@@ -1,0 +1,14 @@
+{
+  "name": "Cash Curry (Restaurant Finance Report)",
+  "short_name": "cash curry",
+  "description": "Multi-branch sales, costs, deposits, salary & loans dashboard.",
+  "start_url": "/login",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0ea5e9",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

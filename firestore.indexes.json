@@ -1,0 +1,82 @@
+{
+  "_comment": "Composite indexes required by Cash Curry v2 Firestore queries. Deploy with: firebase deploy --only firestore:indexes. Keep this file in sync whenever a query adds a new where+orderBy or multi-field filter combo — Firestore will otherwise return FAILED_PRECONDITION at runtime with a link to auto-create the index.",
+  "indexes": [
+    {
+      "_usedBy": "attendanceApiSlice.kioskPunch — finds latest 'in' punch for a staff on a given day before recording an 'out'",
+      "collectionGroup": "attendance",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "staffId", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "ASCENDING" },
+        { "fieldPath": "type", "order": "ASCENDING" },
+        { "fieldPath": "timestamp", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "_usedBy": "requisitionsApiSlice.getRequisitions — list a vendor's requisitions newest first",
+      "collectionGroup": "requisitions",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "vendorId", "order": "ASCENDING" },
+        { "fieldPath": "createdAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "_usedBy": "vendorBillsApiSlice.getVendorBills — filter by vendor + invoiceDate range",
+      "collectionGroup": "vendorBills",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "vendorId", "order": "ASCENDING" },
+        { "fieldPath": "invoiceDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "_usedBy": "vendorBillsApiSlice.getVendorBills — filter by status + invoiceDate range",
+      "collectionGroup": "vendorBills",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "invoiceDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "_usedBy": "vendorBillsApiSlice.getVendorBills — filter by status + vendor + invoiceDate range",
+      "collectionGroup": "vendorBills",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "vendorId", "order": "ASCENDING" },
+        { "fieldPath": "invoiceDate", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "_usedBy": "vendorPaymentsApiSlice.getVendorPayments — vendor + createdAtClient range",
+      "collectionGroup": "vendorPayments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "vendorId", "order": "ASCENDING" },
+        { "fieldPath": "createdAtClient", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "_usedBy": "vendorPaymentsApiSlice.getVendorPayments — method + createdAtClient range",
+      "collectionGroup": "vendorPayments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "paidMethod", "order": "ASCENDING" },
+        { "fieldPath": "createdAtClient", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "_usedBy": "vendorPaymentsApiSlice.getVendorPayments — vendor + method + createdAtClient range",
+      "collectionGroup": "vendorPayments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "vendorId", "order": "ASCENDING" },
+        { "fieldPath": "paidMethod", "order": "ASCENDING" },
+        { "fieldPath": "createdAtClient", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

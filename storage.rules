@@ -1,0 +1,169 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Helper Functions
+    // ─────────────────────────────────────────────────────────────────────────
+
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    function userData() {
+      return firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Handles both legacy lowercase "branchadmin" and canonical "branchAdmin"
+    function isBranchAdmin(u) {
+      return u.role == 'branchAdmin' || u.role == 'branchadmin';
+    }
+
+    // Can the user access files belonging to this company's branch?
+    function canAccessBranch(companyId, branchId) {
+      let u = userData();
+      return isAuth() && u.companyId == companyId && (
+        u.role == 'owner' ||
+        u.branchId == branchId
+      );
+    }
+
+    // Can the user upload? Owner or writer roles on their assigned branch.
+    function canUpload(companyId, branchId) {
+      let u = userData();
+      return isAuth() && u.companyId == companyId && (
+        u.role == 'owner' ||
+        (u.branchId == branchId &&
+          (isBranchAdmin(u) || u.role in ['manager', 'accountant', 'supervisor']))
+      );
+    }
+
+    // Can the user delete? Owner or branchAdmin only.
+    function canDelete(companyId, branchId) {
+      let u = userData();
+      return isAuth() && u.companyId == companyId && (
+        u.role == 'owner' ||
+        (u.branchId == branchId && isBranchAdmin(u))
+      );
+    }
+
+    // Company-level access (not tied to a specific branch)
+    function belongsToCompany(companyId) {
+      let u = userData();
+      return isAuth() && u.companyId == companyId;
+    }
+
+    function canWriteCompanyLevel(companyId) {
+      let u = userData();
+      return isAuth() && u.companyId == companyId && (
+        u.role == 'owner' ||
+        isBranchAdmin(u) ||
+        u.role in ['manager', 'accountant', 'supervisor']
+      );
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Sales Z-Report Images: zReports/{companyId}/{branchId}/{filename}
+    // ─────────────────────────────────────────────────────────────────────────
+    match /zReports/{companyId}/{branchId}/{filename} {
+      allow read: if canAccessBranch(companyId, branchId);
+      allow create, update: if canUpload(companyId, branchId) &&
+        request.resource.size <= 5 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/.*');
+      allow delete: if canDelete(companyId, branchId);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Cost Entry Files: costs/{companyId}/{branchId}/...
+    // Multi-segment wildcard because path includes category/office sub-folders
+    // ─────────────────────────────────────────────────────────────────────────
+    match /costs/{companyId}/{branchId}/{rest=**} {
+      allow read: if canAccessBranch(companyId, branchId);
+      allow create, update: if canUpload(companyId, branchId) &&
+        request.resource.size <= 10 * 1024 * 1024;
+      allow delete: if canDelete(companyId, branchId);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Deposit Entry Receipts: deposits/{companyId}/{branchId}/{filename}
+    // ─────────────────────────────────────────────────────────────────────────
+    match /deposits/{companyId}/{branchId}/{filename} {
+      allow read: if canAccessBranch(companyId, branchId);
+      allow create, update: if canUpload(companyId, branchId) &&
+        request.resource.size <= 10 * 1024 * 1024;
+      allow delete: if canDelete(companyId, branchId);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Cash Withdrawal Receipts: withdrawReceipts/{companyId}/{branchId}/{filename}
+    // ─────────────────────────────────────────────────────────────────────────
+    match /withdrawReceipts/{companyId}/{branchId}/{filename} {
+      allow read: if canAccessBranch(companyId, branchId);
+      allow create, update: if canUpload(companyId, branchId) &&
+        request.resource.size <= 10 * 1024 * 1024;
+      allow delete: if canDelete(companyId, branchId);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Salary Sheets: salarySheets/{companyId}/{branchId}/{filename}
+    // ─────────────────────────────────────────────────────────────────────────
+    match /salarySheets/{companyId}/{branchId}/{filename} {
+      allow read: if canAccessBranch(companyId, branchId);
+      allow create, update: if canUpload(companyId, branchId) &&
+        request.resource.size <= 10 * 1024 * 1024;
+      allow delete: if canDelete(companyId, branchId);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Salary PDFs (generated reports): salaryPDFs/{companyId}/{branchId}/{filename}
+    // ─────────────────────────────────────────────────────────────────────────
+    match /salaryPDFs/{companyId}/{branchId}/{filename} {
+      allow read: if canAccessBranch(companyId, branchId);
+      allow create, update: if canUpload(companyId, branchId) &&
+        request.resource.size <= 10 * 1024 * 1024 &&
+        request.resource.contentType == 'application/pdf';
+      allow delete: if canDelete(companyId, branchId);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Vendor Bills / Invoices: bills/{companyId}/{branchId}/...
+    // Multi-segment because path includes vendorId sub-folder
+    // ─────────────────────────────────────────────────────────────────────────
+    match /bills/{companyId}/{branchId}/{rest=**} {
+      allow read: if canAccessBranch(companyId, branchId);
+      allow create, update: if canUpload(companyId, branchId) &&
+        request.resource.size <= 10 * 1024 * 1024;
+      allow delete: if canDelete(companyId, branchId);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Staff Photos: staffPhotos/{companyId}/{branchId}/{filename}
+    // ─────────────────────────────────────────────────────────────────────────
+    match /staffPhotos/{companyId}/{branchId}/{filename} {
+      allow read: if canAccessBranch(companyId, branchId);
+      allow create, update: if canUpload(companyId, branchId) &&
+        request.resource.size <= 5 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/.*');
+      allow delete: if canDelete(companyId, branchId);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Loan Repayment Receipts: loanRepayments/{companyId}/{segment}/{filename}
+    // Note: segment is "{branchId}_to_{otherId}" — company-level check only
+    // ─────────────────────────────────────────────────────────────────────────
+    match /loanRepayments/{companyId}/{segment}/{filename} {
+      allow read: if belongsToCompany(companyId);
+      allow create, update: if canWriteCompanyLevel(companyId) &&
+        request.resource.size <= 10 * 1024 * 1024;
+      allow delete: if isAuth() && userData().companyId == companyId &&
+        (userData().role == 'owner' || isBranchAdmin(userData()));
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Deny all other paths
+    // ─────────────────────────────────────────────────────────────────────────
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

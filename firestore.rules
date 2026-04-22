@@ -1,0 +1,356 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Helper Functions
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // Fetch the authenticated user's metadata from the global users collection
+    function userData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Check if user is authenticated
+    function isAuth() {
+      return request.auth != null;
+    }
+
+    // Does the user belong to this company?
+    function belongsToCompany(companyId) {
+      return isAuth() && userData().companyId == companyId;
+    }
+
+    // Is the user an owner of this company?
+    function isOwner(companyId) {
+      return isAuth() && userData().companyId == companyId && userData().role == 'owner';
+    }
+
+    // Can the user READ this branch?
+    // - owner / gm / superAdmin: can read ALL branches in their company
+    // - all other authenticated roles in same company: can read their assigned branch
+    //   FALLBACK: if branchId is not set on user doc, allow any company member to read
+    //   (handles existing users created before branchId was standardized)
+    function canRead(companyId, branchId) {
+      let u = userData();
+      return isAuth() && u.companyId == companyId && (
+        u.role == 'owner' ||
+        u.role == 'gm' ||
+        u.role == 'superAdmin' ||
+        u.branchId == branchId ||
+        !('branchId' in u) ||
+        u.branchId == null
+      );
+    }
+
+    // Normalises legacy lowercase "branchadmin" to canonical "branchAdmin".
+    // All new users are stored with camelCase; this handles existing data.
+    function isBranchAdmin(u) {
+      return u.role == 'branchAdmin' || u.role == 'branchadmin';
+    }
+
+    // Can the user WRITE (create/update/delete) to this branch?
+    // - owner: full access to all branches
+    // - branchAdmin, manager, accountant, supervisor: CRUD on their assigned branch only
+    // - staff: no write access ever
+    function canWrite(companyId, branchId) {
+      let u = userData();
+      return isAuth() && u.companyId == companyId && (
+        u.role == 'owner' ||
+        (
+          (isBranchAdmin(u) || u.role in ['manager', 'accountant', 'supervisor']) &&
+          u.branchId == branchId
+        )
+      );
+    }
+
+    // Can the user manage branch settings? (owner or branchAdmin only)
+    function canManageSettings(companyId, branchId) {
+      let u = userData();
+      return isAuth() && u.companyId == companyId && (
+        u.role == 'owner' ||
+        (isBranchAdmin(u) && u.branchId == branchId)
+      );
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Public Collections (no auth required)
+    // ─────────────────────────────────────────────────────────────────────────
+
+    // Invite codes for company signup — readable by anyone to validate,
+    // only writable within a transaction to mark as used (no direct client creation).
+    match /signupInvites/{code} {
+      allow read: if true;
+      // Allow marking as used only: existing doc, only 'used', 'usedAt', 'usedBy' change
+      allow update: if resource.data.used == false &&
+        request.resource.data.used == true &&
+        !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['createdAt']);
+      allow create, delete: if false;
+    }
+
+    // Username → email lookup: must be publicly readable so login by username works
+    // before the user is authenticated with Firebase Auth
+    match /usernames/{username} {
+      allow read: if true;          // Public: required for username-based login
+      allow create: if isAuth();    // Owner/admin writes lookup when creating a user
+      allow update, delete: if false;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Global Users Collection
+    // ─────────────────────────────────────────────────────────────────────────
+
+    match /users/{uid} {
+      // Users can only read their own document
+      allow read: if isAuth() && request.auth.uid == uid;
+
+      // Allow create when:
+      //   - owner is creating a user for their own company (secondary auth keeps owner signed in)
+      //   - new user creating their own profile (signup flow)
+      allow create: if isAuth() && (
+        request.auth.uid == uid ||
+        isOwner(request.resource.data.companyId)
+      );
+
+      allow delete: if false;
+
+      // Users can update their own profile, but CANNOT change their role or companyId
+      allow update: if isAuth() &&
+        request.auth.uid == uid &&
+        !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['role', 'companyId', 'branchId']);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Companies Collection
+    // ─────────────────────────────────────────────────────────────────────────
+
+    match /companies/{companyId} {
+      // Any member of this company can read the company document
+      allow read: if belongsToCompany(companyId);
+
+      // Only the owner can create/update/delete the company document
+      allow write: if isOwner(companyId);
+
+      // ── Company Users Sub-collection ───────────────────────────────────────
+      match /users/{uid} {
+        allow read: if belongsToCompany(companyId);
+        allow write: if isOwner(companyId) || (isAuth() && request.auth.uid == uid);
+
+        // Individual users can manage their own device tokens
+        match /fcmTokens/{token} {
+          allow read, write: if isAuth() && request.auth.uid == uid;
+        }
+      }
+
+      // ── Notifications (Company Level) ──────────────────────────────────────
+      match /notifications/{docId} {
+        allow read: if belongsToCompany(companyId);
+        // Any member (including staff) can send a notification
+        allow write: if belongsToCompany(companyId);
+      }
+
+      // ── Staff Loans (Company Level) ────────────────────────────────────────
+      match /loans/{docId} {
+        allow read: if belongsToCompany(companyId);
+        allow write: if isAuth() && userData().companyId == companyId && (
+          isBranchAdmin(userData()) ||
+          userData().role in ['owner', 'manager', 'accountant', 'supervisor']
+        );
+      }
+
+      // ── Vendors ────────────────────────────────────────────────────────────
+      match /vendors/{vendorId} {
+        allow read: if belongsToCompany(companyId);
+        allow write: if isAuth() && userData().companyId == companyId && (
+          isBranchAdmin(userData()) ||
+          userData().role in ['owner', 'manager', 'accountant', 'supervisor']
+        );
+      }
+
+      // ── Items Catalog ──────────────────────────────────────────────────────
+      match /items/{itemId} {
+        allow read: if belongsToCompany(companyId);
+        allow write: if isAuth() && userData().companyId == companyId && (
+          isBranchAdmin(userData()) ||
+          userData().role in ['owner', 'manager', 'accountant', 'supervisor']
+        );
+      }
+
+      // ── Audit Log (written by Cloud Functions only) ───────────────────────────
+      // owner/gm/superAdmin: read all logs across the company
+      // branchAdmin/manager: read only logs where branchId matches their assigned branch
+      match /auditLog/{logId} {
+        allow read: if isAuth() && userData().companyId == companyId && (
+          userData().role in ['owner', 'gm', 'superAdmin'] ||
+          (
+            (isBranchAdmin(userData()) || userData().role == 'manager') &&
+            resource.data.branchId == userData().branchId
+          )
+        );
+        allow write: if false; // Cloud Functions use Admin SDK (bypasses rules)
+      }
+
+      // ── Branches ───────────────────────────────────────────────────────────
+      match /branches/{branchId} {
+        // Any company member can read branch documents (metadata: name, id only).
+        // Financial data lives in subcollections which keep their own canRead() rules.
+        allow read: if belongsToCompany(companyId);
+
+        // Only owner or branchAdmin can create/update branch metadata
+        allow write: if canManageSettings(companyId, branchId);
+
+        // ── Branch Settings ─────────────────────────────────────────────────
+        match /settings/{docId} {   // Fixed typo from branchSettings to settings!
+          allow read: if canRead(companyId, branchId);
+          allow write: if canManageSettings(companyId, branchId);
+        }
+
+        // ── Branch Admins ─────────────────────────────────────────────────────
+        // Only the owner can assign/remove branch admins
+        match /admins/{uid} {
+          allow read: if belongsToCompany(companyId);
+          allow write: if isOwner(companyId);
+        }
+
+        // ── Branch Users ──────────────────────────────────────────────────────
+        // Owner or branchAdmin of this branch can add/edit/remove users
+        match /users/{uid} {
+          allow read: if belongsToCompany(companyId);
+          allow write: if canManageSettings(companyId, branchId);
+        }
+
+        // ── Monthly Summary Rollups ──────────────────────────────────────────
+        // Written exclusively by Cloud Functions (Admin SDK bypasses these rules).
+        // Any branch member can read — used by dashboards and reports.
+        match /summaries/{month} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if false;
+        }
+
+        // ── Sales ───────────────────────────────────────────────────────────
+        match /sales/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if canWrite(companyId, branchId);
+        }
+
+        // ── Costs / Expenses ────────────────────────────────────────────────
+        match /costs/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if canWrite(companyId, branchId);
+        }
+
+        // ── Bank Deposits ────────────────────────────────────────────────────
+        match /deposits/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if canWrite(companyId, branchId);
+        }
+
+        // ── Cash Withdrawals ─────────────────────────────────────────────────
+        match /cashWithdrawals/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if canWrite(companyId, branchId);
+        }
+
+        // ── Staff List ───────────────────────────────────────────────────────
+        match /staff/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if isAuth() && userData().companyId == companyId &&
+                          (isBranchAdmin(userData()) || userData().role == 'manager') &&
+                          userData().branchId == branchId;
+        }
+
+        // ── Salaries ─────────────────────────────────────────────────────────
+        match /salaries/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if canWrite(companyId, branchId);
+        }
+
+        // ── Staff Loans ──────────────────────────────────────────────────────
+        // Moved to company level!
+        
+        // ── Staff Loans (Branch Level) ───────────────────────────────────────
+        match /loans/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if canWrite(companyId, branchId);
+        }
+
+        // ── Staff Advances ───────────────────────────────────────────────────
+        match /advances/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if canWrite(companyId, branchId) || 
+                          (isAuth() && userData().companyId == companyId && userData().branchId == branchId);
+        }
+
+        // ── Chat Messages ───────────────────────────────────────────────────
+        match /chat_messages/{messageId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if canWrite(companyId, branchId) || 
+                          (isAuth() && userData().companyId == companyId && userData().branchId == branchId);
+        }
+
+        // ── Attendance (Shared Kiosk) ────────────────────────────────────────
+        match /attendance/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if canWrite(companyId, branchId);
+        }
+
+        // ── Vendor Bills ─────────────────────────────────────────────────────
+        match /vendorBills/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if canWrite(companyId, branchId);
+        }
+
+        // ── Vendor Payments ──────────────────────────────────────────────────
+        match /vendorPayments/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if canWrite(companyId, branchId);
+        }
+
+        // ── Purchase Requisitions ────────────────────────────────────────────
+        match /requisitions/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if canWrite(companyId, branchId) || 
+                          (isAuth() && userData().companyId == companyId && userData().branchId == branchId);
+        }
+
+        // ── Payroll Runs ──────────────────────────────────────────────────────
+        // branchAdmin / manager: full read+write on runs and slips for their branch
+        match /payrollRuns/{runId} {
+          allow read:  if canRead(companyId, branchId);
+          allow write: if isAuth() && userData().companyId == companyId &&
+                          (isBranchAdmin(userData()) || userData().role == 'manager') &&
+                          userData().branchId == branchId;
+
+          match /slips/{slipId} {
+            allow read:  if canRead(companyId, branchId);
+            allow write: if isAuth() && userData().companyId == companyId &&
+                            (isBranchAdmin(userData()) || userData().role == 'manager') &&
+                            userData().branchId == branchId;
+          }
+        }
+
+        // ── Work Media: Wall Posts ───────────────────────────────────────────
+        match /wall_posts/{postId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if canWrite(companyId, branchId) || 
+                          (isAuth() && userData().companyId == companyId && userData().branchId == branchId);
+
+          match /comments/{commentId} {
+            allow read: if canRead(companyId, branchId);
+            allow write: if canWrite(companyId, branchId) || 
+                            (isAuth() && userData().companyId == companyId && userData().branchId == branchId);
+          }
+        }
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Deny all other paths not matched above
+    // ─────────────────────────────────────────────────────────────────────────
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

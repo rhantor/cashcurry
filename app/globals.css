@@ -1,0 +1,42 @@
+@import 'tailwindcss';
+
+@theme {
+  /* Palette Name: Mint
+     A fresh, modern, and high-aesthetic palette ranging from crisp ice-mint to deep forest teal.
+  */
+  --color-mint-50: #f0fbf7;
+  --color-mint-100: #d3f4e6;
+  --color-mint-200: #a9e9d1;
+  --color-mint-300: #75d6b8;
+  --color-mint-400: #42bb9c;
+  --color-mint-500: #22a082;
+  --color-mint-600: #158068;
+  --color-mint-700: #126655;
+  --color-mint-800: #125145;
+  --color-mint-900: #10433a;
+  --color-mint-950: #082622;
+
+  /* Semantic Aliases */
+  --color-primary: var(--color-mint-500); /* Vibrant Core Mint */
+  --color-primary-dark: var(--color-mint-600); /* Hover states */
+  --color-primary-light: var(--color-mint-100); /* Background accents */
+  --color-secondary: #ffffff; /* Crisp Whites */
+  --color-accent: var(--color-mint-400); 
+  
+  /* Layout Colors */
+  --color-background: #f8faf9; /* Extremely subtle cool-mint off-white for main bg */
+  --color-surface: #ffffff; /* Clean white cards */
+}
+
+/* Standard Reset & Utility defaults 
+*/
+@layer base {
+  body {
+    background-color: var(--color-background);
+    color: var(--color-mint-900); /* Deep deepest teal for primary text readability */
+  }
+}
+
+button {
+  cursor: pointer;
+}
