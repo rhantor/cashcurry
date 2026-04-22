@@ -9,7 +9,6 @@ import {
   handleShare,
 } from "@/utils/export/exportData";
 import useCurrency from "@/app/hooks/useCurrency";
-import { toBlob } from "html-to-image";
 
 const DEFAULT_TENDERS = [
   { key: "cash", label: "Cash", enabled: true, includeInTotal: true, order: 1 },
@@ -80,14 +79,18 @@ export default function ItemsReportModal({
     if (!reportRef.current || isSharing) return;
     setIsSharing(true);
     try {
-      // Capture the report as a blob using html-to-image
-      const blob = await toBlob(reportRef.current, {
-        cacheBust: true,
+      // Use html-to-image to generate a high-quality PNG
+      const { toPng } = await import("html-to-image");
+      const dataUrl = await toPng(reportRef.current, {
+        quality: 0.95,
+        pixelRatio: 2,
         backgroundColor: "#ffffff",
-        pixelRatio: 2, // High resolution
+        cacheBust: true,
       });
 
-      if (!blob) throw new Error("Image generation failed");
+      // Convert dataUrl to blob for sharing
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
 
       const fileName = `sales-report-${item.date}.png`;
       const file = new File([blob], fileName, { type: "image/png" });
@@ -99,17 +102,16 @@ export default function ItemsReportModal({
           files: [file],
         });
       } else {
-        // Fallback for desktop: trigger download
-        const url = URL.createObjectURL(blob);
+        // Fallback: Download
         const link = document.createElement("a");
-        link.href = url;
+        link.href = dataUrl;
         link.download = fileName;
         link.click();
-        URL.revokeObjectURL(url);
+        alert("Sharing not supported on this browser. The report has been downloaded as an image instead.");
       }
     } catch (err) {
       console.error("Image sharing failed:", err);
-      alert("Failed to generate report image. Please try again.");
+      alert("Failed to generate report image. Please try again or use PDF Export.");
     } finally {
       setIsSharing(false);
     }
@@ -170,13 +172,18 @@ export default function ItemsReportModal({
             {item.zReportUrl && (
               <div className="mt-6 pt-4 border-t border-dashed border-gray-200">
                 <p className="text-xs font-bold text-gray-500 mb-2 uppercase">Z Report Attached:</p>
-                <div className="w-full rounded-lg overflow-hidden border border-gray-100">
+                <div className="w-full rounded-lg overflow-hidden border border-gray-100 relative min-h-[100px] flex items-center justify-center bg-gray-50">
+                  {imgLoading && (
+                    <div className="absolute inset-0 flex items-center justify-center bg-gray-50/80 z-10">
+                      <div className="loader border-t-4 border-mint-500 w-8 h-8 rounded-full animate-spin"></div>
+                    </div>
+                  )}
                   <img
                     src={item.zReportUrl}
                     alt="Z Report Preview"
-                    className="w-full object-contain max-h-[300px]"
+                    className="w-full object-contain max-h-[400px]"
                     onLoad={() => setImgLoading(false)}
-                    crossOrigin="anonymous"
+                    onError={() => setImgLoading(false)}
                   />
                 </div>
               </div>
