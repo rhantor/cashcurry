@@ -270,10 +270,10 @@ export default function SalesEntry() {
   const { canEdit, canDelete, confirmingDelete, setConfirmingDelete, doUpdate, doDelete, updating } = useSalesCrud();
   
   // Fetch this month's sales to compute "Grand Total (This Month)" for the modal
-  const now = new Date();
-  const monthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-    .toISOString().split("T")[0];
+  const selectedMonthStr = date?.slice(0, 7) || new Date().toISOString().slice(0, 7);
+  const [y, m] = selectedMonthStr.split("-");
+  const monthStart = `${selectedMonthStr}-01`;
+  const monthEnd = new Date(y, m, 0).toISOString().split("T")[0];
 
   const { data: sales = [], isLoading: salesLoading, isError: salesError } = useGetSalesEntriesQuery(
     { companyId, branchId, startDate: monthStart, endDate: monthEnd },
