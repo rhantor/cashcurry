@@ -101,6 +101,7 @@ export default function RequestedPanel() {
         companyId,
         branchId,
         id: req.id,
+        user: user,
         data: {
           status: action,
           approvedBy: {
@@ -161,6 +162,7 @@ export default function RequestedPanel() {
           companyId,
           branchId,
           id: req.id,
+          user: user,
           data: {
             status: action,
             approvedBy: {

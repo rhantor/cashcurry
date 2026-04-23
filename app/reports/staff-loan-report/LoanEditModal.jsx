@@ -1,6 +1,7 @@
 /* eslint-disable react/prop-types */
 'use client'
-import { useUpdateStaffLoanMutation } from '@/lib/redux/api/staffLoanApiSlice'
+import { useUpdateStaffLoanMutation, useDeleteStaffLoanMutation } from '@/lib/redux/api/staffLoanApiSlice'
+import { getCurrentUser } from '@/lib/authz/roles'
 import React, { useState, useMemo } from 'react'
 import useCurrency from '@/app/hooks/useCurrency'
 
@@ -27,6 +28,7 @@ export default function LoanEditModal ({
   })
 
   const [updateLoan, { isLoading }] = useUpdateStaffLoanMutation()
+  const [deleteLoan, { isLoading: isDeleting }] = useDeleteStaffLoanMutation()
 
   const handleChange = e => {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
@@ -107,6 +109,7 @@ export default function LoanEditModal ({
         companyId,
         branchId,
         id: item.id,
+        user: getCurrentUser(),
         data: {
           amount: newAmount,
           durationMonths: newDuration,
@@ -124,9 +127,19 @@ export default function LoanEditModal ({
 
       onSuccess?.()
       onClose()
-    } catch (err) {
-      console.error('Failed to update loan:', err)
-      alert('Failed to update loan. Please try again.')
+    }
+  }
+
+  const handleDelete = async () => {
+    if (window.confirm('Are you sure you want to delete this loan entry? This action cannot be undone.')) {
+      try {
+        await deleteLoan({ companyId, branchId, id: item.id, user: getCurrentUser() }).unwrap()
+        onSuccess?.()
+        onClose()
+      } catch (err) {
+        console.error('Failed to delete loan:', err)
+        alert('Failed to delete loan. Please try again.')
+      }
     }
   }
 
@@ -353,26 +366,35 @@ export default function LoanEditModal ({
             )}
           </div>
 
-          {/* Footer */}
-          <div className='sticky bottom-0 bg-gray-50 border-t px-6 py-4 flex justify-end gap-3'>
+          <div className='sticky bottom-0 bg-gray-50 border-t px-6 py-4 flex justify-between items-center'>
             <button
               type='button'
-              onClick={onClose}
-              className='px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium transition-colors'
+              onClick={handleDelete}
+              disabled={isLoading || isDeleting}
+              className='px-4 py-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 text-sm font-medium transition-colors disabled:opacity-50'
             >
-              Cancel
+              {isDeleting ? 'Deleting…' : 'Delete Entry'}
             </button>
-            <button
-              type='submit'
-              disabled={isLoading}
-              className={`px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors ${
-                isLoading
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-blue-600 hover:bg-blue-700'
-              }`}
-            >
-              {isLoading ? 'Saving…' : 'Save Changes'}
-            </button>
+            <div className='flex gap-3'>
+              <button
+                type='button'
+                onClick={onClose}
+                className='px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium transition-colors'
+              >
+                Cancel
+              </button>
+              <button
+                type='submit'
+                disabled={isLoading || isDeleting}
+                className={`px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors ${
+                  isLoading || isDeleting
+                    ? 'bg-gray-400 cursor-not-allowed'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                }`}
+              >
+                {isLoading ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
           </div>
         </form>
       </div>

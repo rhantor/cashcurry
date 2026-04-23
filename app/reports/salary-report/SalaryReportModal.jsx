@@ -61,6 +61,88 @@ export default function SalaryReportModal({ item, branchData, onClose }) {
             </div>
           )}
 
+          {/* Payroll Breakdown (only for payroll source) */}
+          {item.source === 'payroll' && (
+            <div className="mt-4 pt-4 border-t border-dashed space-y-3">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Breakdown</p>
+              
+              <div className="space-y-1">
+                <div className="flex justify-between text-gray-500">
+                  <span>Basic Pay</span>
+                  <span>{item.basePay?.toFixed(2)}</span>
+                </div>
+                {item.allowance > 0 && (
+                  <div className="flex justify-between text-gray-500">
+                    <span>Allowance</span>
+                    <span>{item.allowance.toFixed(2)}</span>
+                  </div>
+                )}
+                {item.otPay > 0 && (
+                  <div className="flex justify-between text-gray-500">
+                    <span>Overtime ({item.otHours}h)</span>
+                    <span>{item.otPay.toFixed(2)}</span>
+                  </div>
+                )}
+                {item.phPay > 0 && (
+                  <div className="flex justify-between text-gray-500">
+                    <span>PH Pay</span>
+                    <span>{item.phPay.toFixed(2)}</span>
+                  </div>
+                )}
+                {item.bonus > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Bonus</span>
+                    <span>{item.bonus.toFixed(2)}</span>
+                  </div>
+                )}
+                {item.otherEarnings > 0 && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Other Earn.</span>
+                    <span>{item.otherEarnings.toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-1 border-t border-gray-50 pt-1">
+                {(item.statutory || []).map(s => (
+                  <div key={s.key} className="flex justify-between text-red-500 text-xs italic">
+                    <span>{s.name} ({s.employeeRate}%)</span>
+                    <span>-{s.employeeAmt.toFixed(2)}</span>
+                  </div>
+                ))}
+                {item.advanceAmt > 0 && (
+                  <div className="flex justify-between text-red-500">
+                    <span>Advance</span>
+                    <span>-{item.advanceAmt.toFixed(2)}</span>
+                  </div>
+                )}
+                {item.loanAmt > 0 && (
+                  <div className="flex justify-between text-red-500">
+                    <span>Loan EMI</span>
+                    <span>-{item.loanAmt.toFixed(2)}</span>
+                  </div>
+                )}
+                {item.penalty > 0 && (
+                  <div className="flex justify-between text-red-500">
+                    <span>Penalty</span>
+                    <span>-{item.penalty.toFixed(2)}</span>
+                  </div>
+                )}
+                {item.otherDeductions > 0 && (
+                  <div className="flex justify-between text-red-500">
+                    <span>Other Ded.</span>
+                    <span>-{item.otherDeductions.toFixed(2)}</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-between font-bold pt-1 text-gray-900">
+                <span>Net Payable</span>
+                <span>{currency} {Number(item.netPay || item.totalSalary).toFixed(2)}</span>
+              </div>
+            </div>
+          )}
+
           <div className="flex justify-between border-t pt-2 mt-2 text-gray-600 text-sm">
             <span>Added By</span>
             <span>{item.createdBy?.username || "Unknown"}</span>

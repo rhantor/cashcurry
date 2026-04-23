@@ -1,17 +1,16 @@
-/* eslint-disable react/prop-types */
 "use client";
 import React, { useEffect, useState } from "react";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import useCurrency from "@/app/hooks/useCurrency";
+import Modal from "@/app/components/common/Modal";
 
 function makeFormatRM(currency) {
-  return (n) => `${currency} ${Number(n || 0).toFixed(2)}`;
+  return (n) => `${currency} ${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 /**
- * Fetches invoiceNo for each billId in the allocations.
- * We resolve sequentially to avoid hammering; feel free to parallelize if needed.
+ * Fetches invoiceNo and invoiceDate for each billId in the allocations.
  */
 async function loadBillInfos({ companyId, branchId, allocations }) {
   const out = [];
@@ -33,8 +32,9 @@ async function loadBillInfos({ companyId, branchId, allocations }) {
           billId,
           amount: Number(amount || 0),
           invoiceNo: b?.invoiceNo || "-",
+          invoiceDate: b?.invoiceDate || "-",
           vendorName: b?.vendorName || "",
-          dueDate: b?.dueDate || "",
+          dueDate: b?.dueDate || "-",
           total: Number(b?.total || 0),
         });
       } else {
@@ -42,8 +42,9 @@ async function loadBillInfos({ companyId, branchId, allocations }) {
           billId,
           amount: Number(amount || 0),
           invoiceNo: "(deleted)",
+          invoiceDate: "-",
           vendorName: "",
-          dueDate: "",
+          dueDate: "-",
           total: 0,
         });
       }
@@ -52,13 +53,30 @@ async function loadBillInfos({ companyId, branchId, allocations }) {
         billId,
         amount: Number(amount || 0),
         invoiceNo: "(error)",
+        invoiceDate: "-",
         vendorName: "",
-        dueDate: "",
+        dueDate: "-",
         total: 0,
       });
     }
   }
   return out;
+}
+
+function formatDate(iso) {
+  if (!iso) return "-";
+  try {
+    const d = new Date(iso);
+    return d.toLocaleDateString(undefined, { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch {
+    return iso;
+  }
 }
 
 export default function PaymentDetailsModal({
@@ -99,109 +117,85 @@ export default function PaymentDetailsModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/30 flex items-center justify-center p-4 z-50">
-      <div className="w-full max-w-2xl bg-white rounded-2xl shadow p-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Payment Details</h2>
-          <button
-            onClick={onClose}
-            className="p-1 rounded-lg hover:bg-gray-100"
-            aria-label="Close"
-          >
-            ✕
-          </button>
-        </div>
-
-        <div className="mt-2 text-sm text-gray-700">
-          <div className="grid md:grid-cols-2 gap-2">
-            <div>
-              <span className="text-gray-500">Vendor: </span>
-              <strong>{payment?.vendorName || "-"}</strong>
+    <Modal title="Payment Details" maxWidth="max-w-3xl" onClose={onClose}>
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-2xl">
+          <div className="space-y-1">
+            <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">Vendor</span>
+            <div className="font-bold text-gray-900">{payment?.vendorName || "-"}</div>
+          </div>
+          <div className="space-y-1">
+            <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">Paid Date</span>
+            <div className="font-bold text-gray-900">{formatDate(payment?.createdISO)}</div>
+          </div>
+          <div className="space-y-1">
+            <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">Office / Method</span>
+            <div className="flex items-center gap-2">
+              <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${payment?.paidFromOffice === 'front' ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-100 text-indigo-700'}`}>
+                {payment?.paidFromOffice || '-'}
+              </span>
+              <span className="px-2 py-0.5 rounded-full text-[10px] bg-gray-200 text-gray-700 font-bold uppercase">
+                {payment?.paidMethod || "-"}
+              </span>
             </div>
-            <div>
-              <span className="text-gray-500">Date: </span>
-              <strong>{payment?.createdISO || "-"}</strong>
-            </div>
-            <div>
-              <span className="text-gray-500">Office: </span>
-              <strong>
-                {payment?.paidFromOffice === "front" ? "Front" : "Back"}
-              </strong>
-            </div>
-            <div>
-              <span className="text-gray-500">Method: </span>
-              <strong>{payment?.paidMethod || "-"}</strong>
-            </div>
-            {payment?.reference ? (
-              <div className="md:col-span-2">
-                <span className="text-gray-500">Reference: </span>
-                <span>{payment.reference}</span>
-              </div>
-            ) : null}
-            {payment?.receiptURL ? (
-              <div className="md:col-span-2">
-                <span className="text-gray-500">Receipt: </span>
-                <a
-                  href={payment.receiptURL}
-                  className="text-mint-600 hover:underline"
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  View
+          </div>
+          <div className="space-y-1">
+            <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">Reference / Receipt</span>
+            <div className="flex items-center gap-3">
+              <span className="font-mono text-sm text-gray-600">{payment?.reference || "-"}</span>
+              {payment?.receiptURL && (
+                <a href={payment.receiptURL} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline font-bold text-xs">
+                  View Receipt
                 </a>
-              </div>
-            ) : null}
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="mt-4 border rounded-lg overflow-hidden">
+        <div className="overflow-hidden border border-gray-100 rounded-2xl shadow-sm">
           <table className="min-w-full text-sm">
-            <thead className="text-left text-gray-600 bg-gray-50">
+            <thead className="bg-gray-50 text-left text-gray-500 font-black uppercase tracking-widest text-[9px]">
               <tr>
-                <th className="py-2 px-3">Invoice</th>
-                <th className="py-2 px-3">Due</th>
-                <th className="py-2 px-3 text-right">Bill Total</th>
-                <th className="py-2 px-3 text-right">Paid Here</th>
+                <th className="px-4 py-3">Invoice #</th>
+                <th className="px-4 py-3">Inv. Date</th>
+                <th className="px-4 py-3">Due Date</th>
+                <th className="px-4 py-3 text-right">Bill Total</th>
+                <th className="px-4 py-3 text-right">Paid Here</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-gray-50">
               {loading ? (
                 <tr>
-                  <td className="py-4 text-center text-gray-500" colSpan={4}>
-                    Loading…
+                  <td colSpan={5} className="px-4 py-8 text-center text-gray-400 animate-pulse font-medium">
+                    Fetching bill details...
                   </td>
                 </tr>
               ) : rows.length ? (
                 rows.map((r) => (
-                  <tr key={r.billId} className="border-t">
-                    <td className="py-2 px-3">{r.invoiceNo}</td>
-                    <td className="py-2 px-3">{r.dueDate || "-"}</td>
-                    <td className="py-2 px-3 text-right">
-                      {formatRM(r.total)}
-                    </td>
-                    <td className="py-2 px-3 text-right">
-                      {formatRM(r.amount)}
-                    </td>
+                  <tr key={r.billId} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="px-4 py-3 font-bold text-gray-900 uppercase font-mono">{r.invoiceNo}</td>
+                    <td className="px-4 py-3 text-gray-600">{r.invoiceDate}</td>
+                    <td className="px-4 py-3 text-gray-600">{r.dueDate}</td>
+                    <td className="px-4 py-3 text-right text-gray-500">{formatRM(r.total)}</td>
+                    <td className="px-4 py-3 text-right font-black text-gray-900">{formatRM(r.amount)}</td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td className="py-4 text-center text-gray-500" colSpan={4}>
+                  <td colSpan={5} className="px-4 py-8 text-center text-gray-400 italic">
                     No allocations recorded.
                   </td>
                 </tr>
               )}
             </tbody>
             {!loading && rows.length > 0 && (
-              <tfoot>
-                <tr className="border-t bg-gray-50">
-                  <td className="py-2 px-3 font-semibold" colSpan={3}>
-                    Total Paid
+              <tfoot className="bg-gray-50 border-t-2 border-gray-100">
+                <tr>
+                  <td colSpan={4} className="px-4 py-3 font-black text-[10px] uppercase tracking-widest text-gray-400">
+                    Total Payment Applied
                   </td>
-                  <td className="py-2 px-3 font-semibold text-right">
-                    {formatRM(
-                      rows.reduce((s, x) => s + Number(x.amount || 0), 0)
-                    )}
+                  <td className="px-4 py-3 text-right font-black text-mint-600 text-base">
+                    {formatRM(rows.reduce((s, x) => s + Number(x.amount || 0), 0))}
                   </td>
                 </tr>
               </tfoot>
@@ -209,6 +203,6 @@ export default function PaymentDetailsModal({
           </table>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

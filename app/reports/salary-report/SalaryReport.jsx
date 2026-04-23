@@ -46,6 +46,18 @@ export default function SalaryReport() {
   // Define Columns
   const columns = [
     {
+      key: "staffName",
+      label: "Staff / Type",
+      render: (val, row) => (
+        <div className="flex flex-col">
+          <span className="font-medium text-gray-800">{val || "Branch Total"}</span>
+          <span className="text-[10px] text-gray-400 uppercase tracking-tight">
+            {row.source === 'payroll' ? 'Individual' : 'Manual Entry'}
+          </span>
+        </div>
+      ),
+    },
+    {
       key: "month",
       label: "Salary Period",
       render: (val) => (
@@ -166,7 +178,7 @@ export default function SalaryReport() {
         columns={columns}
         filterConfig={{
           dateField: "dateForFilter",
-          searchFields: ["createdBy.username", "notes"], // Added notes to search
+          searchFields: ["staffName", "createdBy.username", "notes"], // Added notes to search
         }}
         exportFunctions={{
           exportPDF: (data, branch, type, range, month, q) =>

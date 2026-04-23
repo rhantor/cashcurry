@@ -1,6 +1,7 @@
 /* eslint-disable react/prop-types */
 import React, { useState } from "react";
-import { useUpdateSalaryEntryMutation } from "@/lib/redux/api/salaryApiSlice";
+import { useUpdateSalaryEntryMutation, useDeleteSalaryEntryMutation } from "@/lib/redux/api/salaryApiSlice";
+import { getCurrentUser } from "@/lib/authz/roles";
 import { FaTimes, FaSpinner, FaSave } from "react-icons/fa";
 import useCurrency from "@/app/hooks/useCurrency";
 
@@ -21,6 +22,7 @@ export default function EditSalaryModal({ item, onClose, companyId, branchId }) 
   const [notes, setNotes] = useState(item.notes || "");
   
   const [updateSalaryEntry, { isLoading }] = useUpdateSalaryEntryMutation();
+  const [deleteSalaryEntry, { isLoading: isDeleting }] = useDeleteSalaryEntryMutation();
 
   const handleSave = async () => {
     try {
@@ -37,6 +39,7 @@ export default function EditSalaryModal({ item, onClose, companyId, branchId }) 
         companyId, 
         branchId, 
         entryId: item.id, 
+        user: getCurrentUser(),
         data 
       }).unwrap();
       
@@ -44,6 +47,18 @@ export default function EditSalaryModal({ item, onClose, companyId, branchId }) 
     } catch (error) {
       console.error("Failed to update salary:", error);
       alert("Failed to update. Please try again.");
+    }
+  };
+
+  const handleDelete = async () => {
+    if (window.confirm("Are you sure you want to delete this salary entry? This action cannot be undone.")) {
+      try {
+        await deleteSalaryEntry({ companyId, branchId, salaryId: item.id, user: getCurrentUser() }).unwrap();
+        onClose();
+      } catch (error) {
+        console.error("Failed to delete salary:", error);
+        alert("Failed to delete. Please try again.");
+      }
     }
   };
 
@@ -125,22 +140,30 @@ export default function EditSalaryModal({ item, onClose, companyId, branchId }) 
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="bg-gray-50 px-6 py-4 flex justify-end gap-3">
+        <div className="bg-gray-50 px-6 py-4 flex justify-between items-center">
           <button 
-            onClick={onClose}
-            className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
+            onClick={handleDelete}
+            disabled={isLoading || isDeleting}
+            className="text-xs font-bold text-red-500 hover:text-red-700 uppercase tracking-wider disabled:opacity-50"
           >
-            Cancel
+            {isDeleting ? "Deleting..." : "Delete Entry"}
           </button>
-          <button 
-            onClick={handleSave}
-            disabled={isLoading}
-            className="flex items-center gap-2 px-6 py-2 text-sm font-medium text-white bg-mint-500 hover:bg-mint-600 rounded-lg shadow-sm transition-all disabled:opacity-50"
-          >
-            {isLoading ? <FaSpinner className="animate-spin" /> : <FaSave />}
-            <span>Save Changes</span>
-          </button>
+          <div className="flex gap-3">
+            <button 
+              onClick={onClose}
+              className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200 rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button 
+              onClick={handleSave}
+              disabled={isLoading || isDeleting}
+              className="flex items-center gap-2 px-6 py-2 text-sm font-medium text-white bg-mint-500 hover:bg-mint-600 rounded-lg shadow-sm transition-all disabled:opacity-50"
+            >
+              {isLoading ? <FaSpinner className="animate-spin" /> : <FaSave />}
+              <span>Save Changes</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

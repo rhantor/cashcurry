@@ -257,13 +257,19 @@ export function PayrollSummaryTable ({ slips, branchName, companyName, period, r
     loanAmt:        (acc.loanAmt        || 0) + (s.loanAmt        || 0),
     otherEarnings:  (acc.otherEarnings  || 0) + (s.otherEarnings  || 0),
     otherDeductions:(acc.otherDeductions|| 0) + (s.otherDeductions|| 0),
+    bonus:          (acc.bonus          || 0) + (s.bonus          || 0),
+    phPay:          (acc.phPay          || 0) + (s.phPay          || 0),
+    penalty:        (acc.penalty        || 0) + (s.penalty        || 0),
   }), {})
 
   const showOT      = totals.otPay          > 0
+  const showPH      = totals.phPay          > 0
+  const showBonus   = totals.bonus          > 0
   const showAdvance = totals.advanceAmt     > 0
   const showLoan    = totals.loanAmt        > 0
   const showOtherE  = totals.otherEarnings  > 0
   const showOtherD  = totals.otherDeductions > 0
+  const showPenalty = totals.penalty         > 0
 
   // Department grouping
   const deptMap = {}
@@ -281,10 +287,13 @@ export function PayrollSummaryTable ({ slips, branchName, companyName, period, r
     grand.workedHours     += s.workedHours     || 0
     grand.otHours         += s.otHours         || 0
     grand.otPay           += s.otPay           || 0
+    grand.phPay           += s.phPay           || 0
     grand.allowance       += s.allowance       || 0
+    grand.bonus           += s.bonus           || 0
     grand.advanceAmt      += s.advanceAmt      || 0
     grand.loanAmt         += s.loanAmt         || 0
     grand.otherEarnings   += s.otherEarnings   || 0
+    grand.penalty         += s.penalty         || 0
     grand.otherDeductions += s.otherDeductions || 0
     grand.grossEarnings   += s.grossEarnings   || 0
     grand.netPay          += s.netPay          || 0
@@ -311,11 +320,14 @@ export function PayrollSummaryTable ({ slips, branchName, companyName, period, r
         <td style={TD({ textAlign:'right' })}>{fmtAmt(data.otHours||0)}</td>
         <td style={TD({ textAlign:'right' })}>{currency} {fmtAmt(data.otPay||0)}</td>
       </>}
+      {showPH && <td style={TD({ textAlign:'right' })}>{currency} {fmtAmt(data.phPay||0)}</td>}
       <td style={TD({ textAlign:'right' })}>{data.allowance>0?`${currency} ${fmtAmt(data.allowance)}`:'—'}</td>
+      {showBonus && <td style={TD({ textAlign:'right', color:'#166534' })}>{data.bonus>0?`${currency} ${fmtAmt(data.bonus)}`:'—'}</td>}
       {statKeys.map(k=><td key={k} style={TD({ textAlign:'right', color:'#991b1b' })}>{data.stat?.[k]>0?`${currency} ${fmtAmt(data.stat[k])}`:'—'}</td>)}
       {showAdvance && <td style={TD({ textAlign:'right', color:'#991b1b' })}>{data.advanceAmt>0?`${currency} ${fmtAmt(data.advanceAmt)}`:'—'}</td>}
       {showLoan    && <td style={TD({ textAlign:'right', color:'#991b1b' })}>{data.loanAmt>0?`${currency} ${fmtAmt(data.loanAmt)}`:'—'}</td>}
       {showOtherE  && <td style={TD({ textAlign:'right', color:'#166534' })}>{data.otherEarnings>0?`${currency} ${fmtAmt(data.otherEarnings)}`:'—'}</td>}
+      {showPenalty && <td style={TD({ textAlign:'right', color:'#991b1b' })}>{data.penalty>0?`${currency} ${fmtAmt(data.penalty)}`:'—'}</td>}
       {showOtherD  && <td style={TD({ textAlign:'right', color:'#991b1b' })}>{data.otherDeductions>0?`${currency} ${fmtAmt(data.otherDeductions)}`:'—'}</td>}
       <td style={TD({ textAlign:'right', fontWeight:700 })}>{currency} {fmtAmt(data.grossEarnings||0)}</td>
       <td style={TD({ textAlign:'right', fontWeight:700, color:'#166534' })}>{currency} {fmtAmt(data.netPay||0)}</td>
@@ -347,12 +359,15 @@ export function PayrollSummaryTable ({ slips, branchName, companyName, period, r
             <th style={TH()}>Basic Pay</th>
             <th style={TH()}>Work Hrs</th>
             {showOT && <th colSpan={2} style={TH()}>Overtime</th>}
+            {showPH && <th style={TH()}>PH Pay</th>}
             <th style={TH()}>Allowance</th>
+            {showBonus && <th style={TH({ color:'#166534' })}>Bonus</th>}
             {statKeys.map(k=><th key={k} style={TH({ color:'#991b1b' })}>{statNames[k]}</th>)}
             {showAdvance && <th style={TH({ color:'#991b1b' })}>Advance</th>}
             {showLoan    && <th style={TH({ color:'#991b1b' })}>Loan</th>}
             {showOtherE  && <th style={TH({ color:'#166534' })}>Other Earn.</th>}
-            {showOtherD  && <th style={TH({ color:'#991b1b' })}>Penalty/Ded.</th>}
+            {showPenalty && <th style={TH({ color:'#991b1b' })}>Penalty</th>}
+            {showOtherD  && <th style={TH({ color:'#991b1b' })}>Deduction</th>}
             <th style={TH({ fontWeight:800 })}>Total Salary</th>
             <th style={TH({ fontWeight:800, color:'#166534' })}>Net Pay</th>
             <th style={TH({ textAlign:'left' })}>Remarks</th>
@@ -368,11 +383,14 @@ export function PayrollSummaryTable ({ slips, branchName, companyName, period, r
               <th style={TH({ textAlign:'right', fontSize:7.5 })}>OT hrs</th>
               <th style={TH({ textAlign:'right' })}>OT Pay</th>
             </>}
+            {showPH && <th style={TH({ textAlign:'right' })}>{currency}</th>}
             <th style={TH({ textAlign:'right' })}>{currency}</th>
+            {showBonus && <th style={TH({ textAlign:'right', color:'#166534' })}>{currency}</th>}
             {statKeys.map(k=><th key={k} style={TH({ textAlign:'right', color:'#991b1b' })}>{currency}</th>)}
             {showAdvance && <th style={TH({ textAlign:'right', color:'#991b1b' })}>{currency}</th>}
             {showLoan    && <th style={TH({ textAlign:'right', color:'#991b1b' })}>{currency}</th>}
             {showOtherE  && <th style={TH({ textAlign:'right', color:'#166534' })}>{currency}</th>}
+            {showPenalty && <th style={TH({ textAlign:'right', color:'#991b1b' })}>{currency}</th>}
             {showOtherD  && <th style={TH({ textAlign:'right', color:'#991b1b' })}>{currency}</th>}
             <th style={TH({ textAlign:'right', fontWeight:800 })}>{currency}</th>
             <th style={TH({ textAlign:'right', fontWeight:800, color:'#166534' })}>{currency}</th>
@@ -387,6 +405,7 @@ export function PayrollSummaryTable ({ slips, branchName, companyName, period, r
               dt.basePay+=s.basePay||0; dt.workedHours+=s.workedHours||0; dt.otHours+=s.otHours||0; dt.otPay+=s.otPay||0
               dt.allowance+=s.allowance||0; dt.advanceAmt+=s.advanceAmt||0; dt.loanAmt+=s.loanAmt||0
               dt.otherEarnings+=s.otherEarnings||0; dt.otherDeductions+=s.otherDeductions||0
+              dt.bonus+=s.bonus||0; dt.phPay+=s.phPay||0; dt.penalty+=s.penalty||0
               dt.grossEarnings+=s.grossEarnings||0; dt.netPay+=s.netPay||0
               for (const k of statKeys) {
                 const f=(s.statutory||[]).find(x=>x.key===k)
@@ -405,7 +424,6 @@ export function PayrollSummaryTable ({ slips, branchName, companyName, period, r
                   const isH = s.salaryMode === 'hours'
                   const remarks = [
                     s.loanAmt > 0 && `Loan: ${currency} ${fmtAmt(s.loanAmt)}`,
-                    s.advanceAmt > 0 && `Advance: ${currency} ${fmtAmt(s.advanceAmt)}`,
                     s.otherDeductionsNote && s.otherDeductions > 0 && s.otherDeductionsNote,
                     s.otherEarningsNote   && s.otherEarnings   > 0 && s.otherEarningsNote,
                   ].filter(Boolean).join(' | ')
@@ -420,7 +438,9 @@ export function PayrollSummaryTable ({ slips, branchName, companyName, period, r
                         <td style={TD({ textAlign:'right', color:s.otHours>0?'#92400e':'#94a3b8' })}>{fmtAmt(s.otHours||0)}</td>
                         <td style={TD({ textAlign:'right', color:s.otPay>0?'#92400e':'#94a3b8' })}>{s.otPay>0?`${currency} ${fmtAmt(s.otPay)}`:'—'}</td>
                       </>}
+                      {showPH && <td style={TD({ textAlign:'right', color:s.phPay>0?'#1e293b':'#94a3b8' })}>{s.phPay>0?`${currency} ${fmtAmt(s.phPay)}`:'—'}</td>}
                       <td style={TD({ textAlign:'right', color:s.allowance>0?'#1e293b':'#94a3b8' })}>{s.allowance>0?`${currency} ${fmtAmt(s.allowance)}`:'—'}</td>
+                      {showBonus && <td style={TD({ textAlign:'right', color:s.bonus>0?'#166534':'#94a3b8' })}>{s.bonus>0?`${currency} ${fmtAmt(s.bonus)}`:'—'}</td>}
                       {statKeys.map(k=>{
                         const f=(s.statutory||[]).find(x=>x.key===k)
                         return <td key={k} style={TD({ textAlign:'right', color:f?.employeeAmt>0?'#991b1b':'#94a3b8' })}>{f?.employeeAmt>0?fmtAmt(f.employeeAmt):'—'}</td>
@@ -428,6 +448,7 @@ export function PayrollSummaryTable ({ slips, branchName, companyName, period, r
                       {showAdvance&&<td style={TD({ textAlign:'right', color:s.advanceAmt>0?'#991b1b':'#94a3b8' })}>{s.advanceAmt>0?`${currency} ${fmtAmt(s.advanceAmt)}`:'—'}</td>}
                       {showLoan&&<td style={TD({ textAlign:'right', color:s.loanAmt>0?'#991b1b':'#94a3b8' })}>{s.loanAmt>0?`${currency} ${fmtAmt(s.loanAmt)}`:'—'}</td>}
                       {showOtherE&&<td style={TD({ textAlign:'right', color:s.otherEarnings>0?'#166534':'#94a3b8' })}>{s.otherEarnings>0?`${currency} ${fmtAmt(s.otherEarnings)}`:'—'}</td>}
+                      {showPenalty&&<td style={TD({ textAlign:'right', color:s.penalty>0?'#991b1b':'#94a3b8' })}>{s.penalty>0?`${currency} ${fmtAmt(s.penalty)}`:'—'}</td>}
                       {showOtherD&&<td style={TD({ textAlign:'right', color:s.otherDeductions>0?'#991b1b':'#94a3b8' })}>{s.otherDeductions>0?`${currency} ${fmtAmt(s.otherDeductions)}`:'—'}</td>}
                       <td style={TD({ textAlign:'right', fontWeight:600 })}>{currency} {fmtAmt(s.grossEarnings)}</td>
                       <td style={TD({ textAlign:'right', fontWeight:700, color:'#166534' })}>{currency} {fmtAmt(s.netPay)}</td>
@@ -527,10 +548,13 @@ export function ScreenPreviewSingle ({ slip, period, branchName }) {
 
 export function ScreenPreviewAll ({ slips, period, branchName, status }) {
   const totals = slips.reduce((a,s)=>({
-    gross:a.gross+(s.grossEarnings||0), ded:a.ded+(s.totalDeductions||0), net:a.net+(s.netPay||0),
-    allowance:a.allowance+(s.allowance||0), otPay:a.otPay+(s.otPay||0), otherEarnings:a.otherEarnings+(s.otherEarnings||0),
-  }),{gross:0,ded:0,net:0,allowance:0,otPay:0,otherEarnings:0})
-  const showAllowance=totals.allowance>0, showOT=totals.otPay>0, showOtherE=totals.otherEarnings>0
+    basePay:a.basePay+(s.basePay||0), gross:a.gross+(s.grossEarnings||0), ded:a.ded+(s.totalDeductions||0), net:a.net+(s.netPay||0),
+    allowance:a.allowance+(s.allowance||0), otPay:a.otPay+(s.otPay||0), phPay:a.phPay+(s.phPay||0), bonus:a.bonus+(s.bonus||0),
+    otherEarnings:a.otherEarnings+(s.otherEarnings||0), advanceAmt:a.advanceAmt+(s.advanceAmt||0), loanAmt:a.loanAmt+(s.loanAmt||0),
+    penalty:a.penalty+(s.penalty||0), otherDeductions:a.otherDeductions+(s.otherDeductions||0),
+  }),{basePay:0,gross:0,ded:0,net:0,allowance:0,otPay:0,phPay:0,bonus:0,otherEarnings:0,advanceAmt:0,loanAmt:0,penalty:0,otherDeductions:0})
+  const showAllowance=totals.allowance>0, showOT=totals.otPay>0, showPH=totals.phPay>0, showBonus=totals.bonus>0, showOtherE=totals.otherEarnings>0
+  const showAdvance=totals.advanceAmt>0, showLoan=totals.loanAmt>0, showPenalty=totals.penalty>0, showOtherD=totals.otherDeductions>0
   return (
     <div className='bg-white rounded-xl border border-gray-200 overflow-hidden text-xs'>
       <div className='flex justify-between items-center px-4 py-3 border-b'>
@@ -547,9 +571,15 @@ export function ScreenPreviewAll ({ slips, period, branchName, status }) {
             <th className='px-3 py-2 text-right'>Basic</th>
             {showAllowance&&<th className='px-3 py-2 text-right'>Allowance</th>}
             {showOT&&<th className='px-3 py-2 text-right'>OT</th>}
+            {showPH&&<th className='px-3 py-2 text-right'>PH</th>}
+            {showBonus&&<th className='px-3 py-2 text-right'>Bonus</th>}
             {showOtherE&&<th className='px-3 py-2 text-right'>Other</th>}
-            <th className='px-3 py-2 text-right'>Gross</th>
-            <th className='px-3 py-2 text-right'>Deductions</th>
+            {showAdvance&&<th className='px-3 py-2 text-right'>Advance</th>}
+            {showLoan&&<th className='px-3 py-2 text-right'>Loan</th>}
+            {showPenalty&&<th className='px-3 py-2 text-right'>Penalty</th>}
+            {showOtherD&&<th className='px-3 py-2 text-right'>Deduction</th>}
+            <th className='px-3 py-2 text-right font-semibold text-gray-700'>Gross</th>
+            <th className='px-3 py-2 text-right'>Total Ded.</th>
             <th className='px-3 py-2 text-right font-bold'>Net Pay</th>
           </tr>
         </thead>
@@ -560,7 +590,13 @@ export function ScreenPreviewAll ({ slips, period, branchName, status }) {
               <td className='px-3 py-2 text-right text-gray-600'>{fmtAmt(s.basePay)}</td>
               {showAllowance&&<td className='px-3 py-2 text-right text-gray-600'>{fmtAmt(s.allowance||0)}</td>}
               {showOT&&<td className='px-3 py-2 text-right text-gray-600'>{fmtAmt(s.otPay||0)}</td>}
+              {showPH&&<td className='px-3 py-2 text-right text-gray-600'>{fmtAmt(s.phPay||0)}</td>}
+              {showBonus&&<td className='px-3 py-2 text-right text-green-600'>{fmtAmt(s.bonus||0)}</td>}
               {showOtherE&&<td className='px-3 py-2 text-right text-gray-600'>{fmtAmt(s.otherEarnings||0)}</td>}
+              {showAdvance&&<td className='px-3 py-2 text-right text-red-600'>{fmtAmt(s.advanceAmt||0)}</td>}
+              {showLoan&&<td className='px-3 py-2 text-right text-red-600'>{fmtAmt(s.loanAmt||0)}</td>}
+              {showPenalty&&<td className='px-3 py-2 text-right text-red-600'>{fmtAmt(s.penalty||0)}</td>}
+              {showOtherD&&<td className='px-3 py-2 text-right text-red-600'>{fmtAmt(s.otherDeductions||0)}</td>}
               <td className='px-3 py-2 text-right font-semibold'>{fmtAmt(s.grossEarnings)}</td>
               <td className='px-3 py-2 text-right text-red-600'>{fmtAmt(s.totalDeductions)}</td>
               <td className='px-3 py-2 text-right font-bold text-green-700'>{fmtAmt(s.netPay)}</td>
@@ -570,10 +606,16 @@ export function ScreenPreviewAll ({ slips, period, branchName, status }) {
         <tfoot className='border-t-2 border-gray-300 bg-gray-50'>
           <tr>
             <td className='px-3 py-2 font-bold'>Total ({slips.length})</td>
-            <td className='px-3 py-2 text-right font-semibold'>{fmtAmt(totals.gross-(totals.allowance+totals.otPay+totals.otherEarnings))}</td>
+            <td className='px-3 py-2 text-right font-semibold'>{fmtAmt(totals.basePay)}</td>
             {showAllowance&&<td className='px-3 py-2 text-right'>{fmtAmt(totals.allowance)}</td>}
             {showOT&&<td className='px-3 py-2 text-right'>{fmtAmt(totals.otPay)}</td>}
+            {showPH&&<td className='px-3 py-2 text-right'>{fmtAmt(totals.phPay)}</td>}
+            {showBonus&&<td className='px-3 py-2 text-right'>{fmtAmt(totals.bonus)}</td>}
             {showOtherE&&<td className='px-3 py-2 text-right'>{fmtAmt(totals.otherEarnings)}</td>}
+            {showAdvance&&<td className='px-3 py-2 text-right'>{fmtAmt(totals.advanceAmt)}</td>}
+            {showLoan&&<td className='px-3 py-2 text-right'>{fmtAmt(totals.loanAmt)}</td>}
+            {showPenalty&&<td className='px-3 py-2 text-right'>{fmtAmt(totals.penalty)}</td>}
+            {showOtherD&&<td className='px-3 py-2 text-right'>{fmtAmt(totals.otherDeductions)}</td>}
             <td className='px-3 py-2 text-right font-bold'>{fmtAmt(totals.gross)}</td>
             <td className='px-3 py-2 text-right text-red-600 font-semibold'>{fmtAmt(totals.ded)}</td>
             <td className='px-3 py-2 text-right font-bold text-green-700'>{fmtAmt(totals.net)}</td>

@@ -477,7 +477,7 @@ export default function PaymentsPage() {
         <table className="min-w-full text-sm">
           <thead className="text-left text-gray-600">
             <tr>
-              <th className="py-2">Date</th>
+              <th className="py-2">Paid Date</th>
               <th className="py-2">Vendor</th>
               <th className="py-2">Bills</th>
               <th className="py-2">Office</th>

@@ -29,10 +29,14 @@ function buildCols (slips) {
     loanAmt:        (a.loanAmt        || 0) + (s.loanAmt        || 0),
     otherEarnings:  (a.otherEarnings  || 0) + (s.otherEarnings  || 0),
     otherDeductions:(a.otherDeductions|| 0) + (s.otherDeductions|| 0),
+    bonus:          (a.bonus          || 0) + (s.bonus          || 0),
+    phPay:          (a.phPay          || 0) + (s.phPay          || 0),
   }), {})
   return {
     statKeys, statNames,
     showOT:      tot.otPay          > 0,
+    showPH:      tot.phPay          > 0,
+    showBonus:   tot.bonus          > 0,
     showAdvance: tot.advanceAmt     > 0,
     showLoan:    tot.loanAmt        > 0,
     showOtherE:  tot.otherEarnings  > 0,
@@ -44,7 +48,9 @@ function buildCols (slips) {
 function buildHeaders (cols) {
   const h = ['#', 'Name', 'Designation', 'Basic Pay', 'Work Hrs']
   if (cols.showOT) { h.push('OT Hrs'); h.push('OT Pay') }
+  if (cols.showPH) h.push('PH Pay')
   h.push('Allowance')
+  if (cols.showBonus) h.push('Bonus')
   cols.statKeys.forEach(k => h.push(cols.statNames[k]))
   if (cols.showAdvance) h.push('Advance')
   if (cols.showLoan)    h.push('Loan')
@@ -60,7 +66,6 @@ function buildRow (s, idx, cols) {
   const isH = s.salaryMode === 'hours'
   const remarks = [
     s.loanAmt > 0 && `Loan: ${RM(s.loanAmt)}`,
-    s.advanceAmt > 0 && `Advance: ${RM(s.advanceAmt)}`,
     s.otherDeductionsNote && s.otherDeductions > 0 && s.otherDeductionsNote,
     s.otherEarningsNote   && s.otherEarnings   > 0 && s.otherEarningsNote,
   ].filter(Boolean).join(' | ')
@@ -73,7 +78,9 @@ function buildRow (s, idx, cols) {
     isH ? n2(s.workedHours) : `${s.workedDays || 0}d`,
   ]
   if (cols.showOT) { row.push(n2(s.otHours || 0)); row.push(n2(s.otPay || 0)) }
+  if (cols.showPH) row.push(n2(s.phPay || 0))
   row.push(dash(s.allowance))
+  if (cols.showBonus) row.push(dash(s.bonus))
   cols.statKeys.forEach(k => {
     const f = (s.statutory || []).find(x => x.key === k)
     row.push(dash(f?.employeeAmt))
@@ -91,7 +98,9 @@ function buildRow (s, idx, cols) {
 function buildTotalRow (label, data, cols) {
   const row = ['', label, '', n2(data.basePay), n2(data.workedHours)]
   if (cols.showOT) { row.push(n2(data.otHours)); row.push(n2(data.otPay)) }
+  if (cols.showPH) row.push(n2(data.phPay || 0))
   row.push(n2(data.allowance))
+  if (cols.showBonus) row.push(n2(data.bonus || 0))
   cols.statKeys.forEach(k => row.push(n2(data.stat?.[k] || 0)))
   if (cols.showAdvance) row.push(n2(data.advanceAmt))
   if (cols.showLoan)    row.push(n2(data.loanAmt))
@@ -151,6 +160,7 @@ export function exportPayrollToPDF (slips = [], branchName = '', period = '', ru
         dt.basePay+=s.basePay||0; dt.workedHours+=s.workedHours||0; dt.otHours+=s.otHours||0; dt.otPay+=s.otPay||0
         dt.allowance+=s.allowance||0; dt.advanceAmt+=s.advanceAmt||0; dt.loanAmt+=s.loanAmt||0
         dt.otherEarnings+=s.otherEarnings||0; dt.otherDeductions+=s.otherDeductions||0
+        dt.bonus+=s.bonus||0; dt.phPay+=s.phPay||0
         dt.grossEarnings+=s.grossEarnings||0; dt.netPay+=s.netPay||0
         for (const k of cols.statKeys) {
           const f=(s.statutory||[]).find(x=>x.key===k)
@@ -386,6 +396,7 @@ export function exportPayrollToExcel (slips = [], branchName = '', period = '', 
         dt.basePay+=s.basePay||0; dt.workedHours+=s.workedHours||0; dt.otHours+=s.otHours||0; dt.otPay+=s.otPay||0
         dt.allowance+=s.allowance||0; dt.advanceAmt+=s.advanceAmt||0; dt.loanAmt+=s.loanAmt||0
         dt.otherEarnings+=s.otherEarnings||0; dt.otherDeductions+=s.otherDeductions||0
+        dt.bonus+=s.bonus||0; dt.phPay+=s.phPay||0
         dt.grossEarnings+=s.grossEarnings||0; dt.netPay+=s.netPay||0
         for (const k of cols.statKeys) {
           const f=(s.statutory||[]).find(x=>x.key===k)
@@ -398,6 +409,7 @@ export function exportPayrollToExcel (slips = [], branchName = '', period = '', 
       grandData.basePay+=dt.basePay; grandData.workedHours+=dt.workedHours; grandData.otHours+=dt.otHours; grandData.otPay+=dt.otPay
       grandData.allowance+=dt.allowance; grandData.advanceAmt+=dt.advanceAmt; grandData.loanAmt+=dt.loanAmt
       grandData.otherEarnings+=dt.otherEarnings; grandData.otherDeductions+=dt.otherDeductions
+      grandData.bonus+=dt.bonus; grandData.phPay+=dt.phPay
       grandData.grossEarnings+=dt.grossEarnings; grandData.netPay+=dt.netPay
       for (const k of cols.statKeys) grandData.stat[k]=(grandData.stat[k]||0)+(dt.stat[k]||0)
     })

@@ -1,6 +1,8 @@
 "use client";
 import React, { useState } from "react";
 import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { skipToken } from "@reduxjs/toolkit/query";
 import {
   useGetVendorsQuery,
@@ -11,13 +13,15 @@ import {
 import Modal from "@/app/components/common/Modal";
 import Input from "@/app/components/common/Input";
 import Button from "@/app/components/common/Button";
-import useCompanyId from "@/utils/useCompanyId";
+import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
 import useCurrency from "@/app/hooks/useCurrency";
 import VendorTable from "./VendorTable";
 import SyncVendorMetrics from "./SyncVendorMetrics";
+import VendorPaidBills from "./VendorPaidBills";
+import VendorUnpaidBills from "./VendorUnpaidBills";
 
 export default function VendorsPage() {
-  const companyId = useCompanyId();
+  const { companyId, branchId } = useResolvedCompanyBranch();
   const currency = useCurrency();
   const args = companyId ? { companyId } : skipToken;
 
@@ -58,6 +62,7 @@ export default function VendorsPage() {
   // View modal state
   const [viewOpen, setViewOpen] = useState(false);
   const [viewData, setViewData] = useState(null);
+  const [viewTab, setViewTab] = useState("overview"); // "overview" | "unpaid" | "paid"
 
   const handleSaveNew = async () => {
     if (!addForm.name?.trim()) return alert("Please enter vendor name");
@@ -98,6 +103,7 @@ export default function VendorsPage() {
 
   const handleOpenView = (v) => {
     setViewData(v);
+    setViewTab("overview");
     setViewOpen(true);
   };
 
@@ -220,6 +226,41 @@ export default function VendorsPage() {
     }
   };
 
+  const handleExportPDFMain = () => {
+    if (!vendors?.length) return alert("No vendors to export");
+    const doc = new jsPDF();
+    
+    doc.setFontSize(20);
+    doc.text("Vendor Financial Directory", 14, 22);
+    
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 30);
+    
+    const tableData = vendors.map((v, i) => [
+      i + 1,
+      v.name || "-",
+      v.code || "-",
+      v.phone || "-",
+      currency + " " + (v.totalBilled || 0).toLocaleString(),
+      currency + " " + (v.currentBalance || 0).toLocaleString()
+    ]);
+    
+    autoTable(doc, {
+      startY: 40,
+      head: [["#", "Vendor Name", "Code", "Phone", "Total Billed", "AP Balance"]],
+      body: tableData,
+      theme: 'striped',
+      headStyles: { fillColor: [16, 185, 129] },
+      columnStyles: {
+        4: { halign: 'right' },
+        5: { halign: 'right' }
+      }
+    });
+    
+    doc.save(`Vendor_Directory_${Date.now()}.pdf`);
+  };
+
   return (
     <div className="p-4 md:p-8 bg-gray-50/50 min-h-screen">
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -229,19 +270,22 @@ export default function VendorsPage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <div className="hidden sm:flex items-center gap-2 mr-2">
-            <Button onClick={() => handleExportExcel('directory')} className="bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 text-xs shadow-sm" disabled={!vendors?.length}>
-              Directory
+            <Button onClick={() => handleExportExcel('directory')} className="bg-white border border-gray-200 !text-black font-bold hover:bg-gray-50 text-xs shadow-sm" disabled={!vendors?.length}>
+              Excel Directory
             </Button>
-            <Button onClick={() => handleExportExcel('full')} className="bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 text-xs shadow-sm" disabled={!vendors?.length}>
-              Financials
+            <Button onClick={() => handleExportExcel('full')} className="bg-white border border-gray-200 !text-black font-bold hover:bg-gray-50 text-xs shadow-sm" disabled={!vendors?.length}>
+              Excel Financials
+            </Button>
+            <Button onClick={handleExportPDFMain} className="bg-white border border-gray-200 !text-black font-bold hover:bg-gray-50 text-xs shadow-sm" disabled={!vendors?.length}>
+              PDF Report
             </Button>
           </div>
           <Button onClick={() => setOpenAdd(true)} disabled={!companyId || busy} className="bg-mint-500 hover:bg-mint-600 text-white shadow-md shadow-mint-100 flex-1 sm:flex-none">
             + Add Vendor
           </Button>
           <div className="sm:hidden flex w-full gap-2 mt-1">
-             <Button onClick={() => handleExportExcel('directory')} className="bg-gray-100 text-gray-600 flex-1 text-[10px]" disabled={!vendors?.length}>Export Directory</Button>
-             <Button onClick={() => handleExportExcel('full')} className="bg-gray-100 text-gray-600 flex-1 text-[10px]" disabled={!vendors?.length}>Export w/ Finance</Button>
+             <Button onClick={() => handleExportExcel('directory')} className="bg-gray-100 !text-black font-bold flex-1 text-[10px]" disabled={!vendors?.length}>Export Directory</Button>
+             <Button onClick={() => handleExportExcel('full')} className="bg-gray-100 !text-black font-bold flex-1 text-[10px]" disabled={!vendors?.length}>Export w/ Finance</Button>
           </div>
         </div>
       </div>
@@ -297,112 +341,162 @@ export default function VendorsPage() {
       {/* View Vendor Modal */}
       {viewOpen && viewData && (
         <Modal title="Vendor Details" maxWidth="max-w-2xl" onClose={() => setViewOpen(false)}>
-          <div className="space-y-8 max-h-[75vh] overflow-y-auto px-1">
-            <section>
-              <h3 className="text-xs font-black text-mint-600 uppercase tracking-widest mb-4 flex items-center gap-2">
-                <span className="w-4 h-[2px] bg-mint-500"></span>
-                Basic Information
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div>
-                  <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-widest mb-1">Vendor Name</span>
-                  <span className="font-bold text-gray-900 text-base">{viewData.name || "-"}</span>
-                </div>
-                <div>
-                  <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-widest mb-1">Vendor Code</span>
-                  <span className="font-mono font-bold text-gray-700 bg-gray-50 px-2 py-0.5 rounded text-sm uppercase">{viewData.code || "-"}</span>
-                </div>
-                <div>
-                  <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-widest mb-1">Reg. Number (SSM)</span>
-                  <span className="text-gray-800 font-medium">{viewData.registrationNumber || "-"}</span>
-                </div>
-                <div>
-                  <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-widest mb-1">Tax Number</span>
-                  <span className="text-gray-800 font-medium">{viewData.taxNumber || "-"}</span>
-                </div>
-              </div>
-            </section>
+          {/* Tabs */}
+          <div className="flex border-b border-gray-100 mb-6">
+            <button
+              onClick={() => setViewTab("overview")}
+              className={`px-6 py-2.5 text-xs font-black uppercase tracking-widest transition-all ${
+                viewTab === "overview"
+                  ? "text-mint-600 border-b-2 border-mint-500 bg-mint-50/30"
+                  : "text-gray-400 hover:text-gray-600"
+              }`}
+            >
+              Overview
+            </button>
+            <button
+              onClick={() => setViewTab("unpaid")}
+              className={`px-6 py-2.5 text-xs font-black uppercase tracking-widest transition-all ${
+                viewTab === "unpaid"
+                  ? "text-mint-600 border-b-2 border-mint-500 bg-mint-50/30"
+                  : "text-gray-400 hover:text-gray-600"
+              }`}
+            >
+              Unpaid Bills
+            </button>
+            <button
+              onClick={() => setViewTab("paid")}
+              className={`px-6 py-2.5 text-xs font-black uppercase tracking-widest transition-all ${
+                viewTab === "paid"
+                  ? "text-mint-600 border-b-2 border-mint-500 bg-mint-50/30"
+                  : "text-gray-400 hover:text-gray-600"
+              }`}
+            >
+              Paid Bills
+            </button>
+          </div>
 
-            <section>
-              <h3 className="text-xs font-black text-mint-600 uppercase tracking-widest mb-4 flex items-center gap-2">
-                <span className="w-4 h-[2px] bg-mint-500"></span>
-                Contact Details
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div>
-                  <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-widest mb-1">Incharge / Owner</span>
-                  <span className="font-bold text-gray-800">{viewData.ownerName || "-"}</span>
-                </div>
-                <div>
-                  <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-widest mb-1">Phone Number</span>
-                  <span className="text-gray-800 font-medium">{viewData.phone || "-"}</span>
-                </div>
-                <div>
-                  <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-widest mb-1">Primary Email</span>
-                  <span className="text-gray-800 font-medium">{viewData.email || "-"}</span>
-                </div>
-                <div>
-                  <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-widest mb-1">Enquiries Email</span>
-                  <span className="text-gray-800 font-medium">{viewData.enquiriesEmail || "-"}</span>
-                </div>
-                <div className="sm:col-span-2">
-                  <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-widest mb-1">Website Link</span>
-                  {viewData.website ? (
-                    <a href={viewData.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium break-all">
-                      {viewData.website}
-                    </a>
-                  ) : "-"}
-                </div>
-                <div className="sm:col-span-2">
-                  <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-widest mb-1">Physical Address</span>
-                  <span className="text-gray-700 font-medium leading-relaxed whitespace-pre-wrap">{viewData.address || "-"}</span>
-                </div>
-              </div>
-            </section>
+          <div className="px-1">
+            {viewTab === "overview" ? (
+              <div className="space-y-8">
+                <section>
+                  <h3 className="text-xs font-black text-mint-600 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <span className="w-4 h-[2px] bg-mint-500"></span>
+                    Basic Information
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div>
+                      <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-widest mb-1">Vendor Name</span>
+                      <span className="font-bold text-gray-900 text-base">{viewData.name || "-"}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-widest mb-1">Vendor Code</span>
+                      <span className="font-mono font-bold text-gray-700 bg-gray-50 px-2 py-0.5 rounded text-sm uppercase">{viewData.code || "-"}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-widest mb-1">Reg. Number (SSM)</span>
+                      <span className="text-gray-800 font-medium">{viewData.registrationNumber || "-"}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-widest mb-1">Tax Number</span>
+                      <span className="text-gray-800 font-medium">{viewData.taxNumber || "-"}</span>
+                    </div>
+                  </div>
+                </section>
 
-            <section>
-              <h3 className="text-xs font-black text-mint-600 uppercase tracking-widest mb-4 flex items-center gap-2">
-                <span className="w-4 h-[2px] bg-mint-500"></span>
-                Financial & Accounts
-              </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div>
-                  <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-widest mb-1">Bank Name</span>
-                  <span className="text-gray-800 font-bold">{viewData.bankName || "-"}</span>
-                </div>
-                <div>
-                  <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-widest mb-1">Account Number</span>
-                  <span className="text-gray-800 tracking-widest font-mono font-bold bg-blue-50 px-2 py-1 rounded border border-blue-100">{viewData.bankAccountNumber || "-"}</span>
-                </div>
-                <div>
-                  <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-widest mb-1">Payment Terms</span>
-                  <span className="text-gray-800 font-bold">{viewData.termsDays !== null && viewData.termsDays !== undefined ? `${viewData.termsDays} days` : "-"}</span>
-                </div>
-                <div>
-                  <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-widest mb-1">Credit Limit (Active Bills)</span>
-                  <span className="text-gray-800 font-bold">{viewData.maxOpenBills || "Unlimited"}</span>
+                <section>
+                  <h3 className="text-xs font-black text-mint-600 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <span className="w-4 h-[2px] bg-mint-500"></span>
+                    Contact Details
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div>
+                      <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-widest mb-1">Incharge / Owner</span>
+                      <span className="font-bold text-gray-800">{viewData.ownerName || "-"}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-widest mb-1">Phone Number</span>
+                      <span className="text-gray-800 font-medium">{viewData.phone || "-"}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-widest mb-1">Primary Email</span>
+                      <span className="text-gray-800 font-medium">{viewData.email || "-"}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-widest mb-1">Enquiries Email</span>
+                      <span className="text-gray-800 font-medium">{viewData.enquiriesEmail || "-"}</span>
+                    </div>
+                    <div className="sm:col-span-2">
+                      <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-widest mb-1">Website Link</span>
+                      {viewData.website ? (
+                        <a href={viewData.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium break-all">
+                          {viewData.website}
+                        </a>
+                      ) : "-"}
+                    </div>
+                    <div className="sm:col-span-2">
+                      <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-widest mb-1">Physical Address</span>
+                      <span className="text-gray-700 font-medium leading-relaxed whitespace-pre-wrap">{viewData.address || "-"}</span>
+                    </div>
+                  </div>
+                </section>
+
+                <section>
+                  <h3 className="text-xs font-black text-mint-600 uppercase tracking-widest mb-4 flex items-center gap-2">
+                    <span className="w-4 h-[2px] bg-mint-500"></span>
+                    Financial & Accounts
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    <div>
+                      <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-widest mb-1">Bank Name</span>
+                      <span className="text-gray-800 font-bold">{viewData.bankName || "-"}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-widest mb-1">Account Number</span>
+                      <span className="text-gray-800 tracking-widest font-mono font-bold bg-blue-50 px-2 py-1 rounded border border-blue-100">{viewData.bankAccountNumber || "-"}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-widest mb-1">Payment Terms</span>
+                      <span className="text-gray-800 font-bold">{viewData.termsDays !== null && viewData.termsDays !== undefined ? `${viewData.termsDays} days` : "-"}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400 block text-[10px] uppercase font-bold tracking-widest mb-1">Credit Limit (Active Bills)</span>
+                      <span className="text-gray-800 font-bold">{viewData.maxOpenBills || "Unlimited"}</span>
+                    </div>
+                  </div>
+                </section>
+                
+                <div className="bg-gray-900 rounded-2xl p-6 grid grid-cols-2 sm:grid-cols-4 gap-6 shadow-xl">
+                    <div className="space-y-1">
+                      <span className="text-gray-500 block text-[9px] uppercase font-black tracking-widest">Total Billed</span>
+                      <span className="font-bold text-white text-sm">{currency} {Number(viewData.totalBilled || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                    </div>
+                    <div className="space-y-1 border-l border-gray-800 pl-4">
+                      <span className="text-gray-500 block text-[9px] uppercase font-black tracking-widest">Total Paid</span>
+                      <span className="font-bold text-blue-400 text-sm">{currency} {Number(viewData.totalPaid || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                    </div>
+                    <div className="space-y-1 border-l border-gray-800 pl-4">
+                      <span className="text-gray-500 block text-[9px] uppercase font-black tracking-widest">AP Balance</span>
+                      <span className={`font-bold text-sm ${Number(viewData.currentBalance || 0) > 0 ? "text-red-400" : "text-emerald-400"}`}>{currency} {Number(viewData.currentBalance || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                    </div>
+                    <div className="space-y-1 border-l border-gray-800 pl-4">
+                      <span className="text-gray-500 block text-[9px] uppercase font-black tracking-widest">Last Payment</span>
+                      <span className="text-gray-300 font-bold text-sm">{viewData.lastPaymentDate ? new Date(viewData.lastPaymentDate).toLocaleDateString() : "-"}</span>
+                    </div>
                 </div>
               </div>
-            </section>
-            
-            <div className="bg-gray-900 rounded-2xl p-6 grid grid-cols-2 sm:grid-cols-4 gap-6 shadow-xl">
-                 <div className="space-y-1">
-                   <span className="text-gray-500 block text-[9px] uppercase font-black tracking-widest">Total Billed</span>
-                   <span className="font-bold text-white text-sm">{currency} {Number(viewData.totalBilled || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                 </div>
-                 <div className="space-y-1 border-l border-gray-800 pl-4">
-                   <span className="text-gray-500 block text-[9px] uppercase font-black tracking-widest">Total Paid</span>
-                   <span className="font-bold text-blue-400 text-sm">{currency} {Number(viewData.totalPaid || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                 </div>
-                 <div className="space-y-1 border-l border-gray-800 pl-4">
-                   <span className="text-gray-500 block text-[9px] uppercase font-black tracking-widest">AP Balance</span>
-                   <span className={`font-bold text-sm ${Number(viewData.currentBalance || 0) > 0 ? "text-red-400" : "text-emerald-400"}`}>{currency} {Number(viewData.currentBalance || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
-                 </div>
-                 <div className="space-y-1 border-l border-gray-800 pl-4">
-                   <span className="text-gray-500 block text-[9px] uppercase font-black tracking-widest">Last Payment</span>
-                   <span className="text-gray-300 font-bold text-sm">{viewData.lastPaymentDate ? new Date(viewData.lastPaymentDate).toLocaleDateString() : "-"}</span>
-                 </div>
-            </div>
+            ) : viewTab === "unpaid" ? (
+              <VendorUnpaidBills 
+                companyId={companyId} 
+                branchId={branchId} 
+                vendorId={viewData.id} 
+              />
+            ) : (
+              <VendorPaidBills 
+                companyId={companyId} 
+                branchId={branchId} 
+                vendorId={viewData.id} 
+              />
+            )}
           </div>
           <div className="mt-8 flex justify-end">
             <Button onClick={() => setViewOpen(false)} className="w-full sm:w-auto bg-gray-100 text-gray-700 hover:bg-gray-200 border-none">Close</Button>
@@ -413,7 +507,7 @@ export default function VendorsPage() {
       {/* Add Vendor Modal */}
       {openAdd && (
         <Modal title="Add Vendor" maxWidth="max-w-2xl" onClose={() => setOpenAdd(false)}>
-          <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+          <div className="space-y-6 pr-2">
             {/* Basic Information */}
             <div>
               <h3 className="text-sm font-semibold text-mint-700 border-b pb-1 mb-3">Basic Information</h3>
@@ -527,7 +621,7 @@ export default function VendorsPage() {
       {/* Edit Vendor Modal */}
       {editOpen && editForm && (
         <Modal title="Edit Vendor" maxWidth="max-w-2xl" onClose={() => setEditOpen(false)}>
-          <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+          <div className="space-y-6 pr-2">
             {/* Basic Information */}
             <div>
               <h3 className="text-sm font-semibold text-mint-700 border-b pb-1 mb-3">Basic Information</h3>

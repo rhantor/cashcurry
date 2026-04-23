@@ -1,7 +1,8 @@
 /* eslint-disable react/prop-types */
 'use client'
 import React, { useState } from 'react'
-import { useUpdateAdvanceEntryMutation } from '@/lib/redux/api/AdvanceApiSlice'
+import { useUpdateAdvanceEntryMutation, useDeleteAdvanceEntryMutation } from '@/lib/redux/api/AdvanceApiSlice'
+import { getCurrentUser } from '@/lib/authz/roles'
 
 const ADVANCE_TYPES = [
   { value: 'salary', label: 'Salary Advance' },
@@ -28,6 +29,7 @@ export default function AdvanceEditModal ({
   })
 
   const [updateAdvance, { isLoading }] = useUpdateAdvanceEntryMutation()
+  const [deleteAdvance, { isLoading: isDeleting }] = useDeleteAdvanceEntryMutation()
 
   const handleChange = e => {
     setForm(prev => ({ ...prev, [e.target.name]: e.target.value }))
@@ -41,6 +43,7 @@ export default function AdvanceEditModal ({
         companyId,
         branchId,
         id: item.id,
+        user: getCurrentUser(),
         data: {
           amount: Number(form.amount) || 0,
           advanceType: form.advanceType,
@@ -208,25 +211,49 @@ export default function AdvanceEditModal ({
           </div>
 
           {/* Footer */}
-          <div className='sticky bottom-0 bg-gray-50 border-t px-6 py-4 flex justify-end gap-3'>
-            <button
-              type='button'
-              onClick={onClose}
-              className='px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium transition-colors'
-            >
-              Cancel
-            </button>
-            <button
-              type='submit'
-              disabled={isLoading}
-              className={`px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors ${
-                isLoading
-                  ? 'bg-gray-400 cursor-not-allowed'
-                  : 'bg-mint-600 hover:bg-mint-700'
-              }`}
-            >
-              {isLoading ? 'Saving…' : 'Save Changes'}
-            </button>
+          <div className='sticky bottom-0 bg-gray-50 border-t px-6 py-4'>
+            <div className='flex justify-between items-center w-full'>
+              <button
+                type='button'
+                onClick={async () => {
+                  if (window.confirm('Are you sure you want to delete this advance entry? This action cannot be undone.')) {
+                    try {
+                      await deleteAdvance({ companyId, branchId, id: item.id, user: getCurrentUser() }).unwrap()
+                      onSuccess?.()
+                      onClose()
+                    } catch (err) {
+                      console.error('Delete failed:', err)
+                      alert('Failed to delete entry.')
+                    }
+                  }
+                }}
+                disabled={isDeleting}
+                className='px-4 py-2 rounded-lg bg-red-50 text-red-600 hover:bg-red-100 text-sm font-semibold transition-colors'
+              >
+                {isDeleting ? 'Deleting...' : 'Delete Entry'}
+              </button>
+
+              <div className='flex gap-3'>
+                <button
+                  type='button'
+                  onClick={onClose}
+                  className='px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700 text-sm font-medium transition-colors'
+                >
+                  Cancel
+                </button>
+                <button
+                  type='submit'
+                  disabled={isLoading}
+                  className={`px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors ${
+                    isLoading
+                      ? 'bg-gray-400 cursor-not-allowed'
+                      : 'bg-mint-600 hover:bg-mint-700'
+                  }`}
+                >
+                  {isLoading ? 'Saving…' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
           </div>
         </form>
       </div>

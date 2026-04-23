@@ -12,6 +12,7 @@ import AdvanceModal from './AdvanceModal'
 import AdvanceEditModal from './AdvanceEditModal'
 import StaffSummaryModal from './StaffSummary'
 import useCurrency from '@/app/hooks/useCurrency'
+import { FaCalendarAlt, FaMoneyBillWave, FaEdit, FaFilePdf, FaUserTie } from 'react-icons/fa'
 
 // ✅ Entries (list) exports
 import {
@@ -167,6 +168,22 @@ export default function AdvanceReport () {
               key: 'createdBy',
               label: 'Created By',
               render: val => val?.username || 'Unknown'
+            },
+            {
+              key: 'actions',
+              label: 'Actions',
+              render: (_, row) => (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setEditModal(row)
+                  }}
+                  className="p-2 text-gray-400 hover:text-mint-600 hover:bg-mint-50 rounded-full transition-all"
+                  title="Edit Entry"
+                >
+                  <FaEdit />
+                </button>
+              )
             }
           ]}
           filterConfig={{

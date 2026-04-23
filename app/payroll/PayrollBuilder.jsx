@@ -356,6 +356,7 @@ export default function PayrollBuilder () {
 
   // Per-staff attendance inputs: { [staffId]: inputs }
   const [slipInputs, setSlipInputs] = useState({})
+  const [searchTerm, setSearchTerm] = useState('')
 
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
@@ -445,6 +446,15 @@ export default function PayrollBuilder () {
   const payrollConfig = branchSettings?.payroll || null
 
   const isAdminOrManager = role === 'branchAdmin' || role === 'manager'
+
+  const filteredStaff = useMemo(() => {
+    if (!searchTerm) return staffList
+    const s = searchTerm.toLowerCase()
+    return staffList.filter(st => {
+      const name = getStaffName(st).toLowerCase()
+      return name.includes(s)
+    })
+  }, [staffList, searchTerm])
 
   // ── Advance/loan deductions per staff for this period ─────────────────────
   const advanceByStaff = useMemo(() => {
@@ -652,6 +662,7 @@ export default function PayrollBuilder () {
         runId: activeRunId,
         period,
         slips: buildSlips(),
+        user: currentUser,
       }).unwrap()
       flash('ok', 'Draft saved.')
     } catch (e) {
@@ -666,7 +677,7 @@ export default function PayrollBuilder () {
     setBusy(true); setError('')
     try {
       // Save latest inputs first, then finalize
-      await saveDraftSlips({ companyId, branchId, runId, period, slips: buildSlips() }).unwrap()
+      await saveDraftSlips({ companyId, branchId, runId, period, slips: buildSlips(), user: currentUser }).unwrap()
       await finalize({ companyId, branchId, runId, finalizedBy: currentUser }).unwrap()
       flash('ok', 'Payroll finalized. Advance/loan installments marked as paid.')
     } catch (e) {
@@ -680,7 +691,7 @@ export default function PayrollBuilder () {
     if (!runId) return
     setBusy(true); setError('')
     try {
-      await revert({ companyId, branchId, runId }).unwrap()
+      await revert({ companyId, branchId, runId, user: currentUser }).unwrap()
       flash('ok', 'Reverted to draft. Installments restored.')
     } catch (e) {
       flash('error', e.message || 'Failed to revert')
@@ -714,7 +725,7 @@ export default function PayrollBuilder () {
     if (!confirm('Delete this draft payroll run?')) return
     setBusy(true)
     try {
-      await deleteDraft({ companyId, branchId, runId }).unwrap()
+      await deleteDraft({ companyId, branchId, runId, user: currentUser }).unwrap()
       flash('ok', 'Draft deleted.')
     } catch (e) {
       flash('error', e.message || 'Failed to delete')
@@ -777,6 +788,21 @@ export default function PayrollBuilder () {
               ))}
             </select>
           </div>
+        </div>
+
+        {/* Search and filter */}
+        <div className='flex items-center gap-3 bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-2'>
+          <span className='text-gray-400'>🔍</span>
+          <input
+            type='text'
+            placeholder='Search staff by name…'
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            className='flex-1 bg-transparent border-none outline-none text-sm text-gray-700 placeholder:text-gray-300'
+          />
+          {searchTerm && (
+            <button onClick={() => setSearchTerm('')} className='text-gray-300 hover:text-gray-500 text-xs font-bold'>✕</button>
+          )}
         </div>
 
         {/* Run status banner */}
@@ -887,11 +913,13 @@ export default function PayrollBuilder () {
         </div>
 
         {/* Staff cards */}
-        {staffList.length === 0 ? (
-          <p className='text-sm text-gray-400 text-center py-12'>No staff found for this branch.</p>
+        {filteredStaff.length === 0 ? (
+          <p className='text-sm text-gray-400 text-center py-12'>
+            {searchTerm ? `No staff matching "${searchTerm}"` : 'No staff found for this branch.'}
+          </p>
         ) : (
           <div className='grid md:grid-cols-2 gap-4'>
-            {staffList.map(staff => (
+            {filteredStaff.map(staff => (
               <StaffSlipCard
                 key={staff.id}
                 staff={staff}
