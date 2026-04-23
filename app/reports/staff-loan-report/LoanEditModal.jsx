@@ -127,6 +127,9 @@ export default function LoanEditModal ({
 
       onSuccess?.()
       onClose()
+    } catch (err) {
+      console.error('Failed to update loan:', err)
+      alert('Failed to update loan. Please try again.')
     }
   }
 
