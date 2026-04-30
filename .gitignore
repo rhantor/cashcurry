@@ -46,3 +46,5 @@ next-env.d.ts
 # credentials
 serviceAccountKey.json
 lib/server/serviceAccountKey.json
+
+certificates

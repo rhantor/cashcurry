@@ -1,12 +1,13 @@
 "use client";
 import React, { useState } from "react";
-import { FaBuilding, FaMoneyBillWave, FaUserCog, FaCogs, FaMoneyCheckAlt } from "react-icons/fa";
+import { FaBuilding, FaMoneyBillWave, FaUserCog, FaCogs, FaMoneyCheckAlt, FaClock } from "react-icons/fa";
 
 import BasicInfoSection from "@/app/components/settings/BasicInfoSection";
 import FinanceSalesSection from "@/app/components/settings/FinanceSalesSection";
 import StaffRolesSection from "@/app/components/settings/StaffRolesSection";
 import LoansFinanceSection from "@/app/components/settings/LoansFinanceSection";
 import OtherSection from "@/app/components/settings/OtherSection";
+import AttendanceSettingsSection from "@/app/components/settings/AttendanceSettingsSection";
 import PayrollSettingsSection from "@/app/components/settings/PayrollSettingsSection";
 import useBranchSettingsForm from "./useBranchSettingsForm";
 
@@ -14,6 +15,7 @@ const TABS = [
   { id: "general",    label: "General",          icon: FaBuilding },
   { id: "finance",    label: "Finance & Sales",   icon: FaMoneyBillWave },
   { id: "operations", label: "Operations & Staff", icon: FaUserCog },
+  { id: "attendance", label: "Attendance",          icon: FaClock },
   { id: "payroll",    label: "Payroll",            icon: FaMoneyCheckAlt },
   { id: "advanced",   label: "Advanced",           icon: FaCogs },
 ];
@@ -115,6 +117,22 @@ export default function BranchSettingsPage() {
                   />
                </div>
              </div>
+          )}
+
+          {activeTab === "attendance" && (
+            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
+              <h2 className="text-lg font-bold text-slate-800 mb-2">Attendance Configuration</h2>
+              <p className="text-sm text-slate-500 mb-6">
+                Manage pay cycles, kiosk behavior, and biometric enrollment for your team.
+              </p>
+              <AttendanceSettingsSection 
+                role={role} 
+                companyId={form.companyId || form.basic?.companyId} // Fallback
+                branchId={form.branchId || form.basic?.branchId}
+                value={form.attendance} 
+                onChange={(v) => setForm((prev) => ({ ...prev, attendance: v }))} 
+              />
+            </div>
           )}
 
           {activeTab === "payroll" && (

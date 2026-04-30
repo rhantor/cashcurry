@@ -165,30 +165,15 @@ export const sidebarItems = {
       ]
     },
 
-    /*
     {
-      label: 'Work Media',
-      icon: 'MdOutlineDynamicFeed',
-      allowedRoles: ['branchAdmin', 'manager', 'supervisor'],
+      label: 'Attendance',
+      icon: 'MdOutlineCalendarMonth',
+      allowedRoles: ['branchAdmin', 'manager', 'supervisor', 'accountant'],
       children: [
-        {
-          label: 'Branch Chat',
-          path: '/branch-chat',
-          allowedRoles: ['branchAdmin', 'manager', 'supervisor']
-        },
-        {
-          label: 'Attendance Kiosk',
-          path: '/kiosk',
-          allowedRoles: ['branchAdmin', 'manager']
-        },
-        {
-          label: 'Attendance Log',
-          path: '/attendance-log',
-          allowedRoles: ['branchAdmin', 'manager', 'supervisor']
-        }
+        { label: 'Attendance Log', path: '/attendance-log' },
+        { label: 'Open Kiosk', path: '/kiosk' }
       ]
     },
-    */
 
     {
       label: 'Support',
@@ -308,18 +293,15 @@ export const sidebarItems = {
         { label: 'User Management', path: '/settings/user-management' }
       ]
     },
-    /*
     {
-      label: 'Work Media',
-      icon: 'MdOutlineDynamicFeed',
+      label: 'Attendance',
+      icon: 'MdOutlineCalendarMonth',
       allowedRoles: ['gm', 'superAdmin', 'owner'],
       children: [
-        { label: 'Branch Chat', path: '/branch-chat' },
-        { label: 'Attendance Kiosk', path: '/kiosk' },
-        { label: 'Attendance Log', path: '/attendance-log' }
+        { label: 'Attendance Log', path: '/attendance-log' },
+        { label: 'Open Kiosk', path: '/kiosk' }
       ]
     },
-    */
     {
       label: 'Support',
       icon: 'MdOutlineSupportAgent',

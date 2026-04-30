@@ -1,8 +1,18 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
-import { Clock, LogIn, LogOut, Calendar, ChevronLeft, ChevronRight, Camera, Download, List, LayoutGrid } from "lucide-react";
-import { useGetBranchAttendanceTokensQuery, useGetBranchAttendanceByPeriodQuery } from "@/lib/redux/api/attendanceApiSlice";
+import { 
+  useGetBranchAttendanceTokensQuery, 
+  useGetBranchAttendanceByPeriodQuery,
+  useAddAttendancePunchMutation,
+  useUpdateAttendancePunchMutation,
+  useDeleteAttendancePunchMutation
+} from "@/lib/redux/api/attendanceApiSlice";
 import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
+import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
+import { 
+  Clock, LogIn, LogOut, Calendar, ChevronLeft, ChevronRight, 
+  Camera, Download, List, LayoutGrid, Plus, Edit2, Trash2, Save, X as CloseIcon, Loader2
+} from "lucide-react";
 import * as XLSX from "xlsx";
 import Cookies from "js-cookie";
 
@@ -11,6 +21,8 @@ export default function AttendanceLogPage() {
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
   const [viewMode, setViewMode] = useState("daily"); // "daily" or "monthly"
   const [photoModal, setPhotoModal] = useState(null);
+  const [editModal, setEditModal] = useState(null); // { punch: null, mode: 'add' | 'edit' }
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem("user");
@@ -42,11 +54,48 @@ export default function AttendanceLogPage() {
     !skip ? { companyId, branchId } : { skip: true }
   );
 
+  const { data: settings } = useGetBranchSettingsQuery(
+    !skip ? { companyId, branchId } : { skip: true }
+  );
+  const attendanceSettings = settings?.attendance || {};
+
+  const [addPunch] = useAddAttendancePunchMutation();
+  const [updatePunch] = useUpdateAttendancePunchMutation();
+  const [deletePunch] = useDeleteAttendancePunchMutation();
+
   const [isExporting, setIsExporting] = useState(false);
 
   const formatTime = (ts) => {
     if (!ts?.seconds) return "—";
     return new Date(ts.seconds * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+  };
+
+  const formatHours = (hours) => {
+    if (attendanceSettings.hoursFormat === "hhmm") {
+      const h = Math.floor(hours);
+      const m = Math.round((hours - h) * 60);
+      return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+    }
+    return hours.toFixed(2);
+  };
+
+  // Helper to adjust date based on cutoff
+  const getAttendanceDate = (timestamp) => {
+    if (!timestamp?.seconds) return null;
+    const date = new Date(timestamp.seconds * 1000);
+    const cutoff = attendanceSettings.dayCutoffTime || "00:00";
+    const [cutoffH, cutoffM] = cutoff.split(":").map(Number);
+    
+    const cutoffDate = new Date(date);
+    cutoffDate.setHours(cutoffH, cutoffM, 0, 0);
+
+    if (date < cutoffDate) {
+      // Roll to previous day
+      const prev = new Date(date);
+      prev.setDate(prev.getDate() - 1);
+      return prev.toISOString().split("T")[0];
+    }
+    return date.toISOString().split("T")[0];
   };
 
   const handleExport = async () => {
@@ -65,8 +114,9 @@ export default function AttendanceLogPage() {
 
          const dailyGroups = {};
          myPunches.forEach(p => {
-            if (!dailyGroups[p.date]) dailyGroups[p.date] = [];
-            dailyGroups[p.date].push(p);
+            const adjustedDate = getAttendanceDate(p.timestamp) || p.date;
+            if (!dailyGroups[adjustedDate]) dailyGroups[adjustedDate] = [];
+            dailyGroups[adjustedDate].push(p);
          });
 
          const dailyLimit = Number(staff.basicHoursPerDay) || 8;
@@ -115,11 +165,11 @@ export default function AttendanceLogPage() {
                "Out 2": punchTimes.out2,
                "In 3": punchTimes.in3,
                "Out 3": punchTimes.out3,
-               "Worked Hrs": actualHours.toFixed(2),
-               "Basic Hrs": (dayBasic + (bonus && dayBasic < dailyLimit ? 1 : 0)).toFixed(2),
-               "OT Hrs": (dayOT + (bonus && dayBasic >= dailyLimit ? 1 : 0)).toFixed(2),
+               "Worked Hrs": formatHours(actualHours),
+               "Basic Hrs": formatHours(dayBasic + (bonus && dayBasic < dailyLimit ? 1 : 0)),
+               "OT Hrs": formatHours(dayOT + (bonus && dayBasic >= dailyLimit ? 1 : 0)),
                "Bonus": bonus ? "1.00" : "0.00",
-               "Total": (dayBasic + dayOT + bonus).toFixed(2),
+               "Total": formatHours(dayBasic + dayOT + bonus),
                "EST Earnings": ((dayBasic + dayOT + bonus) * (Number(staff.basicPerHour) || 0)).toFixed(2)
             });
          });
@@ -147,8 +197,9 @@ export default function AttendanceLogPage() {
 
       const dailyGroups = {};
       myPunches.forEach(p => {
-        if (!dailyGroups[p.date]) dailyGroups[p.date] = [];
-        dailyGroups[p.date].push(p);
+        const adjustedDate = getAttendanceDate(p.timestamp) || p.date;
+        if (!dailyGroups[adjustedDate]) dailyGroups[adjustedDate] = [];
+        dailyGroups[adjustedDate].push(p);
       });
 
       let totalBasic = 0;
@@ -253,10 +304,17 @@ export default function AttendanceLogPage() {
           <button
             onClick={handleExport}
             disabled={isExporting}
-            className="flex items-center gap-2 bg-gray-900 hover:bg-black text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-gray-200 transition-all disabled:opacity-50"
+            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-emerald-200 transition-all disabled:opacity-50"
           >
-            {isExporting ? <span className="animate-spin text-lg">◌</span> : <Download size={18} />}
+            {isExporting ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
             Time Card (.xlsx)
+          </button>
+
+          <button
+            onClick={() => setEditModal({ mode: "add", punch: { date: selectedDate, type: "in", staffId: "" } })}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-blue-200 transition-all"
+          >
+            <Plus size={18} /> Add Manual
           </button>
         </div>
       </div>
@@ -332,18 +390,40 @@ export default function AttendanceLogPage() {
                       {punch.type.toUpperCase()}
                     </span>
                   </div>
-                  <div className="col-span-3 text-gray-600 font-black tabular-nums">{formatTime(punch.timestamp)}</div>
-                  <div className="col-span-3">
+                  <div className="col-span-3 text-gray-600 font-black tabular-nums flex items-center gap-2">
+                    {formatTime(punch.timestamp)}
+                    {punch.isManual && <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">MANUAL</span>}
+                  </div>
+                  <div className="col-span-3 flex items-center gap-4">
                     {punch.photoBase64 ? (
                       <button
                         onClick={() => setPhotoModal(punch)}
                         className="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 text-xs font-black"
                       >
-                        <Camera size={14} /> VIEW SNAPSHOT
+                        <Camera size={14} /> SNAP
                       </button>
                     ) : (
-                      <span className="text-gray-300 text-[10px] font-bold italic">No photo attached</span>
+                      <span className="text-gray-300 text-[10px] font-bold italic">No photo</span>
                     )}
+
+                    <div className="flex items-center gap-2 ml-auto">
+                      <button 
+                        onClick={() => setEditModal({ mode: "edit", punch })}
+                        className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-blue-600 transition-colors"
+                      >
+                        <Edit2 size={14} />
+                      </button>
+                      <button 
+                        onClick={() => {
+                          if (confirm("Delete this punch record?")) {
+                            deletePunch({ companyId, branchId, punchId: punch.id });
+                          }
+                        }}
+                        className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-red-600 transition-colors"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -375,9 +455,9 @@ export default function AttendanceLogPage() {
                     <div className="col-span-3 font-black text-gray-900">{s.name}</div>
                     <div className="col-span-2 text-xs text-gray-400 font-bold uppercase">{s.dept}</div>
                     <div className="col-span-1 text-center font-black text-gray-900">{s.days}</div>
-                    <div className="col-span-2 text-right font-bold text-gray-600">{s.worked.toFixed(1)}</div>
-                    <div className="col-span-2 text-right font-black text-blue-600">{s.basic.toFixed(1)}</div>
-                    <div className="col-span-2 text-right font-black text-orange-500">{s.ot.toFixed(1)}</div>
+                    <div className="col-span-2 text-right font-bold text-gray-600">{formatHours(s.worked)}</div>
+                    <div className="col-span-2 text-right font-black text-blue-600">{formatHours(s.basic)}</div>
+                    <div className="col-span-2 text-right font-black text-orange-500">{formatHours(s.ot)}</div>
                  </div>
                ))}
             </div>
@@ -385,25 +465,115 @@ export default function AttendanceLogPage() {
         )
       )}
 
-      {/* Photo Modal */}
-      {photoModal && (
-        <div
-          className="fixed inset-0 z-[120] bg-black/80 backdrop-blur-md flex items-center justify-center p-4"
-          onClick={() => setPhotoModal(null)}
-        >
-          <div className="bg-white rounded-[32px] overflow-hidden max-w-sm w-full shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="p-6 border-b flex justify-between items-center">
-              <div>
-                <h3 className="font-black text-gray-900 leading-tight">{photoModal.staffName}</h3>
-                <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mt-1">
-                  PUNCHED {photoModal.type.toUpperCase()} • {formatTime(photoModal.timestamp)}
-                </p>
-              </div>
-              <button onClick={() => setPhotoModal(null)} className="bg-gray-100 hover:bg-gray-200 text-gray-500 p-2 rounded-full transition-all">✕</button>
+      {/* Edit/Add Modal */}
+      {editModal && (
+        <div className="fixed inset-0 z-[150] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-6 border-b flex justify-between items-center bg-gray-50">
+              <h3 className="text-lg font-black text-gray-900">{editModal.mode === "add" ? "Add Manual Punch" : "Edit Punch Record"}</h3>
+              <button onClick={() => setEditModal(null)} className="text-gray-400 hover:text-gray-600 p-2"><CloseIcon size={20} /></button>
             </div>
-            <img src={photoModal.photoBase64} alt="Punch verification" className="w-full aspect-[4/3] object-cover" />
-            <div className="p-4 bg-gray-50 text-center">
-               <span className="text-[10px] text-green-600 font-black border border-green-200 bg-green-100 rounded-full px-3 py-1 uppercase">✓ VERIFIED AT SOURCE</span>
+            
+            <div className="p-6 space-y-5">
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-500 uppercase">Staff Member</label>
+                <select 
+                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
+                  value={editModal.punch.staffId}
+                  disabled={editModal.mode === "edit"}
+                  onChange={(e) => {
+                    const s = staffList.find(x => x.id === e.target.value);
+                    setEditModal(prev => ({ ...prev, punch: { ...prev.punch, staffId: e.target.value, staffName: s ? `${s.firstName} ${s.lastName}` : "" } }))
+                  }}
+                >
+                  <option value="">Select Staff...</option>
+                  {staffList.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>)}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Date</label>
+                  <input 
+                    type="date" 
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800"
+                    value={editModal.punch.date}
+                    onChange={(e) => setEditModal(prev => ({ ...prev, punch: { ...prev.punch, date: e.target.value } }))}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-xs font-bold text-gray-500 uppercase">Time</label>
+                  <input 
+                    type="time" 
+                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800"
+                    value={editModal.punch.time || (editModal.punch.timestamp?.seconds ? formatTime(editModal.punch.timestamp) : "")}
+                    onChange={(e) => setEditModal(prev => ({ ...prev, punch: { ...prev.punch, time: e.target.value } }))}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-gray-500 uppercase">Punch Type</label>
+                <div className="flex gap-2">
+                  {["in", "out"].map(t => (
+                    <button
+                      key={t}
+                      onClick={() => setEditModal(prev => ({ ...prev, punch: { ...prev.punch, type: t } }))}
+                      className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest border transition-all ${
+                        editModal.punch.type === t 
+                          ? (t === "in" ? "bg-green-600 border-green-600 text-white shadow-lg shadow-green-100" : "bg-orange-600 border-orange-600 text-white shadow-lg shadow-orange-100")
+                          : "bg-white border-slate-200 text-slate-400 hover:border-slate-300"
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 bg-slate-50 border-t flex gap-3">
+              <button 
+                onClick={() => setEditModal(null)}
+                className="flex-1 py-3 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                disabled={isSaving || !editModal.punch.staffId || !editModal.punch.time && !editModal.punch.timestamp}
+                onClick={async () => {
+                  setIsSaving(true);
+                  try {
+                    const timeStr = editModal.punch.time || formatTime(editModal.punch.timestamp);
+                    const [h, m] = timeStr.split(":").map(Number);
+                    const tsDate = new Date(editModal.punch.date);
+                    tsDate.setHours(h, m, 0, 0);
+                    
+                    const payload = {
+                      staffId: editModal.punch.staffId,
+                      staffName: editModal.punch.staffName,
+                      type: editModal.punch.type,
+                      date: editModal.punch.date,
+                      timestamp: tsDate.toISOString(),
+                      isManual: true
+                    };
+
+                    if (editModal.mode === "add") {
+                      await addPunch({ companyId, branchId, data: payload }).unwrap();
+                    } else {
+                      await updatePunch({ companyId, branchId, punchId: editModal.punch.id, data: payload }).unwrap();
+                    }
+                    setEditModal(null);
+                  } catch (err) {
+                    alert("Save failed");
+                  } finally {
+                    setIsSaving(false);
+                  }
+                }}
+                className="flex-1 py-3 rounded-xl bg-gray-900 text-white font-bold hover:bg-black transition-all flex items-center justify-center gap-2"
+              >
+                {isSaving ? <Loader2 className="animate-spin" size={18} /> : <><Save size={18} /> Save Changes</>}
+              </button>
             </div>
           </div>
         </div>

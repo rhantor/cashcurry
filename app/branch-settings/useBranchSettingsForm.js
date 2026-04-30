@@ -91,14 +91,29 @@ export default function useBranchSettingsForm() {
     // If the new field is missing, check the legacy 'initialCash' or default to 0
     const openingBalance = fs.openingBalance ?? settings.initialCash ?? 0;
 
+    // Prepare Attendance
+    const attendance = settings.attendance || {
+      payPeriodStart: 1,
+      startDayOfWeek: "Monday",
+      dayCutoffTime: "05:00",
+      duplicatePunchInterval: 5,
+      maxWorkHoursPerDay: 16,
+      hoursFormat: "decimal",
+      useBiometrics: false,
+      useCamera: true,
+    };
+
     const newForm = {
       ...settings,
+      companyId,
+      branchId,
       basic,
       financeSales: {
         ...fs,
         openingBalance, // Ensure this is set in the form state
         tenders: normalizedTenders,
       },
+      attendance,
     };
 
     setForm(newForm);

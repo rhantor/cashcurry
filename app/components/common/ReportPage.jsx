@@ -229,8 +229,10 @@ export default function ReportPage({
   const thisMonthTotal = useMemo(() => {
     if (!valueField) return 0;
 
-    const start = startOfMonth(today);
-    const end = endOfMonth(today);
+    // Use selectedItem's date if available to show the correct month's total, otherwise fallback to today
+    const baseDate = selectedItem ? new Date(selectedItem[dateField] || today) : today;
+    const start = startOfMonth(baseDate);
+    const end = endOfMonth(baseDate);
 
     return data
       .filter((r) =>
@@ -244,7 +246,7 @@ export default function ReportPage({
           sum + (Number.isFinite(+r[valueField]) ? +r[valueField] : 0),
         0
       );
-  }, [data, valueField, dateField, today]);
+  }, [data, valueField, dateField, today, selectedItem]);
 
   // ✅ Render skeleton AFTER all hooks (Rules of Hooks safe)
   if (isLoading) {

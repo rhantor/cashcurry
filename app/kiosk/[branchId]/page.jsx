@@ -3,7 +3,9 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
 import { useKioskPunchMutation, useGetBranchAttendanceTokensQuery } from "@/lib/redux/api/attendanceApiSlice";
-import { Clock, LogIn, LogOut, X, Camera, Lock, ChevronLeft, User } from "lucide-react";
+import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
+import { Clock, LogIn, LogOut, X, Camera, Lock, ChevronLeft, User, Fingerprint, Loader2 } from "lucide-react";
+import { verifyBiometric } from "@/lib/biometricUtils";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 function todayStr() {
@@ -139,10 +141,20 @@ function PinPadModal({ staff, onSuccess, onCancel }) {
           })}
         </div>
 
-        {/* Cancel */}
-        <button onClick={onCancel} className="mt-8 w-full py-3 rounded-xl text-white/50 font-semibold hover:text-white transition text-sm">
-          Cancel
-        </button>
+        {/* Cancel & Bio Manual */}
+        <div className="flex gap-4 mt-8">
+          <button onClick={onCancel} className="flex-1 py-3 rounded-xl text-white/50 font-semibold hover:text-white transition text-sm">
+            Cancel
+          </button>
+          {staff.biometric?.credentialId && (
+            <button 
+              onClick={onSuccess} // In this context, onSuccess is passed as handlePinSuccess which triggers bio or camera
+              className="flex-1 py-3 rounded-xl bg-indigo-600/20 text-indigo-400 font-bold hover:bg-indigo-600/30 transition text-sm flex items-center justify-center gap-2"
+            >
+              <Fingerprint size={16} /> Use Finger
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -297,6 +309,13 @@ export default function KioskPage() {
   const [punchType, setPunchType] = useState("in");
   const [toast, setToast] = useState(null);
   const [showExitModal, setShowExitModal] = useState(false);
+  const [verifyingBio, setVerifyingBio] = useState(false);
+
+  // Fetch branch settings
+  const { data: settings } = useGetBranchSettingsQuery(
+    companyId && branchId ? { companyId, branchId } : { skip: true }
+  );
+  const attendanceSettings = settings?.attendance || {};
 
   // Determine punch type for a staff member
   const getPunchType = useCallback(
@@ -315,38 +334,85 @@ export default function KioskPage() {
   );
 
   // Staff selection flow
-  const handleStaffSelect = (staff) => {
+  const handleStaffSelect = async (staff) => {
+    setPunchType(getPunchType(staff.id));
+    
+    // 1. Check Duplicate Punch Interval
+    const lastPunch = todayPunches
+      .filter(p => p.staffId === staff.id)
+      .sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0))[0];
+
+    if (lastPunch && attendanceSettings.duplicatePunchInterval) {
+      const lastMs = (lastPunch.timestamp?.seconds || 0) * 1000;
+      const nowMs = Date.now();
+      const diffMin = (nowMs - lastMs) / 60000;
+      if (diffMin < attendanceSettings.duplicatePunchInterval) {
+        alert(`Please wait ${Math.ceil(attendanceSettings.duplicatePunchInterval - diffMin)} more minute(s) before punching again.`);
+        return;
+      }
+    }
+
+    // 2. Biometric Verification
+    console.log("Kiosk Settings:", attendanceSettings);
+    if (attendanceSettings.useBiometrics && staff.biometric?.credentialId) {
+      setVerifyingBio(true);
+      try {
+        const ok = await verifyBiometric(staff.biometric.credentialId);
+        if (ok) {
+          setSelectedStaff(staff);
+          if (attendanceSettings.useCamera) {
+            setShowCamera(true);
+          } else {
+            handleCapture(null, staff); // Immediate punch
+          }
+          return;
+        }
+      } catch (err) {
+        console.error("Biometric failed:", err);
+        // Fallback to PIN
+      } finally {
+        setVerifyingBio(false);
+      }
+    }
+
+    // 3. PIN Fallback
     if (!staff.pinCode) {
       alert(`${staff.firstName} does not have a Kiosk PIN configured. Please ask admin to set one.`);
       return;
     }
     setSelectedStaff(staff);
-    setPunchType(getPunchType(staff.id));
     setShowPinPad(true);
   };
 
   // After correct PIN
   const handlePinSuccess = () => {
     setShowPinPad(false);
-    setShowCamera(true);
+    if (attendanceSettings.useCamera) {
+      setShowCamera(true);
+    } else {
+      handleCapture(null);
+    }
   };
 
-  // After capturing photo
-  const handleCapture = async (photoBase64) => {
+  // After capturing photo (or skipping if disabled)
+  const handleCapture = async (photoBase64, overrideStaff = null) => {
+    const staff = overrideStaff || selectedStaff;
+    if (!staff) return;
+
     setShowCamera(false);
 
     try {
       await kioskPunch({
         companyId,
         branchId,
-        staffId: selectedStaff.id,
-        staffName: `${selectedStaff.firstName} ${selectedStaff.lastName}`,
+        staffId: staff.id,
+        staffName: `${staff.firstName} ${staff.lastName}`,
         type: punchType,
         date: todayStr(),
         photoBase64,
       }).unwrap();
 
-      setToast({ name: selectedStaff.firstName, type: punchType });
+      setToast({ name: staff.firstName, type: punchType });
       refetchPunches();
     } catch (err) {
       alert("Punch failed: " + (err?.message || "Unknown error"));
@@ -430,6 +496,20 @@ export default function KioskPage() {
 
                     {/* Status indicator */}
                     <div className={`absolute top-3 right-3 w-3 h-3 rounded-full ${isPunchedIn ? "bg-green-400 animate-pulse" : "bg-gray-600"}`} />
+                    
+                    {/* Biometric Icon */}
+                    {attendanceSettings.useBiometrics && s.biometric?.credentialId && (
+                      <div className="absolute bottom-3 right-3 text-white/20">
+                        <Fingerprint size={14} />
+                      </div>
+                    )}
+
+                    {/* Verifying Overlay */}
+                    {verifyingBio && selectedStaff?.id === s.id && (
+                      <div className="absolute inset-0 bg-indigo-600/40 backdrop-blur-[2px] rounded-2xl flex items-center justify-center">
+                        <Loader2 className="text-white animate-spin" size={24} />
+                      </div>
+                    )}
                   </button>
                 );
               })}
