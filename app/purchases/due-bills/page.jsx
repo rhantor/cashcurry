@@ -290,7 +290,8 @@ const handleSaveEdit = async (billId, formData) => {
     paidFrom,
     paidMethod,
     note,
-    file
+    file,
+    paymentDate
   }) => {
     try {
       let paymentFileURL = null
@@ -349,7 +350,8 @@ const handleSaveEdit = async (billId, formData) => {
         createdBy: user || {},
         costCategory: 'Inventory',
         paymentFileURL,
-        attachments: allAttachments
+        attachments: allAttachments,
+        paymentDate
       })
 
       await Promise.all([refetchUnpaid(), refetchPartial()])

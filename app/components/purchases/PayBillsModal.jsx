@@ -18,6 +18,7 @@ export default function PayBillsModal({
   const [method, setMethod] = useState("cash");
   const [note, setNote] = useState("");
   const [file, setFile] = useState(null);
+  const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -29,6 +30,7 @@ export default function PayBillsModal({
       setMethod("cash");
       setNote("");
       setFile(null);
+      setPaymentDate(new Date().toISOString().slice(0, 10));
     }
   }, [open, bills]);
 
@@ -72,7 +74,7 @@ export default function PayBillsModal({
     }) &&
     !(paidFrom === "back" && !method);
 
-  const valid = basicValid && (!isPartial || note.trim().length > 0) && !!file;
+  const valid = basicValid && (!isPartial || note.trim().length > 0) && !!file && !!paymentDate;
 
   if (!open) return null;
 
@@ -261,7 +263,23 @@ export default function PayBillsModal({
               Payment Method
             </h3>
 
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div>
+                <label className="text-xs font-medium text-gray-500 uppercase tracking-wider flex items-center gap-1">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Date
+                </label>
+                <input
+                  type="date"
+                  className="mt-1.5 w-full border border-gray-200 rounded-xl p-2.5 text-sm font-medium text-gray-700 bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all"
+                  value={paymentDate}
+                  onChange={(e) => setPaymentDate(e.target.value)}
+                  max={new Date().toISOString().slice(0, 10)}
+                  required
+                />
+              </div>
               <div>
                 <label className="text-xs font-medium text-gray-500 uppercase tracking-wider">Paid From</label>
                 <select
@@ -418,6 +436,7 @@ export default function PayBillsModal({
                     paidMethod: paidFrom === "front" ? "cash" : method,
                     note,
                     file, // pass the file to parent 
+                    paymentDate, // pass the selected date
                   });
                 } finally {
                   setIsSubmitting(false);

@@ -42,6 +42,7 @@ export async function payVendorBills({
   costCategory = "Inventory",
   paymentFileURL = null,
   attachments = [],
+  paymentDate = null,
 }) {
   if (!companyId || !branchId) throw new Error("Missing company/branch");
   if (!vendorId) throw new Error("Missing vendorId");
@@ -50,6 +51,7 @@ export async function payVendorBills({
   }
 
   const now = serverTimestamp();
+  const paymentDateStr = paymentDate || new Date().toISOString().slice(0, 10);
   const batch = writeBatch(db);
 
   // --- 1) Create a vendor payment "header" (optional; useful for audit) ---
@@ -74,6 +76,7 @@ export async function payVendorBills({
     paidMethod, // normalized already by caller
     reference: reference || "",
     createdBy: createdBy || {},
+    paymentDate: paymentDateStr,
     createdAt: now,
     createdAtClient: new Date().toISOString(),
   });
@@ -119,6 +122,7 @@ export async function payVendorBills({
         paidMethod: paidMethod || "",
         paidBy: createdBy ? { username: createdBy.username || createdBy.email || "" } : {},
         note: reference || "",
+        paymentDate: paymentDateStr,
         paidAtClient: new Date().toISOString(),
       }),
     });
@@ -138,7 +142,7 @@ export async function payVendorBills({
   const costRef = doc(costsCol);
   batch.set(costRef, {
     // Required / standard fields your cost report expects:
-    date: new Date().toISOString().slice(0, 10), // YYYY-MM-DD
+    date: paymentDateStr, // YYYY-MM-DD
     amount: Number(totalPaid),
     category: costCategory, // e.g. "Inventory"
     description: reference?.trim()
@@ -175,7 +179,7 @@ export async function payVendorBills({
   batch.update(vendorRef, {
     currentBalance: increment(-Number(totalPaid)),
     totalPaid: increment(Number(totalPaid)),
-    lastPaymentDate: new Date().toISOString(),
+    lastPaymentDate: paymentDateStr,
     updatedAt: now,
   });
 
