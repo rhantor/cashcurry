@@ -9,8 +9,9 @@ import * as XLSX from 'xlsx'
 import { fmtAmt, periodLabel } from '@/utils/payrollCalculations'
 
 const RM = v => `RM ${fmtAmt(v || 0)}`
-const n2 = v => Number(v || 0).toFixed(2)
+const n2 = v => Number(v || 0).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 const dash = v => (Number(v || 0) > 0 ? n2(v) : '-')
+const num = v => Number(Number(v || 0).toFixed(2))
 
 // ─── Build column definitions ─────────────────────────────────────────────────
 
@@ -46,7 +47,7 @@ function buildCols (slips) {
 
 // Build header and a row array for one slip
 function buildHeaders (cols) {
-  const h = ['#', 'Name', 'Designation', 'Basic Pay', 'Work Hrs']
+  const h = ['#', 'Name', 'Designation', 'Basic / Rate', 'Earned Basic', 'Work Hrs']
   if (cols.showOT) { h.push('OT Hrs'); h.push('OT Pay') }
   if (cols.showPH) h.push('PH Pay')
   h.push('Allowance')
@@ -70,10 +71,13 @@ function buildRow (s, idx, cols) {
     s.otherEarningsNote   && s.otherEarnings   > 0 && s.otherEarningsNote,
   ].filter(Boolean).join(' | ')
 
+  const basicAndRate = `${n2(s.basicSalary)} / ${n2(isH ? (s.basicSalary / (s.standardHours || 208)) : (s.basicSalary / (s.workingDays || 26)))}`
+
   const row = [
     idx + 1,
     s.staffName,
     s.designation || '',
+    basicAndRate,
     n2(s.basePay),
     isH ? n2(s.workedHours) : `${s.workedDays || 0}d`,
   ]
@@ -96,7 +100,7 @@ function buildRow (s, idx, cols) {
 }
 
 function buildTotalRow (label, data, cols) {
-  const row = ['', label, '', n2(data.basePay), n2(data.workedHours)]
+  const row = ['', label, '', '', n2(data.basePay), n2(data.workedHours)]
   if (cols.showOT) { row.push(n2(data.otHours)); row.push(n2(data.otPay)) }
   if (cols.showPH) row.push(n2(data.phPay || 0))
   row.push(n2(data.allowance))
@@ -116,25 +120,30 @@ function buildTotalRow (label, data, cols) {
 
 export function exportPayrollToPDF (slips = [], branchName = '', period = '', run = null, companyName = '') {
   try {
-    const doc     = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' })
+    const doc     = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a3' })
     const cols    = buildCols(slips)
     const headers = buildHeaders(cols)
     const status  = run?.status || 'draft'
 
     // Title block
-    let y = 10
+    let y = 14
+    const pageWidth = doc.internal.pageSize.getWidth()
+    
     if (companyName) {
       doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139)
-      doc.text(companyName.toUpperCase(), 14, y)
+      doc.text(companyName.toUpperCase(), pageWidth / 2, y, { align: 'center' })
       y += 5
     }
-    doc.setFontSize(14); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 41, 59)
-    doc.text(branchName, 14, y)
-    y += 6
-    doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(71, 85, 105)
-    doc.text(`Salary Sheet — ${periodLabel(period)}   |   ${slips.length} Staff   |   Status: ${status.toUpperCase()}`, 14, y)
-    y += 5
-    if (run?.paidAt) { doc.text(`Paid: ${new Date(run.paidAt).toLocaleDateString()}`, 14, y); y += 5 }
+    doc.setFontSize(16); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 41, 59)
+    doc.text(branchName, pageWidth / 2, y, { align: 'center' })
+    y += 7
+    doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(71, 85, 105)
+    doc.text(`Salary Sheet — ${periodLabel(period)}   |   ${slips.length} Staff   |   Status: ${status.toUpperCase()}`, pageWidth / 2, y, { align: 'center' })
+    if (run?.paidAt) {
+      y += 5
+      doc.text(`Paid: ${new Date(run.paidAt).toLocaleDateString()}`, pageWidth / 2, y, { align: 'center' })
+    }
+    y += 8
 
     // Group by dept
     const deptMap = {}
@@ -199,14 +208,29 @@ export function exportPayrollToPDF (slips = [], branchName = '', period = '', ru
       alternateRowStyles: { fillColor: [248,250,252] },
       columnStyles: {
         0: { halign: 'center', cellWidth: 8 },
-        1: { halign: 'left', cellWidth: 28 },
-        2: { halign: 'left', cellWidth: 24 },
+        1: { halign: 'left', cellWidth: 26 },
+        2: { halign: 'left', cellWidth: 20 },
+        3: { halign: 'right', cellWidth: 20 }, // Basic / Rate
+        4: { halign: 'right' }, // Earned Basic
       },
       didParseCell (data) {
-        // Net Pay column — green text
-        if (data.section === 'body' && data.column.index === headers.length - 2) {
+        const hName = headers[data.column.index]
+        if (!hName) return
+        
+        const isStat = cols.statKeys.some(k => cols.statNames[k] === hName)
+        const isRed = isStat || ['Advance', 'Loan', 'Penalty/Ded.', 'Penalty', 'Deduction'].includes(hName)
+        const isGreen = ['Bonus', 'Other Earn.', 'Net Pay'].includes(hName)
+
+        if (isRed) {
+          data.cell.styles.textColor = [153, 27, 27]
+        } else if (isGreen) {
           data.cell.styles.textColor = [22, 101, 52]
-          data.cell.styles.fontStyle = 'bold'
+        }
+
+        if (data.section === 'body' && !data.row.raw?.isDept) {
+          if (hName === 'Net Pay' || hName === 'Total Salary' || hName === 'Gross Pay') {
+            data.cell.styles.fontStyle = 'bold'
+          }
         }
       },
       margin: { left: 8, right: 8 },
@@ -239,10 +263,36 @@ export function exportPayrollToPDF (slips = [], branchName = '', period = '', ru
 
 export function exportPayslipToPDF (slip, branchName = '', period = '', companyName = '') {
   try {
-    const doc      = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-    const currency = 'RM'
-    const fmt      = v => `${currency} ${fmtAmt(v || 0)}`
-    const isHours  = slip.salaryMode === 'hours'
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+    drawPayslipToPDF(doc, slip, branchName, period, companyName)
+    doc.save(`Payslip_${slip.staffName?.replace(/\s+/g,'_') || 'staff'}_${period}.pdf`)
+  } catch (err) {
+    console.error('Payslip PDF export failed:', err)
+    alert('PDF export failed. Please try again.')
+  }
+}
+
+export function exportAllPayslipsToPDF (slips = [], branchName = '', period = '', companyName = '') {
+  if (!slips.length) return alert('No payslips to export')
+  try {
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
+    slips.forEach((slip, index) => {
+      if (index > 0) doc.addPage()
+      drawPayslipToPDF(doc, slip, branchName, period, companyName)
+    })
+    doc.save(`All_Payslips_${branchName.replace(/\s+/g,'_')}_${period}.pdf`)
+  } catch (err) {
+    console.error('All Payslips PDF export failed:', err)
+    alert('PDF export failed. Please try again.')
+  }
+}
+
+// ─── Shared Payslip Drawing Helper ────────────────────────────────────────────
+
+function drawPayslipToPDF (doc, slip, branchName = '', period = '', companyName = '') {
+  const currency = 'RM'
+  const fmt      = v => `${currency} ${fmtAmt(v || 0)}`
+  const isHours  = slip.salaryMode === 'hours'
 
     // Header — left side: company + branch
     let y = 12
@@ -252,8 +302,9 @@ export function exportPayslipToPDF (slip, branchName = '', period = '', companyN
       y += 5
     }
     doc.setFontSize(16); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 41, 59)
-    doc.text(branchName, 14, y)
-    y += 6
+    const splitBranch = doc.splitTextToSize(branchName, 130)
+    doc.text(splitBranch, 14, y)
+    y += (splitBranch.length * 6)
     doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139)
     doc.text('EMPLOYEE SALARY VOUCHER', 14, y)
 
@@ -264,28 +315,46 @@ export function exportPayslipToPDF (slip, branchName = '', period = '', companyN
     doc.text(`No: ${period}-${(slip.staffId || '').slice(-4).toUpperCase()}`, 196, 18, { align: 'right' })
     doc.text(`Period: ${periodLabel(period)}`, 196, 23, { align: 'right' })
 
+
+
     const dividerY = y + 5
     doc.setDrawColor(30, 41, 59); doc.setLineWidth(0.5)
     doc.line(14, dividerY, 196, dividerY)
     const afterHeader = dividerY + 4
 
     // Employee info
-    const info = [
-      ['Employee', slip.staffName || ''],
-      ['Designation', slip.designation || '—'],
-      ['Pay Mode', isHours ? 'Hourly (Monthly)' : 'Daily (Monthly)'],
-      ['Basic Salary', fmt(slip.basicSalary)],
-      [isHours ? 'Standard Hours' : 'Working Days', isHours ? `${slip.standardHours || 208} hrs/month` : `${slip.workingDays || 26} days/month`],
-      [isHours ? 'Hourly Rate' : 'Daily Rate', isHours ? `${currency} ${fmtAmt(slip.basicSalary / (slip.standardHours || 208))}/hr` : `${currency} ${fmtAmt(slip.basicSalary / (slip.workingDays || 26))}/day`],
+    const infoBody = [
+      [
+        { content: 'EMPLOYEE NAME', styles: { fontSize: 7, textColor: [148, 163, 184], fontStyle: 'normal' } },
+        { content: 'DESIGNATION', styles: { fontSize: 7, textColor: [148, 163, 184], fontStyle: 'normal' } },
+        { content: 'PAY MODE', styles: { fontSize: 7, textColor: [148, 163, 184], fontStyle: 'normal' } }
+      ],
+      [
+        { content: slip.staffName || '', styles: { fontSize: 9, fontStyle: 'bold' } },
+        { content: slip.designation || '—', styles: { fontSize: 9, fontStyle: 'bold' } },
+        { content: isHours ? 'Hourly (Monthly)' : 'Daily (Monthly)', styles: { fontSize: 9, fontStyle: 'bold' } }
+      ],
+      [
+        { content: 'BASIC SALARY', styles: { fontSize: 7, textColor: [148, 163, 184], fontStyle: 'normal' } },
+        { content: isHours ? 'STANDARD HOURS' : 'WORKING DAYS', styles: { fontSize: 7, textColor: [148, 163, 184], fontStyle: 'normal' } },
+        { content: isHours ? 'HOURLY RATE' : 'DAILY RATE', styles: { fontSize: 7, textColor: [148, 163, 184], fontStyle: 'normal' } }
+      ],
+      [
+        { content: fmt(slip.basicSalary), styles: { fontSize: 9, fontStyle: 'bold' } },
+        { content: isHours ? `${slip.standardHours || 208} hrs/month` : `${slip.workingDays || 26} days/month`, styles: { fontSize: 9, fontStyle: 'bold' } },
+        { content: isHours ? `${currency} ${fmtAmt(slip.basicSalary / (slip.standardHours || 208))}/hr` : `${currency} ${fmtAmt(slip.basicSalary / (slip.workingDays || 26))}/day`, styles: { fontSize: 9, fontStyle: 'bold' } }
+      ]
     ]
+
     autoTable(doc, {
       startY: afterHeader,
-      body: info,
-      theme: 'plain',
-      styles: { fontSize: 8.5, cellPadding: 2 },
-      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 40, textColor: [100, 116, 139] }, 1: { textColor: [30, 41, 59] } },
-      tableWidth: 88,
+      body: infoBody,
+      theme: 'grid',
+      styles: { cellPadding: 3, textColor: [30, 41, 59], fillColor: [248, 250, 252], lineColor: [226, 232, 240], lineWidth: 0.1 },
+      tableWidth: 182,
+      margin: { left: 14 },
     })
+    const afterInfo = doc.lastAutoTable.finalY
 
     // Earnings
     const earnings = [
@@ -297,15 +366,19 @@ export function exportPayslipToPDF (slip, branchName = '', period = '', companyN
     ]
 
     autoTable(doc, {
-      startY: afterHeader,
-      head: [['EARNINGS', 'Amount']],
-      body: [...earnings, [{ content: 'Gross Pay', styles: { fontStyle: 'bold' } }, { content: fmt(slip.grossEarnings), styles: { fontStyle: 'bold', textColor: [22, 101, 52] } }]],
-      styles: { fontSize: 8.5, cellPadding: 2 },
-      headStyles: { fillColor: [240, 253, 244], textColor: [22, 101, 52], fontStyle: 'bold', lineColor: [187, 247, 208], lineWidth: 0.3 },
-      columnStyles: { 0: { cellWidth: 65 }, 1: { halign: 'right', cellWidth: 30 } },
-      tableWidth: 95,
-      margin: { left: 105 },
+      startY: afterInfo + 6,
+      head: [
+        [{ content: 'EARNINGS', colSpan: 2, styles: { fillColor: [240, 253, 244], textColor: [22, 101, 52], fontStyle: 'bold', halign: 'left' } }],
+        [{ content: 'Description', styles: { fillColor: [248, 250, 252], textColor: [100, 116, 139] } }, { content: 'Amount', styles: { fillColor: [248, 250, 252], textColor: [100, 116, 139], halign: 'right' } }]
+      ],
+      body: [...earnings, [{ content: 'Gross Pay', styles: { fontStyle: 'bold', fillColor: [240, 253, 244], textColor: [22, 101, 52] } }, { content: fmt(slip.grossEarnings), styles: { fontStyle: 'bold', textColor: [22, 101, 52], fillColor: [240, 253, 244] } }]],
+      styles: { fontSize: 8.5, cellPadding: 3, lineColor: [241, 245, 249], lineWidth: 0.1 },
+      headStyles: { lineColor: [226, 232, 240], lineWidth: 0.1 },
+      columnStyles: { 0: { cellWidth: 55 }, 1: { halign: 'right', cellWidth: 33 } },
+      tableWidth: 88,
+      margin: { left: 14 },
     })
+    const earningsY = doc.lastAutoTable.finalY
 
     // Deductions
     const deductions = [
@@ -316,26 +389,29 @@ export function exportPayslipToPDF (slip, branchName = '', period = '', companyN
     ]
 
     autoTable(doc, {
-      startY: doc.lastAutoTable.finalY + 3,
-      head: [['DEDUCTIONS', 'Amount']],
+      startY: afterInfo + 6,
+      head: [
+        [{ content: 'DEDUCTIONS', colSpan: 2, styles: { fillColor: [254, 242, 242], textColor: [153, 27, 27], fontStyle: 'bold', halign: 'left' } }],
+        [{ content: 'Description', styles: { fillColor: [248, 250, 252], textColor: [100, 116, 139] } }, { content: 'Amount', styles: { fillColor: [248, 250, 252], textColor: [100, 116, 139], halign: 'right' } }]
+      ],
       body: deductions.length > 0
-        ? [...deductions, [{ content: 'Total Deductions', styles: { fontStyle: 'bold' } }, { content: fmt(slip.totalDeductions), styles: { fontStyle: 'bold', textColor: [153, 27, 27] } }]]
-        : [['No deductions', '']],
-      styles: { fontSize: 8.5, cellPadding: 2 },
-      headStyles: { fillColor: [254, 242, 242], textColor: [153, 27, 27], fontStyle: 'bold', lineColor: [254, 202, 202], lineWidth: 0.3 },
-      columnStyles: { 0: { cellWidth: 65 }, 1: { halign: 'right', cellWidth: 30, textColor: [153, 27, 27] } },
-      tableWidth: 95,
-      margin: { left: 105 },
+        ? [...deductions, [{ content: 'Total Deductions', styles: { fontStyle: 'bold', fillColor: [254, 242, 242], textColor: [153, 27, 27] } }, { content: fmt(slip.totalDeductions), styles: { fontStyle: 'bold', textColor: [153, 27, 27], fillColor: [254, 242, 242] } }]]
+        : [[{ content: 'No deductions', colSpan: 2, styles: { halign: 'center', textColor: [148, 163, 184] } }]],
+      styles: { fontSize: 8.5, cellPadding: 3, lineColor: [241, 245, 249], lineWidth: 0.1 },
+      headStyles: { lineColor: [226, 232, 240], lineWidth: 0.1 },
+      columnStyles: { 0: { cellWidth: 55 }, 1: { halign: 'right', cellWidth: 33, textColor: [153, 27, 27] } },
+      tableWidth: 88,
+      margin: { left: 108 },
     })
 
     // Net Pay box
-    const netY = Math.max(doc.lastAutoTable.finalY, 30 + (info.length * 6)) + 8
+    const netY = Math.max(doc.lastAutoTable.finalY, earningsY) + 8
     doc.setDrawColor(30, 41, 59); doc.setLineWidth(0.7)
     doc.rect(14, netY, 182, 16)
     doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139)
     doc.text('NET PAY (TAKE HOME)', 20, netY + 6)
     doc.setFontSize(8)
-    doc.text(`Gross ${fmt(slip.grossEarnings)} − Deductions ${fmt(slip.totalDeductions)}`, 20, netY + 12)
+    doc.text(`Gross ${fmt(slip.grossEarnings)} - Deductions ${fmt(slip.totalDeductions)}`, 20, netY + 12)
     doc.setFontSize(16); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 41, 59)
     doc.text(fmt(slip.netPay), 192, netY + 10, { align: 'right' })
 
@@ -351,12 +427,6 @@ export function exportPayslipToPDF (slip, branchName = '', period = '', companyN
 
     doc.setFontSize(7); doc.setTextColor(148, 163, 184)
     doc.text(`${branchName} · ${periodLabel(period)} · Generated: ${new Date().toLocaleDateString()}`, 14, sigY + 16)
-
-    doc.save(`Payslip_${slip.staffName?.replace(/\s+/g,'_') || 'staff'}_${period}.pdf`)
-  } catch (err) {
-    console.error('Payslip PDF export failed:', err)
-    alert('PDF export failed. Please try again.')
-  }
 }
 
 // ─── Excel Export ─────────────────────────────────────────────────────────────
@@ -392,7 +462,13 @@ export function exportPayrollToExcel (slips = [], branchName = '', period = '', 
       wsData.push([dept.toUpperCase()])
 
       ds.forEach((s, idx) => {
-        wsData.push(buildRow(s, idx, cols).map(v => isNaN(v) ? v : Number(v) || v))
+        wsData.push(buildRow(s, idx, cols).map(v => {
+          if (typeof v === 'string') {
+            const numStr = v.replace(/,/g, '')
+            if (!isNaN(numStr) && numStr.trim() !== '') return Number(numStr)
+          }
+          return v
+        }))
         dt.basePay+=s.basePay||0; dt.workedHours+=s.workedHours||0; dt.otHours+=s.otHours||0; dt.otPay+=s.otPay||0
         dt.allowance+=s.allowance||0; dt.advanceAmt+=s.advanceAmt||0; dt.loanAmt+=s.loanAmt||0
         dt.otherEarnings+=s.otherEarnings||0; dt.otherDeductions+=s.otherDeductions||0
@@ -404,7 +480,15 @@ export function exportPayrollToExcel (slips = [], branchName = '', period = '', 
         }
       })
 
-      if (depts.length > 1) wsData.push(buildTotalRow(`${dept} Subtotal`, dt, cols))
+      if (depts.length > 1) {
+        wsData.push(buildTotalRow(`${dept} Subtotal`, dt, cols).map(v => {
+          if (typeof v === 'string') {
+            const numStr = v.replace(/,/g, '')
+            if (!isNaN(numStr) && numStr.trim() !== '') return Number(numStr)
+          }
+          return v
+        }))
+      }
 
       grandData.basePay+=dt.basePay; grandData.workedHours+=dt.workedHours; grandData.otHours+=dt.otHours; grandData.otPay+=dt.otPay
       grandData.allowance+=dt.allowance; grandData.advanceAmt+=dt.advanceAmt; grandData.loanAmt+=dt.loanAmt
@@ -415,7 +499,13 @@ export function exportPayrollToExcel (slips = [], branchName = '', period = '', 
     })
 
     wsData.push([])
-    wsData.push(buildTotalRow(`GRAND TOTAL (${slips.length} staff)`, grandData, cols))
+    wsData.push(buildTotalRow(`GRAND TOTAL (${slips.length} staff)`, grandData, cols).map(v => {
+      if (typeof v === 'string') {
+        const numStr = v.replace(/,/g, '')
+        if (!isNaN(numStr) && numStr.trim() !== '') return Number(numStr)
+      }
+      return v
+    }))
     wsData.push([])
     wsData.push([`Generated: ${new Date().toLocaleString()}`])
 
@@ -423,7 +513,7 @@ export function exportPayrollToExcel (slips = [], branchName = '', period = '', 
 
     // Column widths
     ws1['!cols'] = [
-      { wch: 5 }, { wch: 22 }, { wch: 20 }, { wch: 12 }, { wch: 10 },
+      { wch: 5 }, { wch: 22 }, { wch: 20 }, { wch: 18 }, { wch: 12 }, { wch: 10 },
       ...(cols.showOT ? [{ wch: 8 }, { wch: 12 }] : []),
       { wch: 12 },
       ...cols.statKeys.map(() => ({ wch: 12 })),
@@ -443,14 +533,14 @@ export function exportPayrollToExcel (slips = [], branchName = '', period = '', 
       const isH = s.salaryMode === 'hours'
       ws2Data.push([`STAFF: ${s.staffName}`, `Designation: ${s.designation||''}`, `Dept: ${s.department||''}`])
       ws2Data.push(['EARNINGS', '', 'DEDUCTIONS', ''])
-      ws2Data.push(['Basic Pay', Number(n2(s.basePay)), 'Statutory Deductions', ''])
-      ;(s.statutory||[]).forEach(d => ws2Data.push(['', '', `  ${d.name} (${d.employeeRate}%)`, Number(n2(d.employeeAmt))]))
-      if (s.allowance > 0)     ws2Data.push(['Allowance',    Number(n2(s.allowance)),     s.advanceAmt>0?'Salary Advance':  '', s.advanceAmt>0?Number(n2(s.advanceAmt)):''])
-      if (s.otPay > 0)         ws2Data.push([`OT Pay`,       Number(n2(s.otPay)),          s.loanAmt>0?'Loan Repayment':   '', s.loanAmt>0?Number(n2(s.loanAmt)):''])
-      if (s.otherEarnings > 0) ws2Data.push(['Other Earn.',  Number(n2(s.otherEarnings)),  s.otherDeductions>0?'Other Ded.':'', s.otherDeductions>0?Number(n2(s.otherDeductions)):''])
-      ws2Data.push(['GROSS PAY', Number(n2(s.grossEarnings)), 'TOTAL DEDUCTIONS', Number(n2(s.totalDeductions))])
+      ws2Data.push(['Basic Pay', num(s.basePay), 'Statutory Deductions', ''])
+      ;(s.statutory||[]).forEach(d => ws2Data.push(['', '', `  ${d.name} (${d.employeeRate}%)`, num(d.employeeAmt)]))
+      if (s.allowance > 0)     ws2Data.push(['Allowance',    num(s.allowance),     s.advanceAmt>0?'Salary Advance':  '', s.advanceAmt>0?num(s.advanceAmt):''])
+      if (s.otPay > 0)         ws2Data.push([`OT Pay`,       num(s.otPay),          s.loanAmt>0?'Loan Repayment':   '', s.loanAmt>0?num(s.loanAmt):''])
+      if (s.otherEarnings > 0) ws2Data.push(['Other Earn.',  num(s.otherEarnings),  s.otherDeductions>0?'Other Ded.':'', s.otherDeductions>0?num(s.otherDeductions):''])
+      ws2Data.push(['GROSS PAY', num(s.grossEarnings), 'TOTAL DEDUCTIONS', num(s.totalDeductions)])
       ws2Data.push(['', '', '', ''])
-      ws2Data.push(['NET PAY', Number(n2(s.netPay)), '', ''])
+      ws2Data.push(['NET PAY', num(s.netPay), '', ''])
       ws2Data.push([])
     }
     const ws2 = XLSX.utils.aoa_to_sheet(ws2Data)
@@ -464,17 +554,17 @@ export function exportPayrollToExcel (slips = [], branchName = '', period = '', 
       ['Staff Count', slips.length],
       [],
       ['', 'Amount (RM)'],
-      ['Total Basic Pay',     Number(n2(grandData.basePay))],
-      ['Total Allowance',     Number(n2(grandData.allowance))],
-      ['Total OT Pay',        Number(n2(grandData.otPay))],
-      ...cols.statKeys.map(k => [cols.statNames[k], Number(n2(grandData.stat[k]||0))]),
-      ['Total Advance',       Number(n2(grandData.advanceAmt))],
-      ['Total Loan',          Number(n2(grandData.loanAmt))],
-      ['Total Other Earn.',   Number(n2(grandData.otherEarnings))],
-      ['Total Penalty/Ded.',  Number(n2(grandData.otherDeductions))],
+      ['Total Basic Pay',     num(grandData.basePay)],
+      ['Total Allowance',     num(grandData.allowance)],
+      ['Total OT Pay',        num(grandData.otPay)],
+      ...cols.statKeys.map(k => [cols.statNames[k], num(grandData.stat[k]||0)]),
+      ['Total Advance',       num(grandData.advanceAmt)],
+      ['Total Loan',          num(grandData.loanAmt)],
+      ['Total Other Earn.',   num(grandData.otherEarnings)],
+      ['Total Penalty/Ded.',  num(grandData.otherDeductions)],
       [],
-      ['GROSS TOTAL',         Number(n2(grandData.grossEarnings))],
-      ['NET TOTAL PAYABLE',   Number(n2(grandData.netPay))],
+      ['GROSS TOTAL',         num(grandData.grossEarnings)],
+      ['NET TOTAL PAYABLE',   num(grandData.netPay)],
     ]
     const ws3 = XLSX.utils.aoa_to_sheet(kpiData)
     ws3['!cols'] = [{ wch: 22 }, { wch: 16 }]

@@ -162,14 +162,6 @@ function StaffSlipCard ({
           >
             🖨
           </button>
-          <button
-            type='button'
-            onClick={onExportPDF}
-            title='Download payslip PDF'
-            className='text-red-400 hover:text-red-600 text-xs font-semibold transition-colors border border-red-200 rounded px-1.5 py-0.5'
-          >
-            PDF
-          </button>
         </div>
       </div>
 

@@ -42,6 +42,7 @@ export function exportSalarySheetExcel ({
     [
       `Staff Name`,
       `Basic Salary (${currency})`,
+      'Rate/Hr',
       `Allowance (${currency})`,
       'Basic Hours',
       'OT Hours',
@@ -58,6 +59,7 @@ export function exportSalarySheetExcel ({
     ...rows.map(r => [
       safeText(r.staffName),
       toNum(r.basicSalary),
+      toNum(toNum(r.basicSalary) / toNum(standardHours || 208)),
       toNum(r.allowance),
       toNum(r.basicHours),
       toNum(r.otHours),
@@ -74,6 +76,7 @@ export function exportSalarySheetExcel ({
     [
       'TOTALS',
       totals.basicSalary,
+      '',
       totals.allowance,
       '',
       '',
@@ -94,6 +97,7 @@ export function exportSalarySheetExcel ({
   ws['!cols'] = [
     { wch: 25 }, // Staff Name
     { wch: 15 }, // Basic Salary
+    { wch: 10 }, // Rate/Hr
     { wch: 15 }, // Allowance
     { wch: 12 }, // Basic Hours
     { wch: 10 }, // OT Hours
@@ -136,12 +140,12 @@ export function exportSalarySheetCSV ({
   )}\n`
   csv += `${escapeCsv(`Standard Hours: ${standardHours}`)}\n\n`
 
-  csv += `"Staff Name","Basic Salary (${currency})","Allowance (${currency})","Basic Hours","OT Hours","OT Rate (${currency})","OT Pay (${currency})","Bonus (${currency})","Penalty (${currency})","Advance (${currency})","Loan (${currency})","Remarks","Gross (${currency})","Net Pay (${currency})"\n`
+  csv += `"Staff Name","Basic Salary (${currency})","Rate/Hr","Allowance (${currency})","Basic Hours","OT Hours","OT Rate (${currency})","OT Pay (${currency})","Bonus (${currency})","Penalty (${currency})","Advance (${currency})","Loan (${currency})","Remarks","Gross (${currency})","Net Pay (${currency})"\n`
 
   for (const r of rows) {
     csv +=
       `${escapeCsv(safeText(r.staffName))},` +
-      `${toNum(r.basicSalary)},${toNum(r.allowance)},${toNum(r.basicHours)},` +
+      `${toNum(r.basicSalary)},${toNum(toNum(r.basicSalary) / toNum(standardHours || 208))},${toNum(r.allowance)},${toNum(r.basicHours)},` +
       `${toNum(r.otHours)},${toNum(r.otRate)},${toNum(r.otPay)},` +
       `${toNum(r.bonus)},${toNum(r.penalty)},${toNum(r.advance)},${toNum(
         r.loan
@@ -150,7 +154,7 @@ export function exportSalarySheetCSV ({
       `${toNum(r.gross)},${toNum(r.netPay)}\n`
   }
 
-  csv += `"TOTALS",${totals.basicSalary},${totals.allowance},"","","",${totals.otPay},${totals.bonus},${totals.penalty},${totals.advance},${totals.loan},"",${totals.gross},${totals.netPay}\n`
+  csv += `"TOTALS",${totals.basicSalary},"",${totals.allowance},"","","",${totals.otPay},${totals.bonus},${totals.penalty},${totals.advance},${totals.loan},"",${totals.gross},${totals.netPay}\n`
 
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
@@ -189,15 +193,21 @@ export async function exportSalarySheetPDF ({
 }) {
   if (!rows?.length) return alert('No data to export')
 
-  const doc = new jsPDF({ unit: 'pt', format: 'a4' })
+  // Set to landscape to fit more columns comfortably
+  const doc = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'landscape' })
   const sheetTitle = title || `Salary Sheet - ${month}`
   const exportDate = new Date().toLocaleString('en-MY')
 
   // Header
-  doc.setFontSize(14)
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(16)
+  doc.setTextColor(30, 41, 59) // slate-800
   doc.text(sheetTitle, 40, 45)
 
   doc.setFontSize(10)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(100, 116, 139) // slate-500
+  
   const metaLeft = [
     companyName ? `Company: ${companyName}` : null,
     branchName ? `Branch: ${branchName}` : null,
@@ -212,9 +222,10 @@ export async function exportSalarySheetPDF ({
 
   const head = [
     [
-      'Staff',
-      'Basic',
-      'Allow',
+      'Staff Name',
+      `Basic (${currency})`,
+      'Rate/Hr',
+      `Allow (${currency})`,
       'Basic Hrs',
       'OT Hrs',
       'OT Rate',
@@ -223,8 +234,8 @@ export async function exportSalarySheetPDF ({
       'Penalty',
       'Advance',
       'Loan',
-      'Gross',
-      'Net',
+      'Gross Pay',
+      'Net Pay',
       'Remarks'
     ]
   ]
@@ -232,6 +243,7 @@ export async function exportSalarySheetPDF ({
   const body = rows.map(r => [
     safeText(r.staffName),
     fmt(r.basicSalary),
+    fmt(toNum(r.basicSalary) / toNum(standardHours || 208)),
     fmt(r.allowance),
     String(toNum(r.basicHours)),
     String(toNum(r.otHours)),
@@ -250,6 +262,7 @@ export async function exportSalarySheetPDF ({
     [
       'TOTALS',
       fmt(totals.basicSalary),
+      '',
       fmt(totals.allowance),
       '',
       '',
@@ -268,18 +281,51 @@ export async function exportSalarySheetPDF ({
   // If autotable exists, use it (best)
   if (autoTable) {
     autoTable(doc, {
-      startY: 65 + metaLeft.length * 14 + 22,
+      startY: 65 + metaLeft.length * 14 + 15,
       head,
       body,
       foot,
-      styles: { fontSize: 8, cellPadding: 3, overflow: 'linebreak' },
-      headStyles: { fontSize: 8 },
-      footStyles: { fontSize: 8 },
-      columnStyles: {
-        0: { cellWidth: 80 }, // Staff
-        13: { cellWidth: 110 } // Remarks
+      theme: 'grid',
+      styles: { 
+        fontSize: 8, 
+        cellPadding: 4, 
+        overflow: 'linebreak',
+        font: 'helvetica'
       },
-      margin: { left: 40, right: 40 }
+      headStyles: { 
+        fillColor: [241, 245, 249], // slate-100
+        textColor: [30, 41, 59], // slate-800
+        fontStyle: 'bold',
+        fontSize: 8,
+        halign: 'center'
+      },
+      footStyles: { 
+        fillColor: [241, 245, 249],
+        textColor: [30, 41, 59],
+        fontStyle: 'bold',
+        fontSize: 8.5
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252] // slate-50
+      },
+      columnStyles: {
+        0: { cellWidth: 100, halign: 'left', fontStyle: 'bold', textColor: [51, 65, 85] }, // Staff
+        1: { halign: 'right' }, // Basic
+        2: { halign: 'right', textColor: [100, 116, 139] }, // Rate/Hr
+        3: { halign: 'right' }, // Allow
+        4: { halign: 'center' }, // Basic Hrs
+        5: { halign: 'center' }, // OT Hrs
+        6: { halign: 'right' }, // OT Rate
+        7: { halign: 'right' }, // OT Pay
+        8: { halign: 'right', textColor: [22, 101, 52] }, // Bonus (Green)
+        9: { halign: 'right', textColor: [153, 27, 27] }, // Penalty (Red)
+        10: { halign: 'right', textColor: [153, 27, 27] }, // Advance (Red)
+        11: { halign: 'right', textColor: [153, 27, 27] }, // Loan (Red)
+        12: { halign: 'right', fontStyle: 'bold' }, // Gross
+        13: { halign: 'right', fontStyle: 'bold', textColor: [22, 101, 52] }, // Net (Green)
+        14: { cellWidth: 110, halign: 'left', fontSize: 7, textColor: [100, 116, 139] } // Remarks
+      },
+      margin: { left: 30, right: 30 }
     })
   } else {
     // Fallback (no autotable): simple text table

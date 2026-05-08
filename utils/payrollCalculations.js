@@ -273,7 +273,7 @@ function r2(n) {
 /** Format a number as a plain 2-decimal string (no currency symbol). */
 export function fmtAmt(n) {
   const num = parseFloat(n);
-  return Number.isFinite(num) ? num.toFixed(2) : '0.00';
+  return Number.isFinite(num) ? num.toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00';
 }
 
 /** Generate "YYYY-MM" period key from a Date (or year+month integers). */

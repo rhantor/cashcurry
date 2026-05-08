@@ -81,7 +81,7 @@ export function Payslip ({ slip, branchName, companyName, period }) {
   const statusColor = slip.status === 'paid' ? '#166534' : slip.status === 'finalized' ? '#1e40af' : '#92400e'
 
   return (
-    <div className='print-root' style={{ fontFamily: 'Arial, sans-serif', maxWidth: 680, margin: '0 auto' }}>
+    <div id='payslip-print-root' className='print-root' style={{ fontFamily: 'Arial, sans-serif', maxWidth: 680, margin: '0 auto', background: '#ffffff', padding: '24px 32px' }}>
       {/* Header */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', paddingBottom: 10, borderBottom: '2px solid #1e293b', marginBottom: 12 }}>
         <div>
@@ -93,11 +93,6 @@ export function Payslip ({ slip, branchName, companyName, period }) {
           <div style={{ fontSize: 11, fontWeight: 700 }}>SALARY VOUCHER</div>
           <div style={{ fontSize: 9, color: '#64748b', marginTop: 2 }}>No: <strong>{voucherNo}</strong></div>
           <div style={{ fontSize: 9, color: '#64748b', marginTop: 1 }}>Period: <strong>{periodLabel(period)}</strong></div>
-          <div style={{ marginTop: 4 }}>
-            <span style={{ fontSize: 8, padding: '2px 8px', border: `1px solid ${statusColor}`, borderRadius: 10, color: statusColor, fontWeight: 700, textTransform: 'uppercase' }}>
-              {slip.status || 'draft'}
-            </span>
-          </div>
         </div>
       </div>
 
@@ -356,6 +351,7 @@ export function PayrollSummaryTable ({ slips, branchName, companyName, period, r
           <tr>
             <th colSpan={2} style={TH({ textAlign:'left' })}>Employee</th>
             <th style={TH()}>Designation</th>
+            <th style={TH()}>Basic/Rate</th>
             <th style={TH()}>Basic Pay</th>
             <th style={TH()}>Work Hrs</th>
             {showOT && <th colSpan={2} style={TH()}>Overtime</th>}
@@ -377,6 +373,7 @@ export function PayrollSummaryTable ({ slips, branchName, companyName, period, r
             <th style={TH({ width:22, fontSize:7.5 })}>#</th>
             <th style={TH({ textAlign:'left' })}>Name</th>
             <th style={TH({ fontSize:7.5 })}>Role</th>
+            <th style={TH({ textAlign:'right', fontSize:7.5 })}>amt / rate</th>
             <th style={TH({ textAlign:'right' })}>{currency}</th>
             <th style={TH({ textAlign:'right' })}>hrs</th>
             {showOT && <>
@@ -432,6 +429,7 @@ export function PayrollSummaryTable ({ slips, branchName, companyName, period, r
                       <td style={TD({ textAlign:'center', color:'#94a3b8', fontSize:7.5 })}>{idx+1}</td>
                       <td style={TD({ fontWeight:600, textAlign:'left' })}>{s.staffName}</td>
                       <td style={TD({ color:'#475569', textAlign:'left', fontSize:8 })}>{s.designation||'—'}</td>
+                      <td style={TD({ textAlign:'right', color:'#475569', fontSize:8 })}>{fmtAmt(s.basicSalary)} / {fmtAmt(isH ? (s.basicSalary / (s.standardHours || 208)) : (s.basicSalary / (s.workingDays || 26)))}</td>
                       <td style={TD({ textAlign:'right' })}>{currency} {fmtAmt(s.basePay)}</td>
                       <td style={TD({ textAlign:'right', color:'#475569' })}>{isH?fmtAmt(s.workedHours):`${s.workedDays||0}d`}</td>
                       {showOT&&<>
@@ -459,7 +457,7 @@ export function PayrollSummaryTable ({ slips, branchName, companyName, period, r
                 {/* Dept subtotal if multiple depts */}
                 {depts.length > 1 && (
                   <tr style={{ background:'#f1f5f9', borderTop:'1px solid #cbd5e1', borderBottom:'1px solid #cbd5e1' }}>
-                    <td colSpan={3} style={TD({ fontWeight:700, textAlign:'left', fontSize:8.5, background:'#f1f5f9' })}>{dept} — Subtotal</td>
+                    <td colSpan={4} style={TD({ fontWeight:700, textAlign:'left', fontSize:8.5, background:'#f1f5f9' })}>{dept} — Subtotal</td>
                     {totalsCells(dt)}
                   </tr>
                 )}
@@ -469,7 +467,7 @@ export function PayrollSummaryTable ({ slips, branchName, companyName, period, r
         </tbody>
         <tfoot>
           <tr style={{ background:'#f1f5f9', borderTop:'2px solid #94a3b8' }}>
-            <td colSpan={3} style={TD({ fontWeight:800, fontSize:9, textAlign:'left', background:'#f1f5f9' })}>
+            <td colSpan={4} style={TD({ fontWeight:800, fontSize:9, textAlign:'left', background:'#f1f5f9' })}>
               GRAND TOTAL ({slips.length} staff)
             </td>
             {totalsCells(grand)}
@@ -527,7 +525,8 @@ export function ScreenPreviewSingle ({ slip, period, branchName }) {
       </div>
       <div className='font-semibold text-gray-800 text-sm'>{slip.staffName}</div>
       <div className='grid grid-cols-2 gap-x-4 gap-y-1'>
-        <PreviewRow label='Basic Pay'    val={fmtAmt(slip.basePay)} />
+        <PreviewRow label='Basic/Rate'   val={`${fmtAmt(slip.basicSalary)} / ${fmtAmt(slip.salaryMode==='hours' ? (slip.basicSalary/(slip.standardHours||208)) : (slip.basicSalary/(slip.workingDays||26)))}`} />
+        <PreviewRow label='Earned Basic' val={fmtAmt(slip.basePay)} />
         {slip.allowance>0    &&<PreviewRow label='Allowance'   val={fmtAmt(slip.allowance)} />}
         {slip.otPay>0        &&<PreviewRow label='OT Pay'      val={fmtAmt(slip.otPay)} />}
         {slip.phPay>0        &&<PreviewRow label='PH Pay'      val={fmtAmt(slip.phPay)} />}
@@ -568,7 +567,8 @@ export function ScreenPreviewAll ({ slips, period, branchName, status }) {
         <thead className='bg-gray-50 text-gray-500 uppercase text-[9px] tracking-wide'>
           <tr>
             <th className='px-3 py-2 text-left'>Employee</th>
-            <th className='px-3 py-2 text-right'>Basic</th>
+            <th className='px-3 py-2 text-right'>Basic/Rate</th>
+            <th className='px-3 py-2 text-right'>Earned</th>
             {showAllowance&&<th className='px-3 py-2 text-right'>Allowance</th>}
             {showOT&&<th className='px-3 py-2 text-right'>OT</th>}
             {showPH&&<th className='px-3 py-2 text-right'>PH</th>}
@@ -587,6 +587,7 @@ export function ScreenPreviewAll ({ slips, period, branchName, status }) {
           {slips.map((s,i)=>(
             <tr key={s.staffId||i} className='hover:bg-gray-50'>
               <td className='px-3 py-2 font-medium'>{s.staffName}</td>
+              <td className='px-3 py-2 text-right text-gray-500 text-[10px]'>{fmtAmt(s.basicSalary)} / {fmtAmt(s.salaryMode==='hours' ? (s.basicSalary/(s.standardHours||208)) : (s.basicSalary/(s.workingDays||26)))}</td>
               <td className='px-3 py-2 text-right text-gray-600'>{fmtAmt(s.basePay)}</td>
               {showAllowance&&<td className='px-3 py-2 text-right text-gray-600'>{fmtAmt(s.allowance||0)}</td>}
               {showOT&&<td className='px-3 py-2 text-right text-gray-600'>{fmtAmt(s.otPay||0)}</td>}
@@ -606,6 +607,7 @@ export function ScreenPreviewAll ({ slips, period, branchName, status }) {
         <tfoot className='border-t-2 border-gray-300 bg-gray-50'>
           <tr>
             <td className='px-3 py-2 font-bold'>Total ({slips.length})</td>
+            <td className='px-3 py-2 text-right'></td>
             <td className='px-3 py-2 text-right font-semibold'>{fmtAmt(totals.basePay)}</td>
             {showAllowance&&<td className='px-3 py-2 text-right'>{fmtAmt(totals.allowance)}</td>}
             {showOT&&<td className='px-3 py-2 text-right'>{fmtAmt(totals.otPay)}</td>}
@@ -647,13 +649,56 @@ export default function PayrollPrintView ({ mode, singleSlip, slips, branchName,
             <button onClick={()=>window.print()} className='px-4 py-1.5 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-700'>
               🖨 Print
             </button>
+            {mode === 'single' ? (
+              <button 
+                onClick={() => {
+                  if (slip) {
+                    import('@/utils/export/exportPayroll').then(({ exportPayslipToPDF }) => {
+                      exportPayslipToPDF(slip, branchName, period, companyName)
+                    })
+                  }
+                }}
+                className='px-4 py-1.5 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 flex items-center gap-1'
+              >
+                📄 Download PDF
+              </button>
+            ) : (
+              <>
+                <button 
+                  onClick={() => {
+                    if (slips) {
+                      import('@/utils/export/exportPayroll').then(({ exportAllPayslipsToPDF }) => {
+                        exportAllPayslipsToPDF(slips, branchName, period, companyName)
+                      })
+                    }
+                  }}
+                  className='px-4 py-1.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 flex items-center gap-1'
+                  title='Download one PDF containing all individual payslips'
+                >
+                  📄 All Payslips PDF
+                </button>
+                <button 
+                  onClick={() => {
+                    if (slips) {
+                      import('@/utils/export/exportPayroll').then(({ exportPayrollToPDF }) => {
+                        exportPayrollToPDF(slips, branchName, period, run, companyName)
+                      })
+                    }
+                  }}
+                  className='px-4 py-1.5 rounded-lg bg-red-600 text-white text-sm font-semibold hover:bg-red-700 flex items-center gap-1'
+                  title='Download the landscape master summary sheet'
+                >
+                  📄 Summary Sheet PDF
+                </button>
+              </>
+            )}
             <button onClick={onClose} className='px-4 py-1.5 rounded-lg border border-gray-200 text-gray-600 text-sm hover:bg-gray-50'>
               Close
             </button>
           </div>
         </div>
         <div className='flex-1 overflow-auto p-6 bg-gray-100'>
-          <div className='bg-white rounded-xl shadow-xl p-8 max-w-5xl mx-auto'>
+          <div className='bg-white rounded-xl shadow-xl p-8 max-w-[1500px] w-full mx-auto overflow-x-auto'>
             {mode==='single'&&slip  &&<Payslip slip={slip} branchName={branchName} companyName={companyName} period={period}/>}
             {mode==='all'   &&slips &&<PayrollSummaryTable slips={slips} branchName={branchName} companyName={companyName} period={period} run={run}/>}
           </div>
