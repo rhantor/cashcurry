@@ -211,6 +211,14 @@ export function Payslip ({ slip, branchName, companyName, period }) {
         </div>
       )}
 
+      {/* Extra Note / Remarks */}
+      {slip.extraNote && (
+        <div style={{ marginBottom: 16, padding: '8px 12px', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 4 }}>
+          <div style={{ fontSize: 8, fontWeight: 700, color: '#b45309', marginBottom: 2, textTransform: 'uppercase' }}>Remarks</div>
+          <div style={{ fontSize: 10, color: '#92400e' }}>{slip.extraNote}</div>
+        </div>
+      )}
+
       {/* Signatures */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 24, marginTop: 28 }}>
         {['Employee Signature', 'Accountant / HR', 'Authorized Signatory'].map(label => (
@@ -421,8 +429,10 @@ export function PayrollSummaryTable ({ slips, branchName, companyName, period, r
                   const isH = s.salaryMode === 'hours'
                   const remarks = [
                     s.loanAmt > 0 && `Loan: ${currency} ${fmtAmt(s.loanAmt)}`,
+                    s.penalty > 0 && s.penaltyNote && `Penalty: ${s.penaltyNote}`,
                     s.otherDeductionsNote && s.otherDeductions > 0 && s.otherDeductionsNote,
                     s.otherEarningsNote   && s.otherEarnings   > 0 && s.otherEarningsNote,
+                    s.extraNote,
                   ].filter(Boolean).join(' | ')
                   return (
                     <tr key={s.staffId||idx} style={{ background: idx%2===0?'#fff':'#f8fafc' }}>

@@ -45,6 +45,7 @@ function buildDefaultInputs () {
     penalty: '',      penaltyNote: '',
     otherDeductions: '', otherDeductionsNote: '',
     loanOverride: '', loanNote: '',
+    extraNote: '',
   }
 }
 
@@ -242,6 +243,11 @@ function StaffSlipCard ({
               onChange={e => set('loanNote', e.target.value)}
               className='mt-1.5 w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-mint-400 outline-none' />
           )}
+          
+          <p className='text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-3 mb-1'>Remarks / Extra Note</p>
+          <input type='text' placeholder='Any general remarks for this payslip…' value={inputs.extraNote || ''}
+            onChange={e => set('extraNote', e.target.value)}
+            className='w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-mint-400 outline-none' />
         </div>
       )}
 
@@ -422,6 +428,7 @@ export default function PayrollBuilder () {
         otherDeductionsNote:  slip.otherDeductionsNote     || '',
         loanOverride:         slip.loanOverride != null ? String(slip.loanOverride) : '',
         loanNote:             slip.loanNote               || '',
+        extraNote:            slip.extraNote              || '',
       }
     }
     setSlipInputs(restored)
@@ -620,6 +627,7 @@ export default function PayrollBuilder () {
       penaltyNote:         slipData.inputs?.penaltyNote         || '',
       otherDeductionsNote: slipData.inputs?.otherDeductionsNote || '',
       loanNote:            slipData.inputs?.loanNote            || '',
+      extraNote:           slipData.inputs?.extraNote           || '',
     }
   }
 
@@ -637,6 +645,7 @@ export default function PayrollBuilder () {
       penaltyNote:         s.inputs?.penaltyNote         || '',
       otherDeductionsNote: s.inputs?.otherDeductionsNote || '',
       loanNote:            s.inputs?.loanNote            || '',
+      extraNote:           s.inputs?.extraNote           || '',
     }))
   }
 

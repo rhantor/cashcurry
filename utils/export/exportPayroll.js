@@ -63,12 +63,78 @@ function buildHeaders (cols) {
   return h
 }
 
+function buildPDFHeaders (cols) {
+  const h1 = [
+    { content: 'Employee', colSpan: 2, styles: { halign: 'left' } },
+    'Designation', 'Basic/Rate', 'Basic Pay', 'Work Hrs'
+  ]
+  const h2 = [
+    { content: '#', styles: { halign: 'center' } },
+    { content: 'Name', styles: { halign: 'left' } },
+    'Role', 'amt / rate', 'RM', 'hrs'
+  ]
+
+  if (cols.showOT) {
+    h1.push({ content: 'Overtime', colSpan: 2 })
+    h2.push('OT hrs', 'OT Pay')
+  }
+  if (cols.showPH) {
+    h1.push('PH Pay')
+    h2.push('RM')
+  }
+  h1.push('Allowance')
+  h2.push('RM')
+  
+  if (cols.showBonus) {
+    h1.push({ content: 'Bonus', styles: { textColor: [22, 101, 52] } })
+    h2.push({ content: 'RM', styles: { textColor: [22, 101, 52] } })
+  }
+  cols.statKeys.forEach(k => {
+    h1.push({ content: cols.statNames[k], styles: { textColor: [153, 27, 27] } })
+    h2.push({ content: 'RM', styles: { textColor: [153, 27, 27] } })
+  })
+  if (cols.showAdvance) {
+    h1.push({ content: 'Advance', styles: { textColor: [153, 27, 27] } })
+    h2.push({ content: 'RM', styles: { textColor: [153, 27, 27] } })
+  }
+  if (cols.showLoan) {
+    h1.push({ content: 'Loan', styles: { textColor: [153, 27, 27] } })
+    h2.push({ content: 'RM', styles: { textColor: [153, 27, 27] } })
+  }
+  if (cols.showOtherE) {
+    h1.push({ content: 'Other Earn.', styles: { textColor: [22, 101, 52] } })
+    h2.push({ content: 'RM', styles: { textColor: [22, 101, 52] } })
+  }
+  if (cols.showPenalty) {
+    h1.push({ content: 'Penalty', styles: { textColor: [153, 27, 27] } })
+    h2.push({ content: 'RM', styles: { textColor: [153, 27, 27] } })
+  }
+  if (cols.showOtherD) {
+    h1.push({ content: 'Deduction', styles: { textColor: [153, 27, 27] } })
+    h2.push({ content: 'RM', styles: { textColor: [153, 27, 27] } })
+  }
+
+  h1.push(
+    { content: 'Total Salary', styles: { fontStyle: 'bold' } },
+    { content: 'Net Pay', styles: { fontStyle: 'bold', textColor: [22, 101, 52] } },
+    { content: 'Remarks', styles: { halign: 'left' } }
+  )
+  h2.push(
+    { content: 'RM', styles: { fontStyle: 'bold' } },
+    { content: 'RM', styles: { fontStyle: 'bold', textColor: [22, 101, 52] } },
+    { content: 'notes', styles: { halign: 'left', fontStyle: 'normal' } }
+  )
+
+  return [h1, h2]
+}
+
 function buildRow (s, idx, cols) {
   const isH = s.salaryMode === 'hours'
   const remarks = [
     s.loanAmt > 0 && `Loan: ${RM(s.loanAmt)}`,
     s.otherDeductionsNote && s.otherDeductions > 0 && s.otherDeductionsNote,
     s.otherEarningsNote   && s.otherEarnings   > 0 && s.otherEarningsNote,
+    s.extraNote,
   ].filter(Boolean).join(' | ')
 
   const basicAndRate = `${n2(s.basicSalary)} / ${n2(isH ? (s.basicSalary / (s.standardHours || 208)) : (s.basicSalary / (s.workingDays || 26)))}`
@@ -120,10 +186,11 @@ function buildTotalRow (label, data, cols) {
 
 export function exportPayrollToPDF (slips = [], branchName = '', period = '', run = null, companyName = '') {
   try {
-    const doc     = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a3' })
-    const cols    = buildCols(slips)
-    const headers = buildHeaders(cols)
-    const status  = run?.status || 'draft'
+    const doc         = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a3' })
+    const cols        = buildCols(slips)
+    const flatHeaders = buildHeaders(cols)
+    const pdfHeaders  = buildPDFHeaders(cols)
+    const status      = run?.status || 'draft'
 
     // Title block
     let y = 14
@@ -162,7 +229,7 @@ export function exportPayrollToPDF (slips = [], branchName = '', period = '', ru
       const dt = { basePay:0,workedHours:0,otHours:0,otPay:0,allowance:0,advanceAmt:0,loanAmt:0,otherEarnings:0,otherDeductions:0,grossEarnings:0,netPay:0,stat:{} }
 
       // Dept header row
-      bodyRows.push({ isDept: true, label: dept, colCount: headers.length })
+      bodyRows.push({ isDept: true, label: dept, colCount: flatHeaders.length })
 
       ds.forEach((s, idx) => {
         bodyRows.push({ isData: true, row: buildRow(s, idx, cols) })
@@ -193,7 +260,7 @@ export function exportPayrollToPDF (slips = [], branchName = '', period = '', ru
 
     // Convert to autoTable format
     const tableBody = bodyRows.map(r => {
-      if (r.isDept)     return [{ content: r.label, colSpan: headers.length, styles: { fontStyle:'bold', fillColor:[241,245,249], textColor:[55,65,81], fontSize:7.5 } }]
+      if (r.isDept)     return [{ content: r.label, colSpan: flatHeaders.length, styles: { fontStyle:'bold', fillColor:[241,245,249], textColor:[55,65,81], fontSize:7.5 } }]
       if (r.isSubtotal) return r.row.map((v,i) => ({ content: String(v), styles: { fontStyle:'bold', fillColor:[241,245,249], textColor:[55,65,81] } }))
       if (r.isGrand)    return r.row.map((v,i) => ({ content: String(v), styles: { fontStyle:'bold', fillColor:[226,232,240], textColor:[30,41,59], fontSize:8 } }))
       return r.row.map(v => String(v))
@@ -201,11 +268,12 @@ export function exportPayrollToPDF (slips = [], branchName = '', period = '', ru
 
     autoTable(doc, {
       startY: y + 1,
-      head: [headers],
+      head: pdfHeaders,
       body: tableBody,
-      styles: { fontSize: 7, cellPadding: 2, overflow: 'linebreak' },
-      headStyles: { fillColor: [241,245,249], textColor: [30,41,59], fontStyle: 'bold', lineColor: [203,213,225], lineWidth: 0.3 },
-      alternateRowStyles: { fillColor: [248,250,252] },
+      theme: 'grid',
+      styles: { fontSize: 7, cellPadding: 2, overflow: 'linebreak', lineColor: [226, 232, 240], lineWidth: 0.1 },
+      headStyles: { fillColor: [248,250,252], textColor: [71,85,105], fontStyle: 'bold', lineColor: [226,232,240], lineWidth: 0.1, halign: 'center' },
+      alternateRowStyles: { fillColor: [250,252,253] },
       columnStyles: {
         0: { halign: 'center', cellWidth: 8 },
         1: { halign: 'left', cellWidth: 26 },
@@ -214,7 +282,7 @@ export function exportPayrollToPDF (slips = [], branchName = '', period = '', ru
         4: { halign: 'right' }, // Earned Basic
       },
       didParseCell (data) {
-        const hName = headers[data.column.index]
+        const hName = flatHeaders[data.column.index]
         if (!hName) return
         
         const isStat = cols.statKeys.some(k => cols.statNames[k] === hName)
@@ -414,6 +482,20 @@ function drawPayslipToPDF (doc, slip, branchName = '', period = '', companyName 
     doc.text(`Gross ${fmt(slip.grossEarnings)} - Deductions ${fmt(slip.totalDeductions)}`, 20, netY + 12)
     doc.setFontSize(16); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 41, 59)
     doc.text(fmt(slip.netPay), 192, netY + 10, { align: 'right' })
+
+    // Extra Note
+    let afterNet = netY + 22
+    if (slip.extraNote) {
+      doc.setFillColor(254, 252, 232) // yellow-50
+      doc.setDrawColor(253, 230, 138) // yellow-200
+      doc.setLineWidth(0.1)
+      doc.rect(14, afterNet, 182, 12, 'FD')
+      doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(180, 83, 9)
+      doc.text('REMARKS:', 18, afterNet + 8)
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(146, 64, 14)
+      doc.text(slip.extraNote, 42, afterNet + 8)
+      afterNet += 16
+    }
 
     // Signatures
     const sigY = netY + 30
