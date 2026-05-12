@@ -132,6 +132,7 @@ function buildRow (s, idx, cols) {
   const isH = s.salaryMode === 'hours'
   const remarks = [
     s.loanAmt > 0 && `Loan: ${RM(s.loanAmt)}`,
+    s.penalty > 0 && s.penaltyNote && `Penalty: ${s.penaltyNote}`,
     s.otherDeductionsNote && s.otherDeductions > 0 && s.otherDeductionsNote,
     s.otherEarningsNote   && s.otherEarnings   > 0 && s.otherEarningsNote,
     s.extraNote,
@@ -158,6 +159,7 @@ function buildRow (s, idx, cols) {
   if (cols.showAdvance) row.push(dash(s.advanceAmt))
   if (cols.showLoan)    row.push(dash(s.loanAmt))
   if (cols.showOtherE)  row.push(dash(s.otherEarnings))
+  if (cols.showPenalty) row.push(dash(s.penalty))
   if (cols.showOtherD)  row.push(dash(s.otherDeductions))
   row.push(n2(s.grossEarnings))
   row.push(n2(s.netPay))
@@ -175,6 +177,7 @@ function buildTotalRow (label, data, cols) {
   if (cols.showAdvance) row.push(n2(data.advanceAmt))
   if (cols.showLoan)    row.push(n2(data.loanAmt))
   if (cols.showOtherE)  row.push(n2(data.otherEarnings))
+  if (cols.showPenalty) row.push(n2(data.penalty))
   if (cols.showOtherD)  row.push(n2(data.otherDeductions))
   row.push(n2(data.grossEarnings))
   row.push(n2(data.netPay))
@@ -453,6 +456,7 @@ function drawPayslipToPDF (doc, slip, branchName = '', period = '', companyName 
       ...(slip.statutory || []).map(s => [`${s.name} (${s.employeeRate}%)`, fmt(s.employeeAmt)]),
       ...(slip.advanceAmt > 0      ? [['Salary Advance',                             fmt(slip.advanceAmt)]]      : []),
       ...(slip.loanAmt > 0         ? [['Loan Repayment (EMI)',                       fmt(slip.loanAmt)]]         : []),
+      ...(slip.penalty > 0         ? [[slip.penaltyNote ? `Penalty (${slip.penaltyNote})` : 'Penalty', fmt(slip.penalty)]] : []),
       ...(slip.otherDeductions > 0 ? [[slip.otherDeductionsNote || 'Other Deductions', fmt(slip.otherDeductions)]] : []),
     ]
 
