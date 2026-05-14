@@ -1057,9 +1057,9 @@ const handleSaveEdit = async (billId, formData) => {
 
       {/* Modals */}
       <PayBillsModal
-        isOpen={payOpen}
+        open={payOpen}
         onClose={() => setPayOpen(false)}
-        selectedBills={selectedBills}
+        bills={selectedBills}
         onConfirm={handleConfirmPayment}
         vendorName={vendors.find(v => v.id === selectedBills[0]?.vendorId)?.name || 'Multiple'}
         isSaving={isUpdating}
