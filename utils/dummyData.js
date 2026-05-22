@@ -176,6 +176,23 @@ export const sidebarItems = {
     },
 
     {
+      label: 'Tools',
+      icon: 'MdAppRegistration',
+      allowedRoles: [
+        'cashier',
+        'accountant',
+        'manager',
+        'supervisor',
+        'branchAdmin'
+      ],
+      children: [
+        { label: 'Invoice Generator', path: '/tools/invoice-generator' },
+        { label: 'Inventory Checklist', path: '/tools/inventory-checklist' },
+        { label: 'Petty Cash Tracker', path: '/tools/petty-cash' },
+        { label: 'Recipe Cost Calculator', path: '/tools/recipe-calculator' }
+      ]
+    },
+    {
       label: 'Support',
       icon: 'MdOutlineSupportAgent',
       path: '/support',
@@ -199,6 +216,12 @@ export const sidebarItems = {
       label: 'Company Dashboard',
       icon: 'MdOutlineSpaceDashboard',
       path: '/company/dashboard'
+    },
+    {
+      label: 'Daily Cash Tracker',
+      icon: 'MdOutlineAccountBalanceWallet',
+      path: '/cash-tracker',
+      allowedRoles: ['gm', 'superAdmin', 'owner']
     },
     {
       label: 'Purchases',
@@ -300,6 +323,17 @@ export const sidebarItems = {
       children: [
         { label: 'Attendance Log', path: '/attendance-log' },
         { label: 'Open Kiosk', path: '/kiosk' }
+      ]
+    },
+    {
+      label: 'Tools',
+      icon: 'MdAppRegistration',
+      allowedRoles: ['gm', 'superAdmin', 'owner'],
+      children: [
+        { label: 'Invoice Generator', path: '/tools/invoice-generator' },
+        { label: 'Inventory Checklist', path: '/tools/inventory-checklist' },
+        { label: 'Petty Cash Tracker', path: '/tools/petty-cash' },
+        { label: 'Recipe Cost Calculator', path: '/tools/recipe-calculator' }
       ]
     },
     {

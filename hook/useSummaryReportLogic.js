@@ -99,8 +99,12 @@ const mergeNotes = (acc, next) => {
 
 // --- 2. The Hook ---
 
-export const useSummaryReportLogic = (filterState, summaryMode) => {
-  const { ready, companyId, branchId } = useResolvedCompanyBranch()
+export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId = null) => {
+  const resolved = useResolvedCompanyBranch()
+  const companyId = resolved.companyId
+  const branchId = overrideBranchId || resolved.branchId
+  const ready = resolved.ready
+
   const baseArgs =
     ready && companyId && branchId ? { companyId, branchId } : null
 
