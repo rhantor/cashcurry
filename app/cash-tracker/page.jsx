@@ -8,6 +8,11 @@ import autoTable from "jspdf-autotable";
 import { useGetBranchesBasicQuery } from "@/lib/redux/api/branchApiSlice";
 import { useSummaryReportLogic } from "@/hook/useSummaryReportLogic";
 import useCurrency from "@/app/hooks/useCurrency";
+import { 
+  useGetCompanyDeductionsQuery, 
+  useAddCompanyDeductionMutation, 
+  useDeleteCompanyDeductionMutation 
+} from "@/lib/redux/api/companyDeductionsApiSlice";
 
 // --- Subcomponent to load branch cash ---
 const BranchCashLoader = ({ branch, onUpdate }) => {
@@ -44,11 +49,16 @@ export default function DailyCashTracker() {
     skip: !companyId,
   });
 
+  const { data: deductions = [] } = useGetCompanyDeductionsQuery(companyId || "", {
+    skip: !companyId,
+  });
+  const [addDeductionMutation] = useAddCompanyDeductionMutation();
+  const [deleteDeductionMutation] = useDeleteCompanyDeductionMutation();
+
   const [branchBalances, setBranchBalances] = useState({});
   const [selectedBranches, setSelectedBranches] = useState({});
   
-  // Manual deductions
-  const [deductions, setDeductions] = useState([]);
+  // Manual deductions form state
   const [descInput, setDescInput] = useState("");
   const [amountInput, setAmountInput] = useState("");
 
@@ -79,23 +89,27 @@ export default function DailyCashTracker() {
     setSelectedBranches(next);
   };
 
-  const addDeduction = (e) => {
+  const addDeduction = async (e) => {
     e.preventDefault();
+    if (!companyId) return;
     if (!descInput.trim() || !amountInput) return;
     const amt = parseFloat(amountInput);
     if (isNaN(amt) || amt <= 0) return;
 
-    setDeductions(prev => [...prev, {
-      id: Date.now().toString(),
-      description: descInput.trim(),
-      amount: amt
-    }]);
+    await addDeductionMutation({
+      companyId,
+      data: {
+        description: descInput.trim(),
+        amount: amt
+      }
+    });
     setDescInput("");
     setAmountInput("");
   };
 
-  const removeDeduction = (id) => {
-    setDeductions(prev => prev.filter(d => d.id !== id));
+  const removeDeduction = async (id) => {
+    if (!companyId) return;
+    await deleteDeductionMutation({ companyId, deductionId: id });
   };
 
   const totalSelectedCash = useMemo(() => {
@@ -202,6 +216,7 @@ export default function DailyCashTracker() {
     );
   }
 
+  const isSuperAdmin = user?.role?.toLowerCase() === "superadmin";
   const allSelected = branches.length > 0 && branches.every(b => selectedBranches[b.id]);
 
   return (
@@ -333,38 +348,40 @@ export default function DailyCashTracker() {
             </div>
             
             <div className="p-4 sm:p-5">
-              <form onSubmit={addDeduction} className="space-y-4 mb-6">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Description</label>
-                  <input 
-                    type="text" 
-                    value={descInput}
-                    onChange={e => setDescInput(e.target.value)}
-                    placeholder="e.g. Paid Person A"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all sm:text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Amount ({currency})</label>
-                  <input 
-                    type="number" 
-                    step="0.01"
-                    min="0"
-                    value={amountInput}
-                    onChange={e => setAmountInput(e.target.value)}
-                    placeholder="0.00"
-                    className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all sm:text-sm"
-                  />
-                </div>
-                <button 
-                  type="submit"
-                  disabled={!descInput.trim() || !amountInput}
-                  className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Plus size={18} />
-                  <span>Add Deduction</span>
-                </button>
-              </form>
+              {isSuperAdmin && (
+                <form onSubmit={addDeduction} className="space-y-4 mb-6">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Description</label>
+                    <input 
+                      type="text" 
+                      value={descInput}
+                      onChange={e => setDescInput(e.target.value)}
+                      placeholder="e.g. Paid Person A"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all sm:text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Amount ({currency})</label>
+                    <input 
+                      type="number" 
+                      step="0.01"
+                      min="0"
+                      value={amountInput}
+                      onChange={e => setAmountInput(e.target.value)}
+                      placeholder="0.00"
+                      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all sm:text-sm"
+                    />
+                  </div>
+                  <button 
+                    type="submit"
+                    disabled={!descInput.trim() || !amountInput}
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <Plus size={18} />
+                    <span>Add Deduction</span>
+                  </button>
+                </form>
+              )}
 
               <div className="space-y-2">
                 {deductions.length === 0 ? (
@@ -378,12 +395,14 @@ export default function DailyCashTracker() {
                           {currency} {d.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
                       </div>
-                      <button 
-                        onClick={() => removeDeduction(d.id)}
-                        className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors shrink-0 flex-none"
-                      >
-                        <Trash2 size={16} />
-                      </button>
+                      {isSuperAdmin && (
+                        <button 
+                          onClick={() => removeDeduction(d.id)}
+                          className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-colors shrink-0 flex-none"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
                     </div>
                   ))
                 )}

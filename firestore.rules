@@ -178,6 +178,14 @@ service cloud.firestore {
         );
       }
 
+      // ── Company Manual Deductions ──────────────────────────────────────────
+      match /manual_deductions/{docId} {
+        allow read: if isAuth() && userData().companyId == companyId && 
+                       userData().role in ['owner', 'gm', 'superAdmin', 'superadmin'];
+        allow write: if isAuth() && userData().companyId == companyId && 
+                        userData().role in ['superAdmin', 'superadmin'];
+      }
+
       // ── Audit Log (written by Cloud Functions only) ───────────────────────────
       // owner/gm/superAdmin: read all logs across the company
       // branchAdmin/manager: read only logs where branchId matches their assigned branch
