@@ -122,6 +122,9 @@ const isSalaryCash = (s) => {
   return String(s?.paidFromOffice || "front").toLowerCase() !== "back";
 };
 
+const isAdvanceCash = (a) =>
+  String(a?.paidFromOffice || "front").toLowerCase() !== "back";
+
 const tenderDefsFromSales = (fSales) => {
   const defs = new Map();
   for (const s of fSales) {
@@ -352,6 +355,7 @@ export default function useCompanyData(filter) {
 
     const totalCosts = totalCostsFront + totalCostsBack;
     const totalAdv = fAdv.reduce((s, x) => s + num(x.amount), 0);
+    const totalAdvCash = fAdv.filter(isAdvanceCash).reduce((s, x) => s + num(x.amount), 0);
     const totalSal = fSal.reduce((s, x) => s + num(x.amount), 0);
 
     // Split salaries into cash-paid vs bank-paid so each goes to the right pool.
@@ -362,15 +366,15 @@ export default function useCompanyData(filter) {
     // Staff loans paid in cash (from register) — reduces cash on hand.
     const totalStaffLoanCash = fStaffLoans.reduce((s, x) => s + num(x.amount), 0);
 
-    // Bank side: banked receipts minus withdrawals, back-office costs and bank salaries.
+    // Bank side: banked receipts + deposits minus withdrawals, back-office costs and bank salaries.
     const effectiveBankedAfterWithdrawals =
-      bankedSales - totalWdr - totalCostsBack - totalSalBank;
+      bankedSales + totalDep - totalWdr - totalCostsBack - totalSalBank;
 
     // Cash side: sum of branch opening floats + cash in − cash out during the period.
     const estCashOnHand =
       totalOpeningCash +
       totalCash + totalWdr - totalDep -
-      totalCostsFront - totalSalCash - totalAdv - totalStaffLoanCash;
+      totalCostsFront - totalSalCash - totalAdvCash - totalStaffLoanCash;
 
     const totalSales = fSales.reduce((s, x) => s + saleTotalDynamic(x), 0);
 
@@ -436,9 +440,8 @@ export default function useCompanyData(filter) {
     const sumSalCash = allSal.filter(isSalaryCash).reduce((s, x) => s + num(x.amount), 0);
     const sumSalBank = allSal.filter((s) => !isSalaryCash(s)).reduce((s, x) => s + num(x.amount), 0);
 
-    const sumAdv = advances
-      .filter((x) => upto(x.date || x.createdAt))
-      .reduce((s, x) => s + num(x.amount), 0);
+    const allAdv = advances.filter((x) => upto(x.date || x.createdAt));
+    const sumAdvCash = allAdv.filter(isAdvanceCash).reduce((s, x) => s + num(x.amount), 0);
 
     const sumStaffLoanCash = allStaffLoans
       .filter((x) => {
@@ -454,11 +457,11 @@ export default function useCompanyData(filter) {
     const estCashOnHand =
       totalOpeningCash +
       sumCash + sumWdr - sumDep -
-      sumCostsFront - sumSalCash - sumAdv - sumStaffLoanCash;
+      sumCostsFront - sumSalCash - sumAdvCash - sumStaffLoanCash;
 
-    // Bank expected: banked receipts − withdrawals − back costs − bank salaries, all cumulative.
+    // Bank expected: banked receipts + deposits − withdrawals − back costs − bank salaries, all cumulative.
     const effectiveBankedAfterWithdrawals =
-      sumBanked - sumWdr - sumCostsBack - sumSalBank;
+      sumBanked + sumDep - sumWdr - sumCostsBack - sumSalBank;
 
     return { estCashOnHand, effectiveBankedAfterWithdrawals };
   }, [
@@ -643,6 +646,13 @@ export default function useCompanyData(filter) {
         amount: num(x.amount),
       })
     );
+    fStaffLoans.slice(-50).forEach((x) =>
+      rows.push({
+        type: "Staff Loan",
+        date: x.date || x.createdAt,
+        amount: num(x.amount),
+      })
+    );
     fLoan.slice(-50).forEach((x) =>
       rows.push({
         type: "Loan",
@@ -687,6 +697,7 @@ export default function useCompanyData(filter) {
         backCosts: 0,
         salaries: 0,
         advances: 0,
+        staffLoans: 0,
         deposits: 0,
         withdrawals: 0,
       };
@@ -720,6 +731,9 @@ export default function useCompanyData(filter) {
     fAdv.forEach((x) => {
       ensure(x.branchId).advances += num(x.amount);
     });
+    fStaffLoans.forEach((x) => {
+      ensure(x.branchId).staffLoans += num(x.amount);
+    });
 
     // bank cash flow (optional use in UI)
     fDep.forEach((x) => {
@@ -733,7 +747,7 @@ export default function useCompanyData(filter) {
     const rows = Array.from(map.values()).map((r) => ({
       ...r,
       name: branchName(r.branchId),
-      net: r.sales - r.costs - r.salaries - r.advances, // 🔸 your definition of "performance"
+      net: r.sales - r.costs - r.salaries - r.advances - r.staffLoans, // 🔸 your definition of "performance"
       opMarginPct: r.sales ? ((r.sales - r.costs) / r.sales) * 100 : 0,
     }));
 

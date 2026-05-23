@@ -221,7 +221,7 @@ export const sidebarItems = {
       label: 'Daily Cash Tracker',
       icon: 'MdOutlineAccountBalanceWallet',
       path: '/cash-tracker',
-      allowedRoles: ['gm', 'superAdmin', 'owner']
+      allowedRoles: ['gm', 'superAdmin', 'owner', 'branchAdmin', 'manager', 'accountant']
     },
     {
       label: 'Purchases',

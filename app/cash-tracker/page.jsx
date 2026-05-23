@@ -28,7 +28,7 @@ const BranchCashLoader = ({ branch, onUpdate }) => {
   return null; 
 };
 
-const ALLOWED_ROLES = new Set(["owner", "gm", "superadmin"]);
+const ALLOWED_ROLES = new Set(["owner", "gm", "superadmin", "branchadmin", "manager", "accountant"]);
 
 export default function DailyCashTracker() {
   const currency = useCurrency();
@@ -210,7 +210,7 @@ export default function DailyCashTracker() {
       <div className="flex flex-col items-center justify-center min-h-[60vh]">
         <div className="bg-rose-50 text-rose-600 p-6 rounded-2xl max-w-md text-center border border-rose-100 shadow-sm">
           <h2 className="text-xl font-bold mb-2">Unauthorized Access</h2>
-          <p className="text-sm">You do not have permission to view the Daily Cash Tracker. Only Top-Level Management can access this page.</p>
+          <p className="text-sm">You do not have permission to view the Daily Cash Tracker.</p>
         </div>
       </div>
     );

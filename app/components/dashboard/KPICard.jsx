@@ -11,10 +11,10 @@ const VARIANTS = {
   slate:  { card: "bg-white border border-slate-100",          dot: "bg-slate-400",   value: "text-slate-800",  label: "text-slate-500",     sub: "text-slate-400"     },
 };
 
-export default function KPICard({ title, value, sub, color = "slate" }) {
+export default function KPICard({ title, value, sub, color = "slate", breakdown }) {
   const v = VARIANTS[color] ?? VARIANTS.slate;
   return (
-    <div className={`rounded-2xl shadow-sm hover:shadow-md transition-shadow p-4 ${v.card}`}>
+    <div className={`relative group rounded-2xl shadow-sm hover:shadow-md transition-shadow p-4 ${v.card}`}>
       <div className="flex items-center gap-2 mb-2">
         <span className={`h-2 w-2 rounded-full shrink-0 ${v.dot}`} />
         <span className={`text-xs font-semibold uppercase tracking-wide ${v.label}`}>
@@ -23,6 +23,20 @@ export default function KPICard({ title, value, sub, color = "slate" }) {
       </div>
       <div className={`text-2xl font-bold ${v.value}`}>{value}</div>
       {sub && <div className={`text-xs mt-1 leading-snug ${v.sub}`}>{sub}</div>}
+      
+      {breakdown && breakdown.length > 0 && (
+        <div className="absolute top-full left-0 mt-2 w-full z-50 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all bg-white border border-slate-200 shadow-xl rounded-xl p-3 text-sm">
+           <div className="font-semibold text-slate-700 mb-2 border-b pb-1">Branch Breakdown</div>
+           <div className="space-y-1">
+             {breakdown.map((b, i) => (
+               <div key={i} className="flex justify-between items-center">
+                 <span className="text-slate-600 truncate mr-2">{b.label}</span>
+                 <span className="font-medium text-slate-800">{b.value}</span>
+               </div>
+             ))}
+           </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -71,11 +71,52 @@ function convertValue(val) {
   return val;
 }
 
-function safeStringify(val) {
+function FormatValue({ val, fieldName }) {
   const converted = convertValue(val);
-  if (converted === null || converted === undefined) return "—";
-  if (typeof converted === "string") return converted;
-  return JSON.stringify(converted);
+  if (converted === null || converted === undefined || converted === "") {
+    return <span className="text-gray-400 italic">—</span>;
+  }
+  
+  if (Array.isArray(converted)) {
+    if (converted.length === 0) return <span className="text-gray-400 italic">empty</span>;
+    if (fieldName === "attachments" || fieldName === "images") {
+      return (
+        <div className="flex flex-col gap-1 mt-0.5">
+          {converted.map((url, i) => (
+            typeof url === 'string' && url.startsWith('http') ? (
+              <a key={i} href={url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-[11px] truncate block">
+                [View Attachment {i + 1}]
+              </a>
+            ) : (
+              <span key={i} className="text-[11px]">{String(url)}</span>
+            )
+          ))}
+        </div>
+      );
+    }
+    return (
+      <div className="flex flex-col gap-0.5 mt-0.5">
+        {converted.map((item, i) => (
+          <div key={i} className="bg-black/5 px-1.5 py-0.5 rounded text-[11px]">
+             {typeof item === "object" ? JSON.stringify(item) : String(item)}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (typeof converted === "object") {
+    if (fieldName === "createdBy" || fieldName === "updatedBy") {
+      return <span>{converted.name || converted.username || converted.email || "System User"}</span>;
+    }
+    return (
+      <pre className="whitespace-pre-wrap text-[10px] leading-tight bg-black/5 p-1 rounded mt-0.5">
+        {JSON.stringify(converted, null, 2)}
+      </pre>
+    );
+  }
+
+  return <span>{String(converted)}</span>;
 }
 
 // ─── Badge components ─────────────────────────────────────────────────────────
@@ -128,17 +169,17 @@ function DiffViewer({ before, after, action }) {
 
   const allKeys = Array.from(
     new Set([...Object.keys(before || {}), ...Object.keys(after || {})])
-  ).filter((k) => !["createdAt", "updatedAt"].includes(k));
+  ).filter((k) => !["createdAt", "updatedAt", "searchKeywords", "searchArray"].includes(k));
 
   if (action === "created") {
     return (
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         {allKeys.map((k) => (
-          <div key={k} className="flex gap-2 text-xs">
-            <span className="w-36 shrink-0 text-gray-500 font-medium">{k}</span>
-            <span className="text-green-700 bg-green-50 px-1 rounded break-all">
-              {safeStringify(after?.[k])}
-            </span>
+          <div key={k} className="flex gap-2 text-xs items-start">
+            <span className="w-36 shrink-0 text-gray-500 font-medium pt-0.5">{k}</span>
+            <div className="text-green-800 bg-green-100/50 px-1.5 py-0.5 rounded break-all border border-green-200/50 flex-1">
+              <FormatValue val={after?.[k]} fieldName={k} />
+            </div>
           </div>
         ))}
       </div>
@@ -147,40 +188,44 @@ function DiffViewer({ before, after, action }) {
 
   if (action === "deleted") {
     return (
-      <div className="space-y-1">
+      <div className="space-y-1.5">
         {allKeys.map((k) => (
-          <div key={k} className="flex gap-2 text-xs">
-            <span className="w-36 shrink-0 text-gray-500 font-medium">{k}</span>
-            <span className="text-red-700 bg-red-50 px-1 rounded line-through break-all">
-              {safeStringify(before?.[k])}
-            </span>
+          <div key={k} className="flex gap-2 text-xs items-start">
+            <span className="w-36 shrink-0 text-gray-500 font-medium pt-0.5">{k}</span>
+            <div className="text-red-800 bg-red-100/50 px-1.5 py-0.5 rounded line-through break-all border border-red-200/50 flex-1">
+              <FormatValue val={before?.[k]} fieldName={k} />
+            </div>
           </div>
         ))}
       </div>
     );
   }
 
+  // updated — show only changed fields
   const changedKeys = allKeys.filter(
-    (k) => safeStringify(before?.[k]) !== safeStringify(after?.[k])
+    (k) =>
+      JSON.stringify(convertValue(before?.[k])) !== JSON.stringify(convertValue(after?.[k]))
   );
 
   if (changedKeys.length === 0) {
-    return <p className="text-gray-400 text-xs">No field changes detected.</p>;
+    return (
+      <p className="text-gray-400 text-xs">No field changes detected.</p>
+    );
   }
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2.5">
       {changedKeys.map((k) => (
         <div key={k} className="text-xs">
-          <span className="font-medium text-gray-600">{k}</span>
-          <div className="flex flex-wrap gap-2 mt-0.5 items-center">
-            <span className="text-red-600 bg-red-50 px-1 rounded line-through break-all">
-              {safeStringify(before?.[k])}
-            </span>
-            <span className="text-gray-400">→</span>
-            <span className="text-green-700 bg-green-50 px-1 rounded break-all">
-              {safeStringify(after?.[k])}
-            </span>
+          <span className="font-medium text-gray-600 block mb-1">{k}</span>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            <div className="text-red-800 bg-red-100/50 px-1.5 py-0.5 rounded line-through break-all border border-red-200/50 flex-1">
+              <FormatValue val={before?.[k]} fieldName={k} />
+            </div>
+            <span className="text-gray-400 hidden sm:inline">→</span>
+            <div className="text-green-800 bg-green-100/50 px-1.5 py-0.5 rounded break-all border border-green-200/50 flex-1">
+              <FormatValue val={after?.[k]} fieldName={k} />
+            </div>
           </div>
         </div>
       ))}

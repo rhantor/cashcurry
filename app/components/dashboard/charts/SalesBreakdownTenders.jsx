@@ -9,9 +9,9 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
+  Cell,
 } from "recharts";
-import { RM, PCT } from "@/utils/dashboard/utils";
+import { RM } from "@/utils/dashboard/utils";
 
 // Known colors (we'll use these first if keys match)
 const BASE_COLORS = {
@@ -50,91 +50,102 @@ const colorFor = (key, idx) =>
   BASE_COLORS[key] || PALETTE[idx % PALETTE.length];
 
 export default function SalesBreakdownTenders({
-  data = [],
-  seriesKeys, // e.g., tenderKeys from hook
-  labels = {}, // e.g., tenderLabelsByKey from hook
+  rawSales = [],
+  seriesKeys = [],
+  labels = {},
+  branches = [],
 }) {
-  const [mode, setMode] = useState("amount"); // "amount" | "percent"
+  const [selectedBranch, setSelectedBranch] = useState("all");
 
-  // Fallback: infer keys from data if not provided
   const keys = useMemo(() => {
     if (Array.isArray(seriesKeys) && seriesKeys.length) return seriesKeys;
     const set = new Set();
-    (data || []).forEach((row) => {
-      Object.keys(row || {}).forEach((k) => {
-        if (k !== "date") set.add(k);
+    rawSales.forEach((s) => {
+      Object.keys(s).forEach((k) => {
+        if (!['date', 'createdAt', 'branchId', 'id', 'tenderMeta'].includes(k) && typeof s[k] !== 'object') {
+          set.add(k);
+        }
       });
     });
     return Array.from(set);
-  }, [seriesKeys, data]);
+  }, [seriesKeys, rawSales]);
 
-  const hasData = (data?.length ?? 0) > 0;
+  const chartData = useMemo(() => {
+    if (!rawSales?.length || !keys?.length) return [];
+    
+    const filtered = selectedBranch === "all" 
+      ? rawSales 
+      : rawSales.filter(s => s.branchId === selectedBranch);
+
+    return keys
+      .map((k, i) => {
+        const sum = filtered.reduce((acc, row) => acc + (Number(row[k]) || 0), 0);
+        return { 
+          name: labels?.[k] ?? titleCase(k), 
+          value: sum, 
+          key: k,
+          color: colorFor(k, i) 
+        };
+      })
+      .filter((x) => x.value > 0)
+      .sort((a, b) => b.value - a.value);
+  }, [rawSales, keys, labels, selectedBranch]);
+
+  const hasData = chartData.length > 0;
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-2">
-        <span className="font-medium">Sales Breakdown (Tenders)</span>
-        <div className="flex gap-1 rounded-lg bg-black/5 p-1">
+    <div className="flex flex-col h-full">
+      <div className="font-medium mb-3 text-slate-800">Sales Breakdown (Tenders)</div>
+      
+      {branches && branches.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pb-2 mb-4 scrollbar-hide">
           <button
-            className={`px-2 py-1 rounded text-sm ${
-              mode === "amount" ? "bg-white shadow" : ""
+            onClick={() => setSelectedBranch("all")}
+            className={`whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+              selectedBranch === "all" 
+                ? "bg-slate-800 text-white shadow" 
+                : "bg-slate-100 text-slate-600 hover:bg-slate-200"
             }`}
-            onClick={() => setMode("amount")}
           >
-            Amount
+            All Branches
           </button>
-          <button
-            className={`px-2 py-1 rounded text-sm ${
-              mode === "percent" ? "bg-white shadow" : ""
-            }`}
-            onClick={() => setMode("percent")}
-          >
-            %
-          </button>
+          {branches.map(b => (
+            <button
+              key={b.id}
+              onClick={() => setSelectedBranch(b.id)}
+              className={`whitespace-nowrap px-4 py-1.5 rounded-full text-sm font-medium transition-colors ${
+                selectedBranch === b.id 
+                  ? "bg-slate-800 text-white shadow" 
+                  : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+              }`}
+            >
+              {b.name || b.id}
+            </button>
+          ))}
         </div>
-      </div>
+      )}
 
-      <div className="h-72">
+      <div className="h-72 mt-auto">
         {hasData ? (
           <ResponsiveContainer>
             <BarChart
-              data={data}
-              {...(mode === "percent" ? { stackOffset: "expand" } : {})}
+              data={chartData}
               margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
             >
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis
-                tickFormatter={(v) => (mode === "percent" ? PCT(v) : RM(v))}
-                domain={mode === "percent" ? [0, 1] : ["auto", "auto"]}
-              />
-              <Tooltip
-                formatter={(val, name) => [
-                  mode === "percent" ? PCT(val) : RM(val),
-                  name,
-                ]}
-              />
-              <Legend />
-              {keys.map((k, i) => (
-                <Bar
-                  key={k}
-                  dataKey={k}
-                  name={labels?.[k] ?? titleCase(k)}
-                  stackId="a"
-                  fill={colorFor(k, i)}
-                  // round ONLY the top of the stack (last series) in amount mode
-                  radius={
-                    i === keys.length - 1 && mode !== "percent"
-                      ? [8, 8, 0, 0]
-                      : 0
-                  }
-                />
-              ))}
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis dataKey="name" tick={{ fontSize: 12 }} axisLine={false} tickLine={false} />
+              <YAxis tickFormatter={(v) => RM(v)} width={80} axisLine={false} tickLine={false} />
+              <Tooltip formatter={(val) => RM(val)} cursor={{ fill: 'transparent' }} contentStyle={{ borderRadius: '8px' }} />
+              <Bar dataKey="value" radius={[4, 4, 0, 0]} maxBarSize={60}>
+                {chartData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
         ) : (
           <div className="h-full flex items-center justify-center text-sm text-gray-500">
-            No data for selected range
+            No data for selected branch
           </div>
         )}
       </div>

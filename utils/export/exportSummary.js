@@ -93,6 +93,7 @@ const deriveModeKpis = (
   });
 
   const totalAdvance = daily.reduce((s, r) => s + num(r.advance), 0);
+  const totalStaffLoan = daily.reduce((s, r) => s + num(r.staffLoanGiven), 0);
   const totalSalaryCash = daily.reduce((s, r) => s + num(r.salaryCash), 0);
   const lastDaily = daily[daily.length - 1];
   const cashInHandEnd = lastDaily?.runningCash ?? "";
@@ -104,6 +105,7 @@ const deriveModeKpis = (
       { label: "Cash Sales",              value: cashSales },
       { label: "Non-Cash Sales",          value: nonCashSales },
       { label: "Advance (Cash)",          value: totalAdvance },
+      { label: "Staff Loan (Cash)",       value: totalStaffLoan },
       { label: "Salary (Cash)",           value: totalSalaryCash },
       { label: "Cost (Cash)",             value: frontCost },
       { label: "Loan Given",             value: loanAgg.loanGiven },
@@ -142,6 +144,7 @@ const deriveModeKpis = (
     { label: "Withdrawals",            value: withdrawals },
     { label: "Bank Balance",           value: bankBalance },
     { label: "Advance (Cash)",         value: totalAdvance },
+    { label: "Staff Loan (Cash)",      value: totalStaffLoan },
     { label: "Salary (Cash)",          value: totalSalaryCash },
     { label: "Cost (Cash)",            value: frontCost },
     { label: "Cost (Bank)",            value: backCost },
@@ -183,6 +186,7 @@ const buildSummaryColumnSpec = (tenderDefs = [], meta = {}) => {
     "Date",
     ...visibleTenders.map((t) => t.label || t.key),
     "Advance",
+    "Staff Loan",
     ...costHeaders,
     "Salary (Cash)",
     "Loan Given",
@@ -199,7 +203,7 @@ const buildSummaryColumnSpec = (tenderDefs = [], meta = {}) => {
 
   // Column group info for PDF header coloring
   const tenderLabels = new Set(visibleTenders.map((t) => t.label || t.key));
-  const expenseCols = new Set(["Advance", ...costHeaders, "Salary (Cash)"]);
+  const expenseCols = new Set(["Advance", "Staff Loan", ...costHeaders, "Salary (Cash)"]);
   const loanCols = new Set([
     "Loan Given", "Loan Received",
     "Repay In (Cash)", "Repay Out (Cash)",
@@ -261,6 +265,7 @@ const buildSummaryRow = (row, spec) => {
     });
 
     set("Advance", dashOrComma(row.advance));
+    set("Staff Loan", dashOrComma(row.staffLoanGiven));
 
     if (spec.mode === "front") {
       set("Cost (Cash)", dashOrComma(row.costCash ?? (isZeroish(row.costBank) ? row.cost : 0)));
@@ -305,6 +310,7 @@ const buildPeriodTotalsRow = (rows, spec, periodTotals, periodDeposits, periodWi
     set(t.label || t.key, dashOrComma(periodTotals?.[t.key]));
   });
   set("Advance",          dashOrComma(sum("advance")));
+  set("Staff Loan",       dashOrComma(sum("staffLoanGiven")));
   set("Cost (Cash)",      dashOrComma(sum("costCash")));
   set("Cost (Bank)",      dashOrComma(sum("costBank")));
   set("Salary (Cash)",    dashOrComma(sum("salaryCash")));
@@ -383,13 +389,25 @@ const buildLedgerEntries = (rows, tenderDefs, side) => {
       entries.push({ type: 'entry', label: 'Balance from Last Summary', sign: '+', amount: openingCash, balance: running });
     }
 
-    // 3. Advance + Cost Cash combined (-)
+    // 3. Advance (-)
     const totalAdvance  = dailyRows.reduce((s, r) => s + num(r.advance  ?? 0), 0);
+    if (!isZeroish(totalAdvance)) {
+      running -= totalAdvance;
+      entries.push({ type: 'entry', label: 'Advance', sign: '-', amount: totalAdvance, balance: running });
+    }
+
+    // 3a. Staff Loan (-)
+    const totalStaffLoan = dailyRows.reduce((s, r) => s + num(r.staffLoanGiven ?? 0), 0);
+    if (!isZeroish(totalStaffLoan)) {
+      running -= totalStaffLoan;
+      entries.push({ type: 'entry', label: 'Staff Loan', sign: '-', amount: totalStaffLoan, balance: running });
+    }
+
+    // 3b. Cost Cash (-)
     const totalCostCash = dailyRows.reduce((s, r) => s + num(r.costCash ?? 0), 0);
-    const advCost = totalAdvance + totalCostCash;
-    if (!isZeroish(advCost)) {
-      running -= advCost;
-      entries.push({ type: 'entry', label: 'Advance + Cost', sign: '-', amount: advCost, balance: running });
+    if (!isZeroish(totalCostCash)) {
+      running -= totalCostCash;
+      entries.push({ type: 'entry', label: 'Cost', sign: '-', amount: totalCostCash, balance: running });
     }
 
     // 4. Individual transfers from back office / withdrawals (+)

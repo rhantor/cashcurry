@@ -69,6 +69,7 @@ export default function DashboardPage() {
     totalCostsBack,
     totalSal,
     totalAdv,
+    totalStaffLoanCash,
     totalSales,
     bankedTenderLabelList,
     branchName,
@@ -153,7 +154,7 @@ export default function DashboardPage() {
         </div>
 
         {/* ── Secondary KPIs ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
           <KPICard
             title="Front-Office Costs"
             value={fmt(totalCostsFront)}
@@ -174,6 +175,11 @@ export default function DashboardPage() {
           <KPICard
             title="Staff Advances"
             value={fmt(totalAdv)}
+            color="slate"
+          />
+          <KPICard
+            title="Staff Loans"
+            value={fmt(totalStaffLoanCash)}
             color="slate"
           />
         </div>
