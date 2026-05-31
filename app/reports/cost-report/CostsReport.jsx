@@ -444,7 +444,7 @@ export default function CostsReport() {
 
       {/* Totals strip */}
       <div className="w-full bg-white rounded-lg shadow p-4 mb-4">
-        <div className="grid grid-cols-2 sm:grid-cols-6 gap-3 text-sm">
+        <div className="flex flex-wrap justify-between gap-4 text-sm">
           <div className="flex flex-col">
             <span className="text-gray-500">Cash (Front)</span>
             <span className="font-semibold">
@@ -470,6 +470,12 @@ export default function CostsReport() {
           <div className="flex flex-col">
             <span className="text-gray-500">Grand Total</span>
             <span className="font-semibold">{currency} {grandTotal.toFixed(2)}</span>
+          </div>
+          <div className="flex flex-col">
+            <span className="text-gray-500">Average</span>
+            <span className="font-semibold">
+              {currency} {filteredCosts.length > 0 ? (grandTotal / filteredCosts.length).toFixed(2) : "0.00"}
+            </span>
           </div>
         </div>
       </div>
@@ -510,14 +516,14 @@ export default function CostsReport() {
       {/* ===== Top charts (daily | category) ===== */}
       <CostCharts rows={filteredCosts} />
       {/* ===== Table (sticky header, single table) ===== */}
-      <div className="relative bg-white rounded-lg shadow overflow-hidden">
+      <div className="relative bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         <div className="pointer-events-none absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-white/80 to-transparent z-10" />
         <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-white/80 to-transparent z-10" />
 
-        <div className="max-h-[65vh] overflow-auto">
-          <table className="min-w-full table-fixed border-separate border-spacing-0 text-sm">
+        <div className="max-h-[65vh] overflow-auto styled-scrollbar">
+          <table className="min-w-full table-fixed divide-y divide-slate-100 text-sm">
             <thead className="sticky top-0 z-20">
-              <tr className="bg-gray-50/90 backdrop-blur supports-[backdrop-filter]:bg-gray-50/60">
+              <tr className="bg-white/90 backdrop-blur-md supports-[backdrop-filter]:bg-white/60">
                 {[
                   "Date",
                   "Amount",
@@ -532,10 +538,8 @@ export default function CostsReport() {
                   <th
                     key={label}
                     className={[
-                      "px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-gray-700",
-                      "border-b border-gray-200",
-                      idx === 0 ? "rounded-tl-lg" : "",
-                      idx === 8 ? "rounded-tr-lg" : "",
+                      "px-4 py-3 text-xs font-semibold text-slate-500 tracking-wider uppercase",
+                      "border-b border-slate-100",
                     ].join(" ")}
                   >
                     {label}
@@ -544,14 +548,14 @@ export default function CostsReport() {
               </tr>
             </thead>
 
-            <tbody>
+            <tbody className="divide-y divide-slate-50">
               {paginatedCosts.map((entry, rIdx) => {
                 const from = derivePaidFrom(entry);
                 const method = derivePaidMethod(entry);
                 return (
                   <tr
                     key={entry.id || rIdx}
-                    className="border-b border-gray-100 odd:bg-white even:bg-gray-50 hover:bg-mint-50 transition-colors cursor-pointer"
+                    className="bg-white hover:bg-slate-50 transition-colors duration-200 cursor-pointer group focus-within:ring-2 focus-within:ring-mint-500/20"
                     onClick={() => setSelectedCost(entry)}
                     tabIndex={0}
                     onKeyDown={(e) =>
@@ -559,23 +563,23 @@ export default function CostsReport() {
                       setSelectedCost(entry)
                     }
                   >
-                    <td className="px-3 sm:px-4 py-2">
+                    <td className="px-4 py-3 text-sm text-slate-700 font-medium">
                       {format(new Date(entry.date), "dd/MM/yyyy")}
                     </td>
-                    <td className="px-3 sm:px-4 py-2 font-semibold">
+                    <td className="px-4 py-3 font-semibold text-slate-800">
                       {currency} {Number(entry.amount || 0).toFixed(2)}
                     </td>
-                    <td className="px-3 sm:px-4 py-2">
+                    <td className="px-4 py-3 text-sm text-slate-700 font-medium">
                       {(entry.category || "Uncategorized").trim()}
                     </td>
-                    <td className="px-3 sm:px-4 py-2">
+                    <td className="px-4 py-3">
                       {from === "front" ? (
                         <Badge tone="amber">Front</Badge>
                       ) : (
                         <Badge tone="blue">Back</Badge>
                       )}
                     </td>
-                    <td className="px-3 sm:px-4 py-2">
+                    <td className="px-4 py-3">
                       {method ? (
                         <Badge tone={methodTone(method)}>
                           {methodLabel(method)}
@@ -584,10 +588,10 @@ export default function CostsReport() {
                         <span className="text-gray-400">—</span>
                       )}
                     </td>
-                    <td className="px-3 sm:px-4 py-2 break-words">
+                    <td className="px-4 py-3 text-sm text-slate-700 break-words max-w-[12rem] truncate">
                       {entry.description}
                     </td>
-                    <td className="px-3 sm:px-4 py-2">
+                    <td className="px-4 py-3">
                       {entry.attachments?.length > 0 || entry.fileURL ? (
                         <button
                           onClick={(e) => {
@@ -599,13 +603,13 @@ export default function CostsReport() {
                           View Files {entry.attachments?.length > 1 ? `(${entry.attachments.length})` : ''}
                         </button>
                       ) : (
-                        <span className="text-gray-400">—</span>
+                        <span className="text-slate-400">—</span>
                       )}
                     </td>
-                    <td className="px-3 sm:px-4 py-2">
+                    <td className="px-4 py-3 text-sm text-slate-700 font-medium">
                       {entry.createdBy?.username || "N/A"}
                     </td>
-                    <td className="px-3 sm:px-4 py-2">
+                    <td className="px-4 py-3 text-sm text-slate-500">
                       {entry.createdAt?.seconds !== undefined
                         ? format(
                             new Date(
@@ -633,8 +637,15 @@ export default function CostsReport() {
       </div>
 
       {/* Total */}
-      <div className="mt-4 text-right font-bold text-lg">
-        Total: {currency} {grandTotal.toFixed(2)}
+      <div className="mt-4 flex flex-wrap justify-end gap-6 text-right font-bold text-lg">
+        <div>
+          <span className="text-gray-600 text-sm font-medium mr-2">Average:</span>
+          {currency} {filteredCosts.length > 0 ? (grandTotal / filteredCosts.length).toFixed(2) : "0.00"}
+        </div>
+        <div>
+          <span className="text-gray-600 text-sm font-medium mr-2">Total:</span>
+          {currency} {grandTotal.toFixed(2)}
+        </div>
       </div>
 
       {/* Pagination */}

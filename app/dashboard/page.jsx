@@ -17,11 +17,11 @@ import LoansTimeline from "../components/dashboard/charts/LoansTimeline";
 /* ── Reusable section divider ── */
 function SectionHeader({ title }) {
   return (
-    <div className="flex items-center gap-3 pt-2">
+    <div className="flex items-center gap-4 pt-4 pb-1">
       <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap">
         {title}
       </span>
-      <div className="flex-1 h-px bg-slate-200" />
+      <div className="flex-1 h-px bg-slate-200/60" />
     </div>
   );
 }
@@ -29,11 +29,11 @@ function SectionHeader({ title }) {
 /* ── Chart wrapper card ── */
 function ChartCard({ title, subtitle, children }) {
   return (
-    <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-5">
-      <div className="mb-4">
-        <div className="font-semibold text-slate-800 text-sm">{title}</div>
+    <div className="rounded-3xl bg-white shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100/60 p-6 transition-all duration-300 hover:shadow-[0_8px_24px_rgba(0,0,0,0.05)]">
+      <div className="mb-5">
+        <div className="font-semibold text-slate-800 tracking-tight">{title}</div>
         {subtitle && (
-          <div className="text-xs text-slate-400 mt-0.5">{subtitle}</div>
+          <div className="text-xs text-slate-400 mt-1 font-medium">{subtitle}</div>
         )}
       </div>
       {children}

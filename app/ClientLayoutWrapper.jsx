@@ -108,8 +108,8 @@ export default function ClientLayoutWrapper({ children }) {
 
       {!isAuthPage && !isStaffPage && (
         <>
-          <aside className="hidden lg:block fixed top-0 left-0 h-screen w-64 bg-white shadow-md border-r z-40">
-            <React.Suspense fallback={<div className="h-full w-full bg-gray-50 animate-pulse" />}>
+          <aside className="hidden lg:block fixed top-0 left-0 h-screen w-64 bg-white/90 backdrop-blur-xl shadow-sm border-r border-slate-100/60 z-40">
+            <React.Suspense fallback={<div className="h-full w-full bg-slate-50 animate-pulse" />}>
               <Sidebar
                 role={user?.role}
                 onLogout={logout}

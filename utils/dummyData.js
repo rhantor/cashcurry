@@ -12,12 +12,13 @@ export const sidebarItems = {
       icon: 'MdShoppingCart',
       allowedRoles: ['manager', 'accountant', 'branchAdmin', 'supervisor'],
       children: [
-        { label: 'Vendors', path: '/purchases/vendors', allowedRoles: ['manager', 'accountant', 'branchAdmin', 'supervisor'] },
-        { label: 'Items Catalog', path: '/purchases/items', allowedRoles: ['manager', 'accountant', 'branchAdmin', 'supervisor'] },
-        { label: 'Requisitions', path: '/purchases/requisitions', allowedRoles: ['manager', 'accountant', 'branchAdmin', 'supervisor'] },
-        { label: 'New Bill', path: '/purchases/new-bill', allowedRoles: ['manager', 'accountant', 'branchAdmin', 'supervisor'] },
+        { label: 'Order Guides', path: '/purchases/order-guides', allowedRoles: ['manager', 'accountant', 'branchAdmin', 'supervisor'] },
+        { label: 'Purchase Orders', path: '/purchases/purchase-orders', allowedRoles: ['manager', 'accountant', 'branchAdmin', 'supervisor'] },
+        { label: 'New Vendor Bill', path: '/purchases/new-bill', allowedRoles: ['manager', 'accountant', 'branchAdmin', 'supervisor'] },
         { label: 'Due Bills', path: '/purchases/due-bills', allowedRoles: ['manager', 'accountant', 'branchAdmin'] },
-        { label: 'Payments', path: '/purchases/payments', allowedRoles: ['manager', 'accountant', 'branchAdmin'] } // list of vendorPayments
+        { label: 'Payments', path: '/purchases/payments', allowedRoles: ['manager', 'accountant', 'branchAdmin'] },
+        { label: 'Vendors', path: '/purchases/vendors', allowedRoles: ['manager', 'accountant', 'branchAdmin', 'supervisor'] },
+        { label: 'Items Catalog', path: '/purchases/items', allowedRoles: ['manager', 'accountant', 'branchAdmin', 'supervisor'] }
       ]
     },
     {
@@ -228,12 +229,13 @@ export const sidebarItems = {
       icon: 'MdShoppingCart',
       allowedRoles: ['gm', 'superAdmin', 'owner'],
       children: [
-        { label: 'Vendors', path: '/purchases/vendors' },
-        { label: 'Items Catalog', path: '/purchases/items' },
-        { label: 'Requisitions', path: '/purchases/requisitions' },
-        { label: 'New Bill', path: '/purchases/new-bill' },
+        { label: 'Order Guides', path: '/purchases/order-guides' },
+        { label: 'Purchase Orders', path: '/purchases/purchase-orders' },
+        { label: 'New Vendor Bill', path: '/purchases/new-bill' },
         { label: 'Due Bills', path: '/purchases/due-bills' },
-        { label: 'Payments', path: '/purchases/payments' } // list of vendorPayments
+        { label: 'Payments', path: '/purchases/payments' },
+        { label: 'Vendors', path: '/purchases/vendors' },
+        { label: 'Items Catalog', path: '/purchases/items' }
       ]
     },
     {

@@ -86,6 +86,7 @@ export default function ItemsReportModal({
         pixelRatio: 2,
         backgroundColor: "#ffffff",
         cacheBust: true,
+        useCORS: true,
       });
 
       // Convert dataUrl to blob for sharing
@@ -180,6 +181,7 @@ export default function ItemsReportModal({
                   )}
                   <img
                     src={item.zReportUrl}
+                    crossOrigin="anonymous"
                     alt="Z Report Preview"
                     className="w-full object-contain max-h-[400px]"
                     onLoad={() => setImgLoading(false)}

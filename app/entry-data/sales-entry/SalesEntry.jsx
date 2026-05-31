@@ -273,7 +273,8 @@ export default function SalesEntry() {
   const selectedMonthStr = date?.slice(0, 7) || new Date().toISOString().slice(0, 7);
   const [y, m] = selectedMonthStr.split("-");
   const monthStart = `${selectedMonthStr}-01`;
-  const monthEnd = new Date(y, m, 0).toISOString().split("T")[0];
+  const lastDay = new Date(y, m, 0).getDate();
+  const monthEnd = `${selectedMonthStr}-${lastDay.toString().padStart(2, "0")}`;
 
   const { data: sales = [], isLoading: salesLoading, isError: salesError } = useGetSalesEntriesQuery(
     { companyId, branchId, startDate: monthStart, endDate: monthEnd },

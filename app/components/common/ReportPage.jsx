@@ -397,29 +397,23 @@ export default function ReportPage({
         </div>
       )}
 
-      {/* ===== Table ===== */}
       {/* ===== Table (sticky header, single table) ===== */}
-      <div className="relative bg-white rounded-lg shadow overflow-hidden">
+      <div className="relative bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
         {/* subtle top/bottom fade to suggest scroll */}
         <div className="pointer-events-none absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-white/80 to-transparent z-10" />
         <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-white/80 to-transparent z-10" />
 
-        <div className="max-h-[65vh] overflow-auto">
-          <table className="min-w-full table-fixed border-separate border-spacing-0">
+        <div className="max-h-[65vh] overflow-auto styled-scrollbar">
+          <table className="min-w-full table-fixed divide-y divide-slate-100">
             <thead className="sticky top-0 z-20">
-              <tr className="bg-gray-50/90 backdrop-blur supports-[backdrop-filter]:bg-gray-50/60">
+              <tr className="bg-white/90 backdrop-blur-md supports-[backdrop-filter]:bg-white/60">
                 {columns.map((col, idx) => (
                   <th
                     key={col.key}
                     className={[
-                      "px-3 sm:px-4 py-2 text-xs sm:text-sm font-semibold text-gray-700",
-                      "border-b border-gray-200",
-                      // rounded header corners
-                      idx === 0 ? "rounded-tl-lg" : "",
-                      idx === columns.length - 1 ? "rounded-tr-lg" : "",
-                      // optional per-column header classes
+                      "px-4 py-3 text-xs font-semibold text-slate-500 tracking-wider uppercase",
+                      "border-b border-slate-100",
                       col.headerClassName || "",
-                      // alignment helper
                       col.align === "right"
                         ? "text-right"
                         : col.align === "center"
@@ -434,16 +428,14 @@ export default function ReportPage({
               </tr>
             </thead>
 
-            <tbody>
+            <tbody className="divide-y divide-slate-50">
               {paginatedData.map((entry, rIdx) => (
                 <tr
                   key={entry.id || entry[dateField] || rIdx}
                   className={[
-                    "border-b border-gray-100",
-                    "odd:bg-white even:bg-gray-50",
-                    "hover:bg-mint-50 transition-colors",
-                    "cursor-pointer",
-                    "focus-within:ring-2 focus-within:ring-mint-200",
+                    "bg-white hover:bg-slate-50 transition-colors duration-200",
+                    "cursor-pointer group",
+                    "focus-within:ring-2 focus-within:ring-mint-500/20",
                   ].join(" ")}
                   onClick={() => setSelectedItem(entry)}
                   tabIndex={0}
@@ -456,18 +448,14 @@ export default function ReportPage({
                     <td
                       key={col.key}
                       className={[
-                        "px-3 sm:px-4 py-2 align-middle",
-                        "text-sm text-gray-800",
-                        // borders only between rows (not columns)
-                        // optional per-column cell classes
+                        "px-4 py-3 align-middle",
+                        "text-sm text-slate-700 font-medium",
                         col.className || "",
-                        // alignment helper
                         col.align === "right"
                           ? "text-right"
                           : col.align === "center"
                           ? "text-center"
                           : "text-left",
-                        // handle long content gracefully
                         col.truncate ? "truncate max-w-[12rem]" : "break-words",
                       ].join(" ")}
                       style={col.tdStyle}
@@ -502,11 +490,15 @@ export default function ReportPage({
       {showTotalsFooter && valueField && (
         <div className="max-w-7xl mx-auto mt-3">
           <div className="w-full rounded border bg-gray-50">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 text-sm">
+            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 p-3 text-sm">
               <div className="font-medium text-gray-600">Grand Total</div>
               <div className="font-semibold">{currency} {grandTotal.toFixed(2)}</div>
-              <div className="text-gray-600">Entries</div>
-              <div className="font-medium">{filteredData.length}</div>
+              <div className="font-medium text-gray-600">Average</div>
+              <div className="font-semibold">
+                {currency} {filteredData.length > 0 ? (grandTotal / filteredData.length).toFixed(2) : "0.00"}
+              </div>
+              <div className="text-gray-600 font-medium">Entries</div>
+              <div className="font-semibold">{filteredData.length}</div>
             </div>
           </div>
         </div>

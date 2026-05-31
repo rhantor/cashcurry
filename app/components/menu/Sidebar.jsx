@@ -26,7 +26,7 @@ import { SiRedhatopenshift } from "react-icons/si";
 import { FcSalesPerformance } from "react-icons/fc";
 import { IoSettingsSharp } from "react-icons/io5";
 import { useGetBranchesQuery, useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
-import { useGetCompanyDetailsQuery } from "@/lib/redux/api/authApiSlice";
+import { useGetCompanyDetailsQuery, useUpdateUserDefaultBranchMutation } from "@/lib/redux/api/authApiSlice";
 import { skipToken } from "@reduxjs/toolkit/query";
 
 const iconMap = {
@@ -72,6 +72,24 @@ export default function Sidebar({ onLogout, onNavigate }) {
 
   const branchId = activeBranch || userBranchId;
 
+  const [updateDefaultBranch, { isLoading: isUpdatingDefault }] = useUpdateUserDefaultBranchMutation();
+  
+  const handleMakeDefault = async () => {
+    if (!activeBranch) return;
+    try {
+      const uid = currentUser.uid || currentUser.id;
+      if (!uid) return;
+      await updateDefaultBranch({ uid, companyId, defaultBranchId: activeBranch }).unwrap();
+      
+      const updatedUser = { ...currentUser, defaultBranchId: activeBranch };
+      localStorage.setItem("user", JSON.stringify(updatedUser));
+      alert("Default branch saved successfully!");
+    } catch (e) {
+      console.error("Failed to set default branch", e);
+      alert("Failed to set default branch.");
+    }
+  };
+
   const { data: getBranches, isLoading: isGettingBranches } =
     useGetBranchesQuery(companyId, { skip: !companyId });
 
@@ -105,8 +123,12 @@ export default function Sidebar({ onLogout, onNavigate }) {
 
       // Only for company roles: set a default cookie if missing and branches exist
       if (isCompany && !Cookies.get(cookieKey) && formatted.length > 0) {
-        Cookies.set(cookieKey, formatted[0].id, { path: "/" });
-        setActiveBranch(formatted[0].id);
+        let defaultId = formatted[0].id;
+        if (currentUser.defaultBranchId && formatted.some(b => b.id === currentUser.defaultBranchId)) {
+          defaultId = currentUser.defaultBranchId;
+        }
+        Cookies.set(cookieKey, defaultId, { path: "/" });
+        setActiveBranch(defaultId);
       }
     }
   }, [isGettingBranches, getBranches, isCompany, cookieKey]);
@@ -206,17 +228,34 @@ export default function Sidebar({ onLogout, onNavigate }) {
         {isCompany && (
           <>
             {!isGettingBranches && branches.length > 0 ? (
-              <select
-                value={activeBranch}
-                onChange={handleBranchChange}
-                className="mt-2 w-full text-xs font-medium border border-mint-100 rounded-lg px-2 py-1.5 bg-white text-gray-700 focus:ring-2 focus:ring-mint-500/20 focus:border-mint-500 outline-none transition-all"
-              >
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id}>
-                    {b.name}
-                  </option>
-                ))}
-              </select>
+              <div className="w-full">
+                <select
+                  value={activeBranch}
+                  onChange={handleBranchChange}
+                  className="mt-2 w-full text-xs font-medium border border-mint-100 rounded-lg px-2 py-1.5 bg-white text-gray-700 focus:ring-2 focus:ring-mint-500/20 focus:border-mint-500 outline-none transition-all"
+                >
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.name}
+                    </option>
+                  ))}
+                </select>
+                
+                {activeBranch !== currentUser.defaultBranchId && (
+                  <button 
+                    onClick={handleMakeDefault}
+                    disabled={isUpdatingDefault}
+                    className="mt-1.5 w-full text-[10px] font-semibold text-mint-600 hover:text-mint-700 transition-colors text-right"
+                  >
+                    ★ Set as Default Branch
+                  </button>
+                )}
+                {activeBranch === currentUser.defaultBranchId && (
+                  <p className="mt-1.5 w-full text-[10px] font-medium text-slate-400 text-right">
+                    ★ Your Default Branch
+                  </p>
+                )}
+              </div>
             ) : (
               // ✅ NEW: Show create branch button when there is no branch
               <Link
@@ -260,13 +299,13 @@ export default function Sidebar({ onLogout, onNavigate }) {
                 <Link
                   href={item.path}
                   onClick={onNavigate}
-                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
+                  className={`flex items-center gap-3 px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 group ${
                     pathname === item.path
-                      ? "bg-mint-50 text-mint-700 shadow-sm border border-mint-100"
-                      : "hover:bg-gray-50 text-gray-600 hover:text-gray-900 border border-transparent"
+                      ? "bg-mint-50/60 text-mint-700 font-semibold shadow-sm"
+                      : "hover:bg-slate-50 text-slate-600 hover:text-slate-900"
                   }`}
                 >
-                  <span className={`${pathname === item.path ? 'text-mint-600' : 'text-gray-400'}`}>
+                  <span className={`transition-transform duration-200 group-hover:scale-110 ${pathname === item.path ? 'text-mint-600' : 'text-slate-400'}`}>
                     {iconMap[item.icon]}
                   </span>
                   <span className="capitalize tracking-tight">{item.label}</span>
@@ -299,19 +338,19 @@ function DropdownItem({ item, role, pathname, onNavigate }) {
     <li className="mb-1">
       <button
         onClick={() => setOpen(!open)}
-        className={`w-full flex justify-between items-center px-3 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 ${
+        className={`w-full flex justify-between items-center px-3.5 py-2.5 rounded-xl font-medium text-sm transition-all duration-200 group ${
           activeChild
-            ? "bg-mint-50 text-mint-700 shadow-sm border border-mint-100"
-            : "hover:bg-gray-50 text-gray-600 hover:text-gray-900 border border-transparent"
+            ? "bg-mint-50/60 text-mint-700 font-semibold shadow-sm"
+            : "hover:bg-slate-50 text-slate-600 hover:text-slate-900"
         }`}
       >
         <span className="flex items-center gap-3">
-          <span className={`${activeChild ? 'text-mint-600' : 'text-gray-400'}`}>
+          <span className={`transition-transform duration-200 group-hover:scale-110 ${activeChild ? 'text-mint-600' : 'text-slate-400'}`}>
             {iconMap[item.icon]}
           </span>
           <span className="capitalize tracking-tight">{item.label}</span>
         </span>
-        <span className={`text-[10px] transition-transform duration-200 ${open ? "rotate-180" : ""}`}>▼</span>
+        <span className={`text-[10px] transition-transform duration-200 text-slate-400 ${open ? "rotate-180" : ""}`}>▼</span>
       </button>
 
       {open && (
