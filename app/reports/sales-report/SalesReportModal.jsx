@@ -112,7 +112,7 @@ export default function ItemsReportModal({
       }
     } catch (err) {
       console.error("Image sharing failed:", err);
-      alert("Failed to generate report image. Please try again or use PDF Export.");
+      alert(`Failed to generate report image. Reason: ${err.message || err.toString()}. Please try again or use PDF Export.`);
     } finally {
       setIsSharing(false);
     }
