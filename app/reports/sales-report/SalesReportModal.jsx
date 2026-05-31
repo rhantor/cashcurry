@@ -81,12 +81,15 @@ export default function ItemsReportModal({
     try {
       // Use html-to-image to generate a high-quality PNG
       const { toPng } = await import("html-to-image");
+      // Call once to warm up cache (common workaround for html-to-image)
+      await toPng(reportRef.current, { skipFonts: true, useCORS: true }).catch(() => {});
+      
       const dataUrl = await toPng(reportRef.current, {
         quality: 0.95,
         pixelRatio: 2,
         backgroundColor: "#ffffff",
-        cacheBust: true,
         useCORS: true,
+        skipFonts: true,
       });
 
       // Convert dataUrl to blob for sharing
