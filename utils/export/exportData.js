@@ -473,8 +473,7 @@ export const handleShareImage = async (
   sale,
   branchData,
   tendersOpt = null,
-  monthTotal,
-  base64Img = null
+  monthTotal
 ) => {
   const branchName = Array.isArray(branchData)
     ? branchData
@@ -607,7 +606,7 @@ export const handleShareImage = async (
     cy += 20 * scale;
 
     // Z Report Image
-    if (base64Img) {
+    if (sale.zReportUrl) {
       cy += 8 * scale;
       ctx.setLineDash([4 * scale, 4 * scale]);
       ctx.strokeStyle = "#e5e7eb";
@@ -625,6 +624,18 @@ export const handleShareImage = async (
       cy += 16 * scale;
 
       try {
+        // Fetch securely via proxy to avoid CORS
+        const res = await fetch(`/api/proxy-image?url=${encodeURIComponent(sale.zReportUrl)}`);
+        if (!res.ok) throw new Error("Proxy fetch failed");
+        const blob = await res.blob();
+        
+        const base64Img = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+
         const img = new Image();
         img.src = base64Img;
         await new Promise((resolve, reject) => {

@@ -36,28 +36,8 @@ export default function ItemsReportModal({
   const [imgLoading, setImgLoading] = useState(true);
   const [sharingLabel, setSharingLabel] = useState("Share as Image");
   const [fallbackImage, setFallbackImage] = useState(null);
-  const [base64Img, setBase64Img] = useState(null);
   const reportRef = useRef(null);
   const currency = useCurrency();
-
-  useEffect(() => {
-    if (item?.zReportUrl) {
-      // Pre-fetch via proxy and convert to base64 so html-to-image doesn't have to deal with CORS
-      fetch(`/api/proxy-image?url=${encodeURIComponent(item.zReportUrl)}`)
-        .then((res) => {
-          if (!res.ok) throw new Error("Proxy failed");
-          return res.blob();
-        })
-        .then((blob) => {
-          const reader = new FileReader();
-          reader.onloadend = () => setBase64Img(reader.result);
-          reader.readAsDataURL(blob);
-        })
-        .catch((err) => {
-          console.error("Failed to load base64 image via proxy", err);
-        });
-    }
-  }, [item?.zReportUrl]);
 
   const tenders = useMemo(() => {
     if (!item) return DEFAULT_TENDERS;
@@ -100,7 +80,7 @@ export default function ItemsReportModal({
   const doShareImage = async () => {
     setSharingLabel("Capturing...");
     try {
-      const dataUrl = await shareImage(item, branchData, tenders, monthTotal, base64Img);
+      const dataUrl = await shareImage(item, branchData, tenders, monthTotal);
       if (dataUrl) {
         setFallbackImage(dataUrl);
       }
