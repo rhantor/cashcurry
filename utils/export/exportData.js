@@ -465,6 +465,253 @@ export const handleShare = async (
   }
 };
 
+/**
+ * handleShareImage(sale, branchData, tendersOpt?, monthTotal?)
+ * Generates a PNG image of the sales report using Canvas 2D and shares it.
+ */
+export const handleShareImage = async (
+  sale,
+  branchData,
+  tendersOpt = null,
+  monthTotal,
+  base64Img = null
+) => {
+  const branchName = Array.isArray(branchData)
+    ? branchData
+        .map((b) => b?.name)
+        .filter(Boolean)
+        .join(", ")
+    : branchData?.name || "N/A";
+
+  try {
+    const tenders =
+      (tendersOpt && tendersOpt.length ? tendersOpt : tendersFromSale(sale)) ||
+      [];
+
+    const total = sale.total ?? tenders
+      .filter((t) => t.includeInTotal)
+      .reduce((sum, t) => sum + Math.round((parseFloat(sale?.[t.key]) || 0) * 100), 0) / 100;
+
+    // --- Canvas drawing ---
+    const scale = 3; // Bumped from 2 to 3 for ultra-crisp resolution
+    const W = 420 * scale;
+    const pad = 24 * scale;
+    const contentW = W - pad * 2;
+    let cy = pad;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = W;
+    canvas.height = 3000 * scale; // Extra height for Z-report
+    const ctx = canvas.getContext("2d");
+
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    const setFont = (size, weight = "normal") => {
+      ctx.font = `${weight} ${size * scale}px sans-serif`;
+    };
+
+    // Header (Added maxWidth to prevent overflow)
+    setFont(15, "bold");
+    ctx.fillStyle = "#1f2937";
+    ctx.fillText(branchName, pad, cy + 15 * scale, contentW - 100 * scale);
+
+    setFont(11, "bold");
+    ctx.fillStyle = "#4b5563";
+    ctx.textAlign = "right";
+    ctx.fillText("Sales Report", W - pad, cy + 11 * scale);
+    setFont(10, "normal");
+    ctx.fillStyle = "#9ca3af";
+    ctx.fillText(formatDate(sale.date), W - pad, cy + 24 * scale);
+    ctx.textAlign = "left";
+
+    cy += 36 * scale;
+    ctx.strokeStyle = "#e5e7eb";
+    ctx.lineWidth = 1 * scale;
+    ctx.beginPath();
+    ctx.moveTo(pad, cy);
+    ctx.lineTo(W - pad, cy);
+    ctx.stroke();
+    cy += 10 * scale;
+
+    // Tender rows
+    for (const t of tenders) {
+      const val = sale?.[t.key];
+      setFont(12, "normal");
+      ctx.fillStyle = "#374151";
+      ctx.textAlign = "left";
+      ctx.fillText(t.label, pad, cy + 12 * scale);
+
+      setFont(12, "bold");
+      ctx.fillStyle = "#111827";
+      ctx.textAlign = "right";
+      ctx.fillText(fmt(val), W - pad, cy + 12 * scale);
+      ctx.textAlign = "left";
+      cy += 18 * scale;
+
+      ctx.strokeStyle = "#f3f4f6";
+      ctx.lineWidth = 0.5 * scale;
+      ctx.beginPath();
+      ctx.moveTo(pad, cy);
+      ctx.lineTo(W - pad, cy);
+      ctx.stroke();
+      cy += 4 * scale;
+    }
+
+    // Daily Total
+    cy += 4 * scale;
+    ctx.strokeStyle = "#d1d5db";
+    ctx.lineWidth = 2 * scale;
+    ctx.beginPath();
+    ctx.moveTo(pad, cy);
+    ctx.lineTo(W - pad, cy);
+    ctx.stroke();
+    cy += 12 * scale;
+
+    setFont(14, "bold");
+    ctx.fillStyle = "#111827";
+    ctx.textAlign = "left";
+    ctx.fillText("Daily Total", pad, cy + 14 * scale);
+    ctx.textAlign = "right";
+    ctx.fillText(fmt(total), W - pad, cy + 14 * scale);
+    ctx.textAlign = "left";
+    cy += 24 * scale;
+
+    // Monthly Grand Total box
+    if (monthTotal != null) {
+      cy += 4 * scale;
+      const boxH = 44 * scale;
+      ctx.fillStyle = "#ecfdf5";
+      ctx.fillRect(pad, cy, contentW, boxH);
+      ctx.strokeStyle = "#d1fae5";
+      ctx.lineWidth = 1 * scale;
+      ctx.strokeRect(pad, cy, contentW, boxH);
+
+      setFont(9, "bold");
+      ctx.fillStyle = "#059669";
+      ctx.textAlign = "left";
+      ctx.fillText("MONTHLY GRAND TOTAL", pad + 10 * scale, cy + boxH / 2 + 3 * scale);
+
+      setFont(16, "bold");
+      ctx.fillStyle = "#047857";
+      ctx.textAlign = "right";
+      ctx.fillText(`RM ${fmt(monthTotal)}`, W - pad - 10 * scale, cy + boxH / 2 + 5 * scale);
+      ctx.textAlign = "left";
+      cy += boxH + 10 * scale;
+    }
+
+    // Footer
+    setFont(8, "normal");
+    ctx.fillStyle = "#9ca3af";
+    ctx.fillText(`Added By: ${sale.createdBy?.username || "Unknown"}`, pad, cy + 8 * scale);
+    cy += 20 * scale;
+
+    // Z Report Image
+    if (base64Img) {
+      cy += 8 * scale;
+      ctx.setLineDash([4 * scale, 4 * scale]);
+      ctx.strokeStyle = "#e5e7eb";
+      ctx.lineWidth = 1 * scale;
+      ctx.beginPath();
+      ctx.moveTo(pad, cy);
+      ctx.lineTo(W - pad, cy);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      cy += 12 * scale;
+
+      setFont(9, "bold");
+      ctx.fillStyle = "#6b7280";
+      ctx.fillText("Z REPORT ATTACHED:", pad, cy + 8 * scale);
+      cy += 16 * scale;
+
+      try {
+        const img = new Image();
+        img.src = base64Img;
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = reject;
+          if (img.complete) resolve();
+        });
+        
+        // Let the image grow slightly bigger if it's high res
+        const maxImgW = contentW;
+        const maxImgH = 500 * scale; 
+        let imgW = img.naturalWidth;
+        let imgH = img.naturalHeight;
+        const ratio = Math.min(maxImgW / imgW, maxImgH / imgH, 1);
+        imgW = imgW * ratio;
+        imgH = imgH * ratio;
+        const imgX = pad + (contentW - imgW) / 2;
+        
+        // High quality rendering
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+        ctx.drawImage(img, imgX, cy, imgW, imgH);
+        cy += imgH + 8 * scale;
+      } catch (imgErr) {
+        console.warn("Z-Report image skipped:", imgErr);
+      }
+    }
+
+    // Trim canvas to content height
+    const trimmed = document.createElement("canvas");
+    trimmed.width = W;
+    trimmed.height = cy;
+    trimmed.getContext("2d").drawImage(canvas, 0, 0);
+
+    // Convert to data URL (synchronous - won't hang)
+    const dataUrl = trimmed.toDataURL("image/png");
+
+    // Convert data URL to blob manually
+    const byteString = atob(dataUrl.split(",")[1]);
+    const mimeString = dataUrl.split(",")[0].split(":")[1].split(";")[0];
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) {
+      ia[i] = byteString.charCodeAt(i);
+    }
+    const imgBlob = new Blob([ab], { type: mimeString });
+
+    const fileName = `sales-report-${sale.date}.png`;
+    const imgFile = new File([imgBlob], fileName, { type: "image/png" });
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+    try {
+      // 1. Try Native Share (Only reliable on Mobile devices)
+      if (isMobile && navigator.share && navigator.canShare?.({ files: [imgFile] })) {
+        await navigator.share({
+          title: "Sales Report",
+          text: `Sales report for ${formatDate(sale.date)} • ${branchName}`,
+          files: [imgFile],
+        });
+        return null; // Handled by native share
+      }
+      throw new Error("Share skipped for desktop");
+    } catch (shareErr) {
+      // 2. Fallback: Copy to Clipboard (Great for Desktop WhatsApp/Web)
+      try {
+        if (navigator.clipboard && window.ClipboardItem) {
+          await navigator.clipboard.write([
+            new ClipboardItem({
+              [imgBlob.type]: imgBlob,
+            }),
+          ]);
+          alert("✅ Image successfully copied to clipboard!\n\nYou can now right-click -> Paste (or Ctrl+V) directly into WhatsApp, Telegram, or any chat.");
+          return null; // Handled by clipboard
+        }
+        throw new Error("Clipboard not supported");
+      } catch (clipErr) {
+        // 3. Ultimate Fallback: Return the data URL so the Modal can display it on screen
+        return dataUrl;
+      }
+    }
+  } catch (err) {
+    console.error("Image share failed:", err);
+    alert(`Failed to share image: ${err.message || err}`);
+    return null;
+  }
+};
+
 /** =========================================================
  *  Multi-sale exports (dynamic columns)
  *  ========================================================= */

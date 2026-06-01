@@ -1,12 +1,13 @@
 /* eslint-disable react/prop-types */
 /* eslint-disable react/no-unknown-property */
 "use client";
-import React, { useMemo, useState, useRef } from "react";
+import React, { useMemo, useState, useRef, useEffect } from "react";
 import { format } from "date-fns";
 import {
   exportToExcel,
   exportToPDF,
   handleShare,
+  handleShareImage as shareImage,
 } from "@/utils/export/exportData";
 import useCurrency from "@/app/hooks/useCurrency";
 
@@ -33,9 +34,30 @@ export default function ItemsReportModal({
   monthTotal,
 }) {
   const [imgLoading, setImgLoading] = useState(true);
-  const [isSharing, setIsSharing] = useState(false);
+  const [sharingLabel, setSharingLabel] = useState("Share as Image");
+  const [fallbackImage, setFallbackImage] = useState(null);
+  const [base64Img, setBase64Img] = useState(null);
   const reportRef = useRef(null);
   const currency = useCurrency();
+
+  useEffect(() => {
+    if (item?.zReportUrl) {
+      // Pre-fetch via proxy and convert to base64 so html-to-image doesn't have to deal with CORS
+      fetch(`/api/proxy-image?url=${encodeURIComponent(item.zReportUrl)}`)
+        .then((res) => {
+          if (!res.ok) throw new Error("Proxy failed");
+          return res.blob();
+        })
+        .then((blob) => {
+          const reader = new FileReader();
+          reader.onloadend = () => setBase64Img(reader.result);
+          reader.readAsDataURL(blob);
+        })
+        .catch((err) => {
+          console.error("Failed to load base64 image via proxy", err);
+        });
+    }
+  }, [item?.zReportUrl]);
 
   const tenders = useMemo(() => {
     if (!item) return DEFAULT_TENDERS;
@@ -75,77 +97,28 @@ export default function ItemsReportModal({
   const doExportExcel = () => exportToExcel(item, branchData, tenders, monthTotal);
   const doShare = () => handleShare(item, branchData, tenders, monthTotal);
 
-  const handleShareImage = async () => {
-    if (!reportRef.current || isSharing) return;
-    setIsSharing(true);
+  const doShareImage = async () => {
+    setSharingLabel("Capturing...");
     try {
-      // Use html-to-image to generate a high-quality PNG
-      const { toPng } = await import("html-to-image");
-      // Call once to warm up cache (common workaround for html-to-image)
-      await toPng(reportRef.current, { skipFonts: true, useCORS: true }).catch(() => {});
-      
-      let dataUrl;
-      try {
-        dataUrl = await toPng(reportRef.current, {
-          quality: 0.95,
-          pixelRatio: 2,
-          backgroundColor: "#ffffff",
-          useCORS: true,
-          skipFonts: true,
-        });
-      } catch (firstErr) {
-        console.warn("Capture failed, likely due to CORS on Firebase image. Retrying without images...", firstErr);
-        dataUrl = await toPng(reportRef.current, {
-          quality: 0.95,
-          pixelRatio: 2,
-          backgroundColor: "#ffffff",
-          skipFonts: true,
-          filter: (node) => {
-            // Exclude images to bypass CORS taint
-            return node.tagName !== "IMG";
-          }
-        });
-        alert("Note: The Z-Report image was excluded from the screenshot because Firebase Storage CORS is blocking it.");
-      }
-
-      // Convert dataUrl to blob for sharing
-      const res = await fetch(dataUrl);
-      const blob = await res.blob();
-
-      const fileName = `sales-report-${item.date}.png`;
-      const file = new File([blob], fileName, { type: "image/png" });
-
-      if (navigator.share && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({
-          title: "Sales Report Image",
-          text: `Sales report for ${format(new Date(item.date), "dd/MM/yyyy")}`,
-          files: [file],
-        });
-      } else {
-        // Fallback: Download
-        const link = document.createElement("a");
-        link.href = dataUrl;
-        link.download = fileName;
-        link.click();
-        alert("Sharing not supported on this browser. The report has been downloaded as an image instead.");
+      const dataUrl = await shareImage(item, branchData, tenders, monthTotal, base64Img);
+      if (dataUrl) {
+        setFallbackImage(dataUrl);
       }
     } catch (err) {
-      console.error("Image sharing failed:", err);
-      alert(`Failed to generate report image. Reason: ${err.message || err.toString()}. Please try again or use PDF Export.`);
-    } finally {
-      setIsSharing(false);
+      alert(`Share image error: ${err.message || err}`);
     }
+    setSharingLabel("Share as Image");
   };
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div className="bg-white rounded-lg shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div ref={reportRef} className="p-6 bg-white">
-          <div className="flex justify-between items-center mb-4 border-b pb-2">
-            <h2 className="text-lg font-bold text-gray-800">{branchTitle}</h2>
+        <div ref={reportRef} className="p-6" style={{ backgroundColor: "#ffffff", color: "#111827" }}>
+          <div className="flex justify-between items-center mb-4 border-b pb-2" style={{ borderColor: "#e5e7eb" }}>
+            <h2 className="text-lg font-bold" style={{ color: "#1f2937" }}>{branchTitle}</h2>
             <div className="text-right">
-              <p className="text-sm font-semibold text-gray-600">Sales Report</p>
-              <p className="text-xs text-gray-400">{format(new Date(item.date), "dd MMM yyyy")}</p>
+              <p className="text-sm font-semibold" style={{ color: "#4b5563" }}>Sales Report</p>
+              <p className="text-xs" style={{ color: "#9ca3af" }}>{format(new Date(item.date), "dd MMM yyyy")}</p>
             </div>
           </div>
 
@@ -154,52 +127,52 @@ export default function ItemsReportModal({
               const value = item[t.key];
               const note = item.notes?.[t.key];
               return (
-                <div key={t.key} className="flex justify-between gap-3 items-start py-1 border-b border-gray-50 last:border-0">
-                  <span className="font-medium text-gray-700">{t.label}</span>
+                <div key={t.key} className="flex justify-between gap-3 items-start py-1 border-b last:border-0" style={{ borderColor: "#f9fafb" }}>
+                  <span className="font-medium" style={{ color: "#374151" }}>{t.label}</span>
                   <div className="text-right">
                     {note && (
-                      <span className="block text-[10px] text-gray-400 italic leading-tight mb-1 max-w-[150px]">
+                      <span className="block text-[10px] italic leading-tight mb-1 max-w-[150px]" style={{ color: "#9ca3af" }}>
                         Note: {note}
                       </span>
                     )}
-                    <span className="font-semibold text-gray-900">{fmt(value)}</span>
+                    <span className="font-semibold" style={{ color: "#111827" }}>{fmt(value)}</span>
                   </div>
                 </div>
               );
             })}
 
-            <div className="mt-4 pt-3 border-t-2 border-gray-100">
-              <div className="flex justify-between font-bold text-base text-gray-900">
+            <div className="mt-4 pt-3 border-t-2" style={{ borderColor: "#f3f4f6" }}>
+              <div className="flex justify-between font-bold text-base" style={{ color: "#111827" }}>
                 <span>Daily Total</span>
                 <span>{fmt(item.total ?? recalculatedTotal)}</span>
               </div>
             </div>
 
-            <div className="mt-4 p-4 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center justify-between">
-              <div className="text-xs font-semibold text-emerald-600 uppercase tracking-wider">
+            <div className="mt-4 p-4 rounded-xl border flex items-center justify-between" style={{ backgroundColor: "#ecfdf5", borderColor: "#d1fae5" }}>
+              <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: "#059669" }}>
                 Monthly Grand Total
               </div>
-              <div className="text-xl font-black text-emerald-700">
+              <div className="text-xl font-black" style={{ color: "#047857" }}>
                 {currency} {monthTotal}
               </div>
             </div>
 
-            <div className="flex justify-between pt-4 text-gray-400 text-[10px] uppercase tracking-widest">
+            <div className="flex justify-between pt-4 text-[10px] uppercase tracking-widest" style={{ color: "#9ca3af" }}>
               <span>Added By: {item.createdBy?.username || "Unknown"}</span>
               <span>{format(new Date(), "HH:mm")}</span>
             </div>
 
             {item.zReportUrl && (
-              <div className="mt-6 pt-4 border-t border-dashed border-gray-200">
-                <p className="text-xs font-bold text-gray-500 mb-2 uppercase">Z Report Attached:</p>
-                <div className="w-full rounded-lg overflow-hidden border border-gray-100 relative min-h-[100px] flex items-center justify-center bg-gray-50">
+              <div className="mt-6 pt-4 border-t border-dashed" style={{ borderColor: "#e5e7eb" }}>
+                <p className="text-xs font-bold mb-2 uppercase" style={{ color: "#6b7280" }}>Z Report Attached:</p>
+                <div className="w-full rounded-lg overflow-hidden border relative min-h-[100px] flex items-center justify-center" style={{ backgroundColor: "#f9fafb", borderColor: "#f3f4f6" }}>
                   {imgLoading && (
-                    <div className="absolute inset-0 flex items-center justify-center bg-gray-50/80 z-10">
-                      <div className="loader border-t-4 border-mint-500 w-8 h-8 rounded-full animate-spin"></div>
+                    <div className="absolute inset-0 flex items-center justify-center z-10" style={{ backgroundColor: "rgba(249, 250, 251, 0.8)" }}>
+                      <div className="loader border-t-4 w-8 h-8 rounded-full animate-spin" style={{ borderTopColor: "transparent", borderRightColor: "#10b981", borderBottomColor: "#10b981", borderLeftColor: "#10b981" }}></div>
                     </div>
                   )}
                   <img
-                    src={item.zReportUrl}
+                    src={base64Img || item.zReportUrl}
                     alt="Z Report Preview"
                     className="w-full object-contain max-h-[400px]"
                     onLoad={() => setImgLoading(false)}
@@ -208,16 +181,29 @@ export default function ItemsReportModal({
                 </div>
               </div>
             )}
+            {item.total === 0 && (
+              <p className="text-center text-gray-500 italic text-sm mt-4">
+                No sales recorded
+              </p>
+            )}
           </div>
         </div>
+
+        {fallbackImage && (
+          <div className="bg-gray-100 p-4 border-t border-gray-200 flex flex-col items-center">
+            <p className="text-xs font-bold text-gray-700 mb-2">✅ Image Ready! Right-click or long-press to Save/Copy</p>
+            <img src={fallbackImage} alt="Generated Report" className="max-w-[80%] border border-gray-300 shadow-sm rounded-lg mb-2" />
+            <button onClick={() => setFallbackImage(null)} className="text-xs text-blue-500 underline">Dismiss</button>
+          </div>
+        )}
 
         <div className="bg-gray-50 p-6 flex flex-wrap justify-center gap-2 sm:gap-3 border-t border-gray-100">
           <button onClick={onClose} className="flex-1 min-w-[80px] py-2 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 text-xs font-semibold transition">
             Close
           </button>
           
-          <button onClick={handleShareImage} disabled={isSharing} className="flex-1 min-w-[120px] py-2 rounded-lg bg-mint-500 hover:bg-mint-600 text-white text-xs font-bold shadow-sm transition disabled:opacity-50">
-            {isSharing ? "Capturing..." : "Share as Image"}
+          <button onClick={doShareImage} className="flex-1 min-w-[120px] py-2 rounded-lg bg-mint-500 hover:bg-mint-600 text-white text-xs font-bold shadow-sm transition">
+            {sharingLabel}
           </button>
 
           <div className="w-full flex gap-2">

@@ -113,14 +113,19 @@ export default function CostsReport() {
     } else if (filterType === "last7days") {
       startDate = formatYMD(subDays(today, 7));
       endDate = formatYMD(today);
-    } else if (filterType === "range" && dateRange.from && dateRange.to) {
-      startDate = dateRange.from;
-      endDate = dateRange.to;
-    } else if (filterType === "month" && selectedMonth) {
-      const [year, month] = selectedMonth.split("-");
-      const d = new Date(parseInt(year), parseInt(month) - 1, 1);
-      startDate = formatYMD(startOfMonth(d));
-      endDate = formatYMD(endOfMonth(d));
+    } else if (filterType === "range") {
+      startDate = dateRange.from || formatYMD(today);
+      endDate = dateRange.to || dateRange.from || formatYMD(today);
+    } else if (filterType === "month") {
+      if (selectedMonth) {
+        const [year, month] = selectedMonth.split("-");
+        const d = new Date(parseInt(year), parseInt(month) - 1, 1);
+        startDate = formatYMD(startOfMonth(d));
+        endDate = formatYMD(endOfMonth(d));
+      } else {
+        startDate = formatYMD(startOfMonth(today));
+        endDate = formatYMD(endOfMonth(today));
+      }
     }
 
     return { startDate, endDate };
@@ -179,20 +184,23 @@ export default function CostsReport() {
           end: today,
         })
       );
-    } else if (filterType === "range" && dateRange.from && dateRange.to) {
+    } else if (filterType === "range") {
+      const startStr = dateRange.from || format(today, "yyyy-MM-dd");
+      const endStr = dateRange.to || dateRange.from || format(today, "yyyy-MM-dd");
       filtered = filtered.filter((entry) =>
         isWithinInterval(new Date(entry.date), {
-          start: new Date(dateRange.from),
-          end: new Date(dateRange.to),
+          start: new Date(startStr),
+          end: new Date(endStr),
         })
       );
-    } else if (filterType === "month" && selectedMonth) {
-      const [year, month] = selectedMonth.split("-");
+    } else if (filterType === "month") {
+      const yStr = selectedMonth ? selectedMonth.split("-")[0] : today.getFullYear();
+      const mStr = selectedMonth ? selectedMonth.split("-")[1] : today.getMonth() + 1;
       filtered = filtered.filter((entry) => {
         const d = new Date(entry.date);
         return (
-          d.getFullYear() === parseInt(year) &&
-          d.getMonth() + 1 === parseInt(month)
+          d.getFullYear() === parseInt(yStr) &&
+          d.getMonth() + 1 === parseInt(mStr)
         );
       });
     }
