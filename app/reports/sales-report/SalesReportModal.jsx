@@ -84,13 +84,29 @@ export default function ItemsReportModal({
       // Call once to warm up cache (common workaround for html-to-image)
       await toPng(reportRef.current, { skipFonts: true, useCORS: true }).catch(() => {});
       
-      const dataUrl = await toPng(reportRef.current, {
-        quality: 0.95,
-        pixelRatio: 2,
-        backgroundColor: "#ffffff",
-        useCORS: true,
-        skipFonts: true,
-      });
+      let dataUrl;
+      try {
+        dataUrl = await toPng(reportRef.current, {
+          quality: 0.95,
+          pixelRatio: 2,
+          backgroundColor: "#ffffff",
+          useCORS: true,
+          skipFonts: true,
+        });
+      } catch (firstErr) {
+        console.warn("Capture failed, likely due to CORS on Firebase image. Retrying without images...", firstErr);
+        dataUrl = await toPng(reportRef.current, {
+          quality: 0.95,
+          pixelRatio: 2,
+          backgroundColor: "#ffffff",
+          skipFonts: true,
+          filter: (node) => {
+            // Exclude images to bypass CORS taint
+            return node.tagName !== "IMG";
+          }
+        });
+        alert("Note: The Z-Report image was excluded from the screenshot because Firebase Storage CORS is blocking it.");
+      }
 
       // Convert dataUrl to blob for sharing
       const res = await fetch(dataUrl);
@@ -184,7 +200,6 @@ export default function ItemsReportModal({
                   )}
                   <img
                     src={item.zReportUrl}
-                    crossOrigin="anonymous"
                     alt="Z Report Preview"
                     className="w-full object-contain max-h-[400px]"
                     onLoad={() => setImgLoading(false)}
