@@ -152,7 +152,7 @@ export default function ItemsReportModal({
                     </div>
                   )}
                   <img
-                    src={base64Img || item.zReportUrl}
+                    src={item.zReportUrl}
                     alt="Z Report Preview"
                     className="w-full object-contain max-h-[400px]"
                     onLoad={() => setImgLoading(false)}
