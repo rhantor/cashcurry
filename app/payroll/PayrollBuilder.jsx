@@ -496,10 +496,13 @@ export default function PayrollBuilder () {
       const effectiveLoanAmt = inputs.loanOverride !== ''
         ? (parseFloat(inputs.loanOverride) || 0)
         : loanDed
+      const effectiveAllowanceAmt = inputs.allowanceOverride !== ''
+        ? (parseFloat(inputs.allowanceOverride) || 0)
+        : (parseFloat(staff.allowance) || 0)
       const c = calcPayroll(
         {
           basicSalary: parseFloat(staff.basicSalary) || 0,
-          allowance:   parseFloat(staff.allowance)   || 0,
+          allowance:   effectiveAllowanceAmt,
           salaryMode: mode, standardHours: stdH, workingDays: wrkD,
           OTPerHour:   parseFloat(staff.OTPerHour)   || null,
           otMultiplier: staff.otMultiplier ?? payrollConfig?.otMultiplier ?? 1.5,
@@ -554,6 +557,10 @@ export default function PayrollBuilder () {
         ? (parseFloat(inputs.loanOverride) || 0)
         : loanDed
 
+      const effectiveSlipAllowance = inputs.allowanceOverride !== ''
+        ? (parseFloat(inputs.allowanceOverride) || 0)
+        : (parseFloat(staff.allowance) || 0)
+
       // Build effective deductionMeta for loans:
       // - No override → use loan items as-is
       // - Override = 0 → skip all loan installments (don't mark any as paid)
@@ -573,7 +580,7 @@ export default function PayrollBuilder () {
       const calc = calcPayroll(
         {
           basicSalary: parseFloat(staff.basicSalary) || 0,
-          allowance:   parseFloat(staff.allowance)   || 0,
+          allowance:   effectiveSlipAllowance,
           salaryMode: mode, standardHours: stdH, workingDays: wrkD,
           OTPerHour:   parseFloat(staff.OTPerHour)   || null,
           otMultiplier: staff.otMultiplier ?? payrollConfig?.otMultiplier ?? 1.5,

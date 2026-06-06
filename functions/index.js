@@ -573,3 +573,64 @@ exports.onDepositCreated = onDocumentCreated(
     });
   }
 );
+
+// 🔔 POS Shift closed trigger
+// Syncs a closed shift's sales directly into the main Cash Curry sales collection
+exports.onShiftClosed = onDocumentWritten(
+  "companies/{companyId}/branches/{branchId}/shifts/{shiftId}",
+  async (event) => {
+    const { companyId, branchId } = event.params;
+    const before = event.data?.before?.exists ? event.data.before.data() : null;
+    const after = event.data?.after?.exists ? event.data.after.data() : null;
+
+    // We only care if it just transitioned to 'closed'
+    if (after && after.status === "closed" && (!before || before.status !== "closed")) {
+      const salesTotal = Number(after.salesTotal || 0);
+      if (salesTotal <= 0) return; // Ignore zero sales shifts
+
+      // Gate sync on company having opted into the accounting module
+      const companySnap = await db.doc(`companies/${companyId}`).get();
+      const modules = companySnap.exists ? (companySnap.data().modules || []) : [];
+      const accountingConnected = modules.includes("accounting");
+
+      const dateStr = new Date().toISOString().slice(0, 10);
+      const title = "POS Shift Closed";
+      const body = accountingConnected
+        ? `Shift closed with total sales: RM ${salesTotal.toFixed(2)} (synced to ledger)`
+        : `Shift closed with total sales: RM ${salesTotal.toFixed(2)}`;
+
+      console.log("[onShiftClosed] Shift closed", {
+        companyId,
+        branchId,
+        shiftId: event.params.shiftId,
+        salesTotal,
+        accountingConnected,
+      });
+
+      // 1) Write to the main sales collection only if accounting is connected
+      if (accountingConnected) {
+        const tenderBreakdown = after.tenderBreakdown || null;
+        await db.collection(`companies/${companyId}/branches/${branchId}/sales`).add({
+          amount: salesTotal,
+          total: salesTotal,
+          date: dateStr,
+          tenderBreakdown,
+          orderCount: Number(after.orderCount || 0),
+          description: `POS shift ${event.params.shiftId}`,
+          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          source: "POS_SHIFT",
+          shiftId: event.params.shiftId,
+        });
+      }
+
+      // 2) Send notification regardless
+      await notifyRoles({
+        companyId,
+        title,
+        body,
+        roles: ["owner", "gm", "manager", "branchAdmin"],
+        writeInbox: true,
+      });
+    }
+  }
+);

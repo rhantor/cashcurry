@@ -339,6 +339,76 @@ service cloud.firestore {
           }
         }
 
+        // ── POS: Categories (menu groups) ────────────────────────────────────
+        match /categories/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if canManageSettings(companyId, branchId);
+        }
+
+        // ── POS: Menu items ──────────────────────────────────────────────────
+        match /menu/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if canManageSettings(companyId, branchId);
+        }
+
+        // ── POS: Modifier groups (size, add-ons, etc.) ───────────────────────
+        match /modifierGroups/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if canManageSettings(companyId, branchId);
+        }
+
+        // ── POS: Orders (tickets) ────────────────────────────────────────────
+        // Cashiers and above can create/update orders; only owner/branchAdmin can void/refund.
+        match /orders/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow create, update: if isAuth() && userData().companyId == companyId && (
+            userData().role == 'owner' ||
+            (
+              (isBranchAdmin(userData()) || userData().role in ['manager', 'supervisor', 'cashier', 'accountant']) &&
+              userData().branchId == branchId
+            )
+          );
+          allow delete: if false;
+        }
+
+        // ── POS: Shifts (open/close, salesTotal accumulator) ─────────────────
+        // Cashiers can open/close their own shift; manager+ can update any.
+        match /shifts/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if isAuth() && userData().companyId == companyId && (
+            userData().role == 'owner' ||
+            (
+              (isBranchAdmin(userData()) || userData().role in ['manager', 'supervisor', 'cashier', 'accountant']) &&
+              userData().branchId == branchId
+            )
+          );
+        }
+
+        // ── POS: Registered terminals ────────────────────────────────────────
+        match /terminals/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if canManageSettings(companyId, branchId);
+        }
+
+        // ── POS: Floors (sections/zones in the restaurant) ───────────────────
+        match /floors/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if canManageSettings(companyId, branchId);
+        }
+
+        // ── POS: Tables (physical tables on a floor) ─────────────────────────
+        // Cashiers can update table.status (when seating/clearing); only
+        // owner/branchAdmin can create/delete or reshape the layout.
+        match /tables/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow create, delete: if canManageSettings(companyId, branchId);
+          allow update: if canManageSettings(companyId, branchId) || (
+            isAuth() && userData().companyId == companyId &&
+            userData().role in ['cashier', 'supervisor', 'manager', 'accountant'] &&
+            userData().branchId == branchId
+          );
+        }
+
         // ── Work Media: Wall Posts ───────────────────────────────────────────
         match /wall_posts/{postId} {
           allow read: if canRead(companyId, branchId);
