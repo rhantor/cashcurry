@@ -19,6 +19,7 @@ import VendorTable from "./VendorTable";
 import SyncVendorMetrics from "./SyncVendorMetrics";
 import VendorPaidBills from "./VendorPaidBills";
 import VendorUnpaidBills from "./VendorUnpaidBills";
+import ExportVendorOverviewBtn from "./ExportVendorOverviewBtn";
 
 export default function VendorsPage() {
   const { companyId, branchId } = useResolvedCompanyBranch();
@@ -378,6 +379,15 @@ export default function VendorsPage() {
           <div className="px-1">
             {viewTab === "overview" ? (
               <div className="space-y-8">
+                {/* Export button at top right of the overview */}
+                <div className="flex justify-end pr-2">
+                  <ExportVendorOverviewBtn 
+                    companyId={companyId} 
+                    branchId={branchId} 
+                    vendor={viewData} 
+                  />
+                </div>
+
                 <section>
                   <h3 className="text-xs font-black text-mint-600 uppercase tracking-widest mb-4 flex items-center gap-2">
                     <span className="w-4 h-[2px] bg-mint-500"></span>
