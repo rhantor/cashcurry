@@ -218,7 +218,7 @@ function StaffSlipCard ({
 
           {/* Deduction adjustments */}
           <p className='text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-3 mb-1'>Deductions</p>
-          <div className='grid grid-cols-3 gap-2'>
+          <div className='grid grid-cols-2 sm:grid-cols-4 gap-2'>
             <InputNum label='Penalty' value={inputs.penalty} onChange={v => set('penalty', v)} />
             <InputNum label='Other Deductions' value={inputs.otherDeductions} onChange={v => set('otherDeductions', v)} />
             <InputNum
@@ -227,6 +227,14 @@ function StaffSlipCard ({
               onChange={v => set('loanOverride', v)}
               placeholder={String(loanDed || 0)}
             />
+            <div className='opacity-70'>
+              <InputNum
+                label={`Advance Deduction (auto)`}
+                value={advanceDed}
+                onChange={() => {}}
+                disabled={true}
+              />
+            </div>
           </div>
           {parseFloat(inputs.penalty) > 0 && (
             <input type='text' placeholder='Penalty note…' value={inputs.penaltyNote}
@@ -697,6 +705,7 @@ export default function PayrollBuilder () {
 
   async function handleRevert () {
     if (!runId) return
+    if (!confirm('Are you sure you want to revert this payroll to draft? This will undo the finalize step and restore any deducted loan/advance installments back to pending.')) return
     setBusy(true); setError('')
     try {
       await revert({ companyId, branchId, runId, user: currentUser }).unwrap()
@@ -903,7 +912,7 @@ export default function PayrollBuilder () {
               <button
                 onClick={handleRevert}
                 disabled={busy}
-                className='px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 disabled:opacity-50 transition-colors'
+                className='px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 transition-colors'
               >
                 Revert to Draft
               </button>

@@ -29,6 +29,7 @@ function buildCols (slips) {
     advanceAmt:     (a.advanceAmt     || 0) + (s.advanceAmt     || 0),
     loanAmt:        (a.loanAmt        || 0) + (s.loanAmt        || 0),
     otherEarnings:  (a.otherEarnings  || 0) + (s.otherEarnings  || 0),
+    penalty:        (a.penalty        || 0) + (s.penalty        || 0),
     otherDeductions:(a.otherDeductions|| 0) + (s.otherDeductions|| 0),
     bonus:          (a.bonus          || 0) + (s.bonus          || 0),
     phPay:          (a.phPay          || 0) + (s.phPay          || 0),
@@ -41,6 +42,7 @@ function buildCols (slips) {
     showAdvance: tot.advanceAmt     > 0,
     showLoan:    tot.loanAmt        > 0,
     showOtherE:  tot.otherEarnings  > 0,
+    showPenalty: tot.penalty        > 0,
     showOtherD:  tot.otherDeductions > 0,
   }
 }
@@ -56,7 +58,8 @@ function buildHeaders (cols) {
   if (cols.showAdvance) h.push('Advance')
   if (cols.showLoan)    h.push('Loan')
   if (cols.showOtherE)  h.push('Other Earn.')
-  if (cols.showOtherD)  h.push('Penalty/Ded.')
+  if (cols.showPenalty) h.push('Penalty')
+  if (cols.showOtherD)  h.push('Other Ded.')
   h.push('Total Salary')
   h.push('Net Pay')
   h.push('Remarks')
@@ -225,11 +228,11 @@ export function exportPayrollToPDF (slips = [], branchName = '', period = '', ru
     const depts = Object.keys(deptMap)
 
     const bodyRows  = []
-    const grandData = { basePay:0,workedHours:0,otHours:0,otPay:0,allowance:0,advanceAmt:0,loanAmt:0,otherEarnings:0,otherDeductions:0,grossEarnings:0,netPay:0,stat:{} }
+    const grandData = { basePay:0,workedHours:0,otHours:0,otPay:0,allowance:0,advanceAmt:0,loanAmt:0,otherEarnings:0,penalty:0,otherDeductions:0,bonus:0,phPay:0,grossEarnings:0,netPay:0,stat:{} }
 
     depts.forEach(dept => {
       const ds = deptMap[dept]
-      const dt = { basePay:0,workedHours:0,otHours:0,otPay:0,allowance:0,advanceAmt:0,loanAmt:0,otherEarnings:0,otherDeductions:0,grossEarnings:0,netPay:0,stat:{} }
+      const dt = { basePay:0,workedHours:0,otHours:0,otPay:0,allowance:0,advanceAmt:0,loanAmt:0,otherEarnings:0,penalty:0,otherDeductions:0,bonus:0,phPay:0,grossEarnings:0,netPay:0,stat:{} }
 
       // Dept header row
       bodyRows.push({ isDept: true, label: dept, colCount: flatHeaders.length })
@@ -238,7 +241,7 @@ export function exportPayrollToPDF (slips = [], branchName = '', period = '', ru
         bodyRows.push({ isData: true, row: buildRow(s, idx, cols) })
         dt.basePay+=s.basePay||0; dt.workedHours+=s.workedHours||0; dt.otHours+=s.otHours||0; dt.otPay+=s.otPay||0
         dt.allowance+=s.allowance||0; dt.advanceAmt+=s.advanceAmt||0; dt.loanAmt+=s.loanAmt||0
-        dt.otherEarnings+=s.otherEarnings||0; dt.otherDeductions+=s.otherDeductions||0
+        dt.otherEarnings+=s.otherEarnings||0; dt.penalty+=s.penalty||0; dt.otherDeductions+=s.otherDeductions||0
         dt.bonus+=s.bonus||0; dt.phPay+=s.phPay||0
         dt.grossEarnings+=s.grossEarnings||0; dt.netPay+=s.netPay||0
         for (const k of cols.statKeys) {
@@ -254,7 +257,8 @@ export function exportPayrollToPDF (slips = [], branchName = '', period = '', ru
       // Accumulate grand
       grandData.basePay+=dt.basePay; grandData.workedHours+=dt.workedHours; grandData.otHours+=dt.otHours; grandData.otPay+=dt.otPay
       grandData.allowance+=dt.allowance; grandData.advanceAmt+=dt.advanceAmt; grandData.loanAmt+=dt.loanAmt
-      grandData.otherEarnings+=dt.otherEarnings; grandData.otherDeductions+=dt.otherDeductions
+      grandData.otherEarnings+=dt.otherEarnings; grandData.penalty+=dt.penalty; grandData.otherDeductions+=dt.otherDeductions
+      grandData.bonus+=dt.bonus; grandData.phPay+=dt.phPay
       grandData.grossEarnings+=dt.grossEarnings; grandData.netPay+=dt.netPay
       for (const k of cols.statKeys) grandData.stat[k]=(grandData.stat[k]||0)+(dt.stat[k]||0)
     })
@@ -539,11 +543,11 @@ export function exportPayrollToExcel (slips = [], branchName = '', period = '', 
       deptMap[dept].push(s)
     }
     const depts = Object.keys(deptMap)
-    const grandData = { basePay:0,workedHours:0,otHours:0,otPay:0,allowance:0,advanceAmt:0,loanAmt:0,otherEarnings:0,otherDeductions:0,grossEarnings:0,netPay:0,stat:{} }
+    const grandData = { basePay:0,workedHours:0,otHours:0,otPay:0,allowance:0,advanceAmt:0,loanAmt:0,otherEarnings:0,penalty:0,otherDeductions:0,bonus:0,phPay:0,grossEarnings:0,netPay:0,stat:{} }
 
     depts.forEach(dept => {
       const ds = deptMap[dept]
-      const dt = { basePay:0,workedHours:0,otHours:0,otPay:0,allowance:0,advanceAmt:0,loanAmt:0,otherEarnings:0,otherDeductions:0,grossEarnings:0,netPay:0,stat:{} }
+      const dt = { basePay:0,workedHours:0,otHours:0,otPay:0,allowance:0,advanceAmt:0,loanAmt:0,otherEarnings:0,penalty:0,otherDeductions:0,bonus:0,phPay:0,grossEarnings:0,netPay:0,stat:{} }
 
       wsData.push([dept.toUpperCase()])
 
@@ -557,7 +561,7 @@ export function exportPayrollToExcel (slips = [], branchName = '', period = '', 
         }))
         dt.basePay+=s.basePay||0; dt.workedHours+=s.workedHours||0; dt.otHours+=s.otHours||0; dt.otPay+=s.otPay||0
         dt.allowance+=s.allowance||0; dt.advanceAmt+=s.advanceAmt||0; dt.loanAmt+=s.loanAmt||0
-        dt.otherEarnings+=s.otherEarnings||0; dt.otherDeductions+=s.otherDeductions||0
+        dt.otherEarnings+=s.otherEarnings||0; dt.penalty+=s.penalty||0; dt.otherDeductions+=s.otherDeductions||0
         dt.bonus+=s.bonus||0; dt.phPay+=s.phPay||0
         dt.grossEarnings+=s.grossEarnings||0; dt.netPay+=s.netPay||0
         for (const k of cols.statKeys) {
@@ -578,7 +582,7 @@ export function exportPayrollToExcel (slips = [], branchName = '', period = '', 
 
       grandData.basePay+=dt.basePay; grandData.workedHours+=dt.workedHours; grandData.otHours+=dt.otHours; grandData.otPay+=dt.otPay
       grandData.allowance+=dt.allowance; grandData.advanceAmt+=dt.advanceAmt; grandData.loanAmt+=dt.loanAmt
-      grandData.otherEarnings+=dt.otherEarnings; grandData.otherDeductions+=dt.otherDeductions
+      grandData.otherEarnings+=dt.otherEarnings; grandData.penalty+=dt.penalty; grandData.otherDeductions+=dt.otherDeductions
       grandData.bonus+=dt.bonus; grandData.phPay+=dt.phPay
       grandData.grossEarnings+=dt.grossEarnings; grandData.netPay+=dt.netPay
       for (const k of cols.statKeys) grandData.stat[k]=(grandData.stat[k]||0)+(dt.stat[k]||0)
@@ -601,11 +605,14 @@ export function exportPayrollToExcel (slips = [], branchName = '', period = '', 
     ws1['!cols'] = [
       { wch: 5 }, { wch: 22 }, { wch: 20 }, { wch: 18 }, { wch: 12 }, { wch: 10 },
       ...(cols.showOT ? [{ wch: 8 }, { wch: 12 }] : []),
+      ...(cols.showPH ? [{ wch: 12 }] : []),
       { wch: 12 },
+      ...(cols.showBonus ? [{ wch: 12 }] : []),
       ...cols.statKeys.map(() => ({ wch: 12 })),
       ...(cols.showAdvance ? [{ wch: 12 }] : []),
       ...(cols.showLoan    ? [{ wch: 12 }] : []),
       ...(cols.showOtherE  ? [{ wch: 12 }] : []),
+      ...(cols.showPenalty ? [{ wch: 12 }] : []),
       ...(cols.showOtherD  ? [{ wch: 12 }] : []),
       { wch: 14 }, { wch: 14 }, { wch: 28 },
     ]
@@ -621,9 +628,28 @@ export function exportPayrollToExcel (slips = [], branchName = '', period = '', 
       ws2Data.push(['EARNINGS', '', 'DEDUCTIONS', ''])
       ws2Data.push(['Basic Pay', num(s.basePay), 'Statutory Deductions', ''])
       ;(s.statutory||[]).forEach(d => ws2Data.push(['', '', `  ${d.name} (${d.employeeRate}%)`, num(d.employeeAmt)]))
-      if (s.allowance > 0)     ws2Data.push(['Allowance',    num(s.allowance),     s.advanceAmt>0?'Salary Advance':  '', s.advanceAmt>0?num(s.advanceAmt):''])
-      if (s.otPay > 0)         ws2Data.push([`OT Pay`,       num(s.otPay),          s.loanAmt>0?'Loan Repayment':   '', s.loanAmt>0?num(s.loanAmt):''])
-      if (s.otherEarnings > 0) ws2Data.push(['Other Earn.',  num(s.otherEarnings),  s.otherDeductions>0?'Other Ded.':'', s.otherDeductions>0?num(s.otherDeductions):''])
+      const eArr = []
+      if (s.allowance > 0) eArr.push(['Allowance', num(s.allowance)])
+      if (s.otPay > 0) eArr.push([`OT Pay`, num(s.otPay)])
+      if (s.phPay > 0) eArr.push([`PH Pay`, num(s.phPay)])
+      if (s.bonus > 0) eArr.push([`Bonus`, num(s.bonus)])
+      if (s.otherEarnings > 0) eArr.push(['Other Earn.', num(s.otherEarnings)])
+
+      const dArr = []
+      if (s.advanceAmt > 0) dArr.push(['Salary Advance', num(s.advanceAmt)])
+      if (s.loanAmt > 0) dArr.push(['Loan Repayment', num(s.loanAmt)])
+      if (s.penalty > 0) dArr.push(['Penalty', num(s.penalty)])
+      if (s.otherDeductions > 0) dArr.push(['Other Ded.', num(s.otherDeductions)])
+
+      const maxLen = Math.max(eArr.length, dArr.length)
+      for (let i = 0; i < maxLen; i++) {
+        ws2Data.push([
+          eArr[i] ? eArr[i][0] : '',
+          eArr[i] ? eArr[i][1] : '',
+          dArr[i] ? dArr[i][0] : '',
+          dArr[i] ? dArr[i][1] : ''
+        ])
+      }
       ws2Data.push(['GROSS PAY', num(s.grossEarnings), 'TOTAL DEDUCTIONS', num(s.totalDeductions)])
       ws2Data.push(['', '', '', ''])
       ws2Data.push(['NET PAY', num(s.netPay), '', ''])
@@ -643,11 +669,14 @@ export function exportPayrollToExcel (slips = [], branchName = '', period = '', 
       ['Total Basic Pay',     num(grandData.basePay)],
       ['Total Allowance',     num(grandData.allowance)],
       ['Total OT Pay',        num(grandData.otPay)],
+      ['Total PH Pay',        num(grandData.phPay)],
+      ['Total Bonus',         num(grandData.bonus)],
       ...cols.statKeys.map(k => [cols.statNames[k], num(grandData.stat[k]||0)]),
       ['Total Advance',       num(grandData.advanceAmt)],
       ['Total Loan',          num(grandData.loanAmt)],
       ['Total Other Earn.',   num(grandData.otherEarnings)],
-      ['Total Penalty/Ded.',  num(grandData.otherDeductions)],
+      ['Total Penalty',       num(grandData.penalty)],
+      ['Total Other Ded.',    num(grandData.otherDeductions)],
       [],
       ['GROSS TOTAL',         num(grandData.grossEarnings)],
       ['NET TOTAL PAYABLE',   num(grandData.netPay)],

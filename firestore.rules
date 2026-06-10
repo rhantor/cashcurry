@@ -56,7 +56,7 @@ service cloud.firestore {
     function canWrite(companyId, branchId) {
       let u = userData();
       return isAuth() && u.companyId == companyId && (
-        u.role == 'owner' ||
+        u.role in ['owner', 'gm', 'superAdmin', 'superadmin'] ||
         (
           (isBranchAdmin(u) || u.role in ['manager', 'accountant', 'supervisor']) &&
           u.branchId == branchId
@@ -78,15 +78,21 @@ service cloud.firestore {
     // ─────────────────────────────────────────────────────────────────────────
 
     // Invite codes for company signup — readable by anyone to validate,
-    // only writable within a transaction to mark as used (no direct client creation).
+    // only writable by platform admins (create / delete unused) or by the
+    // signup flow (consuming a code = flipping used:false to used:true).
+    function isPlatformAdmin() {
+      return isAuth() && userData().get('platformAdmin', false) == true;
+    }
     match /signupInvites/{code} {
       allow read: if true;
-      // Allow marking as used only: existing doc, only 'used', 'usedAt', 'usedBy' change
+      allow create: if isPlatformAdmin();
+      // Consume: flip used false→true. createdAt cannot change.
       allow update: if resource.data.used == false &&
         request.resource.data.used == true &&
         !request.resource.data.diff(resource.data).affectedKeys()
           .hasAny(['createdAt']);
-      allow create, delete: if false;
+      // Platform admins can clean up unused codes.
+      allow delete: if isPlatformAdmin() && resource.data.used == false;
     }
 
     // Username → email lookup: must be publicly readable so login by username works
@@ -169,12 +175,23 @@ service cloud.firestore {
         );
       }
 
+      // ── POS: Customer DB (company-scoped so loyalty spans branches) ──────
+      match /customers/{customerId} {
+        allow read: if belongsToCompany(companyId);
+        allow write: if isAuth() && userData().companyId == companyId && (
+          userData().role == 'owner' ||
+          isBranchAdmin(userData()) ||
+          userData().role in ['manager', 'supervisor', 'cashier', 'accountant']
+        );
+      }
+
       // ── Items Catalog ──────────────────────────────────────────────────────
+      // Cashier+ can read for POS recipe lookups; create/update by supervisor+.
       match /items/{itemId} {
         allow read: if belongsToCompany(companyId);
         allow write: if isAuth() && userData().companyId == companyId && (
           isBranchAdmin(userData()) ||
-          userData().role in ['owner', 'manager', 'accountant', 'supervisor']
+          userData().role in ['owner', 'manager', 'accountant', 'supervisor', 'cashier']
         );
       }
 
@@ -262,11 +279,16 @@ service cloud.firestore {
         }
 
         // ── Staff List ───────────────────────────────────────────────────────
+        // Owner can manage staff in any branch; branchAdmin/manager only in their own.
         match /staff/{docId} {
           allow read: if canRead(companyId, branchId);
-          allow write: if isAuth() && userData().companyId == companyId &&
-                          (isBranchAdmin(userData()) || userData().role == 'manager') &&
-                          userData().branchId == branchId;
+          allow write: if isAuth() && userData().companyId == companyId && (
+            userData().role == 'owner' ||
+            (
+              (isBranchAdmin(userData()) || userData().role == 'manager') &&
+              userData().branchId == branchId
+            )
+          );
         }
 
         // ── Salaries ─────────────────────────────────────────────────────────
@@ -394,6 +416,64 @@ service cloud.firestore {
         match /floors/{docId} {
           allow read: if canRead(companyId, branchId);
           allow write: if canManageSettings(companyId, branchId);
+        }
+
+        // ── POS: Promotions (auto-applied at cart) ───────────────────────────
+        match /promotions/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if canManageSettings(companyId, branchId);
+        }
+
+        // ── POS: Combos / set meals ──────────────────────────────────────────
+        match /combos/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if canManageSettings(companyId, branchId);
+        }
+
+        // ── POS: Ingredients (legacy — superseded by items + itemStock) ──────
+        match /ingredients/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if canWrite(companyId, branchId);
+        }
+
+        // ── POS: Per-branch stock for company-wide items (replaces ingredients).
+        // Updated transactionally by inventoryMovements writers.
+        match /itemStock/{itemId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if isAuth() && userData().companyId == companyId && (
+            userData().role == 'owner' ||
+            isBranchAdmin(userData()) ||
+            userData().role in ['manager', 'supervisor', 'cashier', 'accountant']
+          );
+        }
+
+        // ── POS: Inventory ledger (append-only; updated via transactions) ────
+        // Reads open to branch staff; writes restricted to cashier+ (so POS
+        // can record SALE_CONSUMPTION). Deletes never allowed.
+        match /inventoryMovements/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow create, update: if isAuth() && userData().companyId == companyId && (
+            userData().role == 'owner' ||
+            isBranchAdmin(userData()) ||
+            userData().role in ['manager', 'supervisor', 'cashier', 'accountant']
+          );
+          allow delete: if false;
+        }
+
+        // ── POS: Stock count sessions ────────────────────────────────────────
+        match /stockCounts/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if canWrite(companyId, branchId);
+        }
+
+        // ── POS: Reservations / waitlist ─────────────────────────────────────
+        match /reservations/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if isAuth() && userData().companyId == companyId && (
+            userData().role == 'owner' ||
+            isBranchAdmin(userData()) ||
+            userData().role in ['manager', 'supervisor', 'cashier']
+          );
         }
 
         // ── POS: Tables (physical tables on a floor) ─────────────────────────

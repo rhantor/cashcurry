@@ -159,7 +159,7 @@ const AdvanceForm = ({ staffList, staffLoading, companyId, branchId, isAdminOrMa
   const today = new Date().toISOString().split('T')[0]
 
   const [staffId, setStaffId] = useState('')
-  const [form, setForm] = useState({ amount: '', advanceType: 'personal', reason: '', date: today, paidFromOffice: 'front', approvalNotes: '' })
+  const [form, setForm] = useState({ amount: '', advanceType: 'personal', reason: '', date: today, deductionMonth: getNextMonthDeduction(today).value, paidFromOffice: 'front', approvalNotes: '' })
   const [successMsg, setSuccessMsg] = useState('')
 
   const [addAdvanceEntry, { isLoading, isError, error }] = useAddAdvanceEntryMutation()
@@ -187,7 +187,7 @@ const AdvanceForm = ({ staffList, staffLoading, companyId, branchId, isAdminOrMa
           advanceType:    form.advanceType,
           reason:         form.reason,
           date:           form.date,
-          deductionMonth: deduction.value,
+          deductionMonth: form.deductionMonth,
           paidFromOffice: form.paidFromOffice,  // 'front' | 'back'
           status:         approved ? 'approved' : 'pending',
           deducted:       false,
@@ -197,7 +197,7 @@ const AdvanceForm = ({ staffList, staffLoading, companyId, branchId, isAdminOrMa
       }).unwrap()
 
       setStaffId('')
-      setForm({ amount: '', advanceType: 'personal', reason: '', date: today, paidFromOffice: 'front', approvalNotes: '' })
+      setForm({ amount: '', advanceType: 'personal', reason: '', date: today, deductionMonth: getNextMonthDeduction(today).value, paidFromOffice: 'front', approvalNotes: '' })
       setSuccessMsg(approved
         ? `Advance recorded. Deducted from ${form.paidFromOffice === 'back' ? 'back office (bank)' : 'front office (cash)'}.`
         : 'Advance request submitted — pending manager approval.')
@@ -257,18 +257,16 @@ const AdvanceForm = ({ staffList, staffLoading, companyId, branchId, isAdminOrMa
 
       {/* Deduction info — read-only */}
       <Section title='Salary Deduction'>
-        <div className='flex items-center justify-between px-4 py-3.5 bg-mint-50 border border-mint-200 rounded-xl'>
-          <div>
-            <p className='text-xs text-gray-500 font-medium uppercase tracking-wide'>Will be deducted in</p>
-            <p className='text-sm font-semibold text-mint-700 mt-0.5'>{deduction.label}</p>
-          </div>
-          {amount > 0 && (
-            <div className='text-right'>
-              <p className='text-xs text-gray-500 font-medium uppercase tracking-wide'>Amount</p>
-              <p className='text-sm font-semibold text-mint-700 mt-0.5'>{amount.toLocaleString()}</p>
-            </div>
-          )}
-        </div>
+        <Field label='Will be deducted in (Payroll Month)' required>
+          <input
+            type='month'
+            name='deductionMonth'
+            value={form.deductionMonth}
+            onChange={set}
+            required
+            className={inputCls}
+          />
+        </Field>
       </Section>
 
       {/* Cash source — front or back office */}

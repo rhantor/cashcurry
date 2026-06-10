@@ -10,6 +10,11 @@ import {
   useDeletePayrollRunMutation,
 } from '@/lib/redux/api/payrollRunApiSlice'
 import { fmtAmt, periodLabel } from '@/utils/payrollCalculations'
+import { useGetBranchSettingsQuery } from '@/lib/redux/api/branchSettingsApiSlice'
+import { useGetCompanyDetailsQuery } from '@/lib/redux/api/authApiSlice'
+import { useGetSingleBranchQuery } from '@/lib/redux/api/branchApiSlice'
+import { useGetStaffListQuery } from '@/lib/redux/api/staffApiSlice'
+import PayrollPrintView from '../components/PayrollPrintView'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -34,16 +39,34 @@ function fmt (iso) {
 
 // ─── Slips drawer (expandable) ────────────────────────────────────────────────
 
-function SlipsDrawer ({ companyId, branchId, runId }) {
+function SlipsDrawer ({ companyId, branchId, runId, run, setPrintTarget }) {
   const { data: slips = [], isLoading } = useGetPayrollSlipsQuery(
     companyId && branchId && runId ? { companyId, branchId, runId } : skipToken
   )
+  const { data: staffList = [] } = useGetStaffListQuery(
+    companyId && branchId ? { companyId, branchId } : skipToken
+  )
+
+  const staffMap = {}
+  for (const s of staffList) {
+    staffMap[s.id] = `${s.firstName || ''} ${s.lastName || ''}`.trim() || s.name || s.staffName || ''
+  }
+
+  const enrichedSlips = slips.map(slip => ({
+    ...slip,
+    staffName: slip.staffName || staffMap[slip.staffId] || 'Ali Munther'
+  }))
 
   if (isLoading) return <p className='text-xs text-gray-400 py-3 text-center'>Loading slips…</p>
-  if (slips.length === 0) return <p className='text-xs text-gray-400 py-3 text-center'>No slips saved yet.</p>
+  if (enrichedSlips.length === 0) return <p className='text-xs text-gray-400 py-3 text-center'>No slips saved yet.</p>
 
   return (
     <div className='overflow-x-auto'>
+      <div className='flex justify-end p-2 border-b border-gray-100 bg-gray-50 gap-2'>
+        <button onClick={() => setPrintTarget({ mode: 'all', slips: enrichedSlips, run })} className='text-xs px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 font-medium hover:bg-blue-100 transition-colors'>
+          📄 Print / Download Master Sheet
+        </button>
+      </div>
       <table className='w-full text-xs'>
         <thead>
           <tr className='bg-gray-50 text-gray-500 uppercase tracking-wide text-[10px]'>
@@ -52,26 +75,33 @@ function SlipsDrawer ({ companyId, branchId, runId }) {
             <th className='px-3 py-2 text-right font-semibold'>Deductions</th>
             <th className='px-3 py-2 text-right font-semibold'>Net Pay</th>
             <th className='px-3 py-2 text-right font-semibold'>Employer</th>
+            <th className='px-3 py-2 text-right font-semibold'>Action</th>
           </tr>
         </thead>
         <tbody className='divide-y divide-gray-100'>
-          {slips.map(slip => (
+          {enrichedSlips.map(slip => (
             <tr key={slip.id} className='hover:bg-gray-50 transition-colors'>
               <td className='px-3 py-2 font-medium text-gray-800'>{slip.staffName}</td>
               <td className='px-3 py-2 text-right text-gray-700'>{fmtAmt(slip.grossEarnings)}</td>
               <td className='px-3 py-2 text-right text-red-600'>{fmtAmt(slip.totalDeductions)}</td>
               <td className='px-3 py-2 text-right font-semibold text-mint-700'>{fmtAmt(slip.netPay)}</td>
               <td className='px-3 py-2 text-right text-blue-600'>{fmtAmt(slip.totalStatutoryEmployer || 0)}</td>
+              <td className='px-3 py-2 text-right'>
+                <button onClick={() => setPrintTarget({ mode: 'single', slip, slips: enrichedSlips, run })} className='text-gray-400 hover:text-gray-600 transition-colors' title='Print Payslip'>
+                  🖨
+                </button>
+              </td>
             </tr>
           ))}
         </tbody>
         <tfoot>
           <tr className='bg-gray-50 font-semibold text-gray-700 text-[11px]'>
             <td className='px-3 py-2'>Totals</td>
-            <td className='px-3 py-2 text-right'>{fmtAmt(slips.reduce((s, sl) => s + (sl.grossEarnings || 0), 0))}</td>
-            <td className='px-3 py-2 text-right text-red-600'>{fmtAmt(slips.reduce((s, sl) => s + (sl.totalDeductions || 0), 0))}</td>
-            <td className='px-3 py-2 text-right text-mint-700'>{fmtAmt(slips.reduce((s, sl) => s + (sl.netPay || 0), 0))}</td>
-            <td className='px-3 py-2 text-right text-blue-600'>{fmtAmt(slips.reduce((s, sl) => s + (sl.totalStatutoryEmployer || 0), 0))}</td>
+            <td className='px-3 py-2 text-right'>{fmtAmt(enrichedSlips.reduce((s, sl) => s + (sl.grossEarnings || 0), 0))}</td>
+            <td className='px-3 py-2 text-right text-red-600'>{fmtAmt(enrichedSlips.reduce((s, sl) => s + (sl.totalDeductions || 0), 0))}</td>
+            <td className='px-3 py-2 text-right text-mint-700'>{fmtAmt(enrichedSlips.reduce((s, sl) => s + (sl.netPay || 0), 0))}</td>
+            <td className='px-3 py-2 text-right text-blue-600'>{fmtAmt(enrichedSlips.reduce((s, sl) => s + (sl.totalStatutoryEmployer || 0), 0))}</td>
+            <td className='px-3 py-2 text-right'></td>
           </tr>
         </tfoot>
       </table>
@@ -81,7 +111,7 @@ function SlipsDrawer ({ companyId, branchId, runId }) {
 
 // ─── Run row ──────────────────────────────────────────────────────────────────
 
-function RunRow ({ run, companyId, branchId, isAdminOrManager }) {
+function RunRow ({ run, companyId, branchId, isAdminOrManager, setPrintTarget }) {
   const [expanded, setExpanded] = useState(false)
   const [deleteDraft] = useDeletePayrollRunMutation()
   const [deleting, setDeleting] = useState(false)
@@ -149,7 +179,7 @@ function RunRow ({ run, companyId, branchId, isAdminOrManager }) {
       {/* Slips table */}
       {expanded && (
         <div className='border-t border-gray-100'>
-          <SlipsDrawer companyId={companyId} branchId={branchId} runId={run.id} />
+          <SlipsDrawer companyId={companyId} branchId={branchId} runId={run.id} run={run} setPrintTarget={setPrintTarget} />
         </div>
       )}
 
@@ -173,6 +203,7 @@ export default function PayrollHistory () {
   const [role, setRole] = useState(null)
   const [authReady, setAuthReady] = useState(false)
   const [statusFilter, setStatusFilter] = useState('all')
+  const [printTarget, setPrintTarget] = useState(null)
 
   useEffect(() => {
     const u = JSON.parse(localStorage.getItem('user') || '{}')
@@ -186,6 +217,12 @@ export default function PayrollHistory () {
   const { data: runs = [], isLoading } = useGetPayrollRunsQuery(
     skip ? skipToken : { companyId, branchId }
   )
+  const { data: branchSettings } = useGetBranchSettingsQuery(skip ? skipToken : { companyId, branchId })
+  const { data: companyData }    = useGetCompanyDetailsQuery(companyId ?? skipToken)
+  const { data: branchDoc }      = useGetSingleBranchQuery(skip ? skipToken : { companyId, branchId })
+
+  const companyName = companyData?.name || ''
+  const branchName  = branchDoc?.name || branchSettings?.basic?.name || 'Branch'
 
   const isAdminOrManager = role === 'branchAdmin' || role === 'manager'
 
@@ -263,11 +300,25 @@ export default function PayrollHistory () {
                 companyId={companyId}
                 branchId={branchId}
                 isAdminOrManager={isAdminOrManager}
+                setPrintTarget={setPrintTarget}
               />
             ))}
           </div>
         )}
       </div>
+
+      {printTarget && (
+        <PayrollPrintView
+          mode={printTarget.mode}
+          singleSlip={printTarget.slip}
+          slips={printTarget.slips}
+          run={printTarget.run}
+          branchName={branchName}
+          companyName={companyName}
+          period={printTarget.run?.period}
+          onClose={() => setPrintTarget(null)}
+        />
+      )}
     </div>
   )
 }
