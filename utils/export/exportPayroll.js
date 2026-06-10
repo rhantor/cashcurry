@@ -203,14 +203,14 @@ export function exportPayrollToPDF (slips = [], branchName = '', period = '', ru
     const pageWidth = doc.internal.pageSize.getWidth()
     
     if (companyName) {
-      doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139)
+      doc.setFontSize(10); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139)
       doc.text(companyName.toUpperCase(), pageWidth / 2, y, { align: 'center' })
-      y += 5
+      y += 6
     }
-    doc.setFontSize(16); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 41, 59)
+    doc.setFontSize(20); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 41, 59)
     doc.text(branchName, pageWidth / 2, y, { align: 'center' })
-    y += 7
-    doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(71, 85, 105)
+    y += 8
+    doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(71, 85, 105)
     doc.text(`Salary Sheet — ${periodLabel(period)}   |   ${slips.length} Staff   |   Status: ${status.toUpperCase()}`, pageWidth / 2, y, { align: 'center' })
     if (run?.paidAt) {
       y += 5
@@ -267,9 +267,9 @@ export function exportPayrollToPDF (slips = [], branchName = '', period = '', ru
 
     // Convert to autoTable format
     const tableBody = bodyRows.map(r => {
-      if (r.isDept)     return [{ content: r.label, colSpan: flatHeaders.length, styles: { fontStyle:'bold', fillColor:[241,245,249], textColor:[55,65,81], fontSize:7.5 } }]
+      if (r.isDept)     return [{ content: r.label, colSpan: flatHeaders.length, styles: { fontStyle:'bold', fillColor:[241,245,249], textColor:[55,65,81], fontSize:10 } }]
       if (r.isSubtotal) return r.row.map((v,i) => ({ content: String(v), styles: { fontStyle:'bold', fillColor:[241,245,249], textColor:[55,65,81] } }))
-      if (r.isGrand)    return r.row.map((v,i) => ({ content: String(v), styles: { fontStyle:'bold', fillColor:[226,232,240], textColor:[30,41,59], fontSize:8 } }))
+      if (r.isGrand)    return r.row.map((v,i) => ({ content: String(v), styles: { fontStyle:'bold', fillColor:[226,232,240], textColor:[30,41,59], fontSize:11 } }))
       return r.row.map(v => String(v))
     })
 
@@ -278,15 +278,14 @@ export function exportPayrollToPDF (slips = [], branchName = '', period = '', ru
       head: pdfHeaders,
       body: tableBody,
       theme: 'grid',
-      styles: { fontSize: 7, cellPadding: 2, overflow: 'linebreak', lineColor: [226, 232, 240], lineWidth: 0.1 },
-      headStyles: { fillColor: [248,250,252], textColor: [71,85,105], fontStyle: 'bold', lineColor: [226,232,240], lineWidth: 0.1, halign: 'center' },
+      styles: { fontSize: 9.5, cellPadding: 3, overflow: 'linebreak', lineColor: [226, 232, 240], lineWidth: 0.1 },
+      headStyles: { fillColor: [248,250,252], textColor: [71,85,105], fontStyle: 'bold', fontSize: 10, lineColor: [226,232,240], lineWidth: 0.1, halign: 'center' },
       alternateRowStyles: { fillColor: [250,252,253] },
       columnStyles: {
-        0: { halign: 'center', cellWidth: 8 },
-        1: { halign: 'left', cellWidth: 26 },
-        2: { halign: 'left', cellWidth: 20 },
-        3: { halign: 'right', cellWidth: 20 }, // Basic / Rate
-        4: { halign: 'right' }, // Earned Basic
+        0: { halign: 'center', cellWidth: 12 },
+        1: { halign: 'left', cellWidth: 40 },
+        2: { halign: 'left', cellWidth: 32 },
+        3: { halign: 'right' },
       },
       didParseCell (data) {
         const hName = flatHeaders[data.column.index]
