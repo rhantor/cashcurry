@@ -91,9 +91,9 @@ export default function AdvanceReport () {
   const advances = advancesData ?? []
   const branch = branchData ?? {}
 
-  // ✅ only approved
+  // ✅ approved + closed (paid via payroll)
   const approvedAdvances = useMemo(
-    () => advances.filter(a => a.status === 'approved'),
+    () => advances.filter(a => a.status === 'approved' || a.status === 'closed'),
     [advances]
   )
 
@@ -158,11 +158,16 @@ export default function AdvanceReport () {
             {
               key: 'status',
               label: 'Status',
-              render: val => (
-                <span className='px-3 py-1 rounded-full text-sm font-semibold bg-green-500 text-white'>
-                  {val || 'approved'}
-                </span>
-              )
+              render: val => {
+                const isClosed = val === 'closed'
+                return (
+                  <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                    isClosed ? 'bg-blue-500 text-white' : 'bg-green-500 text-white'
+                  }`}>
+                    {isClosed ? 'Paid' : (val || 'approved')}
+                  </span>
+                )
+              }
             },
             {
               key: 'createdBy',
