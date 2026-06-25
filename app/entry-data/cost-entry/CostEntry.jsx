@@ -3,9 +3,8 @@ import React, { useEffect, useState, useMemo } from 'react'
 import { db, storage } from '@/lib/firebase'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
-import imageCompression from 'browser-image-compression'
-import { FaUpload } from 'react-icons/fa'
 import useCurrency from '@/app/hooks/useCurrency'
+import UploadInvoice from '@/app/components/purchases/UploadInvoice'
 
 const CATEGORIES = [
   'Utilities',
@@ -42,7 +41,6 @@ export default function CostEntryPage () {
   const [customCategory, setCustomCategory] = useState('') // shown if "Other"
   const [description, setDescription] = useState('')
   const [file, setFile] = useState(null)
-  const [filePreview, setFilePreview] = useState(null)
   const [uploadProgress, setUploadProgress] = useState(0)
 
   const [companyId, setCompanyId] = useState(null)
@@ -115,32 +113,7 @@ export default function CostEntryPage () {
     }
   }
 
-  // Handle file selection & compress image if needed
-  const handleFileChange = async e => {
-    try {
-      const selectedFile = e.target.files[0]
-      if (!selectedFile) return
 
-      let processedFile = selectedFile
-
-      if (selectedFile.type.startsWith('image/')) {
-        const options = {
-          maxSizeMB: 0.5,
-          maxWidthOrHeight: 1024,
-          useWebWorker: true
-        }
-        processedFile = await imageCompression(selectedFile, options)
-        setFilePreview(URL.createObjectURL(processedFile))
-      } else {
-        setFilePreview(null) // no preview for PDF
-      }
-
-      setFile(processedFile)
-    } catch (err) {
-      console.error('File processing error:', err)
-      alert('❌ Failed to process file. Try again.')
-    }
-  }
 
   // Upload file to Firebase Storage
   const uploadFile = async () => {
@@ -250,7 +223,6 @@ export default function CostEntryPage () {
       setCustomCategory('')
       setDescription('')
       setFile(null)
-      setFilePreview(null)
       setUploadProgress(0)
       setPaidFromOffice('front')
       setPaidMethod('cash')
@@ -435,45 +407,11 @@ export default function CostEntryPage () {
 
         {/* File Upload */}
         <div className='bg-white rounded-lg shadow p-4 mb-4'>
-          <label className='block text-sm font-medium text-gray-600'>
-            Upload Invoice (PDF or Image)
-          </label>
-
-          <div className='flex items-center gap-4'>
-            <label className='cursor-pointer flex items-center gap-2 px-4 py-2 bg-mint-100 hover:bg-mint-200 rounded-lg text-mint-700 font-medium'>
-              <FaUpload />
-              <span>Select File</span>
-              <input
-                type='file'
-                accept='.pdf,image/*'
-                onChange={handleFileChange}
-                className='hidden'
-              />
-            </label>
-
-            {/* Image preview */}
-            {filePreview && (
-              <img
-                src={filePreview}
-                alt='Preview'
-                className='w-20 h-20 object-cover rounded-lg border'
-              />
-            )}
-          </div>
-
-          {/* Progress Bar */}
-          {uploadProgress > 0 && uploadProgress < 100 && (
-            <div className='mt-2 w-full bg-gray-200 rounded-full h-2'>
-              <div
-                className='bg-mint-500 h-2 rounded-full'
-                style={{ width: `${uploadProgress}%` }}
-              />
-            </div>
-          )}
-
-          {file && !filePreview && (
-            <p className='text-xs text-gray-500 mt-1'>Selected: {file.name}</p>
-          )}
+          <UploadInvoice
+            file={file}
+            onChange={setFile}
+            progress={uploadProgress}
+          />
         </div>
 
         {/* Save Button */}
