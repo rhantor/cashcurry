@@ -117,6 +117,29 @@ const TEMPLATES = {
       compliance: "You shall perform all services in a safe, professional manner, complying with road safety laws and the Company's partner code of conduct.",
       closing: "Please sign and return this service contract within seven (7) days to confirm your agreement with these contractor terms.",
     }
+  },
+  applicationForm: {
+    title: "Job Application Form",
+    jobTerms: {
+      title: "Service Crew",
+      department: "Service Department",
+      commencementDate: "",
+      basicSalary: "",
+      probationPeriod: "",
+      probationSalary: "",
+      noticeProbation: "",
+      noticeConfirmed: "",
+      workingHours: "",
+      salaryLabel: "",
+      durationLabel: ""
+    },
+    clauses: {
+      intro: "",
+      duties: "",
+      confidentiality: "",
+      compliance: "",
+      closing: ""
+    }
   }
 };
 
@@ -313,8 +336,14 @@ export default function AppointmentLetterGenerator() {
     if (selected) {
       setJobTerms(selected.jobTerms);
       setClauses(selected.clauses);
-      // Clean allowances if internship or contractor as default
-      if (type === "internship" || type === "contractor") {
+      
+      // Auto tab reset for Job Application Form (hides Signatures & Clauses tabs)
+      if (type === "applicationForm") {
+        setAllowances([]);
+        if (activeTab === "signatures" || activeTab === "clauses") {
+          setActiveTab("style");
+        }
+      } else if (type === "internship" || type === "contractor") {
         setAllowances([]);
       } else {
         setAllowances([
@@ -515,6 +544,7 @@ export default function AppointmentLetterGenerator() {
   };
 
   // --- PDF Generation Logic (Native Vector jsPDF) ---
+  // --- PDF Generation Logic (Native Vector jsPDF) ---
   const handlePrint = async () => {
     setIsGenerating(true);
 
@@ -561,323 +591,736 @@ export default function AppointmentLetterGenerator() {
       // Draw watermark on the first page
       drawWatermark();
 
-      // 1. Letterhead Section
-      if (logo) {
-        try {
-          // Place logo at top-left
-          pdf.addImage(logo, 'PNG', margin, y, 45, 15, undefined, 'FAST');
-          y += 18;
-        } catch (e) {
-          console.error("Error adding logo to PDF:", e);
-          y += 5;
-        }
-      }
-
-      pdf.setFont(fontFamily, 'bold');
-      pdf.setFontSize(14);
-      pdf.setTextColor(30, 41, 59); // slate-800
-      pdf.text(companyDetails.name, margin, y);
-      y += 5.5;
-
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(9);
-      pdf.setTextColor(71, 85, 105); // slate-600
-      pdf.text(`Company Registration No: ${companyDetails.registrationNo}`, margin, y);
-      y += 4.5;
-
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(8.5);
-      pdf.setTextColor(100, 116, 139); // slate-500
-      pdf.text(`${companyDetails.addressLine1}, ${companyDetails.addressLine2}`, margin, y);
-      y += 4.5;
-
-      pdf.text(companyDetails.phoneEmail, margin, y);
-      y += 6;
-
-      // Letterhead divider line
-      if (stylingOptions.showLetterheadBorder && stylingOptions.accentColor !== 'transparent') {
-        const hex = stylingOptions.accentColor || '#059669';
-        const r = parseInt(hex.slice(1, 3), 16) || 5;
-        const g = parseInt(hex.slice(3, 5), 16) || 150;
-        const b = parseInt(hex.slice(5, 7), 16) || 105;
-        pdf.setDrawColor(r, g, b);
-        pdf.setLineWidth(0.8);
-        pdf.line(margin, y, 210 - margin, y);
-        y += 8;
-      } else {
-        y += 4;
-      }
-
-      // 2. Letter Meta Details (Ref & Date)
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(10);
-      pdf.setTextColor(71, 85, 105);
-      pdf.text(`Ref: ${letterMeta.refNo || "N/A"}`, margin, y);
-      pdf.text(`Date: ${letterMeta.date || "N/A"}`, 210 - margin, y, { align: 'right' });
-      y += 8;
-
-      // 3. Employee Info Block
-      pdf.setFont(fontFamily, 'bold');
-      pdf.setFontSize(11);
-      pdf.setTextColor(15, 23, 42); // slate-900
-      pdf.text(employeeDetails.name.toUpperCase(), margin, y);
-      y += 5;
-
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(9.5);
-      pdf.setTextColor(71, 85, 105);
-      pdf.text(`IC / Passport No: ${employeeDetails.icPassport}`, margin, y);
-      y += 4.5;
-
-      pdf.setFont(fontFamily, 'normal');
-      pdf.setFontSize(10);
-      pdf.setTextColor(51, 65, 85); // slate-700
-      pdf.text(employeeDetails.addressLine1, margin, y);
-      y += 4.5;
-      pdf.text(employeeDetails.addressLine2, margin, y);
-      y += 9;
-
-      // 4. Salutation
-      pdf.setFont(fontFamily, 'normal');
-      pdf.setFontSize(10.5);
-      pdf.setTextColor(0, 0, 0);
-      const salName = employeeDetails.name ? employeeDetails.name.split(" ")[0] : "Candidate";
-      pdf.text(`Dear ${salName},`, margin, y);
-      y += 8;
-
-      // 5. Subject Line
-      pdf.setFont(fontFamily, 'bold');
-      pdf.setFontSize(11);
-      pdf.setTextColor(15, 23, 42);
-      const subjectText = `LETTER OF APPOINTMENT AS ${jobTerms.title.toUpperCase()}`;
-      pdf.text(subjectText, margin, y);
-      const textWidth = pdf.getTextWidth(subjectText);
-      pdf.setDrawColor(0, 0, 0);
-      pdf.setLineWidth(0.4);
-      pdf.line(margin, y + 1.5, margin + textWidth, y + 1.5);
-      y += 9;
-
-      // 6. Clauses and Job Terms Table
-      const drawParagraph = (text, isBold = false) => {
-        pdf.setFont(fontFamily, isBold ? 'bold' : 'normal');
-        pdf.setFontSize(fontSize);
-        pdf.setTextColor(0, 0, 0);
+      if (templateType === "applicationForm") {
+        // =====================================================================
+        // NATIVE PDF GENERATION: printable Job Application & Interview Form
+        // =====================================================================
         
-        const lines = pdf.splitTextToSize(text, 210 - 2 * margin);
-        for (const line of lines) {
-          checkPageBreak(lineHeight);
-          pdf.text(line, margin, y);
-          y += lineHeight;
+        // --- Header Section ---
+        if (logo) {
+          try {
+            pdf.addImage(logo, 'PNG', margin, y, 40, 13, undefined, 'FAST');
+            y += 15;
+          } catch (e) {
+            console.error("Error adding logo to application PDF:", e);
+            y += 3;
+          }
         }
-        y += 4; // Space between paragraphs
-      };
-
-      const drawTableRow = (label, valueContent) => {
-        const labelWidth = 50; 
-        const valWidth = (210 - 2 * margin) - 55; 
+        
+        pdf.setFont(fontFamily, 'bold');
+        pdf.setFontSize(13);
+        pdf.setTextColor(30, 41, 59); // slate-800
+        pdf.text(companyDetails.name.toUpperCase(), margin, y);
+        y += 5;
+        
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8.5);
+        pdf.setTextColor(71, 85, 105); // slate-600
+        const detailsStr = `Company Registration No: ${companyDetails.registrationNo}  |  ${companyDetails.addressLine1}, ${companyDetails.addressLine2}`;
+        const detailsLines = pdf.splitTextToSize(detailsStr, 210 - 2 * margin);
+        for (const line of detailsLines) {
+          pdf.text(line, margin, y);
+          y += 4;
+        }
+        y += 2;
+        
+        // Header divider line
+        pdf.setDrawColor(203, 213, 225); // slate-300
+        pdf.setLineWidth(0.4);
+        pdf.line(margin, y, 210 - margin, y);
+        y += 6;
+        
+        // Form Title
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(12);
+        pdf.setTextColor(15, 23, 42); // slate-900
+        pdf.text("EMPLOYMENT APPLICATION FORM", 105, y, { align: 'center' });
+        y += 4.5;
+        
+        // Subtext
+        pdf.setFont('helvetica', 'italic');
+        pdf.setFontSize(8);
+        pdf.setTextColor(100, 116, 139); // slate-500
+        pdf.text("Please complete all sections in BLOCK letters. All information will be treated in strict confidence.", 105, y, { align: 'center' });
+        y += 6;
+        
+        const drawSectionHeader = (title) => {
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(9);
+          pdf.setTextColor(255, 255, 255);
+          pdf.setFillColor(30, 41, 59); // slate-800
+          pdf.rect(margin, y, 210 - 2 * margin, 5.5, 'F');
+          pdf.text(title.toUpperCase(), margin + 3, y + 3.8);
+          y += 5.5 + 3; // height + gap
+        };
+        
+        // --- Section A: Personal Details ---
+        drawSectionHeader("Section A: Personal Details");
+        
+        const detailsBoxHeight = 32;
+        pdf.setDrawColor(148, 163, 184); // slate-400
+        pdf.setLineWidth(0.3);
+        pdf.rect(margin, y, 210 - 2 * margin, detailsBoxHeight);
+        
+        // Horizontal grid lines
+        pdf.line(margin, y + 8, 210 - margin, y + 8);
+        pdf.line(margin, y + 16, 210 - margin, y + 16);
+        pdf.line(margin, y + 24, 210 - margin, y + 24);
+        
+        // Vertical grid lines
+        pdf.line(margin + 90, y + 8, margin + 90, y + 24);
+        
+        // Labels
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(7);
+        pdf.setTextColor(100, 116, 139);
+        
+        pdf.text("FULL NAME (As per IC / Passport):", margin + 2, y + 3);
+        pdf.text("IC / PASSPORT NUMBER:", margin + 2, y + 11);
+        pdf.text("CONTACT NUMBER (Mobile/WhatsApp):", margin + 92, y + 11);
+        pdf.text("EMAIL ADDRESS:", margin + 2, y + 19);
+        pdf.text("EMERGENCY CONTACT NAME & PHONE:", margin + 92, y + 19);
+        pdf.text("RESIDENTIAL ADDRESS:", margin + 2, y + 27);
+        
+        y += detailsBoxHeight + 6;
+        
+        // --- Section B: Position & Expectations ---
+        drawSectionHeader("Section B: Position & Expectations");
+        
+        const expBoxHeight = 16;
+        pdf.rect(margin, y, 210 - 2 * margin, expBoxHeight);
+        pdf.line(margin, y + 8, 210 - margin, y + 8);
+        pdf.line(margin + 90, y, margin + 90, y + 16);
         
         pdf.setFont('helvetica', 'bold');
-        pdf.setFontSize(8.5);
-        const labelLines = pdf.splitTextToSize(label.toUpperCase(), labelWidth);
+        pdf.setFontSize(7);
+        pdf.setTextColor(100, 116, 139);
+        
+        pdf.text("POSITION APPLIED FOR:", margin + 2, y + 3);
+        pdf.text("EXPECTED MONTHLY SALARY (RM):", margin + 92, y + 3);
+        pdf.text("EARLIEST COMMENCEMENT DATE:", margin + 2, y + 11);
+        pdf.text("AVAILABILITY (e.g., Immediate / Notice Period):", margin + 92, y + 11);
+        
+        // Pre-fill position if HR configured it
+        if (jobTerms.title || jobTerms.department) {
+          pdf.setFont(fontFamily, 'bold');
+          pdf.setFontSize(9);
+          pdf.setTextColor(15, 23, 42);
+          const proposedPos = [jobTerms.title, jobTerms.department].filter(Boolean).join(" - ");
+          pdf.text(proposedPos, margin + 2, y + 6.5);
+        }
+        
+        y += expBoxHeight + 6;
+        
+        // --- Section C: Academic Qualifications ---
+        drawSectionHeader("Section C: Academic Qualifications");
+        
+        const writableWidth = 210 - 2 * margin;
+        const col1 = writableWidth * 0.3;
+        const col2 = writableWidth * 0.4;
+        const col3 = writableWidth * 0.15;
+        
+        // Table Header & Board
+        pdf.setFillColor(241, 245, 249); // slate-100
+        pdf.rect(margin, y, writableWidth, 6, 'F');
+        pdf.rect(margin, y, writableWidth, 24); 
+        
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(51, 65, 85);
+        pdf.text("LEVEL / DEGREE", margin + 2, y + 4);
+        pdf.text("SCHOOL / UNIVERSITY / INSTITUTION", margin + col1 + 2, y + 4);
+        pdf.text("YEAR GRADUATED", margin + col1 + col2 + 2, y + 4);
+        pdf.text("GRADE / GPA", margin + col1 + col2 + col3 + 2, y + 4);
+        
+        // Vertical lines
+        pdf.line(margin + col1, y, margin + col1, y + 24);
+        pdf.line(margin + col1 + col2, y, margin + col1 + col2, y + 24);
+        pdf.line(margin + col1 + col2 + col3, y, margin + col1 + col2 + col3, y + 24);
+        
+        // Horizontal lines (3 empty rows)
+        pdf.line(margin, y + 6, 210 - margin, y + 6);
+        pdf.line(margin, y + 12, 210 - margin, y + 12);
+        pdf.line(margin, y + 18, 210 - margin, y + 18);
+        
+        y += 30;
+        
+        // --- Section D: Employment History ---
+        drawSectionHeader("Section D: Employment History (Start from most recent)");
+        
+        const w1 = writableWidth * 0.3;
+        const w2 = writableWidth * 0.25;
+        const w3 = writableWidth * 0.15;
+        const w4 = writableWidth * 0.12;
+        
+        // Table Header & Board
+        pdf.setFillColor(241, 245, 249);
+        pdf.rect(margin, y, writableWidth, 6, 'F');
+        pdf.rect(margin, y, writableWidth, 30); 
+        
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(51, 65, 85);
+        pdf.text("COMPANY NAME", margin + 2, y + 4);
+        pdf.text("DESIGNATION", margin + w1 + 2, y + 4);
+        pdf.text("DURATION", margin + w1 + w2 + 2, y + 4);
+        pdf.text("LAST SALARY", margin + w1 + w2 + w3 + 2, y + 4);
+        pdf.text("REASON FOR LEAVING", margin + w1 + w2 + w3 + w4 + 2, y + 4);
+        
+        // Vertical lines
+        pdf.line(margin + w1, y, margin + w1, y + 30);
+        pdf.line(margin + w1 + w2, y, margin + w1 + w2, y + 30);
+        pdf.line(margin + w1 + w2 + w3, y, margin + w1 + w2 + w3, y + 30);
+        pdf.line(margin + w1 + w2 + w3 + w4, y, margin + w1 + w2 + w3 + w4, y + 30);
+        
+        // Horizontal lines (4 empty rows)
+        pdf.line(margin, y + 6, 210 - margin, y + 6);
+        pdf.line(margin, y + 12, 210 - margin, y + 12);
+        pdf.line(margin, y + 18, 210 - margin, y + 18);
+        pdf.line(margin, y + 24, 210 - margin, y + 24);
+        
+        y += 36;
+        
+        // --- Section E: Declaration ---
+        drawSectionHeader("Section E: Candidate Declaration");
         
         pdf.setFont(fontFamily, 'normal');
-        pdf.setFontSize(10);
-        
-        let valLines = [];
-        if (Array.isArray(valueContent)) {
-          valLines = valueContent;
-        } else {
-          valLines = pdf.splitTextToSize(valueContent, valWidth);
+        pdf.setFontSize(8);
+        pdf.setTextColor(71, 85, 105);
+        const decText = "I hereby declare that the information provided in this application is true, complete, and accurate to the best of my knowledge. I understand that any false statement, misrepresentation, or omission of facts may be grounds for immediate rejection of this application or subsequent termination of employment if hired.";
+        const decLines = pdf.splitTextToSize(decText, writableWidth);
+        for (const line of decLines) {
+          pdf.text(line, margin, y);
+          y += 3.8;
         }
+        y += 4;
         
-        const labelHeight = labelLines.length * 4.5;
-        const valHeight = valLines.length * 4.5;
-        const rowHeight = Math.max(labelHeight, valHeight) + 4; 
-        
-        checkPageBreak(rowHeight);
-        
-        pdf.setDrawColor(241, 245, 249); // slate-100
+        // Signature lines
+        pdf.setDrawColor(0, 0, 0);
         pdf.setLineWidth(0.3);
-        pdf.line(margin, y + rowHeight, 210 - margin, y + rowHeight);
+        pdf.line(margin, y + 12, margin + 50, y + 12);
+        pdf.line(210 - margin - 40, y + 12, 210 - margin, y + 12);
         
         pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(7);
+        pdf.setTextColor(148, 163, 184);
+        pdf.text("CANDIDATE SIGNATURE", margin, y + 15);
+        pdf.text("DATE", 210 - margin - 40, y + 15);
+        
+        // =====================================================================
+        // PAGE 2: Interview Evaluation & Negotiation Record
+        // =====================================================================
+        pdf.addPage();
+        drawWatermark();
+        y = margin;
+        
+        // Header Page 2
+        pdf.setFont(fontFamily, 'bold');
+        pdf.setFontSize(13);
+        pdf.setTextColor(30, 41, 59);
+        pdf.text(companyDetails.name.toUpperCase(), margin, y);
+        y += 5.5;
+        
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(11);
+        pdf.setTextColor(15, 23, 42);
+        pdf.text("INTERVIEW EVALUATION & NEGOTIATION RECORD", margin, y);
+        y += 4.5;
+        
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(239, 68, 68); // red-500
+        pdf.text("FOR MANAGEMENT & INTERVIEWER USE ONLY — DO NOT HAND TO CANDIDATE", margin, y);
+        y += 3;
+        
+        // Divider
+        pdf.setDrawColor(30, 41, 59);
+        pdf.setLineWidth(0.5);
+        pdf.line(margin, y, 210 - margin, y);
+        y += 6;
+        
+        // Metadata Box
+        pdf.setDrawColor(148, 163, 184);
+        pdf.setLineWidth(0.3);
+        pdf.rect(margin, y, writableWidth, 14);
+        pdf.line(margin, y + 7, 210 - margin, y + 7);
+        pdf.line(margin + 90, y, margin + 90, y + 14);
+        
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(100, 116, 139);
+        
+        pdf.text("CANDIDATE NAME:", margin + 2, y + 3);
+        pdf.text("DATE OF INTERVIEW:", margin + 92, y + 3);
+        pdf.text("INTERVIEWER NAME(S):", margin + 2, y + 10);
+        pdf.text("PROPOSED POSITION & DEPT:", margin + 92, y + 10);
+        
+        if (jobTerms.title || jobTerms.department) {
+          pdf.setFont(fontFamily, 'bold');
+          pdf.setFontSize(9);
+          pdf.setTextColor(15, 23, 42);
+          const proposed = [jobTerms.title, jobTerms.department].filter(Boolean).join(" - ");
+          pdf.text(proposed, margin + 92, y + 13.2);
+        }
+        
+        y += 20;
+        
+        // --- Section 1: Evaluation Matrix ---
+        drawSectionHeader("1. Candidate Assessment Matrix");
+        
+        const cw1 = 45;
+        const cw2 = 18;
+        
+        // Table Header & Board
+        pdf.setFillColor(241, 245, 249);
+        pdf.rect(margin, y, writableWidth, 7, 'F');
+        pdf.rect(margin, y, writableWidth, 42); // 6 rows of 7mm (1 header + 5 criteria)
+        
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(51, 65, 85);
+        pdf.text("EVALUATION CRITERIA", margin + 2, y + 4.5);
+        pdf.text("EXCELLENT", margin + cw1 + 1.5, y + 4.5);
+        pdf.text("GOOD", margin + cw1 + cw2 + 4.5, y + 4.5);
+        pdf.text("AVERAGE", margin + cw1 + cw2 * 2 + 2.5, y + 4.5);
+        pdf.text("POOR", margin + cw1 + cw2 * 3 + 4.5, y + 4.5);
+        pdf.text("INTERVIEWER REMARKS & EVIDENCE", margin + cw1 + cw2 * 4 + 2, y + 4.5);
+        
+        // Vertical lines
+        pdf.line(margin + cw1, y, margin + cw1, y + 42);
+        pdf.line(margin + cw1 + cw2, y, margin + cw1 + cw2, y + 42);
+        pdf.line(margin + cw1 + cw2 * 2, y, margin + cw1 + cw2 * 2, y + 42);
+        pdf.line(margin + cw1 + cw2 * 3, y, margin + cw1 + cw2 * 3, y + 42);
+        pdf.line(margin + cw1 + cw2 * 4, y, margin + cw1 + cw2 * 4, y + 42);
+        
+        // Rows
+        const criteria = [
+          "Communication & Language",
+          "Appearance & Professionalism",
+          "Technical Skills & Job Knowledge",
+          "Relevant Experience & Background",
+          "Attitude, Motivation & Values"
+        ];
+        
+        pdf.setFont('helvetica', 'semibold');
+        pdf.setFontSize(8);
+        pdf.setTextColor(15, 23, 42);
+        
+        for (let i = 0; i < criteria.length; i++) {
+          const rowY = y + 7 * (i + 1);
+          pdf.line(margin, rowY, 210 - margin, rowY);
+          pdf.text(criteria[i], margin + 2, rowY + 4.5);
+          
+          // Draw checkboxes
+          pdf.setFont('courier', 'bold');
+          pdf.setFontSize(9);
+          pdf.setTextColor(148, 163, 184);
+          pdf.text("[ ]", margin + cw1 + 7, rowY + 4.5);
+          pdf.text("[ ]", margin + cw1 + cw2 + 7, rowY + 4.5);
+          pdf.text("[ ]", margin + cw1 + cw2 * 2 + 7, rowY + 4.5);
+          pdf.text("[ ]", margin + cw1 + cw2 * 3 + 7, rowY + 4.5);
+          
+          pdf.setFont('helvetica', 'semibold');
+          pdf.setFontSize(8);
+          pdf.setTextColor(15, 23, 42);
+        }
+        
+        y += 48;
+        
+        // --- Section 2: Interview Notes & Salary Negotiation ---
+        drawSectionHeader("2. Interview Notes & Salary Negotiation (Handwritten)");
+        
+        const notesHeight = 32;
+        pdf.setDrawColor(148, 163, 184);
+        pdf.rect(margin, y, writableWidth, notesHeight);
+        
+        // Ruled lines
+        pdf.setDrawColor(226, 232, 240);
+        pdf.setLineWidth(0.2);
+        for (let lY = y + 6; lY < y + notesHeight; lY += 6) {
+          pdf.line(margin + 1, lY, 210 - margin - 1, lY);
+        }
+        
+        y += notesHeight + 6;
+        
+        // --- Section 3: Final Hiring Decision ---
+        drawSectionHeader("3. Final Hiring Decision");
+        
+        const decisionHeight = 24;
+        pdf.setDrawColor(148, 163, 184);
+        pdf.setLineWidth(0.3);
+        pdf.rect(margin, y, writableWidth, decisionHeight);
+        
+        pdf.line(margin, y + 8, 210 - margin, y + 8);
+        pdf.line(margin + 90, y + 8, margin + 90, y + 24);
+        
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(100, 116, 139);
+        
+        pdf.text("STATUS / DECISION:", margin + 2, y + 3);
+        pdf.setFont('courier', 'bold');
+        pdf.setFontSize(10);
+        pdf.setTextColor(15, 23, 42);
+        pdf.text("[ ] APPROVED / HIRE   [ ] SHORTLISTED / HOLD   [ ] REJECTED", margin + 35, y + 5.2);
+        
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(100, 116, 139);
+        pdf.text("APPROVED JOB TITLE:", margin + 2, y + 11);
+        pdf.text("APPROVED MONTHLY BASIC (RM):", margin + 92, y + 11);
+        pdf.text("APPROVED ALLOWANCES & PROBATION:", margin + 2, y + 19);
+        pdf.text("AGREED COMMENCEMENT DATE:", margin + 92, y + 19);
+        
+        y += decisionHeight + 8;
+        
+        // --- Section 4: Approvals ---
+        pdf.setDrawColor(148, 163, 184);
+        pdf.rect(margin, y, writableWidth, 24);
+        pdf.line(margin + 90, y, margin + 90, y + 24);
+        
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(100, 116, 139);
+        
+        pdf.text("INTERVIEWER SIGN-OFF:", margin + 2, y + 3);
+        pdf.text("AUTHORIZED MANAGEMENT APPROVAL:", margin + 92, y + 3);
+        
+        pdf.line(margin + 5, y + 17, margin + 65, y + 17);
+        pdf.line(margin + 95, y + 17, margin + 160, y + 17);
+        
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(7);
+        pdf.setTextColor(148, 163, 184);
+        pdf.text("Signature & Date", margin + 5, y + 21);
+        pdf.text("Signature & Date", margin + 95, y + 21);
+        
+        const sanitizedName = (jobTerms.title || "job").toLowerCase().replace(/[^a-z0-9]/g, "_");
+        pdf.save(`employment_application_${sanitizedName}.pdf`);
+      } else {
+        // =====================================================================
+        // NATIVE PDF GENERATION: standard Appointment Letter
+        // =====================================================================
+
+        // 1. Letterhead Section
+        if (logo) {
+          try {
+            // Place logo at top-left
+            pdf.addImage(logo, 'PNG', margin, y, 45, 15, undefined, 'FAST');
+            y += 18;
+          } catch (e) {
+            console.error("Error adding logo to PDF:", e);
+            y += 5;
+          }
+        }
+
+        pdf.setFont(fontFamily, 'bold');
+        pdf.setFontSize(14);
+        pdf.setTextColor(30, 41, 59); // slate-800
+        pdf.text(companyDetails.name, margin, y);
+        y += 5.5;
+
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(9);
+        pdf.setTextColor(71, 85, 105); // slate-600
+        pdf.text(`Company Registration No: ${companyDetails.registrationNo}`, margin, y);
+        y += 4.5;
+
+        pdf.setFont('helvetica', 'normal');
         pdf.setFontSize(8.5);
         pdf.setTextColor(100, 116, 139); // slate-500
-        let currentY = y + 3;
-        for (const line of labelLines) {
-          pdf.text(line, margin, currentY);
-          currentY += 4.5;
-        }
-        
-        pdf.setFont(fontFamily, 'semibold');
-        pdf.setFontSize(9.5);
-        pdf.setTextColor(15, 23, 42); // slate-900
-        currentY = y + 3;
-        for (const line of valLines) {
-          pdf.text(line, margin + 52, currentY);
-          currentY += 4.5;
-        }
-        
-        y += rowHeight;
-      };
+        pdf.text(`${companyDetails.addressLine1}, ${companyDetails.addressLine2}`, margin, y);
+        y += 4.5;
 
-      const drawClause = (number, title, text) => {
-        checkPageBreak(lineHeight + 6);
+        pdf.text(companyDetails.phoneEmail, margin, y);
+        y += 6;
+
+        // Letterhead divider line
+        if (stylingOptions.showLetterheadBorder && stylingOptions.accentColor !== 'transparent') {
+          const hex = stylingOptions.accentColor || '#059669';
+          const r = parseInt(hex.slice(1, 3), 16) || 5;
+          const g = parseInt(hex.slice(3, 5), 16) || 150;
+          const b = parseInt(hex.slice(5, 7), 16) || 105;
+          pdf.setDrawColor(r, g, b);
+          pdf.setLineWidth(0.8);
+          pdf.line(margin, y, 210 - margin, y);
+          y += 8;
+        } else {
+          y += 4;
+        }
+
+        // 2. Letter Meta Details (Ref & Date)
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(10);
+        pdf.setTextColor(71, 85, 105);
+        pdf.text(`Ref: ${letterMeta.refNo || "N/A"}`, margin, y);
+        pdf.text(`Date: ${letterMeta.date || "N/A"}`, 210 - margin, y, { align: 'right' });
+        y += 8;
+
+        // 3. Employee Info Block
         pdf.setFont(fontFamily, 'bold');
-        pdf.setFontSize(fontSize);
-        pdf.setTextColor(15, 23, 42);
-        pdf.text(`${number}. ${title}`, margin, y);
+        pdf.setFontSize(11);
+        pdf.setTextColor(15, 23, 42); // slate-900
+        pdf.text(employeeDetails.name.toUpperCase(), margin, y);
+        y += 5;
+
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(9.5);
+        pdf.setTextColor(71, 85, 105);
+        pdf.text(`IC / Passport No: ${employeeDetails.icPassport}`, margin, y);
         y += 4.5;
-        
+
         pdf.setFont(fontFamily, 'normal');
-        pdf.setFontSize(fontSize - 0.5);
+        pdf.setFontSize(10);
         pdf.setTextColor(51, 65, 85); // slate-700
-        
-        const lines = pdf.splitTextToSize(text, 210 - 2 * margin);
-        for (const line of lines) {
-          checkPageBreak(lineHeight);
-          pdf.text(line, margin, y);
-          y += lineHeight;
-        }
+        pdf.text(employeeDetails.addressLine1, margin, y);
         y += 4.5;
-      };
+        pdf.text(employeeDetails.addressLine2, margin, y);
+        y += 9;
 
-      // Introduction
-      drawParagraph(clauses.intro);
+        // 4. Salutation
+        pdf.setFont(fontFamily, 'normal');
+        pdf.setFontSize(10.5);
+        pdf.setTextColor(0, 0, 0);
+        const salName = employeeDetails.name ? employeeDetails.name.split(" ")[0] : "Candidate";
+        pdf.text(`Dear ${salName},`, margin, y);
+        y += 8;
 
-      // Terms Table
-      const salaryStr = formatCurrency(jobTerms.basicSalary);
-      const salaryLines = [salaryStr];
-      if (templateType === "fullTime" && jobTerms.probationPeriod && parseFloat(jobTerms.probationSalary) > 0) {
-        salaryLines.push(`(Reduced basic during probation: ${formatCurrency(jobTerms.probationSalary)}/month)`);
-      }
-      if (templateType === "fullTime") {
-        salaryLines.push(`Subject to statutory EPF / SOCSO deductions`);
-      }
+        // 5. Subject Line
+        pdf.setFont(fontFamily, 'bold');
+        pdf.setFontSize(11);
+        pdf.setTextColor(15, 23, 42);
+        const subjectText = `LETTER OF APPOINTMENT AS ${jobTerms.title.toUpperCase()}`;
+        pdf.text(subjectText, margin, y);
+        const textWidth = pdf.getTextWidth(subjectText);
+        pdf.setDrawColor(0, 0, 0);
+        pdf.setLineWidth(0.4);
+        pdf.line(margin, y + 1.5, margin + textWidth, y + 1.5);
+        y += 9;
 
-      const allowanceLines = [];
-      allowances.forEach(al => {
-        if (al.name) {
-          allowanceLines.push(`• ${al.name}: ${formatCurrency(al.amount)} per month`);
+        // 6. Clauses and Job Terms Table
+        const drawParagraph = (text, isBold = false) => {
+          pdf.setFont(fontFamily, isBold ? 'bold' : 'normal');
+          pdf.setFontSize(fontSize);
+          pdf.setTextColor(0, 0, 0);
+          
+          const lines = pdf.splitTextToSize(text, 210 - 2 * margin);
+          for (const line of lines) {
+            checkPageBreak(lineHeight);
+            pdf.text(line, margin, y);
+            y += lineHeight;
+          }
+          y += 4; // Space between paragraphs
+        };
+
+        const drawTableRow = (label, valueContent) => {
+          const labelWidth = 50; 
+          const valWidth = (210 - 2 * margin) - 55; 
+          
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(8.5);
+          const labelLines = pdf.splitTextToSize(label.toUpperCase(), labelWidth);
+          
+          pdf.setFont(fontFamily, 'normal');
+          pdf.setFontSize(10);
+          
+          let valLines = [];
+          if (Array.isArray(valueContent)) {
+            valLines = valueContent;
+          } else {
+            valLines = pdf.splitTextToSize(valueContent, valWidth);
+          }
+          
+          const labelHeight = labelLines.length * 4.5;
+          const valHeight = valLines.length * 4.5;
+          const rowHeight = Math.max(labelHeight, valHeight) + 4; 
+          
+          checkPageBreak(rowHeight);
+          
+          pdf.setDrawColor(241, 245, 249); // slate-100
+          pdf.setLineWidth(0.3);
+          pdf.line(margin, y + rowHeight, 210 - margin, y + rowHeight);
+          
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(8.5);
+          pdf.setTextColor(100, 116, 139); // slate-500
+          let currentY = y + 3;
+          for (const line of labelLines) {
+            pdf.text(line, margin, currentY);
+            currentY += 4.5;
+          }
+          
+          pdf.setFont(fontFamily, 'semibold');
+          pdf.setFontSize(9.5);
+          pdf.setTextColor(15, 23, 42); // slate-900
+          currentY = y + 3;
+          for (const line of valLines) {
+            pdf.text(line, margin + 52, currentY);
+            currentY += 4.5;
+          }
+          
+          y += rowHeight;
+        };
+
+        const drawClause = (number, title, text) => {
+          checkPageBreak(lineHeight + 6);
+          pdf.setFont(fontFamily, 'bold');
+          pdf.setFontSize(fontSize);
+          pdf.setTextColor(15, 23, 42);
+          pdf.text(`${number}. ${title}`, margin, y);
+          y += 4.5;
+          
+          pdf.setFont(fontFamily, 'normal');
+          pdf.setFontSize(fontSize - 0.5);
+          pdf.setTextColor(51, 65, 85); // slate-700
+          
+          const lines = pdf.splitTextToSize(text, 210 - 2 * margin);
+          for (const line of lines) {
+            checkPageBreak(lineHeight);
+            pdf.text(line, margin, y);
+            y += lineHeight;
+          }
+          y += 4.5;
+        };
+
+        // Introduction
+        drawParagraph(clauses.intro);
+
+        // Terms Table
+        const salaryStr = formatCurrency(jobTerms.basicSalary);
+        const salaryLines = [salaryStr];
+        if (templateType === "fullTime" && jobTerms.probationPeriod && parseFloat(jobTerms.probationSalary) > 0) {
+          salaryLines.push(`(Reduced basic during probation: ${formatCurrency(jobTerms.probationSalary)}/month)`);
         }
-      });
-
-      const probVal = (templateType === "fullTime" || templateType === "partTime") ? `${jobTerms.probationPeriod} Months` : jobTerms.probationPeriod;
-
-      const noticeLines = [
-        `Under Trial/Probation: ${jobTerms.noticeProbation} written notice`,
-        `Upon Confirmation: ${jobTerms.noticeConfirmed} written notice`
-      ];
-
-      // Draw table rows
-      drawTableRow("1. Designation & Dept", `${jobTerms.title}  |  ${jobTerms.department}`);
-      drawTableRow("2. Start Date", jobTerms.commencementDate);
-      drawTableRow(`3. ${jobTerms.salaryLabel || "Monthly Basic"}`, salaryLines);
-      if (templateType !== "internship" && templateType !== "contractor" && allowanceLines.length > 0) {
-        drawTableRow("4. Allowance Packages", allowanceLines);
-      }
-      drawTableRow(`5. ${jobTerms.durationLabel || "Probation Period"}`, probVal);
-      drawTableRow("6. Service Notice Period", noticeLines);
-      drawTableRow("7. Prescribed Hours", jobTerms.workingHours);
-      y += 6; // Space after table
-
-      // Clauses
-      drawClause("8", "Duties & Responsibilities", clauses.duties);
-      drawClause("9", "Professional Confidentiality", clauses.confidentiality);
-      drawClause("10", "Policy Compliance", clauses.compliance);
-
-      // Closing paragraph
-      drawParagraph(clauses.closing);
-
-      // 7. Signatures & Acceptance Block
-      checkPageBreak(65); // Make sure the entire signatures section is kept together on the same page
-      
-      const sigYStart = y;
-
-      // Employer signature (left)
-      pdf.setFont(fontFamily, 'normal');
-      pdf.setFontSize(10);
-      pdf.setTextColor(0, 0, 0);
-      pdf.text("Yours sincerely,", margin, y);
-      y += 4.5;
-      
-      pdf.setFont(fontFamily, 'bold');
-      pdf.setFontSize(9.5);
-      pdf.setTextColor(51, 65, 85);
-      pdf.text(`For ${companyDetails.name}`, margin, y);
-      
-      const signatureY = y + 4;
-      if (signatorySignature) {
-        try {
-          pdf.addImage(signatorySignature, 'PNG', margin + 2, signatureY, 32, 16, undefined, 'FAST');
-        } catch (e) {
-          console.error("Error adding signatory signature to PDF:", e);
+        if (templateType === "fullTime") {
+          salaryLines.push(`Subject to statutory EPF / SOCSO deductions`);
         }
-      }
-      if (stamp) {
-        try {
-          pdf.addImage(stamp, 'PNG', margin + 20, signatureY - 3, 18, 18, undefined, 'FAST');
-        } catch (e) {
-          console.error("Error adding stamp to PDF:", e);
-        }
-      }
-      
-      const detailsY = signatureY + 19;
-      pdf.setDrawColor(0, 0, 0);
-      pdf.setLineWidth(0.3);
-      pdf.line(margin, detailsY, margin + 45, detailsY); // signature line
-      
-      pdf.setFont(fontFamily, 'bold');
-      pdf.setFontSize(10);
-      pdf.setTextColor(15, 23, 42);
-      pdf.text(signatory.name, margin, detailsY + 4);
-      
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(8);
-      pdf.setTextColor(100, 116, 139);
-      pdf.text(signatory.title.toUpperCase(), margin, detailsY + 7.5);
 
-      // Candidate signature (right)
-      y = sigYStart;
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(9.5);
-      pdf.setTextColor(15, 23, 42);
-      pdf.text("ACKNOWLEDGEMENT & ACCEPTANCE", 115, y);
-      
-      pdf.setFont('helvetica', 'normal');
-      pdf.setFontSize(8.5);
-      pdf.setTextColor(71, 85, 105);
-      const acceptText = "I hereby confirm that I have read, understood, and accept this appointment under the terms and conditions outlined in this letter.";
-      const acceptLines = pdf.splitTextToSize(acceptText, 210 - margin - 115);
-      let acceptY = y + 4.5;
-      for (const line of acceptLines) {
-        pdf.text(line, 115, acceptY);
-        acceptY += 4;
-      }
-      
-      const empSigY = acceptY + 3;
-      if (employeeSignature) {
-        try {
-          pdf.addImage(employeeSignature, 'PNG', 125, empSigY, 32, 16, undefined, 'FAST');
-        } catch (e) {
-          console.error("Error adding employee signature to PDF:", e);
-        }
-      }
-      
-      const empLineY = empSigY + 19;
-      pdf.setDrawColor(0, 0, 0);
-      pdf.setLineWidth(0.3);
-      pdf.line(115, empLineY, 115 + 45, empLineY); // signature line
-      pdf.line(170, empLineY, 210 - margin, empLineY); // date line
-      
-      pdf.setFont('helvetica', 'bold');
-      pdf.setFontSize(7.5);
-      pdf.setTextColor(148, 163, 184); // slate-400
-      pdf.text("CANDIDATE SIGNATURE", 115, empLineY + 4);
-      pdf.text("DATE", 170, empLineY + 4);
+        const allowanceLines = [];
+        allowances.forEach(al => {
+          if (al.name) {
+            allowanceLines.push(`• ${al.name}: ${formatCurrency(al.amount)} per month`);
+          }
+        });
 
-      const sanitizedName = employeeDetails.name.toLowerCase().replace(/[^a-z0-9]/g, "_");
-      pdf.save(`appointment_letter_${sanitizedName}.pdf`);
+        const probVal = (templateType === "fullTime" || templateType === "partTime") ? `${jobTerms.probationPeriod} Months` : jobTerms.probationPeriod;
+
+        const noticeLines = [
+          `Under Trial/Probation: ${jobTerms.noticeProbation} written notice`,
+          `Upon Confirmation: ${jobTerms.noticeConfirmed} written notice`
+        ];
+
+        // Draw table rows
+        drawTableRow("1. Designation & Dept", `${jobTerms.title}  |  ${jobTerms.department}`);
+        drawTableRow("2. Start Date", jobTerms.commencementDate);
+        drawTableRow(`3. ${jobTerms.salaryLabel || "Monthly Basic"}`, salaryLines);
+        if (templateType !== "internship" && templateType !== "contractor" && allowanceLines.length > 0) {
+          drawTableRow("4. Allowance Packages", allowanceLines);
+        }
+        drawTableRow(`5. ${jobTerms.durationLabel || "Probation Period"}`, probVal);
+        drawTableRow("6. Service Notice Period", noticeLines);
+        drawTableRow("7. Prescribed Hours", jobTerms.workingHours);
+        y += 6; // Space after table
+
+        // Clauses
+        drawClause("8", "Duties & Responsibilities", clauses.duties);
+        drawClause("9", "Professional Confidentiality", clauses.confidentiality);
+        drawClause("10", "Policy Compliance", clauses.compliance);
+
+        // Closing paragraph
+        drawParagraph(clauses.closing);
+
+        // 7. Signatures & Acceptance Block
+        checkPageBreak(65); // Make sure the entire signatures section is kept together on the same page
+        
+        const sigYStart = y;
+
+        // Employer signature (left)
+        pdf.setFont(fontFamily, 'normal');
+        pdf.setFontSize(10);
+        pdf.setTextColor(0, 0, 0);
+        pdf.text("Yours sincerely,", margin, y);
+        y += 4.5;
+        
+        pdf.setFont(fontFamily, 'bold');
+        pdf.setFontSize(9.5);
+        pdf.setTextColor(51, 65, 85);
+        pdf.text(`For ${companyDetails.name}`, margin, y);
+        
+        const signatureY = y + 4;
+        if (signatorySignature) {
+          try {
+            pdf.addImage(signatorySignature, 'PNG', margin + 2, signatureY, 32, 16, undefined, 'FAST');
+          } catch (e) {
+            console.error("Error adding signatory signature to PDF:", e);
+          }
+        }
+        if (stamp) {
+          try {
+            pdf.addImage(stamp, 'PNG', margin + 20, signatureY - 3, 18, 18, undefined, 'FAST');
+          } catch (e) {
+            console.error("Error adding stamp to PDF:", e);
+          }
+        }
+        
+        const detailsY = signatureY + 19;
+        pdf.setDrawColor(0, 0, 0);
+        pdf.setLineWidth(0.3);
+        pdf.line(margin, detailsY, margin + 45, detailsY); // signature line
+        
+        pdf.setFont(fontFamily, 'bold');
+        pdf.setFontSize(10);
+        pdf.setTextColor(15, 23, 42);
+        pdf.text(signatory.name, margin, detailsY + 4);
+        
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(8);
+        pdf.setTextColor(100, 116, 139);
+        pdf.text(signatory.title.toUpperCase(), margin, detailsY + 7.5);
+
+        // Candidate signature (right)
+        y = sigYStart;
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(9.5);
+        pdf.setTextColor(15, 23, 42);
+        pdf.text("ACKNOWLEDGEMENT & ACCEPTANCE", 115, y);
+        
+        pdf.setFont('helvetica', 'normal');
+        pdf.setFontSize(8.5);
+        pdf.setTextColor(71, 85, 105);
+        const acceptText = "I hereby confirm that I have read, understood, and accept this appointment under the terms and conditions outlined in this letter.";
+        const acceptLines = pdf.splitTextToSize(acceptText, 210 - margin - 115);
+        let acceptY = y + 4.5;
+        for (const line of acceptLines) {
+          pdf.text(line, 115, acceptY);
+          acceptY += 4;
+        }
+        
+        const empSigY = acceptY + 3;
+        if (employeeSignature) {
+          try {
+            pdf.addImage(employeeSignature, 'PNG', 125, empSigY, 32, 16, undefined, 'FAST');
+          } catch (e) {
+            console.error("Error adding employee signature to PDF:", e);
+          }
+        }
+        
+        const empLineY = empSigY + 19;
+        pdf.setDrawColor(0, 0, 0);
+        pdf.setLineWidth(0.3);
+        pdf.line(115, empLineY, 115 + 45, empLineY); // signature line
+        pdf.line(170, empLineY, 210 - margin, empLineY); // date line
+        
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(7.5);
+        pdf.setTextColor(148, 163, 184); // slate-400
+        pdf.text("CANDIDATE SIGNATURE", 115, empLineY + 4);
+        pdf.text("DATE", 170, empLineY + 4);
+      }
+
+      const fileSuffix = templateType === "applicationForm" ? "job_application" : "appointment_letter";
+      const sanitizedName = (templateType === "applicationForm" ? (jobTerms.title || "job") : employeeDetails.name).toLowerCase().replace(/[^a-z0-9]/g, "_");
+      pdf.save(`${fileSuffix}_${sanitizedName}.pdf`);
     } catch (err) {
       console.error('Failed to generate PDF natively, falling back to window.print', err);
       window.print();
@@ -942,24 +1385,28 @@ export default function AppointmentLetterGenerator() {
             <Briefcase className="w-3.5 h-3.5 mx-auto mb-1" />
             Job Terms
           </button>
-          <button 
-            onClick={() => setActiveTab("signatures")}
-            className={`flex-1 min-w-[75px] py-3 text-center border-b-2 transition-colors cursor-pointer ${
-              activeTab === "signatures" ? "border-mint-600 text-mint-700 bg-mint-50/10" : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50/50"
-            }`}
-          >
-            <PenTool className="w-3.5 h-3.5 mx-auto mb-1" />
-            Signature
-          </button>
-          <button 
-            onClick={() => setActiveTab("clauses")}
-            className={`flex-1 min-w-[75px] py-3 text-center border-b-2 transition-colors cursor-pointer ${
-              activeTab === "clauses" ? "border-mint-600 text-mint-700 bg-mint-50/10" : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50/50"
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5 mx-auto mb-1" />
-            Clauses
-          </button>
+          {templateType !== "applicationForm" && (
+            <>
+              <button 
+                onClick={() => setActiveTab("signatures")}
+                className={`flex-1 min-w-[75px] py-3 text-center border-b-2 transition-colors cursor-pointer ${
+                  activeTab === "signatures" ? "border-mint-600 text-mint-700 bg-mint-50/10" : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50/50"
+                }`}
+              >
+                <PenTool className="w-3.5 h-3.5 mx-auto mb-1" />
+                Signature
+              </button>
+              <button 
+                onClick={() => setActiveTab("clauses")}
+                className={`flex-1 min-w-[75px] py-3 text-center border-b-2 transition-colors cursor-pointer ${
+                  activeTab === "clauses" ? "border-mint-600 text-mint-700 bg-mint-50/10" : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50/50"
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5 mx-auto mb-1" />
+                Clauses
+              </button>
+            </>
+          )}
         </div>
 
         {/* Tab Content Panels */}
@@ -1618,265 +2065,542 @@ export default function AppointmentLetterGenerator() {
             lineHeight: stylingOptions.lineHeight
           }}
         >
-          {/* Visual Page Break Guidelines in Editor (Hidden in Print and PDF) */}
-          <div className="absolute inset-0 pointer-events-none z-30 print:hidden select-none pdf-exclude">
-            {/* Page 1 Break at 297mm */}
-            <div 
-              className="absolute left-0 right-0 border-t border-dashed border-red-300 flex justify-end" 
-              style={{ top: "297mm" }}
-            >
-              <span className="bg-red-50 text-red-500 text-[9px] font-bold px-2 py-0.5 rounded-bl border-l border-b border-red-100 uppercase tracking-wider shadow-sm">
-                Page 1 / Page 2 Break
-              </span>
-            </div>
-            
-            {/* Page 2 Break at 594mm */}
-            <div 
-              className="absolute left-0 right-0 border-t border-dashed border-red-300 flex justify-end" 
-              style={{ top: "594mm" }}
-            >
-              <span className="bg-red-50 text-red-500 text-[9px] font-bold px-2 py-0.5 rounded-bl border-l border-b border-red-100 uppercase tracking-wider shadow-sm">
-                Page 2 / Page 3 Break
-              </span>
-            </div>
-          </div>
-          
-          {/* Background Slanted Watermark */}
-          {stylingOptions.showWatermark && letterMeta.watermarkText && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden z-0">
-              <div 
-                className="font-sans font-black tracking-[0.15em] text-slate-400/8 text-[82px] uppercase whitespace-nowrap rotate-[-40deg] opacity-60"
-                style={{ transform: "rotate(-40deg) scale(1.1)" }}
-              >
-                {letterMeta.watermarkText}
+          {templateType === "applicationForm" ? (
+            <div className="flex-1 flex flex-col text-left text-slate-800 text-[11px] leading-relaxed relative font-sans p-2 select-none">
+              
+              {/* PAGE 1: APPLICATION FORM */}
+              <div className="flex flex-col min-h-[280mm] relative">
+                {/* Header */}
+                <div className="flex items-start justify-between border-b pb-4 mb-4">
+                  <div>
+                    {logo ? (
+                      <img src={logo} alt="Company Logo" className="h-12 max-w-[200px] object-contain object-left mb-2" />
+                    ) : (
+                      <div className="h-10 w-24 bg-slate-100 border border-dashed rounded flex items-center justify-center text-[8px] text-slate-400 mb-2">Company Logo</div>
+                    )}
+                    <h1 className="font-bold text-[14px] uppercase">{companyDetails.name}</h1>
+                    <p className="text-[9px] text-slate-500 font-semibold">Reg No: {companyDetails.registrationNo} | {companyDetails.addressLine1}, {companyDetails.addressLine2}</p>
+                  </div>
+                  <span className="text-[8px] bg-slate-800 text-white px-2 py-1 rounded font-bold tracking-widest uppercase">Page 1</span>
+                </div>
+
+                <div className="text-center mb-4">
+                  <h2 className="text-sm font-black tracking-wide border-b border-slate-300 pb-1 uppercase">Employment Application Form</h2>
+                  <p className="text-[9px] text-slate-500 italic mt-1">Please fill in all sections in BLOCK letters. This information will remain strictly confidential.</p>
+                </div>
+
+                {/* Section A: Personal Details */}
+                <div className="mb-4">
+                  <div className="bg-slate-800 text-white text-[9px] font-bold px-3 py-1 uppercase rounded-t tracking-wider">Section A: Personal Details</div>
+                  <div className="border border-slate-300 grid grid-cols-2 text-[9px]">
+                    <div className="col-span-2 border-b border-slate-300 p-2 min-h-[10mm]">
+                      <span className="block font-bold text-slate-400 uppercase text-[7px]">Full Name (as per IC / Passport)</span>
+                      <div className="h-4"></div>
+                    </div>
+                    <div className="border-r border-b border-slate-300 p-2 min-h-[10mm]">
+                      <span className="block font-bold text-slate-400 uppercase text-[7px]">IC / Passport Number</span>
+                      <div className="h-4"></div>
+                    </div>
+                    <div className="border-b border-slate-300 p-2 min-h-[10mm]">
+                      <span className="block font-bold text-slate-400 uppercase text-[7px]">Contact Number (Mobile/WhatsApp)</span>
+                      <div className="h-4"></div>
+                    </div>
+                    <div className="border-r border-slate-300 p-2 min-h-[10mm]">
+                      <span className="block font-bold text-slate-400 uppercase text-[7px]">Email Address</span>
+                      <div className="h-4"></div>
+                    </div>
+                    <div className="p-2 min-h-[10mm]">
+                      <span className="block font-bold text-slate-400 uppercase text-[7px]">Emergency Contact Name & Phone</span>
+                      <div className="h-4"></div>
+                    </div>
+                    <div className="col-span-2 border-t border-slate-300 p-2 min-h-[12mm]">
+                      <span className="block font-bold text-slate-400 uppercase text-[7px]">Residential Address</span>
+                      <div className="h-6"></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section B: Position & Expectations */}
+                <div className="mb-4">
+                  <div className="bg-slate-800 text-white text-[9px] font-bold px-3 py-1 uppercase rounded-t tracking-wider">Section B: Position & Expectations</div>
+                  <div className="border border-slate-300 grid grid-cols-2 text-[9px]">
+                    <div className="border-r border-b border-slate-300 p-2 min-h-[11mm]">
+                      <span className="block font-bold text-slate-400 uppercase text-[7px]">Position Applied For</span>
+                      <div className="font-bold text-slate-900 mt-0.5">{[jobTerms.title, jobTerms.department].filter(Boolean).join(" - ") || "Service Crew"}</div>
+                    </div>
+                    <div className="border-b border-slate-300 p-2 min-h-[11mm]">
+                      <span className="block font-bold text-slate-400 uppercase text-[7px]">Expected Monthly Salary (RM)</span>
+                      <div className="h-4"></div>
+                    </div>
+                    <div className="border-r border-slate-300 p-2 min-h-[11mm]">
+                      <span className="block font-bold text-slate-400 uppercase text-[7px]">Earliest Commencement Date</span>
+                      <div className="h-4"></div>
+                    </div>
+                    <div className="p-2 min-h-[11mm]">
+                      <span className="block font-bold text-slate-400 uppercase text-[7px]">Availability (e.g., Immediate / Notice Period)</span>
+                      <div className="h-4"></div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Section C: Academic Qualifications */}
+                <div className="mb-4">
+                  <div className="bg-slate-800 text-white text-[9px] font-bold px-3 py-1 uppercase rounded-t tracking-wider">Section C: Academic Qualifications</div>
+                  <table className="w-full border-collapse border border-slate-300 text-[8.5px]">
+                    <thead>
+                      <tr className="bg-slate-100 font-bold border-b border-slate-300 text-slate-700">
+                        <th className="border-r border-slate-300 p-1.5 text-left w-[30%]">Level / Degree</th>
+                        <th className="border-r border-slate-300 p-1.5 text-left w-[40%]">School / University / Institution</th>
+                        <th className="border-r border-slate-300 p-1.5 text-left w-[15%]">Year Graduated</th>
+                        <th className="p-1.5 text-left w-[15%]">Grade / GPA</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[1, 2, 3].map(i => (
+                        <tr key={i} className="border-b border-slate-200">
+                          <td className="border-r border-slate-300 p-3"></td>
+                          <td className="border-r border-slate-300 p-3"></td>
+                          <td className="border-r border-slate-300 p-3"></td>
+                          <td className="p-3"></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Section D: Employment History */}
+                <div className="mb-4">
+                  <div className="bg-slate-800 text-white text-[9px] font-bold px-3 py-1 uppercase rounded-t tracking-wider">Section D: Employment History (Most Recent First)</div>
+                  <table className="w-full border-collapse border border-slate-300 text-[8.5px]">
+                    <thead>
+                      <tr className="bg-slate-100 font-bold border-b border-slate-300 text-slate-700">
+                        <th className="border-r border-slate-300 p-1.5 text-left w-[30%]">Company Name</th>
+                        <th className="border-r border-slate-300 p-1.5 text-left w-[25%]">Designation</th>
+                        <th className="border-r border-slate-300 p-1.5 text-left w-[15%]">Duration</th>
+                        <th className="border-r border-slate-300 p-1.5 text-left w-[12%]">Last Salary</th>
+                        <th className="p-1.5 text-left w-[18%]">Reason for Leaving</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[1, 2, 3, 4].map(i => (
+                        <tr key={i} className="border-b border-slate-200">
+                          <td className="border-r border-slate-300 p-3"></td>
+                          <td className="border-r border-slate-300 p-3"></td>
+                          <td className="border-r border-slate-300 p-3"></td>
+                          <td className="border-r border-slate-300 p-3"></td>
+                          <td className="p-3"></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Section E: Declaration */}
+                <div className="mt-auto pt-4">
+                  <div className="bg-slate-800 text-white text-[9px] font-bold px-3 py-1 uppercase rounded-t tracking-wider">Section E: Candidate Declaration</div>
+                  <div className="border border-slate-300 p-3 rounded-b bg-slate-50/50 text-[8px] text-slate-600 text-justify">
+                    I hereby declare that the information provided in this application is true, complete, and accurate to the best of my knowledge. I understand that any false statement, misrepresentation, or omission of facts may be grounds for immediate rejection of this application or subsequent termination of employment if hired.
+                    <div className="flex justify-between items-end mt-6 pt-4 border-t border-slate-200/80">
+                      <div className="w-[180px] border-t border-slate-500 text-center pt-1 text-[7px] font-bold text-slate-400 uppercase">Candidate Signature</div>
+                      <div className="w-[120px] border-t border-slate-500 text-center pt-1 text-[7px] font-bold text-slate-400 uppercase">Date</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* DOTTED PAGE BREAK SEPARATOR */}
+              <div className="my-8 border-t-2 border-dashed border-red-300 flex items-center justify-center relative select-none pdf-exclude">
+                <span className="absolute bg-red-50 text-red-500 text-[9px] font-bold px-3 py-1 rounded-full border border-red-100 uppercase tracking-widest shadow-sm">Page 1 / Page 2 Break</span>
+              </div>
+
+              {/* PAGE 2: INTERVIEW & EVALUATION */}
+              <div className="flex flex-col min-h-[280mm] relative">
+                {/* Header */}
+                <div className="flex items-start justify-between border-b pb-4 mb-4">
+                  <div>
+                    <h1 className="font-bold text-[14px] uppercase text-slate-900">{companyDetails.name}</h1>
+                    <h2 className="font-bold text-[11px] text-slate-800 uppercase tracking-tight mt-0.5">Interview Evaluation & Negotiation Record</h2>
+                    <p className="text-[8px] text-red-500 font-bold uppercase tracking-wider mt-1">For Management Use Only — Do Not Show to Candidate</p>
+                  </div>
+                  <span className="text-[8px] bg-slate-800 text-white px-2 py-1 rounded font-bold tracking-widest uppercase">Page 2</span>
+                </div>
+
+                {/* Candidate & Interviewer Metadata Box */}
+                <div className="border border-slate-300 grid grid-cols-2 text-[9px] mb-4">
+                  <div className="border-r border-b border-slate-300 p-2 min-h-[10mm]">
+                    <span className="block font-bold text-slate-400 uppercase text-[7px]">Candidate Name</span>
+                    <div className="h-4"></div>
+                  </div>
+                  <div className="border-b border-slate-300 p-2 min-h-[10mm]">
+                    <span className="block font-bold text-slate-400 uppercase text-[7px]">Date of Interview</span>
+                    <div className="h-4"></div>
+                  </div>
+                  <div className="border-r border-slate-300 p-2 min-h-[10mm]">
+                    <span className="block font-bold text-slate-400 uppercase text-[7px]">Interviewer Name(s)</span>
+                    <div className="h-4"></div>
+                  </div>
+                  <div className="p-2 min-h-[10mm]">
+                    <span className="block font-bold text-slate-400 uppercase text-[7px]">Proposed Position & Department</span>
+                    <div className="font-bold text-slate-900 mt-0.5">{[jobTerms.title, jobTerms.department].filter(Boolean).join(" - ") || "Service Crew"}</div>
+                  </div>
+                </div>
+
+                {/* Assessment Matrix */}
+                <div className="mb-4">
+                  <div className="bg-slate-800 text-white text-[9px] font-bold px-3 py-1 uppercase rounded-t tracking-wider">1. Candidate Assessment Matrix</div>
+                  <table className="w-full border-collapse border border-slate-300 text-[8.5px]">
+                    <thead>
+                      <tr className="bg-slate-100 font-bold border-b border-slate-300 text-slate-700">
+                        <th className="border-r border-slate-300 p-2 text-left w-[35%]">Evaluation Criteria</th>
+                        <th className="border-r border-slate-300 p-2 text-center w-[12%]">Excellent</th>
+                        <th className="border-r border-slate-300 p-2 text-center w-[12%]">Good</th>
+                        <th className="border-r border-slate-300 p-2 text-center w-[12%]">Average</th>
+                        <th className="border-r border-slate-300 p-2 text-center w-[12%]">Poor</th>
+                        <th className="p-2 text-left w-[17%]">Remarks</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[
+                        "Communication & Language",
+                        "Appearance & Professionalism",
+                        "Technical Skills & Job Knowledge",
+                        "Relevant Experience & Background",
+                        "Attitude, Motivation & Values"
+                      ].map((criterion, idx) => (
+                        <tr key={idx} className="border-b border-slate-200">
+                          <td className="border-r border-slate-300 p-2 font-semibold text-slate-800">{criterion}</td>
+                          <td className="border-r border-slate-300 p-2 text-center text-slate-300 courier font-bold">[ ]</td>
+                          <td className="border-r border-slate-300 p-2 text-center text-slate-300 courier font-bold">[ ]</td>
+                          <td className="border-r border-slate-300 p-2 text-center text-slate-300 courier font-bold">[ ]</td>
+                          <td className="border-r border-slate-300 p-2 text-center text-slate-300 courier font-bold">[ ]</td>
+                          <td className="p-2"></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Interview Notes & Salary Negotiation */}
+                <div className="mb-4">
+                  <div className="bg-slate-800 text-white text-[9px] font-bold px-3 py-1 uppercase rounded-t tracking-wider">2. Interview Notes & Salary Negotiation (Handwritten)</div>
+                  <div className="border border-slate-300 p-4 min-h-[35mm] rounded-b bg-slate-50/20 flex flex-col justify-between">
+                    {[1, 2, 3, 4, 5].map(i => (
+                      <div key={i} className="border-b border-slate-200/60 h-6 w-full"></div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Final Decision */}
+                <div className="mb-4 mt-auto">
+                  <div className="bg-slate-800 text-white text-[9px] font-bold px-3 py-1 uppercase rounded-t tracking-wider">3. Final Hiring Decision</div>
+                  <div className="border border-slate-300 text-[9px]">
+                    <div className="border-b border-slate-300 p-3 bg-slate-50/50">
+                      <span className="font-bold text-slate-500 mr-4">STATUS / DECISION:</span>
+                      <span className="font-mono text-[10px] font-bold text-slate-400">[ ] APPROVED / HIRE &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; [ ] SHORTLISTED / HOLD &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; [ ] REJECTED</span>
+                    </div>
+                    <div className="grid grid-cols-2">
+                      <div className="border-r border-b border-slate-300 p-2 min-h-[10mm]">
+                        <span className="block font-bold text-slate-400 uppercase text-[7px]">Approved Job Title</span>
+                        <div className="h-3"></div>
+                      </div>
+                      <div className="border-b border-slate-300 p-2 min-h-[10mm]">
+                        <span className="block font-bold text-slate-400 uppercase text-[7px]">Approved Monthly Basic Salary (RM)</span>
+                        <div className="h-3"></div>
+                      </div>
+                      <div className="border-r border-slate-300 p-2 min-h-[10mm]">
+                        <span className="block font-bold text-slate-400 uppercase text-[7px]">Approved Allowances & Probation Terms</span>
+                        <div className="h-3"></div>
+                      </div>
+                      <div className="p-2 min-h-[10mm]">
+                        <span className="block font-bold text-slate-400 uppercase text-[7px]">Agreed Commencement Date</span>
+                        <div className="h-3"></div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Management Sign-offs */}
+                <div className="border border-slate-300 grid grid-cols-2 text-[9px]">
+                  <div className="border-r p-3 min-h-[22mm] flex flex-col justify-between">
+                    <span className="block font-bold text-slate-500 uppercase text-[7px]">Interviewer Sign-Off</span>
+                    <div className="flex justify-between items-end border-t border-slate-300 pt-1 text-[7px] font-bold text-slate-400 uppercase">
+                      <span>Interviewer Signature</span>
+                      <span>Date</span>
+                    </div>
+                  </div>
+                  <div className="p-3 min-h-[22mm] flex flex-col justify-between">
+                    <span className="block font-bold text-slate-500 uppercase text-[7px]">Authorized Management Approval</span>
+                    <div className="flex justify-between items-end border-t border-slate-300 pt-1 text-[7px] font-bold text-slate-400 uppercase">
+                      <span>Authorized Signature</span>
+                      <span>Date</span>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-          )}
-
-          {/* Letterhead Header Section */}
-          <div 
-            className="flex items-start justify-between pb-5 mb-6 z-10"
-            style={{ 
-              borderBottomWidth: stylingOptions.showLetterheadBorder ? "2px" : "0px",
-              borderColor: stylingOptions.accentColor 
-            }}
-          >
-            <div className="flex-1 text-left">
-              {logo ? (
+          ) : (
+            <>
+              {/* Visual Page Break Guidelines in Editor (Hidden in Print and PDF) */}
+              <div className="absolute inset-0 pointer-events-none z-30 print:hidden select-none pdf-exclude">
+                {/* Page 1 Break at 297mm */}
+                <div 
+                  className="absolute left-0 right-0 border-t border-dashed border-red-300 flex justify-end" 
+                  style={{ top: "297mm" }}
+                >
+                  <span className="bg-red-50 text-red-500 text-[9px] font-bold px-2 py-0.5 rounded-bl border-l border-b border-red-100 uppercase tracking-wider shadow-sm">
+                    Page 1 / Page 2 Break
+                  </span>
+                </div>
                 
-                <img src={logo} alt="Company Logo" className="h-14 max-w-[220px] object-contain object-left mb-3" />
-              ) : (
-                <div className="h-12 w-32 bg-slate-100 border border-slate-200 border-dashed rounded-lg flex items-center justify-center text-[10px] font-sans text-slate-400 mb-3 print:hidden select-none">
-                  Letterhead Logo Place
+                {/* Page 2 Break at 594mm */}
+                <div 
+                  className="absolute left-0 right-0 border-t border-dashed border-red-300 flex justify-end" 
+                  style={{ top: "594mm" }}
+                >
+                  <span className="bg-red-50 text-red-500 text-[9px] font-bold px-2 py-0.5 rounded-bl border-l border-b border-red-100 uppercase tracking-wider shadow-sm">
+                    Page 2 / Page 3 Break
+                  </span>
+                </div>
+              </div>
+              
+              {/* Background Slanted Watermark */}
+              {stylingOptions.showWatermark && letterMeta.watermarkText && (
+                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden z-0">
+                  <div 
+                    className="font-sans font-black tracking-[0.15em] text-slate-400/8 text-[82px] uppercase whitespace-nowrap rotate-[-40deg] opacity-60"
+                    style={{ transform: "rotate(-40deg) scale(1.1)" }}
+                  >
+                    {letterMeta.watermarkText}
+                  </div>
                 </div>
               )}
-              
-              <h1 className="font-bold text-[16px] leading-tight tracking-tight uppercase">
-                {companyDetails.name}
-              </h1>
-              <p className="text-[9.5px] font-sans text-slate-600 font-semibold tracking-wide mt-0.5">
-                Company Registration No: {companyDetails.registrationNo}
-              </p>
-              <div className="text-[9.5px] font-sans text-slate-500 mt-1 leading-normal">
-                <p>{companyDetails.addressLine1}, {companyDetails.addressLine2}</p>
-                <p className="mt-0.5 font-medium">{companyDetails.phoneEmail}</p>
-              </div>
-            </div>
-            
-            {/* Elegant confidentiality tag */}
-            <div className="text-right flex flex-col justify-between h-full pt-1 select-none">
-              <span className="font-sans text-[9px] font-bold tracking-[0.25em] text-slate-300 uppercase">
-                Strictly Private
-              </span>
-            </div>
-          </div>
 
-          {/* Letter Meta Details */}
-          <div className="flex justify-between items-start mb-5 font-sans text-[11.5px] text-slate-700 z-10">
-            <div>
-              <p><span className="font-semibold">Ref:</span> {letterMeta.refNo || "N/A"}</p>
-            </div>
-            <div className="text-right">
-              <p><span className="font-semibold">Date:</span> {letterMeta.date || "N/A"}</p>
-            </div>
-          </div>
-
-          {/* Employee Info Block */}
-          <div className="mb-5 leading-normal text-left z-10">
-            <p className="font-bold uppercase text-[12.5px] tracking-tight">{employeeDetails.name}</p>
-            <p className="text-slate-500 font-semibold font-sans text-[11px]">IC / Passport No: {employeeDetails.icPassport}</p>
-            <div className="text-slate-700 mt-1">
-              <p>{employeeDetails.addressLine1}</p>
-              <p>{employeeDetails.addressLine2}</p>
-            </div>
-          </div>
-
-          {/* Salutation */}
-          <div className="mb-4 text-left z-10">
-            <p>Dear {employeeDetails.name ? employeeDetails.name.split(" ")[0] : "Candidate"},</p>
-          </div>
-
-          {/* Subject Block */}
-          <div className="mb-5 border-b border-black/80 pb-1.5 text-left z-10">
-            <h2 className="font-bold uppercase tracking-tight text-[13.5px] text-slate-900">
-              LETTER OF APPOINTMENT AS {jobTerms.title}
-            </h2>
-          </div>
-
-          {/* Core Content Body */}
-          <div className="space-y-4 text-justify leading-relaxed z-10">
-            <p>{clauses.intro}</p>
-
-            {/* Employment Terms Table */}
-            <table className="w-full border-collapse my-4 text-[12px] font-sans text-slate-800">
-              <tbody>
-                <tr className="border-b border-slate-100 align-top">
-                  <td className="w-1/3 py-2 pr-2 font-bold text-slate-500 text-[10.5px] uppercase tracking-wider">1. Designation & Dept</td>
-                  <td className="w-2/3 py-2 font-semibold text-black">
-                    <span className="font-bold text-[12.5px]">{jobTerms.title}</span> &nbsp;|&nbsp; {jobTerms.department}
-                  </td>
-                </tr>
-                <tr className="border-b border-slate-100 align-top">
-                  <td className="w-1/3 py-2 pr-2 font-bold text-slate-500 text-[10.5px] uppercase tracking-wider">2. Start Date</td>
-                  <td className="w-2/3 py-2 font-semibold text-black">{jobTerms.commencementDate}</td>
-                </tr>
-                <tr className="border-b border-slate-100 align-top">
-                  <td className="w-1/3 py-2 pr-2 font-bold text-slate-500 text-[10.5px] uppercase tracking-wider">
-                    3. {jobTerms.salaryLabel || "Monthly Basic"}
-                  </td>
-                  <td className="w-2/3 py-2 text-black">
-                    <span className="font-bold text-[13px]">{formatCurrency(jobTerms.basicSalary)}</span>
-                    {templateType === "fullTime" && jobTerms.probationPeriod && parseFloat(jobTerms.probationSalary) > 0 && (
-                      <span className="text-slate-500 text-[11px] block mt-0.5 font-medium">
-                        (Reduced basic during probation: {formatCurrency(jobTerms.probationSalary)}/month)
-                      </span>
-                    )}
-                    {templateType === "fullTime" && (
-                      <span className="text-slate-400 text-[10px] block mt-0.5 font-sans font-semibold uppercase tracking-wider">
-                        Subject to statutory EPF / SOCSO deductions
-                      </span>
-                    )}
-                  </td>
-                </tr>
-                
-                {templateType !== "internship" && templateType !== "contractor" && allowances.length > 0 && (
-                  <tr className="border-b border-slate-100 align-top">
-                    <td className="w-1/3 py-2 pr-2 font-bold text-slate-500 text-[10.5px] uppercase tracking-wider">4. Allowance Packages</td>
-                    <td className="w-2/3 py-2 text-black">
-                      <ul className="list-disc pl-4 space-y-0.5 font-semibold text-[12px]">
-                        {allowances.map((al, idx) => (
-                          al.name ? (
-                            <li key={idx}>
-                              {al.name}: <span className="font-bold">{formatCurrency(al.amount)}</span> per month
-                            </li>
-                          ) : null
-                        ))}
-                      </ul>
-                    </td>
-                  </tr>
-                )}
-                
-                <tr className="border-b border-slate-100 align-top">
-                  <td className="w-1/3 py-2 pr-2 font-bold text-slate-500 text-[10.5px] uppercase tracking-wider">
-                    5. {jobTerms.durationLabel || "Probation Period"}
-                  </td>
-                  <td className="w-2/3 py-2 font-semibold text-black">
-                    {templateType === "fullTime" || templateType === "partTime" ? `${jobTerms.probationPeriod} Months` : jobTerms.probationPeriod}
-                  </td>
-                </tr>
-                <tr className="border-b border-slate-100 align-top">
-                  <td className="w-1/3 py-2 pr-2 font-bold text-slate-500 text-[10.5px] uppercase tracking-wider">6. Service Notice Period</td>
-                  <td className="w-2/3 py-2 text-slate-800 text-[11px] leading-normal font-semibold">
-                    <p><span className="font-bold text-black text-[11px]">Under Trial/Probation:</span> {jobTerms.noticeProbation} written notice</p>
-                    <p className="mt-0.5"><span className="font-bold text-black text-[11px]">Upon Confirmation:</span> {jobTerms.noticeConfirmed} written notice</p>
-                  </td>
-                </tr>
-                <tr className="border-b border-slate-100 align-top">
-                  <td className="w-1/3 py-2 pr-2 font-bold text-slate-500 text-[10.5px] uppercase tracking-wider">7. Prescribed Hours</td>
-                  <td className="w-2/3 py-2 font-semibold text-black">{jobTerms.workingHours}</td>
-                </tr>
-              </tbody>
-            </table>
-
-            <p><span className="font-bold">8. Duties & Responsibilities:</span> {clauses.duties}</p>
-            <p><span className="font-bold">9. Professional Confidentiality:</span> {clauses.confidentiality}</p>
-            <p><span className="font-bold">10. Policy Compliance:</span> {clauses.compliance}</p>
-            <p>{clauses.closing}</p>
-          </div>
-
-          {/* Signatures & Acceptance Section */}
-          <div className="mt-auto pt-8 z-10 relative">
-            
-            {/* Signature Blocks Layout */}
-            <div className="grid grid-cols-2 gap-8 pt-8">
-              
-              {/* Employer Signature Block */}
-              <div className="text-left flex flex-col justify-between min-h-[125px] relative">
-                <div>
-                  <p className="font-medium">Yours sincerely,</p>
-                  <p className="font-bold uppercase text-[11px] mt-0.5 text-slate-800">For {companyDetails.name}</p>
-                </div>
-                
-                {/* Embedded drawn signatory signature */}
-                <div className="absolute bottom-10 left-4 h-16 w-32 pointer-events-none">
-                  {signatorySignature && (
+              {/* Letterhead Header Section */}
+              <div 
+                className="flex items-start justify-between pb-5 mb-6 z-10"
+                style={{ 
+                  borderBottomWidth: stylingOptions.showLetterheadBorder ? "2px" : "0px",
+                  borderColor: stylingOptions.accentColor 
+                }}
+              >
+                <div className="flex-1 text-left">
+                  {logo ? (
                     
-                    <img src={signatorySignature} alt="Employer Signature" className="h-full w-full object-contain" />
+                    <img src={logo} alt="Company Logo" className="h-14 max-w-[220px] object-contain object-left mb-3" />
+                  ) : (
+                    <div className="h-12 w-32 bg-slate-100 border border-slate-200 border-dashed rounded-lg flex items-center justify-center text-[10px] font-sans text-slate-400 mb-3 print:hidden select-none">
+                      Letterhead Logo Place
+                    </div>
                   )}
-                </div>
-
-                {/* Overlapping corporate stamp */}
-                {stamp && (
-                  <div 
-                    className="absolute bottom-4 left-20 w-20 h-20 pointer-events-none opacity-85"
-                    style={{ transform: "rotate(-8deg)" }}
-                  >
-                    
-                    <img src={stamp} alt="Corporate Stamp" className="h-full w-full object-contain" />
-                  </div>
-                )}
-
-                <div className="pt-12">
-                  <div className="border-b border-black w-48 mb-1"></div>
-                  <p className="font-bold text-[11.5px] leading-none">{signatory.name}</p>
-                  <p className="text-[9.5px] text-slate-500 font-bold uppercase font-sans tracking-tight mt-1">{signatory.title}</p>
-                </div>
-              </div>
-
-              {/* Candidate Acceptance Block */}
-              <div className="text-left flex flex-col justify-between min-h-[125px] bg-slate-50/35 p-3 rounded-xl border border-slate-100/70 relative print:bg-white print:p-0 print:border-none">
-                <div>
-                  <p className="font-bold text-[10.5px] uppercase text-slate-800 tracking-wide border-b border-slate-200/80 pb-1 mb-1.5 print:border-none">Acknowledgement & Acceptance</p>
-                  <p className="text-[9.5px] leading-relaxed text-slate-500 font-medium font-sans">
-                    I, the undersigned, hereby confirm that I have read, understood, and accept this appointment under the terms and conditions outlined in this letter.
+                  
+                  <h1 className="font-bold text-[16px] leading-tight tracking-tight uppercase">
+                    {companyDetails.name}
+                  </h1>
+                  <p className="text-[9.5px] font-sans text-slate-600 font-semibold tracking-wide mt-0.5">
+                    Company Registration No: {companyDetails.registrationNo}
                   </p>
+                  <div className="text-[9.5px] font-sans text-slate-500 mt-1 leading-normal">
+                    <p>{companyDetails.addressLine1}, {companyDetails.addressLine2}</p>
+                    <p className="mt-0.5 font-medium">{companyDetails.phoneEmail}</p>
+                  </div>
                 </div>
                 
-                {/* Embedded drawn employee signature */}
-                <div className="absolute bottom-10 left-10 h-16 w-32 pointer-events-none">
-                  {employeeSignature && (
-                    
-                    <img src={employeeSignature} alt="Employee Signature" className="h-full w-full object-contain" />
-                  )}
-                </div>
-
-                <div className="pt-8">
-                  <div className="flex gap-4 mb-2">
-                    <div className="flex-1">
-                      <div className="border-b border-black w-full mb-1"></div>
-                      <p className="text-[8px] font-sans font-bold text-slate-400 uppercase tracking-wider">Candidate Signature</p>
-                    </div>
-                    <div className="w-24">
-                      <div className="border-b border-black w-full mb-1"></div>
-                      <p className="text-[8px] font-sans font-bold text-slate-400 uppercase tracking-wider">Date</p>
-                    </div>
-                  </div>
+                {/* Elegant confidentiality tag */}
+                <div className="text-right flex flex-col justify-between h-full pt-1 select-none">
+                  <span className="font-sans text-[9px] font-bold tracking-[0.25em] text-slate-300 uppercase">
+                    Strictly Private
+                  </span>
                 </div>
               </div>
 
-            </div>
+              {/* Letter Meta Details */}
+              <div className="flex justify-between items-start mb-5 font-sans text-[11.5px] text-slate-700 z-10">
+                <div>
+                  <p><span className="font-semibold">Ref:</span> {letterMeta.refNo || "N/A"}</p>
+                </div>
+                <div className="text-right">
+                  <p><span className="font-semibold">Date:</span> {letterMeta.date || "N/A"}</p>
+                </div>
+              </div>
 
-          </div>
+              {/* Employee Info Block */}
+              <div className="mb-5 leading-normal text-left z-10">
+                <p className="font-bold uppercase text-[12.5px] tracking-tight">{employeeDetails.name}</p>
+                <p className="text-slate-500 font-semibold font-sans text-[11px]">IC / Passport No: {employeeDetails.icPassport}</p>
+                <div className="text-slate-700 mt-1">
+                  <p>{employeeDetails.addressLine1}</p>
+                  <p>{employeeDetails.addressLine2}</p>
+                </div>
+              </div>
+
+              {/* Salutation */}
+              <div className="mb-4 text-left z-10">
+                <p>Dear {employeeDetails.name ? employeeDetails.name.split(" ")[0] : "Candidate"},</p>
+              </div>
+
+              {/* Subject Block */}
+              <div className="mb-5 border-b border-black/80 pb-1.5 text-left z-10">
+                <h2 className="font-bold uppercase tracking-tight text-[13.5px] text-slate-900">
+                  LETTER OF APPOINTMENT AS {jobTerms.title}
+                </h2>
+              </div>
+
+              {/* Core Content Body */}
+              <div className="space-y-4 text-justify leading-relaxed z-10">
+                <p>{clauses.intro}</p>
+
+                {/* Employment Terms Table */}
+                <table className="w-full border-collapse my-4 text-[12px] font-sans text-slate-800">
+                  <tbody>
+                    <tr className="border-b border-slate-100 align-top">
+                      <td className="w-1/3 py-2 pr-2 font-bold text-slate-500 text-[10.5px] uppercase tracking-wider">1. Designation & Dept</td>
+                      <td className="w-2/3 py-2 font-semibold text-black">
+                        <span className="font-bold text-[12.5px]">{jobTerms.title}</span> &nbsp;|&nbsp; {jobTerms.department}
+                      </td>
+                    </tr>
+                    <tr className="border-b border-slate-100 align-top">
+                      <td className="w-1/3 py-2 pr-2 font-bold text-slate-500 text-[10.5px] uppercase tracking-wider">2. Start Date</td>
+                      <td className="w-2/3 py-2 font-semibold text-black">{jobTerms.commencementDate}</td>
+                    </tr>
+                    <tr className="border-b border-slate-100 align-top">
+                      <td className="w-1/3 py-2 pr-2 font-bold text-slate-500 text-[10.5px] uppercase tracking-wider">
+                        3. {jobTerms.salaryLabel || "Monthly Basic"}
+                      </td>
+                      <td className="w-2/3 py-2 text-black">
+                        <span className="font-bold text-[13px]">{formatCurrency(jobTerms.basicSalary)}</span>
+                        {templateType === "fullTime" && jobTerms.probationPeriod && parseFloat(jobTerms.probationSalary) > 0 && (
+                          <span className="text-slate-500 text-[11px] block mt-0.5 font-medium">
+                            (Reduced basic during probation: {formatCurrency(jobTerms.probationSalary)}/month)
+                          </span>
+                        )}
+                        {templateType === "fullTime" && (
+                          <span className="text-slate-400 text-[10px] block mt-0.5 font-sans font-semibold uppercase tracking-wider">
+                            Subject to statutory EPF / SOCSO deductions
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                    
+                    {templateType !== "internship" && templateType !== "contractor" && allowances.length > 0 && (
+                      <tr className="border-b border-slate-100 align-top">
+                        <td className="w-1/3 py-2 pr-2 font-bold text-slate-500 text-[10.5px] uppercase tracking-wider">4. Allowance Packages</td>
+                        <td className="w-2/3 py-2 text-black">
+                          <ul className="list-disc pl-4 space-y-0.5 font-semibold text-[12px]">
+                            {allowances.map((al, idx) => (
+                              al.name ? (
+                                <li key={idx}>
+                                  {al.name}: <span className="font-bold">{formatCurrency(al.amount)}</span> per month
+                                </li>
+                              ) : null
+                            ))}
+                          </ul>
+                        </td>
+                      </tr>
+                    )}
+                    
+                    <tr className="border-b border-slate-100 align-top">
+                      <td className="w-1/3 py-2 pr-2 font-bold text-slate-500 text-[10.5px] uppercase tracking-wider">
+                        5. {jobTerms.durationLabel || "Probation Period"}
+                      </td>
+                      <td className="w-2/3 py-2 font-semibold text-black">
+                        {templateType === "fullTime" || templateType === "partTime" ? `${jobTerms.probationPeriod} Months` : jobTerms.probationPeriod}
+                      </td>
+                    </tr>
+                    <tr className="border-b border-slate-100 align-top">
+                      <td className="w-1/3 py-2 pr-2 font-bold text-slate-500 text-[10.5px] uppercase tracking-wider">6. Service Notice Period</td>
+                      <td className="w-2/3 py-2 text-slate-800 text-[11px] leading-normal font-semibold">
+                        <p><span className="font-bold text-black text-[11px]">Under Trial/Probation:</span> {jobTerms.noticeProbation} written notice</p>
+                        <p className="mt-0.5"><span className="font-bold text-black text-[11px]">Upon Confirmation:</span> {jobTerms.noticeConfirmed} written notice</p>
+                      </td>
+                    </tr>
+                    <tr className="border-b border-slate-100 align-top">
+                      <td className="w-1/3 py-2 pr-2 font-bold text-slate-500 text-[10.5px] uppercase tracking-wider">7. Prescribed Hours</td>
+                      <td className="w-2/3 py-2 font-semibold text-black">{jobTerms.workingHours}</td>
+                    </tr>
+                  </tbody>
+                </table>
+
+                <p><span className="font-bold">8. Duties & Responsibilities:</span> {clauses.duties}</p>
+                <p><span className="font-bold">9. Professional Confidentiality:</span> {clauses.confidentiality}</p>
+                <p><span className="font-bold">10. Policy Compliance:</span> {clauses.compliance}</p>
+                <p>{clauses.closing}</p>
+              </div>
+
+              {/* Signatures & Acceptance Section */}
+              <div className="mt-auto pt-8 z-10 relative">
+                
+                {/* Signature Blocks Layout */}
+                <div className="grid grid-cols-2 gap-8 pt-8">
+                  
+                  {/* Employer Signature Block */}
+                  <div className="text-left flex flex-col justify-between min-h-[125px] relative">
+                    <div>
+                      <p className="font-medium">Yours sincerely,</p>
+                      <p className="font-bold uppercase text-[11px] mt-0.5 text-slate-800">For {companyDetails.name}</p>
+                    </div>
+                    
+                    {/* Embedded drawn signatory signature */}
+                    <div className="absolute bottom-10 left-4 h-16 w-32 pointer-events-none">
+                      {signatorySignature && (
+                        
+                        <img src={signatorySignature} alt="Employer Signature" className="h-full w-full object-contain" />
+                      )}
+                    </div>
+
+                    {/* Overlapping corporate stamp */}
+                    {stamp && (
+                      <div 
+                        className="absolute bottom-4 left-20 w-20 h-20 pointer-events-none opacity-85"
+                        style={{ transform: "rotate(-8deg)" }}
+                      >
+                        
+                        <img src={stamp} alt="Corporate Stamp" className="h-full w-full object-contain" />
+                      </div>
+                    )}
+
+                    <div className="pt-12">
+                      <div className="border-b border-black w-48 mb-1"></div>
+                      <p className="font-bold text-[11.5px] leading-none">{signatory.name}</p>
+                      <p className="text-[9.5px] text-slate-500 font-bold uppercase font-sans tracking-tight mt-1">{signatory.title}</p>
+                    </div>
+                  </div>
+
+                  {/* Candidate Acceptance Block */}
+                  <div className="text-left flex flex-col justify-between min-h-[125px] bg-slate-50/35 p-3 rounded-xl border border-slate-100/70 relative print:bg-white print:p-0 print:border-none">
+                    <div>
+                      <p className="font-bold text-[10.5px] uppercase text-slate-800 tracking-wide border-b border-slate-200/80 pb-1 mb-1.5 print:border-none">Acknowledgement & Acceptance</p>
+                      <p className="text-[9.5px] leading-relaxed text-slate-500 font-medium font-sans">
+                        I, the undersigned, hereby confirm that I have read, understood, and accept this appointment under the terms and conditions outlined in this letter.
+                      </p>
+                    </div>
+                    
+                    {/* Embedded drawn employee signature */}
+                    <div className="absolute bottom-10 left-10 h-16 w-32 pointer-events-none">
+                      {employeeSignature && (
+                        
+                        <img src={employeeSignature} alt="Employee Signature" className="h-full w-full object-contain" />
+                      )}
+                    </div>
+
+                    <div className="pt-8">
+                      <div className="flex gap-4 mb-2">
+                        <div className="flex-1">
+                          <div className="border-b border-black w-full mb-1"></div>
+                          <p className="text-[8px] font-sans font-bold text-slate-400 uppercase tracking-wider">Candidate Signature</p>
+                        </div>
+                        <div className="w-24">
+                          <div className="border-b border-black w-full mb-1"></div>
+                          <p className="text-[8px] font-sans font-bold text-slate-400 uppercase tracking-wider">Date</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+
+              </div>
+            </>
+          )}
           
         </div>
       </div>
