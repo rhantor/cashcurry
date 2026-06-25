@@ -65,7 +65,7 @@ export default function useBranchSettingsForm() {
       // editable basic fields
       phone: settings.basic?.phone ?? branch.phone ?? "",
       whatsapp: settings.basic?.whatsapp ?? branch.whatsapp ?? "",
-      email: (branch.email || settings.basic?.email) ?? branch.email ?? "",
+      email: settings.basic?.email ?? branch.email ?? "",
       companyName: settings.basic?.companyName ?? branch.companyName ?? "",
       companyRegistration: settings.basic?.companyRegistration ?? branch.companyRegistration ?? "",
       address: {
