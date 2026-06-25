@@ -2,7 +2,6 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { jsPDF } from "jspdf";
-import { toPng } from "html-to-image";
 import Cookies from "js-cookie";
 import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
 import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
@@ -490,58 +489,372 @@ export default function AppointmentLetterGenerator() {
     setSignatureModal({ ...signatureModal, isOpen: false });
   };
 
-  // --- PDF Generation Logic ---
+  // --- PDF Generation Logic (Native Vector jsPDF) ---
   const handlePrint = async () => {
-    if (!letterRef.current) return;
     setIsGenerating(true);
 
     try {
-      // Render the A4 container to a PNG, filtering out the visual page break lines
-      const dataUrl = await toPng(letterRef.current, { 
-        quality: 1.0, 
-        pixelRatio: 2,
-        backgroundColor: '#ffffff',
-        filter: (node) => {
-          if (node.classList && node.classList.contains('pdf-exclude')) {
-            return false;
-          }
-          return true;
-        }
-      });
-      
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
         format: 'a4',
       });
-      
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      
-      const imgWidth = pageWidth;
-      const imgHeight = (letterRef.current.offsetHeight * imgWidth) / letterRef.current.offsetWidth;
-      
-      let heightLeft = imgHeight;
-      let position = 0;
-      let pageNum = 1;
 
-      // Add the first A4 page
-      pdf.addImage(dataUrl, 'PNG', 0, position, imgWidth, imgHeight);
-      heightLeft -= pageHeight;
+      const fontFamilyMap = {
+        serif: "times",
+        sans: "helvetica",
+        mono: "courier"
+      };
+      const fontFamily = fontFamilyMap[stylingOptions.fontFamily] || "times";
+      const fontSize = parseInt(stylingOptions.fontSize) || 12;
+      const lineHeightRatio = parseFloat(stylingOptions.lineHeight) || 1.6;
+      const lineHeight = fontSize * lineHeightRatio * 0.3528;
+      const margin = parseInt(stylingOptions.marginSize) || 20;
+
+      let y = margin;
+
+      const drawWatermark = () => {
+        if (stylingOptions.showWatermark && letterMeta.watermarkText) {
+          pdf.setFont('helvetica', 'bold');
+          pdf.setFontSize(75);
+          pdf.setTextColor(245, 245, 245); // Very light grey, elegant
+          pdf.text(letterMeta.watermarkText.toUpperCase(), 105, 148.5, {
+            align: 'center',
+            angle: 315
+          });
+        }
+      };
+
+      const checkPageBreak = (heightNeeded) => {
+        if (y + heightNeeded > 297 - margin) {
+          pdf.addPage();
+          drawWatermark();
+          y = margin;
+        }
+      };
+
+      // Draw watermark on the first page
+      drawWatermark();
+
+      // 1. Letterhead Section
+      if (logo) {
+        try {
+          // Place logo at top-left
+          pdf.addImage(logo, 'PNG', margin, y, 45, 15, undefined, 'FAST');
+          y += 18;
+        } catch (e) {
+          console.error("Error adding logo to PDF:", e);
+          y += 5;
+        }
+      }
+
+      pdf.setFont(fontFamily, 'bold');
+      pdf.setFontSize(14);
+      pdf.setTextColor(30, 41, 59); // slate-800
+      pdf.text(companyDetails.name, margin, y);
+      y += 5.5;
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9);
+      pdf.setTextColor(71, 85, 105); // slate-600
+      pdf.text(`Company Registration No: ${companyDetails.registrationNo}`, margin, y);
+      y += 4.5;
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8.5);
+      pdf.setTextColor(100, 116, 139); // slate-500
+      pdf.text(`${companyDetails.addressLine1}, ${companyDetails.addressLine2}`, margin, y);
+      y += 4.5;
+
+      pdf.text(companyDetails.phoneEmail, margin, y);
+      y += 6;
+
+      // Letterhead divider line
+      if (stylingOptions.showLetterheadBorder && stylingOptions.accentColor !== 'transparent') {
+        const hex = stylingOptions.accentColor || '#059669';
+        const r = parseInt(hex.slice(1, 3), 16) || 5;
+        const g = parseInt(hex.slice(3, 5), 16) || 150;
+        const b = parseInt(hex.slice(5, 7), 16) || 105;
+        pdf.setDrawColor(r, g, b);
+        pdf.setLineWidth(0.8);
+        pdf.line(margin, y, 210 - margin, y);
+        y += 8;
+      } else {
+        y += 4;
+      }
+
+      // 2. Letter Meta Details (Ref & Date)
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(10);
+      pdf.setTextColor(71, 85, 105);
+      pdf.text(`Ref: ${letterMeta.refNo || "N/A"}`, margin, y);
+      pdf.text(`Date: ${letterMeta.date || "N/A"}`, 210 - margin, y, { align: 'right' });
+      y += 8;
+
+      // 3. Employee Info Block
+      pdf.setFont(fontFamily, 'bold');
+      pdf.setFontSize(11);
+      pdf.setTextColor(15, 23, 42); // slate-900
+      pdf.text(employeeDetails.name.toUpperCase(), margin, y);
+      y += 5;
+
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9.5);
+      pdf.setTextColor(71, 85, 105);
+      pdf.text(`IC / Passport No: ${employeeDetails.icPassport}`, margin, y);
+      y += 4.5;
+
+      pdf.setFont(fontFamily, 'normal');
+      pdf.setFontSize(10);
+      pdf.setTextColor(51, 65, 85); // slate-700
+      pdf.text(employeeDetails.addressLine1, margin, y);
+      y += 4.5;
+      pdf.text(employeeDetails.addressLine2, margin, y);
+      y += 9;
+
+      // 4. Salutation
+      pdf.setFont(fontFamily, 'normal');
+      pdf.setFontSize(10.5);
+      pdf.setTextColor(0, 0, 0);
+      const salName = employeeDetails.name ? employeeDetails.name.split(" ")[0] : "Candidate";
+      pdf.text(`Dear ${salName},`, margin, y);
+      y += 8;
+
+      // 5. Subject Line
+      pdf.setFont(fontFamily, 'bold');
+      pdf.setFontSize(11);
+      pdf.setTextColor(15, 23, 42);
+      const subjectText = `LETTER OF APPOINTMENT AS ${jobTerms.title.toUpperCase()}`;
+      pdf.text(subjectText, margin, y);
+      const textWidth = pdf.getTextWidth(subjectText);
+      pdf.setDrawColor(0, 0, 0);
+      pdf.setLineWidth(0.4);
+      pdf.line(margin, y + 1.5, margin + textWidth, y + 1.5);
+      y += 9;
+
+      // 6. Clauses and Job Terms Table
+      const drawParagraph = (text, isBold = false) => {
+        pdf.setFont(fontFamily, isBold ? 'bold' : 'normal');
+        pdf.setFontSize(fontSize);
+        pdf.setTextColor(0, 0, 0);
+        
+        const lines = pdf.splitTextToSize(text, 210 - 2 * margin);
+        for (const line of lines) {
+          checkPageBreak(lineHeight);
+          pdf.text(line, margin, y);
+          y += lineHeight;
+        }
+        y += 4; // Space between paragraphs
+      };
+
+      const drawTableRow = (label, valueContent) => {
+        const labelWidth = 50; 
+        const valWidth = (210 - 2 * margin) - 55; 
+        
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(8.5);
+        const labelLines = pdf.splitTextToSize(label.toUpperCase(), labelWidth);
+        
+        pdf.setFont(fontFamily, 'normal');
+        pdf.setFontSize(10);
+        
+        let valLines = [];
+        if (Array.isArray(valueContent)) {
+          valLines = valueContent;
+        } else {
+          valLines = pdf.splitTextToSize(valueContent, valWidth);
+        }
+        
+        const labelHeight = labelLines.length * 4.5;
+        const valHeight = valLines.length * 4.5;
+        const rowHeight = Math.max(labelHeight, valHeight) + 4; 
+        
+        checkPageBreak(rowHeight);
+        
+        pdf.setDrawColor(241, 245, 249); // slate-100
+        pdf.setLineWidth(0.3);
+        pdf.line(margin, y + rowHeight, 210 - margin, y + rowHeight);
+        
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(8.5);
+        pdf.setTextColor(100, 116, 139); // slate-500
+        let currentY = y + 3;
+        for (const line of labelLines) {
+          pdf.text(line, margin, currentY);
+          currentY += 4.5;
+        }
+        
+        pdf.setFont(fontFamily, 'semibold');
+        pdf.setFontSize(9.5);
+        pdf.setTextColor(15, 23, 42); // slate-900
+        currentY = y + 3;
+        for (const line of valLines) {
+          pdf.text(line, margin + 52, currentY);
+          currentY += 4.5;
+        }
+        
+        y += rowHeight;
+      };
+
+      const drawClause = (number, title, text) => {
+        checkPageBreak(lineHeight + 6);
+        pdf.setFont(fontFamily, 'bold');
+        pdf.setFontSize(fontSize);
+        pdf.setTextColor(15, 23, 42);
+        pdf.text(`${number}. ${title}`, margin, y);
+        y += 4.5;
+        
+        pdf.setFont(fontFamily, 'normal');
+        pdf.setFontSize(fontSize - 0.5);
+        pdf.setTextColor(51, 65, 85); // slate-700
+        
+        const lines = pdf.splitTextToSize(text, 210 - 2 * margin);
+        for (const line of lines) {
+          checkPageBreak(lineHeight);
+          pdf.text(line, margin, y);
+          y += lineHeight;
+        }
+        y += 4.5;
+      };
+
+      // Introduction
+      drawParagraph(clauses.intro);
+
+      // Terms Table
+      const salaryStr = formatCurrency(jobTerms.basicSalary);
+      const salaryLines = [salaryStr];
+      if (templateType === "fullTime" && jobTerms.probationPeriod && parseFloat(jobTerms.probationSalary) > 0) {
+        salaryLines.push(`(Reduced basic during probation: ${formatCurrency(jobTerms.probationSalary)}/month)`);
+      }
+      if (templateType === "fullTime") {
+        salaryLines.push(`Subject to statutory EPF / SOCSO deductions`);
+      }
+
+      const allowanceLines = [];
+      allowances.forEach(al => {
+        if (al.name) {
+          allowanceLines.push(`• ${al.name}: ${formatCurrency(al.amount)} per month`);
+        }
+      });
+
+      const probVal = (templateType === "fullTime" || templateType === "partTime") ? `${jobTerms.probationPeriod} Months` : jobTerms.probationPeriod;
+
+      const noticeLines = [
+        `Under Trial/Probation: ${jobTerms.noticeProbation} written notice`,
+        `Upon Confirmation: ${jobTerms.noticeConfirmed} written notice`
+      ];
+
+      // Draw table rows
+      drawTableRow("1. Designation & Dept", `${jobTerms.title}  |  ${jobTerms.department}`);
+      drawTableRow("2. Start Date", jobTerms.commencementDate);
+      drawTableRow(`3. ${jobTerms.salaryLabel || "Monthly Basic"}`, salaryLines);
+      if (templateType !== "internship" && templateType !== "contractor" && allowanceLines.length > 0) {
+        drawTableRow("4. Allowance Packages", allowanceLines);
+      }
+      drawTableRow(`5. ${jobTerms.durationLabel || "Probation Period"}`, probVal);
+      drawTableRow("6. Service Notice Period", noticeLines);
+      drawTableRow("7. Prescribed Hours", jobTerms.workingHours);
+      y += 6; // Space after table
+
+      // Clauses
+      drawClause("8", "Duties & Responsibilities", clauses.duties);
+      drawClause("9", "Professional Confidentiality", clauses.confidentiality);
+      drawClause("10", "Policy Compliance", clauses.compliance);
+
+      // Closing paragraph
+      drawParagraph(clauses.closing);
+
+      // 7. Signatures & Acceptance Block
+      checkPageBreak(65); // Make sure the entire signatures section is kept together on the same page
       
-      // If the content overflows, add subsequent standard A4 pages
-      while (heightLeft > 0) {
-        position = - (pageNum * pageHeight);
-        pdf.addPage();
-        pdf.addImage(dataUrl, 'PNG', 0, position, imgWidth, imgHeight);
-        heightLeft -= pageHeight;
-        pageNum++;
+      const sigYStart = y;
+
+      // Employer signature (left)
+      pdf.setFont(fontFamily, 'normal');
+      pdf.setFontSize(10);
+      pdf.setTextColor(0, 0, 0);
+      pdf.text("Yours sincerely,", margin, y);
+      y += 4.5;
+      
+      pdf.setFont(fontFamily, 'bold');
+      pdf.setFontSize(9.5);
+      pdf.setTextColor(51, 65, 85);
+      pdf.text(`For ${companyDetails.name}`, margin, y);
+      
+      const signatureY = y + 4;
+      if (signatorySignature) {
+        try {
+          pdf.addImage(signatorySignature, 'PNG', margin + 2, signatureY, 32, 16, undefined, 'FAST');
+        } catch (e) {
+          console.error("Error adding signatory signature to PDF:", e);
+        }
+      }
+      if (stamp) {
+        try {
+          pdf.addImage(stamp, 'PNG', margin + 20, signatureY - 3, 18, 18, undefined, 'FAST');
+        } catch (e) {
+          console.error("Error adding stamp to PDF:", e);
+        }
       }
       
+      const detailsY = signatureY + 19;
+      pdf.setDrawColor(0, 0, 0);
+      pdf.setLineWidth(0.3);
+      pdf.line(margin, detailsY, margin + 45, detailsY); // signature line
+      
+      pdf.setFont(fontFamily, 'bold');
+      pdf.setFontSize(10);
+      pdf.setTextColor(15, 23, 42);
+      pdf.text(signatory.name, margin, detailsY + 4);
+      
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(8);
+      pdf.setTextColor(100, 116, 139);
+      pdf.text(signatory.title.toUpperCase(), margin, detailsY + 7.5);
+
+      // Candidate signature (right)
+      y = sigYStart;
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(9.5);
+      pdf.setTextColor(15, 23, 42);
+      pdf.text("ACKNOWLEDGEMENT & ACCEPTANCE", 115, y);
+      
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(8.5);
+      pdf.setTextColor(71, 85, 105);
+      const acceptText = "I hereby confirm that I have read, understood, and accept this appointment under the terms and conditions outlined in this letter.";
+      const acceptLines = pdf.splitTextToSize(acceptText, 210 - margin - 115);
+      let acceptY = y + 4.5;
+      for (const line of acceptLines) {
+        pdf.text(line, 115, acceptY);
+        acceptY += 4;
+      }
+      
+      const empSigY = acceptY + 3;
+      if (employeeSignature) {
+        try {
+          pdf.addImage(employeeSignature, 'PNG', 125, empSigY, 32, 16, undefined, 'FAST');
+        } catch (e) {
+          console.error("Error adding employee signature to PDF:", e);
+        }
+      }
+      
+      const empLineY = empSigY + 19;
+      pdf.setDrawColor(0, 0, 0);
+      pdf.setLineWidth(0.3);
+      pdf.line(115, empLineY, 115 + 45, empLineY); // signature line
+      pdf.line(170, empLineY, 210 - margin, empLineY); // date line
+      
+      pdf.setFont('helvetica', 'bold');
+      pdf.setFontSize(7.5);
+      pdf.setTextColor(148, 163, 184); // slate-400
+      pdf.text("CANDIDATE SIGNATURE", 115, empLineY + 4);
+      pdf.text("DATE", 170, empLineY + 4);
+
       const sanitizedName = employeeDetails.name.toLowerCase().replace(/[^a-z0-9]/g, "_");
       pdf.save(`appointment_letter_${sanitizedName}.pdf`);
     } catch (err) {
-      console.error('Failed to generate PDF', err);
+      console.error('Failed to generate PDF natively, falling back to window.print', err);
       window.print();
     } finally {
       setIsGenerating(false);

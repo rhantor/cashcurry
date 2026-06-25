@@ -2,8 +2,8 @@
 
 import React, { useState } from 'react'
 import PropTypes from 'prop-types'
-import { FaUpload } from 'react-icons/fa'
 import { NumericFormat } from 'react-number-format'
+import UploadInvoice from '@/app/components/purchases/UploadInvoice'
 import {
   CATEGORIES,
   BACK_OFFICE_METHODS,
@@ -25,17 +25,14 @@ export default function CostEntryForm ({ form, onSave }) {
     description,
     setDescription,
     file,
-    filePreview,
     uploadProgress,
     paidFromOffice,
     setPaidFromOffice,
     paidMethod,
     setPaidMethod,
     isSaving,
-    handleFileChange,
     handleDescriptionKeyDown,
-    setFile,
-    setFilePreview
+    setFile
   } = form
 
   const [showImageCapture, setShowImageCapture] = useState(false)
@@ -50,14 +47,6 @@ export default function CostEntryForm ({ form, onSave }) {
       // Single file (PDF or image)
       const selectedFile = files[0]
       setFile(selectedFile)
-
-      // Set preview for images
-      if (selectedFile.type.startsWith('image/')) {
-        const url = URL.createObjectURL(selectedFile)
-        setFilePreview(url)
-      } else {
-        setFilePreview(null)
-      }
     } else if (files.length > 1) {
       // Multiple images - user should convert to PDF first
       alert('⚠️ Multiple images detected. Please convert to PDF first.')
@@ -230,66 +219,30 @@ export default function CostEntryForm ({ form, onSave }) {
           </div>
         </div>
 
-        {/* File Upload - Enhanced with ImageCaptureEditor */}
+        {/* File Upload - Enhanced with Drag & Drop and ImageCaptureEditor */}
         <div className='bg-white rounded-lg shadow p-4 mb-4'>
-          <label className='block text-sm font-medium text-gray-600 mb-3'>
-            Upload Invoice (PDF or Image)
-          </label>
+          <UploadInvoice
+            file={file}
+            onChange={setFile}
+            progress={uploadProgress}
+            allowCamera={false}
+          />
 
-          <div className='space-y-3'>
-            {/* Traditional upload */}
-            <div className='flex items-center gap-4'>
-              <label className='cursor-pointer flex items-center gap-2 px-4 py-2 bg-sage-100 hover:bg-sage-200 rounded-lg text-sage-500 font-medium transition-all duration-300 hover:text-white'>
-                <FaUpload />
-                <span>Select File</span>
-                <input
-                  type='file'
-                  accept='.pdf,image/*'
-                  onChange={handleFileChange}
-                  className='hidden'
-                />
-              </label>
-
-              {filePreview && (
-                <img
-                  src={filePreview}
-                  alt='Preview'
-                  className='w-20 h-20 object-cover rounded-lg border'
-                />
-              )}
-            </div>
-
-            {/* OR separator */}
-            <div className='flex items-center gap-3'>
-              <div className='flex-1 border-t border-gray-300'></div>
-              <span className='text-xs text-gray-500'>OR</span>
-              <div className='flex-1 border-t border-gray-300'></div>
-            </div>
-
-            {/* Camera + Multi-image + PDF conversion */}
-            <button
-              type='button'
-              onClick={() => setShowImageCapture(true)}
-              className='w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition'
-            >
-              📷 Capture & Edit Images / Convert to PDF
-            </button>
-
-            {uploadProgress > 0 && uploadProgress < 100 && (
-              <div className='mt-2 w-full bg-gray-200 rounded-full h-2'>
-                <div
-                  className='bg-mint-500 h-2 rounded-full'
-                  style={{ width: `${uploadProgress}%` }}
-                />
-              </div>
-            )}
-
-            {file && !filePreview && (
-              <p className='text-xs text-gray-500 mt-1'>
-                Selected: {file.name} ({(file.size / 1024).toFixed(1)} KB)
-              </p>
-            )}
+          {/* OR separator */}
+          <div className='flex items-center gap-3 my-4'>
+            <div className='flex-1 border-t border-gray-200'></div>
+            <span className='text-xs text-gray-400 font-semibold'>OR</span>
+            <div className='flex-1 border-t border-gray-200'></div>
           </div>
+
+          {/* Camera + Multi-image + PDF conversion */}
+          <button
+            type='button'
+            onClick={() => setShowImageCapture(true)}
+            className='w-full px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold text-sm shadow-sm hover:shadow transition duration-200 flex items-center justify-center gap-2 cursor-pointer'
+          >
+            📷 Capture & Edit Images / Convert to PDF
+          </button>
         </div>
 
         {/* Save Button */}

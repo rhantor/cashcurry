@@ -142,9 +142,16 @@ export default function UploadInvoice({
     return () => window.removeEventListener("paste", onPaste);
   }, [handleFileInternal]);
 
-  // Clear preview when parent resets file to null (e.g. after save)
+  // Sync preview when parent file changes (both for resets and external updates)
   useEffect(() => {
-    if (!file) {
+    if (file) {
+      if (file.type?.startsWith("image/")) {
+        const url = URL.createObjectURL(file);
+        setPreviewSafely(url);
+      } else {
+        setPreviewSafely(null);
+      }
+    } else {
       setPreviewSafely(null);
       setLocalError("");
     }
