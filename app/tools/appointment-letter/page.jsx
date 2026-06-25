@@ -3,6 +3,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import { jsPDF } from "jspdf";
 import { toPng } from "html-to-image";
+import Cookies from "js-cookie";
+import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
+import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
 import { 
   FileText, 
   Upload, 
@@ -125,6 +128,40 @@ export default function AppointmentLetterGenerator() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [activeTab, setActiveTab] = useState("style"); // style, parties, terms, signatures, clauses
   
+  // Active Branch / User Session States
+  const [companyId, setCompanyId] = useState(null);
+  const [branchId, setBranchId] = useState(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("user");
+        if (raw) {
+          const u = JSON.parse(raw);
+          setCompanyId(u.companyId);
+          
+          // Get active branch from cookies or fallback to user's default branchId
+          const cookieKey = u.companyId ? `activeBranch_${u.companyId}` : "activeBranch";
+          const activeBranchId = Cookies.get(cookieKey) || u.branchId;
+          setBranchId(activeBranchId);
+        }
+      } catch (e) {
+        console.error("Failed to read user session", e);
+      }
+    }
+  }, []);
+
+  // RTK Query hooks for database settings & branch info
+  const skip = !companyId || !branchId;
+  const { data: dbSettings } = useGetBranchSettingsQuery(
+    { companyId, branchId },
+    { skip }
+  );
+  const { data: dbBranch } = useGetSingleBranchQuery(
+    { companyId, branchId },
+    { skip }
+  );
+
   // Signature Drawing Modal State
   const [signatureModal, setSignatureModal] = useState({
     isOpen: false,
@@ -151,6 +188,44 @@ export default function AppointmentLetterGenerator() {
     addressLine2: "Jalan Tun Sambanthan, 50470 Kuala Lumpur",
     phoneEmail: "Tel: +603-2276 8888 | Email: hr@cashcurry.com",
   });
+
+  // Auto-populate company details from database once loaded
+  useEffect(() => {
+    if (!dbSettings) return;
+    
+    const settingsBasic = dbSettings.basic || {};
+    const branchBasic = dbBranch || {};
+
+    setCompanyDetails(prev => {
+      let addressLine1 = prev.addressLine1;
+      let addressLine2 = prev.addressLine2;
+      
+      const addr = branchBasic.address || settingsBasic.address || {};
+      if (addr.line1) {
+        addressLine1 = addr.line1;
+        const cityStatePostcode = [addr.postcode, addr.city, addr.state].filter(Boolean).join(", ");
+        addressLine2 = cityStatePostcode || addr.city || "";
+      }
+
+      let phoneEmail = prev.phoneEmail;
+      const phone = settingsBasic.phone || branchBasic.phone || "";
+      const email = settingsBasic.email || branchBasic.email || "";
+      if (phone || email) {
+        const parts = [];
+        if (phone) parts.push(`Tel: ${phone}`);
+        if (email) parts.push(`Email: ${email}`);
+        phoneEmail = parts.join(" | ");
+      }
+
+      return {
+        name: settingsBasic.companyName || prev.name,
+        registrationNo: settingsBasic.companyRegistration || prev.registrationNo,
+        addressLine1,
+        addressLine2,
+        phoneEmail
+      };
+    });
+  }, [dbSettings, dbBranch]);
 
   const [letterMeta, setLetterMeta] = useState({
     refNo: "CC/HR/APP/2026/089",
@@ -421,10 +496,17 @@ export default function AppointmentLetterGenerator() {
     setIsGenerating(true);
 
     try {
+      // Render the A4 container to a PNG, filtering out the visual page break lines
       const dataUrl = await toPng(letterRef.current, { 
         quality: 1.0, 
         pixelRatio: 2,
-        backgroundColor: '#ffffff'
+        backgroundColor: '#ffffff',
+        filter: (node) => {
+          if (node.classList && node.classList.contains('pdf-exclude')) {
+            return false;
+          }
+          return true;
+        }
       });
       
       const pdf = new jsPDF({
@@ -433,10 +515,28 @@ export default function AppointmentLetterGenerator() {
         format: 'a4',
       });
       
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (letterRef.current.offsetHeight * pdfWidth) / letterRef.current.offsetWidth;
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
       
-      pdf.addImage(dataUrl, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      const imgWidth = pageWidth;
+      const imgHeight = (letterRef.current.offsetHeight * imgWidth) / letterRef.current.offsetWidth;
+      
+      let heightLeft = imgHeight;
+      let position = 0;
+      let pageNum = 1;
+
+      // Add the first A4 page
+      pdf.addImage(dataUrl, 'PNG', 0, position, imgWidth, imgHeight);
+      heightLeft -= pageHeight;
+      
+      // If the content overflows, add subsequent standard A4 pages
+      while (heightLeft > 0) {
+        position = - (pageNum * pageHeight);
+        pdf.addPage();
+        pdf.addImage(dataUrl, 'PNG', 0, position, imgWidth, imgHeight);
+        heightLeft -= pageHeight;
+        pageNum++;
+      }
       
       const sanitizedName = employeeDetails.name.toLowerCase().replace(/[^a-z0-9]/g, "_");
       pdf.save(`appointment_letter_${sanitizedName}.pdf`);
@@ -1180,6 +1280,28 @@ export default function AppointmentLetterGenerator() {
             lineHeight: stylingOptions.lineHeight
           }}
         >
+          {/* Visual Page Break Guidelines in Editor (Hidden in Print and PDF) */}
+          <div className="absolute inset-0 pointer-events-none z-30 print:hidden select-none pdf-exclude">
+            {/* Page 1 Break at 297mm */}
+            <div 
+              className="absolute left-0 right-0 border-t border-dashed border-red-300 flex justify-end" 
+              style={{ top: "297mm" }}
+            >
+              <span className="bg-red-50 text-red-500 text-[9px] font-bold px-2 py-0.5 rounded-bl border-l border-b border-red-100 uppercase tracking-wider shadow-sm">
+                Page 1 / Page 2 Break
+              </span>
+            </div>
+            
+            {/* Page 2 Break at 594mm */}
+            <div 
+              className="absolute left-0 right-0 border-t border-dashed border-red-300 flex justify-end" 
+              style={{ top: "594mm" }}
+            >
+              <span className="bg-red-50 text-red-500 text-[9px] font-bold px-2 py-0.5 rounded-bl border-l border-b border-red-100 uppercase tracking-wider shadow-sm">
+                Page 2 / Page 3 Break
+              </span>
+            </div>
+          </div>
           
           {/* Background Slanted Watermark */}
           {stylingOptions.showWatermark && letterMeta.watermarkText && (

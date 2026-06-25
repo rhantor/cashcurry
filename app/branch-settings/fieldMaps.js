@@ -8,4 +8,6 @@ export const BASIC_SETTINGS_FIELDS = [
   "email",
   "address",
   "openHours",
+  "companyName",
+  "companyRegistration",
 ];

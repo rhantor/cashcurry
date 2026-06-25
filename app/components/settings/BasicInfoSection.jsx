@@ -14,101 +14,129 @@ export default function BasicInfoSection({ role, value, onChange }) {
   return (
     <SettingsSection role={role} sectionKey="basic">
       {(can) => (
-        <SectionCard
-          title="Basic Branch Info"
-          subtitle="Name, contact and operating details"
-        >
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <FieldRow label="Branch Name">
-              <TextField
-                value={v.name}
-                onChange={(name) => patch({ name })}
-                disabled={!can("name")}
-                placeholder="e.g., Lazeez KLCC"
-              />
-            </FieldRow>
-
-            <FieldRow label="Branch Code">
-              <TextField
-                value={v.code}
-                onChange={(code) => patch({ code })}
-                disabled={!can("code")}
-                placeholder="e.g., KLCC-01"
-              />
-            </FieldRow>
-
-            <FieldRow label="Phone">
-              <TextField
-                value={v.phone}
-                onChange={(phone) => patch({ phone })}
-                disabled={!can("phone")}
-                placeholder="+60 12-345 6789"
-                type="tel"
-              />
-            </FieldRow>
-
-            <FieldRow label="WhatsApp">
-              <TextField
-                value={v.whatsapp}
-                onChange={(whatsapp) => patch({ whatsapp })}
-                disabled={!can("whatsapp")}
-                placeholder="+60 12-345 6789"
-                type="tel"
-              />
-            </FieldRow>
-
-            <div className="md:col-span-2">
-              <FieldRow label="Email">
+        <>
+          <SectionCard
+            title="Basic Branch Info"
+            subtitle="Name, contact and operating details"
+          >
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              <FieldRow label="Branch Name">
                 <TextField
-                  value={v.email}
-                  onChange={(email) => patch({ email })}
-                  disabled={!can("email")}
-                  placeholder="branch@company.com"
-                  type="email"
+                  value={v.name}
+                  onChange={(name) => patch({ name })}
+                  disabled={!can("name")}
+                  placeholder="e.g., Lazeez KLCC"
                 />
               </FieldRow>
-            </div>
 
-            <div className="md:col-span-2">
-              <FieldRow label="Address line 1">
+              <FieldRow label="Branch Code">
                 <TextField
-                  value={addr.line1}
-                  onChange={(line1) => patchAddr({ line1 })}
+                  value={v.code}
+                  onChange={(code) => patch({ code })}
+                  disabled={!can("code")}
+                  placeholder="e.g., KLCC-01"
+                />
+              </FieldRow>
+
+              <FieldRow label="Phone">
+                <TextField
+                  value={v.phone}
+                  onChange={(phone) => patch({ phone })}
+                  disabled={!can("phone")}
+                  placeholder="+60 12-345 6789"
+                  type="tel"
+                />
+              </FieldRow>
+
+              <FieldRow label="WhatsApp">
+                <TextField
+                  value={v.whatsapp}
+                  onChange={(whatsapp) => patch({ whatsapp })}
+                  disabled={!can("whatsapp")}
+                  placeholder="+60 12-345 6789"
+                  type="tel"
+                />
+              </FieldRow>
+
+              <div className="md:col-span-2">
+                <FieldRow label="Email">
+                  <TextField
+                    value={v.email}
+                    onChange={(email) => patch({ email })}
+                    disabled={!can("email")}
+                    placeholder="branch@company.com"
+                    type="email"
+                  />
+                </FieldRow>
+              </div>
+
+              <div className="md:col-span-2">
+                <FieldRow label="Address line 1">
+                  <TextField
+                    value={addr.line1}
+                    onChange={(line1) => patchAddr({ line1 })}
+                    disabled={!can("address")}
+                    placeholder="Lot / Street / Building"
+                  />
+                </FieldRow>
+              </div>
+
+              <FieldRow label="City">
+                <TextField
+                  value={addr.city}
+                  onChange={(city) => patchAddr({ city })}
                   disabled={!can("address")}
-                  placeholder="Lot / Street / Building"
+                  placeholder="Kuala Lumpur"
+                />
+              </FieldRow>
+
+              <FieldRow label="State">
+                <TextField
+                  value={addr.state}
+                  onChange={(state) => patchAddr({ state })}
+                  disabled={!can("address")}
+                  placeholder="WP Kuala Lumpur"
+                />
+              </FieldRow>
+
+              <FieldRow label="Postcode">
+                <TextField
+                  value={addr.postcode}
+                  onChange={(postcode) => patchAddr({ postcode })}
+                  disabled={!can("address")}
+                  placeholder="50088"
                 />
               </FieldRow>
             </div>
+          </SectionCard>
 
-            <FieldRow label="City">
-              <TextField
-                value={addr.city}
-                onChange={(city) => patchAddr({ city })}
-                disabled={!can("address")}
-                placeholder="Kuala Lumpur"
-              />
-            </FieldRow>
+          <div className="mt-6">
+            <SectionCard
+              title="Company Billing Details"
+              subtitle="Corporate details for official documents (Invoice, Appointment Letter, etc.)"
+            >
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <FieldRow label="Company Name">
+                  <TextField
+                    value={v.companyName}
+                    onChange={(companyName) => patch({ companyName })}
+                    disabled={!can("companyName")}
+                    placeholder="e.g., CASH CURRY SDN. BHD."
+                  />
+                </FieldRow>
 
-            <FieldRow label="State">
-              <TextField
-                value={addr.state}
-                onChange={(state) => patchAddr({ state })}
-                disabled={!can("address")}
-                placeholder="WP Kuala Lumpur"
-              />
-            </FieldRow>
-
-            <FieldRow label="Postcode">
-              <TextField
-                value={addr.postcode}
-                onChange={(postcode) => patchAddr({ postcode })}
-                disabled={!can("address")}
-                placeholder="50088"
-              />
-            </FieldRow>
+                <FieldRow label="Company Registration No.">
+                  <TextField
+                    value={v.companyRegistration}
+                    onChange={(companyRegistration) => patch({ companyRegistration })}
+                    disabled={!can("companyRegistration")}
+                    placeholder="e.g., 202401012345 (1234567-A)"
+                  />
+                </FieldRow>
+              </div>
+            </SectionCard>
           </div>
-
-        </SectionCard>
+        </>
       )}
     </SettingsSection>
   );

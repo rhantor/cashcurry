@@ -66,6 +66,8 @@ export default function useBranchSettingsForm() {
       phone: settings.basic?.phone ?? branch.phone ?? "",
       whatsapp: settings.basic?.whatsapp ?? branch.whatsapp ?? "",
       email: (branch.email || settings.basic?.email) ?? branch.email ?? "",
+      companyName: settings.basic?.companyName ?? branch.companyName ?? "",
+      companyRegistration: settings.basic?.companyRegistration ?? branch.companyRegistration ?? "",
       address: {
         line1:
           (branch.address || settings.basic?.address?.line1) ??
