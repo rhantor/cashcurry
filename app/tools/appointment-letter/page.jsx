@@ -190,20 +190,45 @@ export default function AppointmentLetterGenerator() {
 
   // Auto-populate company details from database once loaded
   useEffect(() => {
-    if (!dbSettings) return;
+    if (!dbSettings && !dbBranch) return;
     
-    const settingsBasic = dbSettings.basic || {};
+    const settingsBasic = dbSettings?.basic || {};
     const branchBasic = dbBranch || {};
 
     setCompanyDetails(prev => {
       let addressLine1 = prev.addressLine1;
       let addressLine2 = prev.addressLine2;
       
-      const addr = branchBasic.address || settingsBasic.address || {};
-      if (addr.line1) {
-        addressLine1 = addr.line1;
-        const cityStatePostcode = [addr.postcode, addr.city, addr.state].filter(Boolean).join(", ");
-        addressLine2 = cityStatePostcode || addr.city || "";
+      const branchAddress = branchBasic.address;
+      const settingsAddress = settingsBasic.address;
+
+      if (typeof branchAddress === "string" && branchAddress.trim() !== "") {
+        const trimmed = branchAddress.trim();
+        const parts = trimmed.split(",");
+        if (parts.length > 1) {
+          // Split address string into two lines for cleaner letterhead styling
+          addressLine1 = parts[0].trim();
+          addressLine2 = parts.slice(1).join(", ").trim();
+        } else {
+          addressLine1 = trimmed;
+          addressLine2 = "";
+        }
+      } else if (settingsAddress && typeof settingsAddress === "object") {
+        if (settingsAddress.line1) {
+          addressLine1 = settingsAddress.line1;
+          const cityStatePostcode = [settingsAddress.postcode, settingsAddress.city, settingsAddress.state].filter(Boolean).join(", ");
+          addressLine2 = cityStatePostcode || settingsAddress.city || "";
+        }
+      } else if (typeof settingsAddress === "string" && settingsAddress.trim() !== "") {
+        const trimmed = settingsAddress.trim();
+        const parts = trimmed.split(",");
+        if (parts.length > 1) {
+          addressLine1 = parts[0].trim();
+          addressLine2 = parts.slice(1).join(", ").trim();
+        } else {
+          addressLine1 = trimmed;
+          addressLine2 = "";
+        }
       }
 
       let phoneEmail = prev.phoneEmail;
@@ -217,7 +242,7 @@ export default function AppointmentLetterGenerator() {
       }
 
       return {
-        name: settingsBasic.companyName || prev.name,
+        name: settingsBasic.companyName || branchBasic.name || prev.name,
         registrationNo: settingsBasic.companyRegistration || prev.registrationNo,
         addressLine1,
         addressLine2,
