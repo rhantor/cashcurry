@@ -297,9 +297,6 @@ service cloud.firestore {
           allow write: if canWrite(companyId, branchId);
         }
 
-        // ── Staff Loans ──────────────────────────────────────────────────────
-        // Moved to company level!
-        
         // ── Staff Loans (Branch Level) ───────────────────────────────────────
         match /loans/{docId} {
           allow read: if canRead(companyId, branchId);
@@ -345,6 +342,12 @@ service cloud.firestore {
                           (isAuth() && userData().companyId == companyId && userData().branchId == branchId);
         }
 
+        // ── POS: Order Guides ────────────────────────────────────────────────
+        match /orderGuides/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if canWrite(companyId, branchId);
+        }
+
         // ── Payroll Runs ──────────────────────────────────────────────────────
         // branchAdmin / manager: full read+write on runs and slips for their branch
         match /payrollRuns/{runId} {
@@ -364,19 +367,19 @@ service cloud.firestore {
         // ── POS: Categories (menu groups) ────────────────────────────────────
         match /categories/{docId} {
           allow read: if canRead(companyId, branchId);
-          allow write: if canManageSettings(companyId, branchId);
+          allow write: if canWrite(companyId, branchId);
         }
 
         // ── POS: Menu items ──────────────────────────────────────────────────
         match /menu/{docId} {
           allow read: if canRead(companyId, branchId);
-          allow write: if canManageSettings(companyId, branchId);
+          allow write: if canWrite(companyId, branchId);
         }
 
         // ── POS: Modifier groups (size, add-ons, etc.) ───────────────────────
         match /modifierGroups/{docId} {
           allow read: if canRead(companyId, branchId);
-          allow write: if canManageSettings(companyId, branchId);
+          allow write: if canWrite(companyId, branchId);
         }
 
         // ── POS: Orders (tickets) ────────────────────────────────────────────
@@ -409,25 +412,25 @@ service cloud.firestore {
         // ── POS: Registered terminals ────────────────────────────────────────
         match /terminals/{docId} {
           allow read: if canRead(companyId, branchId);
-          allow write: if canManageSettings(companyId, branchId);
+          allow write: if canWrite(companyId, branchId);
         }
 
         // ── POS: Floors (sections/zones in the restaurant) ───────────────────
         match /floors/{docId} {
           allow read: if canRead(companyId, branchId);
-          allow write: if canManageSettings(companyId, branchId);
+          allow write: if canWrite(companyId, branchId);
         }
 
         // ── POS: Promotions (auto-applied at cart) ───────────────────────────
         match /promotions/{docId} {
           allow read: if canRead(companyId, branchId);
-          allow write: if canManageSettings(companyId, branchId);
+          allow write: if canWrite(companyId, branchId);
         }
 
         // ── POS: Combos / set meals ──────────────────────────────────────────
         match /combos/{docId} {
           allow read: if canRead(companyId, branchId);
-          allow write: if canManageSettings(companyId, branchId);
+          allow write: if canWrite(companyId, branchId);
         }
 
         // ── POS: Ingredients (legacy — superseded by items + itemStock) ──────

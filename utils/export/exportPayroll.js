@@ -24,15 +24,15 @@ function buildCols (slips) {
     }
   }
   const tot = slips.reduce((a, s) => ({
-    otPay:          (a.otPay          || 0) + (s.otPay          || 0),
-    allowance:      (a.allowance      || 0) + (s.allowance      || 0),
-    advanceAmt:     (a.advanceAmt     || 0) + (s.advanceAmt     || 0),
-    loanAmt:        (a.loanAmt        || 0) + (s.loanAmt        || 0),
-    otherEarnings:  (a.otherEarnings  || 0) + (s.otherEarnings  || 0),
-    penalty:        (a.penalty        || 0) + (s.penalty        || 0),
-    otherDeductions:(a.otherDeductions|| 0) + (s.otherDeductions|| 0),
-    bonus:          (a.bonus          || 0) + (s.bonus          || 0),
-    phPay:          (a.phPay          || 0) + (s.phPay          || 0),
+    otPay:          (a.otPay          || 0) + Number(s.otPay          || 0),
+    allowance:      (a.allowance      || 0) + Number(s.allowance      || 0),
+    advanceAmt:     (a.advanceAmt     || 0) + Number(s.advanceAmt     || 0),
+    loanAmt:        (a.loanAmt        || 0) + Number(s.loanAmt        || 0),
+    otherEarnings:  (a.otherEarnings  || 0) + Number(s.otherEarnings  || 0),
+    penalty:        (a.penalty        || 0) + Number(s.penalty        || 0),
+    otherDeductions:(a.otherDeductions|| 0) + Number(s.otherDeductions|| 0),
+    bonus:          (a.bonus          || 0) + Number(s.bonus          || 0),
+    phPay:          (a.phPay          || 0) + Number(s.phPay          || 0),
   }), {})
   return {
     statKeys, statNames,
@@ -239,11 +239,11 @@ export function exportPayrollToPDF (slips = [], branchName = '', period = '', ru
 
       ds.forEach((s, idx) => {
         bodyRows.push({ isData: true, row: buildRow(s, idx, cols) })
-        dt.basePay+=s.basePay||0; dt.workedHours+=s.workedHours||0; dt.otHours+=s.otHours||0; dt.otPay+=s.otPay||0
-        dt.allowance+=s.allowance||0; dt.advanceAmt+=s.advanceAmt||0; dt.loanAmt+=s.loanAmt||0
-        dt.otherEarnings+=s.otherEarnings||0; dt.penalty+=s.penalty||0; dt.otherDeductions+=s.otherDeductions||0
-        dt.bonus+=s.bonus||0; dt.phPay+=s.phPay||0
-        dt.grossEarnings+=s.grossEarnings||0; dt.netPay+=s.netPay||0
+        dt.basePay+=Number(s.basePay||0); dt.workedHours+=Number(s.workedHours||0); dt.otHours+=Number(s.otHours||0); dt.otPay+=Number(s.otPay||0)
+        dt.allowance+=Number(s.allowance||0); dt.advanceAmt+=Number(s.advanceAmt||0); dt.loanAmt+=Number(s.loanAmt||0)
+        dt.otherEarnings+=Number(s.otherEarnings||0); dt.penalty+=Number(s.penalty||0); dt.otherDeductions+=Number(s.otherDeductions||0)
+        dt.bonus+=Number(s.bonus||0); dt.phPay+=Number(s.phPay||0)
+        dt.grossEarnings+=Number(s.grossEarnings||0); dt.netPay+=Number(s.netPay||0)
         for (const k of cols.statKeys) {
           const f=(s.statutory||[]).find(x=>x.key===k)
           dt.stat[k]=(dt.stat[k]||0)+(f?.employeeAmt||0)

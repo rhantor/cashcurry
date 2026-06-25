@@ -188,9 +188,7 @@ export const sidebarItems = {
       ],
       children: [
         { label: 'Invoice Generator', path: '/tools/invoice-generator' },
-        { label: 'Inventory Checklist', path: '/tools/inventory-checklist' },
-        { label: 'Petty Cash Tracker', path: '/tools/petty-cash' },
-        { label: 'Recipe Cost Calculator', path: '/tools/recipe-calculator' }
+        { label: 'Appointment Letter', path: '/tools/appointment-letter' }
       ]
     },
     {
@@ -333,9 +331,7 @@ export const sidebarItems = {
       allowedRoles: ['gm', 'superAdmin', 'owner'],
       children: [
         { label: 'Invoice Generator', path: '/tools/invoice-generator' },
-        { label: 'Inventory Checklist', path: '/tools/inventory-checklist' },
-        { label: 'Petty Cash Tracker', path: '/tools/petty-cash' },
-        { label: 'Recipe Cost Calculator', path: '/tools/recipe-calculator' }
+        { label: 'Appointment Letter', path: '/tools/appointment-letter' }
       ]
     },
     {
