@@ -346,14 +346,28 @@ export function exportPayslipToPDF (slip, branchName = '', period = '', companyN
   }
 }
 
-export function exportAllPayslipsToPDF (slips = [], branchName = '', period = '', companyName = '') {
+export function exportAllPayslipsToPDF (slips = [], branchName = '', period = '', companyName = '', twoPerPage = false) {
   if (!slips.length) return alert('No payslips to export')
   try {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-    slips.forEach((slip, index) => {
-      if (index > 0) doc.addPage()
-      drawPayslipToPDF(doc, slip, branchName, period, companyName)
-    })
+
+    if (twoPerPage) {
+      // Two compact payslips per page with cutting line
+      for (let i = 0; i < slips.length; i += 2) {
+        if (i > 0) doc.addPage()
+        drawCompactPayslipToPDF(doc, slips[i], branchName, period, companyName, 8)
+        if (i + 1 < slips.length) {
+          drawCuttingLine(doc, 148)
+          drawCompactPayslipToPDF(doc, slips[i + 1], branchName, period, companyName, 156)
+        }
+      }
+    } else {
+      slips.forEach((slip, index) => {
+        if (index > 0) doc.addPage()
+        drawPayslipToPDF(doc, slip, branchName, period, companyName)
+      })
+    }
+
     doc.save(`All_Payslips_${branchName.replace(/\s+/g,'_')}_${period}.pdf`)
   } catch (err) {
     console.error('All Payslips PDF export failed:', err)
@@ -516,6 +530,194 @@ function drawPayslipToPDF (doc, slip, branchName = '', period = '', companyName 
 
     doc.setFontSize(7); doc.setTextColor(148, 163, 184)
     doc.text(`${branchName} · ${periodLabel(period)} · Generated: ${new Date().toLocaleDateString()}`, 14, sigY + 16)
+}
+
+// ─── Cutting line for 2-per-page layout ───────────────────────────────────────
+
+function drawCuttingLine (doc, y) {
+  const pw = doc.internal.pageSize.getWidth()
+  const midX = pw / 2
+
+  doc.setDrawColor(190, 190, 190)
+  doc.setLineWidth(0.15)
+
+  // Draw dashed line segments — left side
+  for (let x = 8; x < midX - 20; x += 4) {
+    doc.line(x, y, Math.min(x + 2, midX - 20), y)
+  }
+  // Draw dashed line segments — right side
+  for (let x = midX + 20; x < pw - 8; x += 4) {
+    doc.line(x, y, Math.min(x + 2, pw - 8), y)
+  }
+
+  // "CUT HERE" text centered
+  doc.setFontSize(6)
+  doc.setTextColor(190, 190, 190)
+  doc.setFont('helvetica', 'normal')
+  doc.text('CUT HERE', midX, y + 1.2, { align: 'center' })
+}
+
+// ─── Compact Payslip for 2-per-page layout ────────────────────────────────────
+
+function drawCompactPayslipToPDF (doc, slip, branchName, period, companyName, offsetY) {
+  const currency = 'RM'
+  const fmt      = v => `${currency} ${fmtAmt(v || 0)}`
+  const isHours  = slip.salaryMode === 'hours'
+  const pw       = doc.internal.pageSize.getWidth()
+  const leftM    = 10
+  const rightEdge = pw - 10
+
+  // ── Header (left) ──
+  let y = offsetY
+  if (companyName) {
+    doc.setFontSize(6.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139)
+    doc.text(companyName.toUpperCase(), leftM, y)
+    y += 3.5
+  }
+  doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 41, 59)
+  doc.text(branchName, leftM, y)
+  y += 4
+  doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139)
+  doc.text('EMPLOYEE SALARY VOUCHER', leftM, y)
+
+  // ── Header (right) ──
+  doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 41, 59)
+  doc.text('SALARY VOUCHER', rightEdge, offsetY, { align: 'right' })
+  doc.setFontSize(6.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139)
+  doc.text(`No: ${period}-${(slip.staffId || '').slice(-4).toUpperCase()}`, rightEdge, offsetY + 4, { align: 'right' })
+  doc.text(`Period: ${periodLabel(period)}`, rightEdge, offsetY + 8, { align: 'right' })
+
+  y += 3
+  doc.setDrawColor(30, 41, 59); doc.setLineWidth(0.4)
+  doc.line(leftM, y, rightEdge, y)
+  y += 3
+
+  // ── Employee Info (compact 2-row × 5-col grid) ──
+  const infoBody = [
+    [
+      { content: 'EMPLOYEE NAME', styles: { fontSize: 5.5, textColor: [148, 163, 184], fontStyle: 'normal' } },
+      { content: 'DESIGNATION', styles: { fontSize: 5.5, textColor: [148, 163, 184], fontStyle: 'normal' } },
+      { content: 'BASIC SALARY', styles: { fontSize: 5.5, textColor: [148, 163, 184], fontStyle: 'normal' } },
+      { content: isHours ? 'STD HRS' : 'WORK DAYS', styles: { fontSize: 5.5, textColor: [148, 163, 184], fontStyle: 'normal' } },
+      { content: isHours ? 'HOURLY RATE' : 'DAILY RATE', styles: { fontSize: 5.5, textColor: [148, 163, 184], fontStyle: 'normal' } },
+    ],
+    [
+      { content: slip.staffName || '', styles: { fontSize: 7.5, fontStyle: 'bold' } },
+      { content: slip.designation || '—', styles: { fontSize: 7.5, fontStyle: 'bold' } },
+      { content: fmt(slip.basicSalary), styles: { fontSize: 7.5, fontStyle: 'bold' } },
+      { content: isHours ? `${slip.standardHours || 208} hrs` : `${slip.workingDays || 26} days`, styles: { fontSize: 7.5, fontStyle: 'bold' } },
+      { content: isHours
+        ? `${currency} ${fmtAmt(slip.basicSalary / (slip.standardHours || 208))}/hr`
+        : `${currency} ${fmtAmt(slip.basicSalary / (slip.workingDays || 26))}/day`,
+        styles: { fontSize: 7.5, fontStyle: 'bold' } },
+    ],
+  ]
+
+  autoTable(doc, {
+    startY: y,
+    body: infoBody,
+    theme: 'grid',
+    styles: { cellPadding: 1.5, textColor: [30, 41, 59], fillColor: [248, 250, 252], lineColor: [226, 232, 240], lineWidth: 0.1 },
+    tableWidth: rightEdge - leftM,
+    margin: { left: leftM },
+  })
+  const afterInfo = doc.lastAutoTable.finalY
+
+  // ── Earnings ──
+  const earnings = [
+    [`Basic Pay${isHours && slip.workedHours < slip.standardHours ? ` (${slip.workedHours}/${slip.standardHours}h)` : !isHours && slip.workedDays < slip.workingDays ? ` (${slip.workedDays}/${slip.workingDays}d)` : ''}`, fmt(slip.basePay)],
+    ...(slip.allowance > 0     ? [['Allowance',                            fmt(slip.allowance)]]     : []),
+    ...(slip.otPay > 0         ? [[`OT (${slip.otHours || 0}h)`,            fmt(slip.otPay)]]         : []),
+    ...(slip.phPay > 0         ? [['PH Pay',                                fmt(slip.phPay)]]         : []),
+    ...(slip.bonus > 0         ? [['Bonus',                                 fmt(slip.bonus)]]         : []),
+    ...(slip.otherEarnings > 0 ? [[slip.otherEarningsNote || 'Other Earn.', fmt(slip.otherEarnings)]] : []),
+  ]
+
+  const halfW = (rightEdge - leftM - 6) / 2
+
+  autoTable(doc, {
+    startY: afterInfo + 3,
+    head: [
+      [{ content: 'EARNINGS', colSpan: 2, styles: { fillColor: [240, 253, 244], textColor: [22, 101, 52], fontStyle: 'bold', halign: 'left', fontSize: 7 } }],
+    ],
+    body: [
+      ...earnings,
+      [{ content: 'Gross Pay', styles: { fontStyle: 'bold', fillColor: [240, 253, 244], textColor: [22, 101, 52] } },
+       { content: fmt(slip.grossEarnings), styles: { fontStyle: 'bold', textColor: [22, 101, 52], fillColor: [240, 253, 244] } }],
+    ],
+    styles: { fontSize: 7, cellPadding: 1.5, lineColor: [241, 245, 249], lineWidth: 0.1 },
+    headStyles: { lineColor: [226, 232, 240], lineWidth: 0.1 },
+    columnStyles: { 1: { halign: 'right', cellWidth: 28 } },
+    tableWidth: halfW,
+    margin: { left: leftM },
+  })
+  const earningsY = doc.lastAutoTable.finalY
+
+  // ── Deductions ──
+  const deductions = [
+    ...(slip.statutory || []).map(s => [`${s.name} (${s.employeeRate}%)`, fmt(s.employeeAmt)]),
+    ...(slip.advanceAmt > 0      ? [['Advance',                                                                  fmt(slip.advanceAmt)]]      : []),
+    ...(slip.loanAmt > 0         ? [['Loan (EMI)',                                                                fmt(slip.loanAmt)]]         : []),
+    ...(slip.penalty > 0         ? [[slip.penaltyNote ? `Penalty (${slip.penaltyNote})` : 'Penalty',              fmt(slip.penalty)]]         : []),
+    ...(slip.otherDeductions > 0 ? [[slip.otherDeductionsNote || 'Other Ded.',                                    fmt(slip.otherDeductions)]] : []),
+  ]
+
+  autoTable(doc, {
+    startY: afterInfo + 3,
+    head: [
+      [{ content: 'DEDUCTIONS', colSpan: 2, styles: { fillColor: [254, 242, 242], textColor: [153, 27, 27], fontStyle: 'bold', halign: 'left', fontSize: 7 } }],
+    ],
+    body: deductions.length > 0
+      ? [...deductions,
+         [{ content: 'Total Ded.', styles: { fontStyle: 'bold', fillColor: [254, 242, 242], textColor: [153, 27, 27] } },
+          { content: fmt(slip.totalDeductions), styles: { fontStyle: 'bold', textColor: [153, 27, 27], fillColor: [254, 242, 242] } }]]
+      : [[{ content: 'No deductions', colSpan: 2, styles: { halign: 'center', textColor: [148, 163, 184] } }]],
+    styles: { fontSize: 7, cellPadding: 1.5, lineColor: [241, 245, 249], lineWidth: 0.1 },
+    headStyles: { lineColor: [226, 232, 240], lineWidth: 0.1 },
+    columnStyles: { 1: { halign: 'right', cellWidth: 28, textColor: [153, 27, 27] } },
+    tableWidth: halfW,
+    margin: { left: leftM + halfW + 6 },
+  })
+
+  // ── Net Pay ──
+  const netY = Math.max(doc.lastAutoTable.finalY, earningsY) + 4
+  doc.setDrawColor(30, 41, 59); doc.setLineWidth(0.5)
+  doc.rect(leftM, netY, rightEdge - leftM, 11)
+  doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139)
+  doc.text('NET PAY (TAKE HOME)', leftM + 4, netY + 4.5)
+  doc.setFontSize(6)
+  doc.text(`Gross ${fmt(slip.grossEarnings)} - Ded. ${fmt(slip.totalDeductions)}`, leftM + 4, netY + 8.5)
+  doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 41, 59)
+  doc.text(fmt(slip.netPay), rightEdge - 4, netY + 7.5, { align: 'right' })
+
+  // ── Remarks (if any) ──
+  let afterNet = netY + 14
+  if (slip.extraNote) {
+    doc.setFillColor(254, 252, 232)
+    doc.setDrawColor(253, 230, 138)
+    doc.setLineWidth(0.1)
+    doc.rect(leftM, afterNet, rightEdge - leftM, 7, 'FD')
+    doc.setFontSize(5.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(180, 83, 9)
+    doc.text('NOTE:', leftM + 2, afterNet + 4.5)
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(146, 64, 14)
+    doc.text(slip.extraNote, leftM + 14, afterNet + 4.5)
+    afterNet += 9
+  }
+
+  // ── Signatures ──
+  const sigY = afterNet + 4
+  const sigGap = (rightEdge - leftM) / 3
+  ;['Employee', 'Accountant / HR', 'Authorized'].forEach((label, i) => {
+    const x = leftM + i * sigGap
+    doc.setLineWidth(0.2); doc.setDrawColor(148, 163, 184)
+    doc.line(x + 2, sigY, x + sigGap - 4, sigY)
+    doc.setFontSize(6); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139)
+    doc.text(label, x + sigGap / 2, sigY + 4, { align: 'center' })
+  })
+
+  // ── Footer ──
+  doc.setFontSize(5); doc.setTextColor(180, 180, 180)
+  doc.text(`${branchName} · ${periodLabel(period)} · ${new Date().toLocaleDateString()}`, leftM, sigY + 9)
 }
 
 // ─── Excel Export ─────────────────────────────────────────────────────────────
