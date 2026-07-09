@@ -79,6 +79,8 @@ export async function payVendorBills({
     paymentDate: paymentDateStr,
     createdAt: now,
     createdAtClient: new Date().toISOString(),
+    receiptURL: paymentFileURL || (attachments.length > 0 ? attachments[0] : null),
+    attachments: attachments,
   });
 
   // --- 2) Apply allocations to each bill ---
