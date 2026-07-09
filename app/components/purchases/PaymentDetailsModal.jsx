@@ -95,14 +95,33 @@ export default function PaymentDetailsModal({
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
   const [previewUrl, setPreviewUrl] = useState(null);
+  const [hasAutoPreviewed, setHasAutoPreviewed] = useState(false);
 
   const allocations = payment?.allocations || [];
 
   useEffect(() => {
     if (!open) {
       setPreviewUrl(null);
+      setHasAutoPreviewed(false);
     }
   }, [open]);
+
+  useEffect(() => {
+    if (!open || hasAutoPreviewed) return;
+    if (payment?.receiptURL) {
+      setPreviewUrl(payment.receiptURL);
+      setHasAutoPreviewed(true);
+    }
+  }, [open, payment, hasAutoPreviewed]);
+
+  useEffect(() => {
+    if (!open || !rows.length || hasAutoPreviewed) return;
+    const firstWithAttachment = rows.find(r => r.attachments && r.attachments.length > 0);
+    if (firstWithAttachment) {
+      setPreviewUrl(firstWithAttachment.attachments[0]);
+    }
+    setHasAutoPreviewed(true);
+  }, [open, rows, hasAutoPreviewed]);
 
   useEffect(() => {
     let active = true;
