@@ -1,16 +1,20 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
-import { useGetBranchAttendanceTokensQuery } from "@/lib/redux/api/attendanceApiSlice";
+import { useGetBranchAttendanceByPeriodQuery } from "@/lib/redux/api/attendanceApiSlice";
 import { useGetStaffLoansQuery } from "@/lib/redux/api/staffLoanApiSlice";
 import { useGetAdvanceEntriesQuery } from "@/lib/redux/api/AdvanceApiSlice";
 import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
+import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
+import { computeAttendance, toLocalDateStr } from "@/lib/attendance/computeHours";
+import useCurrency from "@/app/hooks/useCurrency";
+import { formatMoney } from "@/utils/formatMoney";
+import { skipToken } from "@reduxjs/toolkit/query";
 import { auth } from "@/lib/firebase";
 import { 
-  User, 
-  MapPin, 
-  Clock, 
-  DollarSign, 
-  AlertCircle, 
+  User,
+  MapPin,
+  Clock,
+  AlertCircle,
   Download, 
   LogOut, 
   CreditCard, 
@@ -23,6 +27,7 @@ import Cookies from "js-cookie";
 export default function StaffProfilePage() {
   const [user, setUser] = useState(null);
   const [staffData, setStaffData] = useState(null);
+  const currency = useCurrency();
 
   useEffect(() => {
     const stored = localStorage.getItem("user");
@@ -46,26 +51,40 @@ export default function StaffProfilePage() {
     if (!staffData) return null;
     const now = new Date();
     const type = staffData.attendancePeriod || "monthly";
-    let start = new Date();
-    
+    let start;
+
     if (type === "weekly") {
-      // Find Monday of the current week
-      const day = now.getDay(); // 0 is Sun, 1 is Mon
+      // Find Monday of the current week (no mutation of `now`).
+      const day = now.getDay(); // 0 = Sun, 1 = Mon
       const diff = now.getDate() - (day === 0 ? 6 : day - 1);
-      start = new Date(now.setDate(diff));
+      start = new Date(now.getFullYear(), now.getMonth(), diff);
     } else {
       // 1st of the month
       start = new Date(now.getFullYear(), now.getMonth(), 1);
     }
-    
+
     start.setHours(0, 0, 0, 0);
-    return { start, end: new Date(), type };
+    return { start, startStr: toLocalDateStr(start), type };
   }, [staffData]);
 
   // Queries
   const skip = !user?.companyId || !user?.branchId;
-  const { data: allAttendance = [], isLoading: loadingAttendance } = useGetBranchAttendanceTokensQuery(
-    !skip ? { companyId: user.companyId, branchId: user.branchId } : { skip: true }
+
+  const { data: branchSettings } = useGetBranchSettingsQuery(
+    !skip ? { companyId: user.companyId, branchId: user.branchId } : skipToken
+  );
+  const attendanceSettings = branchSettings?.attendance || {};
+
+  // Punches for the current period. Query from a day before the period start
+  // (buffer for overnight shifts) up to today; computeAttendance re-buckets by
+  // the branch day-cutoff, then we keep only days inside the period.
+  const todayStr = toLocalDateStr(new Date());
+  const bufStartStr = period ? toLocalDateStr(new Date(period.start.getTime() - 86400000)) : null;
+  const canAttendance = !skip && !!period && !staffData?.fixedSalaryNoAttendance;
+  const { data: periodPunches = [] } = useGetBranchAttendanceByPeriodQuery(
+    canAttendance
+      ? { companyId: user.companyId, branchId: user.branchId, startDate: bufStartStr, endDate: todayStr }
+      : skipToken
   );
 
   const { data: allLoans = [] } = useGetStaffLoansQuery(
@@ -76,89 +95,37 @@ export default function StaffProfilePage() {
     !skip ? { companyId: user.companyId, branchId: user.branchId } : { skip: true }
   );
 
-  // Calculations
+  // Calculations — uses the shared attendance engine (same as payroll/log).
   const stats = useMemo(() => {
-    if (!staffData || !period || allAttendance.length === 0) {
-      return { totalHours: 0, basicHours: 0, otHours: 0, earnings: 0, loanDebt: 0, advanceDebt: 0 };
-    }
+    const base = { isFixed: false, totalHours: 0, basicHours: 0, otHours: 0, earnings: 0, loanDebt: 0, advanceDebt: 0 };
+    if (!staffData) return base;
 
-    const myAttendance = allAttendance.filter(a => 
-      a.staffId === staffData.id && 
-      new Date(a.timestamp?.seconds * 1000) >= period.start
-    );
-
-    // Group by Date for Break & OT Calculation
-    const dailyTotals = {};
-    
-    const sorted = [...myAttendance].sort((a, b) => a.timestamp?.seconds - b.timestamp?.seconds);
-    for (let i = 0; i < sorted.length - 1; i++) {
-      if (sorted[i].type === "in" && sorted[i+1].type === "out") {
-        const dateKey = new Date(sorted[i].timestamp.seconds * 1000).toDateString();
-        const diff = (sorted[i+1].timestamp.seconds - sorted[i].timestamp.seconds) * 1000;
-        dailyTotals[dateKey] = (dailyTotals[dateKey] || 0) + diff;
-        i++; 
-      }
-    }
-
-    let totalBasic = 0;
-    let totalOT = 0;
-    const dailyLimit = Number(staffData.basicHoursPerDay) || 8;
-    const isFullTime = staffData.employmentType !== "part-time";
-
-    Object.keys(dailyTotals).forEach(date => {
-      let dayHours = dailyTotals[date] / (1000 * 60 * 60);
-      
-      // Calculate OT per day
-      let dayBasic = dayHours;
-      let dayOT = 0;
-
-      if (isFullTime) {
-        dayBasic = Math.min(dayHours, dailyLimit);
-        dayOT = Math.max(0, dayHours - dailyLimit);
-      }
-
-      // Add Paid Break (+1 hour per day if eligible)
-      if (staffData.hasPaidBreak) {
-        const meetsStrict = !staffData.requireFullShiftForBreak || dayHours >= (Number(staffData.fullShiftHours) || 7.5);
-        if (meetsStrict) {
-           // Add to OT if basic is already full, otherwise add to basic
-           if (dayBasic < dailyLimit && isFullTime) {
-             const space = dailyLimit - dayBasic;
-             const toAdd = Math.min(1, space);
-             dayBasic += toAdd;
-             if (toAdd < 1) dayOT += (1 - toAdd);
-           } else {
-             dayOT += 1;
-           }
-        }
-      }
-
-      totalBasic += dayBasic;
-      totalOT += dayOT;
-    });
-
-    const basicRate = Number(staffData.basicPerHour) || 0;
-    const otRate = Number(staffData.OTPerHour) || 0;
-    const earnings = (totalBasic * basicRate) + (totalOT * otRate);
-
-    // Financials
-    const myLoanDebt = allLoans
+    // Financials (independent of attendance)
+    const loanDebt = allLoans
       .filter(l => l.staffId === staffData.id && l.status !== "closed")
       .reduce((sum, l) => sum + (l.remainingAmount || 0), 0);
-    
-    const myAdvanceDebt = allAdvances
-      .filter(a => (a.staffId === staffData.id || a.createdBy?.uid === user.uid) && a.status === "approved" && a.advanceType === "personal")
+    const advanceDebt = allAdvances
+      .filter(a => (a.staffId === staffData.id || a.createdBy?.uid === user?.uid) && a.status === "approved" && a.advanceType === "personal")
       .reduce((sum, a) => sum + (a.amount || 0), 0);
 
-    return { 
-      totalHours: totalBasic + totalOT, 
-      basicHours: totalBasic, 
-      otHours: totalOT, 
-      earnings, 
-      loanDebt: myLoanDebt, 
-      advanceDebt: myAdvanceDebt 
-    };
-  }, [staffData, period, allAttendance, allLoans, allAdvances, user]);
+    // Fixed-salary staff: flat monthly Basic Salary, no attendance tracking.
+    if (staffData.fixedSalaryNoAttendance) {
+      return { ...base, isFixed: true, earnings: Number(staffData.basicSalary) || 0, loanDebt, advanceDebt };
+    }
+
+    if (!period) return { ...base, loanDebt, advanceDebt };
+
+    const mine = periodPunches.filter(p => p.staffId === staffData.id);
+    const { days } = computeAttendance({ punches: mine, staff: staffData, settings: attendanceSettings });
+    const inPeriod = days.filter(d => d.date >= period.startStr);
+    const basicHours = inPeriod.reduce((s, d) => s + d.basic, 0);
+    const otHours = inPeriod.reduce((s, d) => s + d.ot, 0);
+    const earnings =
+      basicHours * (Number(staffData.basicPerHour) || 0) +
+      otHours * (Number(staffData.OTPerHour) || 0);
+
+    return { isFixed: false, totalHours: basicHours + otHours, basicHours, otHours, earnings, loanDebt, advanceDebt };
+  }, [staffData, period, periodPunches, attendanceSettings, allLoans, allAdvances, user]);
 
   const handleLogout = async () => {
     try {
@@ -213,29 +180,38 @@ export default function StaffProfilePage() {
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
-           <div>
-              <p className="text-xs opacity-70 mb-1 font-medium">Basic Hours</p>
-              <div className="text-2xl font-black">{stats.basicHours.toFixed(1)}<span className="text-xs font-medium opacity-50 ml-1">hrs</span></div>
-           </div>
-           <div>
-              <p className="text-xs opacity-70 mb-1 font-medium text-orange-200">Overtime (OT)</p>
-              <div className="text-2xl font-black text-orange-300">+{stats.otHours.toFixed(1)}<span className="text-xs font-medium opacity-50 ml-1">hrs</span></div>
-           </div>
-        </div>
+        {stats.isFixed ? (
+          <div className="bg-white/10 rounded-2xl px-4 py-3 text-sm font-semibold">
+            Fixed monthly salary — attendance is not tracked for your account.
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-4">
+             <div>
+                <p className="text-xs opacity-70 mb-1 font-medium">Basic Hours</p>
+                <div className="text-2xl font-black">{stats.basicHours.toFixed(1)}<span className="text-xs font-medium opacity-50 ml-1">hrs</span></div>
+             </div>
+             <div>
+                <p className="text-xs opacity-70 mb-1 font-medium text-orange-200">Overtime (OT)</p>
+                <div className="text-2xl font-black text-orange-300">+{stats.otHours.toFixed(1)}<span className="text-xs font-medium opacity-50 ml-1">hrs</span></div>
+             </div>
+          </div>
+        )}
 
         <div className="mt-6 pt-6 border-t border-white/10 flex justify-between items-end">
            <div>
-             <p className="text-xs opacity-70 mb-1 font-medium uppercase tracking-tight">Est. Instant Earnings</p>
+             <p className="text-xs opacity-70 mb-1 font-medium uppercase tracking-tight">
+               {stats.isFixed ? "Monthly Salary (Fixed)" : "Est. Instant Earnings"}
+             </p>
              <div className="text-3xl font-black tracking-tighter flex items-center gap-1">
                <TrendingUp size={24} className="text-green-300" />
-               <DollarSign size={20} className="text-white/60 -mr-1" />
-               {stats.earnings.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+               {formatMoney(stats.earnings, currency)}
              </div>
            </div>
-           <div className="text-[10px] opacity-60 text-right font-medium">
-              Based on {staffData.basicPerHour || 0}/hr <br/> and {staffData.OTPerHour || 0} OT rate
-           </div>
+           {!stats.isFixed && (
+             <div className="text-[10px] opacity-60 text-right font-medium">
+                Based on {staffData.basicPerHour || 0}/hr <br/> and {staffData.OTPerHour || 0} OT rate
+             </div>
+           )}
         </div>
       </div>
 
@@ -246,14 +222,14 @@ export default function StaffProfilePage() {
              <Receipt size={16} className="text-orange-500" /> 
              <span className="text-[11px] font-bold uppercase tracking-wider">Advances</span>
            </div>
-           <div className="text-xl font-black text-gray-800">${stats.advanceDebt.toFixed(2)}</div>
+           <div className="text-xl font-black text-gray-800">{formatMoney(stats.advanceDebt, currency)}</div>
         </div>
         <div className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
            <div className="flex items-center gap-2 mb-2 text-gray-500">
              <CreditCard size={16} className="text-red-500" /> 
              <span className="text-[11px] font-bold uppercase tracking-wider">Loan Bal.</span>
            </div>
-           <div className="text-xl font-black text-gray-800">${stats.loanDebt.toFixed(2)}</div>
+           <div className="text-xl font-black text-gray-800">{formatMoney(stats.loanDebt, currency)}</div>
         </div>
       </div>
 
