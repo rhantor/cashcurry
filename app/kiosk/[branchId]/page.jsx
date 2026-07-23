@@ -1,11 +1,13 @@
+/* eslint-disable react/prop-types */
 "use client";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
 import { useKioskPunchMutation, useGetBranchAttendanceTokensQuery } from "@/lib/redux/api/attendanceApiSlice";
 import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
-import { Clock, LogIn, LogOut, X, Camera, Lock, ChevronLeft, User, Fingerprint, Loader2 } from "lucide-react";
+import { Clock, LogIn, LogOut, Camera, Lock, ChevronLeft, Fingerprint, Loader2, ScanFace, User } from "lucide-react";
 import { verifyBiometric } from "@/lib/biometricUtils";
+import FaceKioskScanner from "./FaceKioskScanner";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 function todayStr() {
@@ -288,6 +290,30 @@ export default function KioskPage() {
     if (stored) setUser(JSON.parse(stored));
   }, []);
 
+  // Keep the tablet screen awake while the kiosk is open (re-acquire when the
+  // tab becomes visible again — the lock drops on tab switch / sleep).
+  useEffect(() => {
+    let lock = null;
+    const acquire = async () => {
+      try {
+        if (document.visibilityState === "visible" && "wakeLock" in navigator) {
+          lock = await navigator.wakeLock.request("screen");
+        }
+      } catch {
+        /* wake lock unsupported or denied — non-critical */
+      }
+    };
+    acquire();
+    const onVis = () => {
+      if (document.visibilityState === "visible") acquire();
+    };
+    document.addEventListener("visibilitychange", onVis);
+    return () => {
+      document.removeEventListener("visibilitychange", onVis);
+      if (lock) lock.release().catch(() => {});
+    };
+  }, []);
+
   const companyId = user?.companyId;
 
   // Fetch staff list
@@ -310,12 +336,19 @@ export default function KioskPage() {
   const [toast, setToast] = useState(null);
   const [showExitModal, setShowExitModal] = useState(false);
   const [verifyingBio, setVerifyingBio] = useState(false);
+  const [manualMode, setManualMode] = useState(null); // null | "face" | "grid"
+  const [scanType, setScanType] = useState(null); // null (idle) | "in" | "out" — camera opens only after a choice
 
   // Fetch branch settings
   const { data: settings } = useGetBranchSettingsQuery(
     companyId && branchId ? { companyId, branchId } : { skip: true }
   );
   const attendanceSettings = settings?.attendance || {};
+  const faceEnabled = !!attendanceSettings.faceEnabled;
+
+  // Face scanning is the primary flow when enabled; the user can switch to the
+  // PIN grid and back. manualMode overrides the default once they choose.
+  const showScanner = faceEnabled && (manualMode ?? "face") === "face";
 
   // Determine punch type for a staff member
   const getPunchType = useCallback(
@@ -421,6 +454,73 @@ export default function KioskPage() {
     setSelectedStaff(null);
   };
 
+  // Face-recognition punch. Identity is already verified by the scanner. The
+  // staff explicitly tapped IN or OUT (requestedType). Before recording we check
+  // their current state: if they tap IN while already IN (or OUT while not in),
+  // we DON'T record it — we return a `conflict` so the scanner can ask "you're
+  // already IN, punch OUT instead?". Pass opts.force to record the switch.
+  // Returns an outcome object (never throws).
+  const handleFacePunch = async (staff, thumb, distance, requestedType, opts = {}) => {
+    const type = requestedType || getPunchType(staff.id);
+
+    const lastPunch = todayPunches
+      .filter((p) => p.staffId === staff.id)
+      .sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0))[0];
+    const currentlyIn = lastPunch?.type === "in";
+    const lastTime = lastPunch?.timestamp?.seconds
+      ? new Date(lastPunch.timestamp.seconds * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+      : null;
+
+    // Duplicate-interval guard always applies (prevents rapid repeats).
+    if (lastPunch && attendanceSettings.duplicatePunchInterval) {
+      const diffMin = (Date.now() - (lastPunch.timestamp?.seconds || 0) * 1000) / 60000;
+      if (diffMin < attendanceSettings.duplicatePunchInterval) {
+        const wait = Math.ceil(attendanceSettings.duplicatePunchInterval - diffMin);
+        return { ok: false, message: `Already punched. Wait ${wait} more min.` };
+      }
+    }
+
+    // State conflict — ask before recording (unless the user confirmed a switch).
+    if (!opts.force) {
+      if (type === "in" && currentlyIn) {
+        return {
+          ok: false,
+          conflict: true,
+          suggestedType: "out",
+          message: lastTime ? `You're already punched IN (since ${lastTime}).` : "You're already punched IN.",
+        };
+      }
+      if (type === "out" && !currentlyIn) {
+        return {
+          ok: false,
+          conflict: true,
+          suggestedType: "in",
+          message: lastPunch ? `You're already punched OUT.` : "You haven't punched IN yet.",
+        };
+      }
+    }
+
+    try {
+      await kioskPunch({
+        companyId,
+        branchId,
+        staffId: staff.id,
+        staffName: `${staff.firstName} ${staff.lastName}`,
+        type,
+        date: todayStr(),
+        photoBase64: thumb || null,
+        method: "face",
+        matchDistance: distance != null ? Number(distance.toFixed(3)) : undefined,
+      }).unwrap();
+
+      setToast({ name: staff.firstName, type });
+      refetchPunches();
+      return { ok: true, type };
+    } catch (err) {
+      return { ok: false, message: err?.message || "Punch failed" };
+    }
+  };
+
   // Admin exit (triple-tap top-left corner)
   const tapCountRef = useRef(0);
   const tapTimerRef = useRef(null);
@@ -454,10 +554,62 @@ export default function KioskPage() {
         </div>
       </div>
 
-      {/* Staff Grid */}
+      {/* Primary: Face flow (tap IN/OUT → camera opens → auto-detect), or fallback name grid */}
+      {showScanner ? (
+        scanType ? (
+          <FaceKioskScanner
+            staffList={staffList}
+            punchType={scanType}
+            onPunch={handleFacePunch}
+            onCancel={() => setScanType(null)}
+          />
+        ) : (
+          <div className="flex flex-col items-center justify-center flex-1 px-4">
+            <h2 className="text-white/50 text-sm font-bold uppercase tracking-widest mb-8">
+              Tap to punch — then look at the camera
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 w-full max-w-2xl">
+              <button
+                onClick={() => setScanType("in")}
+                className="group flex flex-col items-center justify-center gap-4 py-14 rounded-3xl bg-green-500/10 border-2 border-green-500/30 hover:bg-green-500/20 active:scale-[0.98] transition-all"
+              >
+                <div className="w-24 h-24 rounded-full bg-green-500 flex items-center justify-center shadow-lg shadow-green-500/30 group-hover:scale-105 transition-transform">
+                  <LogIn size={44} className="text-black" />
+                </div>
+                <span className="text-white font-black text-2xl tracking-tight">PUNCH IN</span>
+              </button>
+              <button
+                onClick={() => setScanType("out")}
+                className="group flex flex-col items-center justify-center gap-4 py-14 rounded-3xl bg-orange-500/10 border-2 border-orange-500/30 hover:bg-orange-500/20 active:scale-[0.98] transition-all"
+              >
+                <div className="w-24 h-24 rounded-full bg-orange-500 flex items-center justify-center shadow-lg shadow-orange-500/30 group-hover:scale-105 transition-transform">
+                  <LogOut size={44} className="text-black" />
+                </div>
+                <span className="text-white font-black text-2xl tracking-tight">PUNCH OUT</span>
+              </button>
+            </div>
+            <button
+              onClick={() => setManualMode("grid")}
+              className="mt-10 inline-flex items-center gap-2 px-5 py-3 rounded-2xl bg-white/10 text-white/70 font-bold hover:bg-white/20 transition"
+            >
+              <User size={18} /> Use PIN instead
+            </button>
+          </div>
+        )
+      ) : (
       <div className="flex-1 overflow-y-auto px-4 pb-4">
         <div className="max-w-5xl mx-auto">
-          <h2 className="text-white/40 text-xs font-bold uppercase tracking-widest mb-4 px-2">Select Your Name</h2>
+          <div className="flex items-center justify-between mb-4 px-2">
+            <h2 className="text-white/40 text-xs font-bold uppercase tracking-widest">Select Your Name</h2>
+            {faceEnabled && (
+              <button
+                onClick={() => setManualMode("face")}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-indigo-500/20 text-indigo-300 text-xs font-bold hover:bg-indigo-500/30 transition"
+              >
+                <ScanFace size={14} /> Back to Face Scan
+              </button>
+            )}
+          </div>
 
           {staffLoading ? (
             <div className="text-center text-white/30 py-20">Loading staff...</div>
@@ -517,6 +669,7 @@ export default function KioskPage() {
           )}
         </div>
       </div>
+      )}
 
       {/* Modals */}
       {showPinPad && selectedStaff && (

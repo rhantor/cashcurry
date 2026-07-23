@@ -5,7 +5,7 @@ import SettingsSection from "./SettingsSection";
 import { FieldRow, TextField, NumberField, Toggle, SectionCard } from "./fields";
 import { useGetStaffListQuery, useUpdateStaffMutation } from "@/lib/redux/api/staffApiSlice";
 import { registerBiometric, isBiometricAvailable } from "@/lib/biometricUtils";
-import { Fingerprint, CheckCircle2, ShieldAlert, Loader2, Camera, Clock, Calendar } from "lucide-react";
+import { Fingerprint, CheckCircle2, ShieldAlert, Loader2, Camera } from "lucide-react";
 
 export default function AttendanceSettingsSection({ role, companyId, branchId, value, onChange }) {
   const v = value || {};
@@ -124,6 +124,12 @@ export default function AttendanceSettingsSection({ role, companyId, branchId, v
             <SectionCard title="Kiosk Interaction" subtitle="Enable/disable verification methods.">
               <div className="flex flex-wrap gap-8 mt-4">
                 <Toggle
+                  label="Enable Face Recognition (Beta)"
+                  checked={v.faceEnabled}
+                  onChange={(faceEnabled) => patch({ faceEnabled })}
+                  disabled={!can("faceEnabled")}
+                />
+                <Toggle
                   label="Enable Biometric (Fingerprint)"
                   checked={v.useBiometrics}
                   onChange={(useBiometrics) => patch({ useBiometrics })}
@@ -136,6 +142,12 @@ export default function AttendanceSettingsSection({ role, companyId, branchId, v
                   disabled={!can("useCamera")}
                 />
               </div>
+              {v.faceEnabled && (
+                <div className="mt-4 p-3 bg-indigo-50 border border-indigo-200 rounded-xl flex items-center gap-3 text-indigo-700 text-sm font-medium">
+                  <Camera size={18} />
+                  Face recognition is on. Enroll each staff member&apos;s face from the Staff Management page (Add/Edit staff → Face ID).
+                </div>
+              )}
               {!biometricSupported && v.useBiometrics && (
                 <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3 text-amber-700 text-sm font-medium">
                   <ShieldAlert size={18} />

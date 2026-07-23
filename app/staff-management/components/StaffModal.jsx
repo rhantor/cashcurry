@@ -13,9 +13,12 @@ import {
   MapPin,
   Briefcase,
   Edit,
-  Plus
+  Plus,
+  ScanFace,
+  CheckCircle2
 } from 'lucide-react'
 import Field from './Field'
+import FaceEnroll from './FaceEnroll'
 import {
   EMPTY_FORM,
   PHOTO_MAX_DIMENSION,
@@ -31,6 +34,7 @@ export default function StaffModal ({
   mode = 'add',
   initialData = null,
   payrollConfig = null,   // branch payroll settings (for deduction overrides)
+  faceEnabled = false,    // branch has face recognition attendance turned on
   onSave,
   onClose
 }) {
@@ -39,6 +43,7 @@ export default function StaffModal ({
   const [errors, setErrors] = useState({})
   const [touched, setTouched] = useState({})
   const [saving, setSaving] = useState(false)
+  const [showFaceEnroll, setShowFaceEnroll] = useState(false)
 
   // photo
   const fileRef = useRef(null)
@@ -648,6 +653,65 @@ export default function StaffModal ({
               </Field>
             </div>
 
+            {faceEnabled && (
+              <div className='mb-6 p-4 bg-indigo-50/60 rounded-2xl border border-indigo-100'>
+                <div className='flex items-center gap-2 mb-3'>
+                  <ScanFace size={16} className='text-indigo-600' />
+                  <h3 className='text-xs font-extrabold uppercase tracking-wider text-indigo-600'>
+                    Face ID (Kiosk Attendance)
+                  </h3>
+                </div>
+
+                <div className='flex items-center gap-4'>
+                  <div className={`w-16 h-16 rounded-2xl border-2 flex items-center justify-center overflow-hidden flex-shrink-0 ${
+                    form.faceDescriptors?.length ? 'border-indigo-400 bg-white' : 'border-dashed border-black/15 bg-white'
+                  }`}>
+                    {form.faceThumb ? (
+                      <img src={form.faceThumb} alt='Face' className='w-full h-full object-cover' />
+                    ) : (
+                      <ScanFace className='text-black/25' size={22} />
+                    )}
+                  </div>
+
+                  <div className='flex flex-col gap-1'>
+                    {form.faceDescriptors?.length ? (
+                      <span className='inline-flex items-center gap-1.5 text-sm font-bold text-green-600'>
+                        <CheckCircle2 size={15} /> Enrolled
+                        <span className='text-black/40 font-semibold'>
+                          ({form.faceDescriptors.length} sample{form.faceDescriptors.length > 1 ? 's' : ''})
+                        </span>
+                      </span>
+                    ) : (
+                      <span className='text-sm font-bold text-black/50'>Not enrolled</span>
+                    )}
+
+                    <div className='flex items-center gap-3'>
+                      <button
+                        type='button'
+                        onClick={() => setShowFaceEnroll(true)}
+                        className='text-sm font-extrabold text-indigo-600 hover:underline w-fit'
+                      >
+                        {form.faceDescriptors?.length ? 'Re-enroll Face' : 'Enroll Face'}
+                      </button>
+                      {form.faceDescriptors?.length > 0 && (
+                        <button
+                          type='button'
+                          onClick={() => setForm(prev => ({ ...prev, faceDescriptors: [], faceEnrolledAt: null, faceThumb: null }))}
+                          className='text-xs font-bold text-red-600 hover:text-red-700 w-fit'
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+
+                    <span className='text-[11px] text-black/45 font-semibold'>
+                      Used to punch in/out at the attendance kiosk. Optional.
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className='mb-6 p-4 bg-gray-50 rounded-2xl border border-gray-100'>
               <h3 className='text-xs font-extrabold uppercase tracking-wider text-blue-600 mb-4'>
                 Attendance & Payroll Config
@@ -956,6 +1020,26 @@ export default function StaffModal ({
           </button>
         </div>
       </div>
+
+      {showFaceEnroll && (
+        <div onClick={e => e.stopPropagation()}>
+          <FaceEnroll
+            staffName={`${form.firstName || ''} ${form.lastName || ''}`.trim() || 'this staff member'}
+            onClose={() => setShowFaceEnroll(false)}
+            onEnrolled={({ descriptors, thumb }) => {
+              setForm(prev => ({
+                ...prev,
+                // Firestore forbids array-of-array, so each 128-number
+                // descriptor is wrapped as { data: [...] } (array of maps).
+                faceDescriptors: descriptors.map(d => ({ data: d })),
+                faceEnrolledAt: new Date().toISOString(),
+                faceThumb: thumb || prev.faceThumb || null
+              }))
+              setShowFaceEnroll(false)
+            }}
+          />
+        </div>
+      )}
     </div>
   )
 }

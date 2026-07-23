@@ -10,7 +10,7 @@ import {
 import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
 import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
 import { 
-  Clock, LogIn, LogOut, Calendar, ChevronLeft, ChevronRight, 
+  Clock, LogIn, LogOut, ChevronLeft, ChevronRight,
   Camera, Download, List, LayoutGrid, Plus, Edit2, Trash2, Save, X as CloseIcon, Loader2
 } from "lucide-react";
 import * as XLSX from "xlsx";
@@ -564,7 +564,7 @@ export default function AttendanceLogPage() {
                       await updatePunch({ companyId, branchId, punchId: editModal.punch.id, data: payload }).unwrap();
                     }
                     setEditModal(null);
-                  } catch (err) {
+                  } catch {
                     alert("Save failed");
                   } finally {
                     setIsSaving(false);
@@ -574,6 +574,46 @@ export default function AttendanceLogPage() {
               >
                 {isSaving ? <Loader2 className="animate-spin" size={18} /> : <><Save size={18} /> Save Changes</>}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Photo / Snapshot Modal */}
+      {photoModal && (
+        <div
+          className="fixed inset-0 z-[160] bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
+          onClick={() => setPhotoModal(null)}
+        >
+          <div
+            className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-4 border-b flex justify-between items-center bg-gray-50">
+              <div>
+                <h3 className="text-base font-black text-gray-900">{photoModal.staffName}</h3>
+                <p className="text-xs text-gray-500 font-semibold flex items-center gap-2">
+                  <span className={photoModal.type === "in" ? "text-green-600" : "text-orange-600"}>
+                    {photoModal.type === "in" ? "Punch IN" : "Punch OUT"}
+                  </span>
+                  · {formatTime(photoModal.timestamp)}
+                  {photoModal.method && (
+                    <span className="uppercase bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded text-[9px] font-bold">
+                      {photoModal.method}
+                    </span>
+                  )}
+                </p>
+              </div>
+              <button onClick={() => setPhotoModal(null)} className="text-gray-400 hover:text-gray-600 p-2">
+                <CloseIcon size={20} />
+              </button>
+            </div>
+            <div className="bg-gray-900 flex items-center justify-center">
+              <img
+                src={photoModal.photoBase64}
+                alt={`${photoModal.staffName} snapshot`}
+                className="w-full h-auto object-contain max-h-[70vh]"
+              />
             </div>
           </div>
         </div>

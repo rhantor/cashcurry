@@ -35,6 +35,7 @@ export default function StaffManagementPage () {
     companyId && branchId ? { companyId, branchId } : skipToken
   )
   const payrollConfig = branchSettings?.payroll || null
+  const faceEnabled = !!branchSettings?.attendance?.faceEnabled
   const branchName = branchData?.name || 'Selected Branch'
 
   const [addStaff] = useAddStaffMutation()
@@ -192,6 +193,7 @@ export default function StaffManagementPage () {
           mode={modalMode}
           initialData={modalMode === 'edit' ? editTarget : null}
           payrollConfig={payrollConfig}
+          faceEnabled={faceEnabled}
           onSave={handleSave}
           onClose={() => {
             setModalMode(null)
