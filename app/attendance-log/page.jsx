@@ -15,10 +15,11 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import Cookies from "js-cookie";
+import { computeAttendance, formatHours as fmtHours, toLocalDateStr } from "@/lib/attendance/computeHours";
 
 export default function AttendanceLogPage() {
   const [user, setUser] = useState(null);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
+  const [selectedDate, setSelectedDate] = useState(toLocalDateStr(new Date()));
   const [viewMode, setViewMode] = useState("daily"); // "daily" or "monthly"
   const [photoModal, setPhotoModal] = useState(null);
   const [editModal, setEditModal] = useState(null); // { punch: null, mode: 'add' | 'edit' }
@@ -70,33 +71,7 @@ export default function AttendanceLogPage() {
     return new Date(ts.seconds * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
   };
 
-  const formatHours = (hours) => {
-    if (attendanceSettings.hoursFormat === "hhmm") {
-      const h = Math.floor(hours);
-      const m = Math.round((hours - h) * 60);
-      return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
-    }
-    return hours.toFixed(2);
-  };
-
-  // Helper to adjust date based on cutoff
-  const getAttendanceDate = (timestamp) => {
-    if (!timestamp?.seconds) return null;
-    const date = new Date(timestamp.seconds * 1000);
-    const cutoff = attendanceSettings.dayCutoffTime || "00:00";
-    const [cutoffH, cutoffM] = cutoff.split(":").map(Number);
-    
-    const cutoffDate = new Date(date);
-    cutoffDate.setHours(cutoffH, cutoffM, 0, 0);
-
-    if (date < cutoffDate) {
-      // Roll to previous day
-      const prev = new Date(date);
-      prev.setDate(prev.getDate() - 1);
-      return prev.toISOString().split("T")[0];
-    }
-    return date.toISOString().split("T")[0];
-  };
+  const formatHours = (hours) => fmtHours(hours, attendanceSettings);
 
   const handleExport = async () => {
     setIsExporting(true);
@@ -112,65 +87,25 @@ export default function AttendanceLogPage() {
          const myPunches = monthlyPunches.filter(p => p.staffId === staff.id);
          if (myPunches.length === 0) return;
 
-         const dailyGroups = {};
-         myPunches.forEach(p => {
-            const adjustedDate = getAttendanceDate(p.timestamp) || p.date;
-            if (!dailyGroups[adjustedDate]) dailyGroups[adjustedDate] = [];
-            dailyGroups[adjustedDate].push(p);
-         });
+         const { days } = computeAttendance({ punches: myPunches, staff, settings: attendanceSettings });
 
-         const dailyLimit = Number(staff.basicHoursPerDay) || 8;
-         const isFullTime = staff.employmentType !== "part-time";
-
-         Object.keys(dailyGroups).sort().forEach(date => {
-            const dayPunches = dailyGroups[date].sort((a,b) => (a.timestamp?.seconds||0) - (b.timestamp?.seconds||0));
-            let clockedMillis = 0;
-            const punchTimes = { in1: "—", out1: "—", in2: "—", out2: "—", in3: "—", out3: "—" };
-            
-            let pairIdx = 1;
-            for (let i = 0; i < dayPunches.length - 1; i++) {
-              if (dayPunches[i].type === "in" && dayPunches[i+1].type === "out") {
-                clockedMillis += (dayPunches[i+1].timestamp.seconds - dayPunches[i].timestamp.seconds) * 1000;
-                
-                if (pairIdx <= 3) {
-                  punchTimes[`in${pairIdx}`] = formatTime(dayPunches[i].timestamp);
-                  punchTimes[`out${pairIdx}`] = formatTime(dayPunches[i+1].timestamp);
-                  pairIdx++;
-                }
-                i++;
-              }
-            }
-
-            let actualHours = clockedMillis / (1000 * 60 * 60);
-            let dayBasic = actualHours;
-            let dayOT = 0;
-
-            if (isFullTime) {
-              dayBasic = Math.min(actualHours, dailyLimit);
-              dayOT = Math.max(0, actualHours - dailyLimit);
-            }
-
-            let bonus = 0;
-            if (staff.hasPaidBreak) {
-              const meetsStrict = !staff.requireFullShiftForBreak || actualHours >= (Number(staff.fullShiftHours) || 7.5);
-              if (meetsStrict) bonus = 1;
-            }
-
+         days.forEach(day => {
+            const [p1, p2, p3] = day.pairs;
             reportData.push({
-               "Date": date,
+               "Date": day.date,
                "Name": staff.firstName + " " + staff.lastName,
-               "In 1": punchTimes.in1,
-               "Out 1": punchTimes.out1,
-               "In 2": punchTimes.in2,
-               "Out 2": punchTimes.out2,
-               "In 3": punchTimes.in3,
-               "Out 3": punchTimes.out3,
-               "Worked Hrs": formatHours(actualHours),
-               "Basic Hrs": formatHours(dayBasic + (bonus && dayBasic < dailyLimit ? 1 : 0)),
-               "OT Hrs": formatHours(dayOT + (bonus && dayBasic >= dailyLimit ? 1 : 0)),
-               "Bonus": bonus ? "1.00" : "0.00",
-               "Total": formatHours(dayBasic + dayOT + bonus),
-               "EST Earnings": ((dayBasic + dayOT + bonus) * (Number(staff.basicPerHour) || 0)).toFixed(2)
+               "In 1": p1?.in || "—",
+               "Out 1": p1?.out || "—",
+               "In 2": p2?.in || "—",
+               "Out 2": p2?.out || "—",
+               "In 3": p3?.in || "—",
+               "Out 3": p3?.out || "—",
+               "Worked Hrs": formatHours(day.worked),
+               "Basic Hrs": formatHours(day.basic),
+               "OT Hrs": formatHours(day.ot),
+               "Bonus": day.bonus ? "1.00" : "0.00",
+               "Total": formatHours(day.total),
+               "EST Earnings": (day.total * (Number(staff.basicPerHour) || 0)).toFixed(2)
             });
          });
       });
@@ -187,7 +122,7 @@ export default function AttendanceLogPage() {
     }
   };
 
-  // Monthly Summary Calculation
+  // Monthly Summary Calculation (shared engine)
   const monthlySummaries = useMemo(() => {
     if (!monthlyPunches.length || !staffList.length) return [];
 
@@ -195,79 +130,26 @@ export default function AttendanceLogPage() {
       const myPunches = monthlyPunches.filter(p => p.staffId === staff.id);
       if (myPunches.length === 0) return null;
 
-      const dailyGroups = {};
-      myPunches.forEach(p => {
-        const adjustedDate = getAttendanceDate(p.timestamp) || p.date;
-        if (!dailyGroups[adjustedDate]) dailyGroups[adjustedDate] = [];
-        dailyGroups[adjustedDate].push(p);
-      });
-
-      let totalBasic = 0;
-      let totalOT = 0;
-      let totalWorked = 0;
-      let daysWorked = 0;
-
-      const dailyLimit = Number(staff.basicHoursPerDay) || 8;
-      const isFullTime = staff.employmentType !== "part-time";
-
-      Object.keys(dailyGroups).forEach(date => {
-        const dayPunches = dailyGroups[date].sort((a,b) => (a.timestamp?.seconds||0) - (b.timestamp?.seconds||0));
-        let clockedMillis = 0;
-        for (let i = 0; i < dayPunches.length - 1; i++) {
-          if (dayPunches[i].type === "in" && dayPunches[i+1].type === "out") {
-            clockedMillis += (dayPunches[i+1].timestamp.seconds - dayPunches[i].timestamp.seconds) * 1000;
-            i++;
-          }
-        }
-
-        let actualHours = clockedMillis / (1000 * 60 * 60);
-        if (actualHours > 0) {
-          daysWorked++;
-          totalWorked += actualHours;
-          
-          let dayBasic = actualHours;
-          let dayOT = 0;
-          if (isFullTime) {
-            dayBasic = Math.min(actualHours, dailyLimit);
-            dayOT = Math.max(0, actualHours - dailyLimit);
-          }
-
-          if (staff.hasPaidBreak) {
-            const meetsStrict = !staff.requireFullShiftForBreak || actualHours >= (Number(staff.fullShiftHours) || 7.5);
-            if (meetsStrict) {
-              if (dayBasic < dailyLimit && isFullTime) {
-                const space = dailyLimit - dayBasic;
-                const toAdd = Math.min(1, space);
-                dayBasic += toAdd;
-                if (toAdd < 1) dayOT += (1 - toAdd);
-              } else {
-                dayOT += 1;
-              }
-            }
-          }
-          totalBasic += dayBasic;
-          totalOT += dayOT;
-        }
-      });
+      const { totals } = computeAttendance({ punches: myPunches, staff, settings: attendanceSettings });
 
       return {
         id: staff.id,
         name: staff.firstName + " " + staff.lastName,
         dept: staff.department || "N/A",
-        days: daysWorked,
-        worked: totalWorked,
-        basic: totalBasic,
-        ot: totalOT
+        days: totals.daysWorked,
+        worked: totals.worked,
+        basic: totals.basic,
+        ot: totals.ot
       };
     }).filter(s => s !== null);
-  }, [monthlyPunches, staffList]);
+  }, [monthlyPunches, staffList, attendanceSettings]);
 
   const sortedDaily = [...punches].sort((a, b) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
 
   const shiftDate = (days) => {
     const d = new Date(selectedDate);
     d.setDate(d.getDate() + days);
-    setSelectedDate(d.toISOString().split("T")[0]);
+    setSelectedDate(toLocalDateStr(d));
   };
 
   if (!user) return <div className="p-8 text-center text-gray-400">Loading...</div>;
@@ -336,7 +218,7 @@ export default function AttendanceLogPage() {
           </div>
           <button
             onClick={() => shiftDate(1)}
-            disabled={selectedDate === new Date().toISOString().split("T")[0]}
+            disabled={selectedDate === toLocalDateStr(new Date())}
             className="p-2 rounded-xl hover:bg-gray-100 transition text-gray-600 disabled:opacity-30"
           >
             <ChevronRight size={20} />

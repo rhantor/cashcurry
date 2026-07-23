@@ -8,10 +8,11 @@ import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlic
 import { Clock, LogIn, LogOut, Camera, Lock, ChevronLeft, Fingerprint, Loader2, ScanFace, User } from "lucide-react";
 import { verifyBiometric } from "@/lib/biometricUtils";
 import FaceKioskScanner from "./FaceKioskScanner";
+import { todayLocalStr } from "@/lib/attendance/computeHours";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 function todayStr() {
-  return new Date().toISOString().split("T")[0];
+  return todayLocalStr(); // local date, not UTC (avoids day rollover near midnight)
 }
 
 function LiveClock() {
