@@ -18,8 +18,11 @@ import {
   useMarkPayrollRunPaidMutation,
   useDeletePayrollRunMutation,
 } from '@/lib/redux/api/payrollRunApiSlice'
+import { useLazyGetBranchAttendanceByPeriodQuery } from '@/lib/redux/api/attendanceApiSlice'
 import { calcPayroll, fmtAmt, toPeriodKey, periodLabel } from '@/utils/payrollCalculations'
 import { exportPayrollToPDF, exportPayrollToExcel, exportPayslipToPDF } from '@/utils/export/exportPayroll'
+import { computeAttendance } from '@/lib/attendance/computeHours'
+import { startOfMonth, endOfMonth, addDays, subDays, format } from 'date-fns'
 import { skipToken } from '@reduxjs/toolkit/query'
 import PayrollPrintView from './components/PayrollPrintView'
 
@@ -28,6 +31,7 @@ import PayrollPrintView from './components/PayrollPrintView'
 const today = new Date()
 const currentYear  = today.getFullYear()
 const currentMonth = today.getMonth() + 1
+const round2 = v => Math.round((Number(v) || 0) * 100) / 100
 
 function getStaffName (s) {
   if (!s) return ''
@@ -91,7 +95,6 @@ function StaffSlipCard ({
   loanDed,
   locked,
   onPrint,
-  onExportPDF,
 }) {
   const mode = staff.salaryMode || payrollConfig?.defaultPayMode || 'hours'
   const stdHours = parseFloat(staff.standardHours) || parseFloat(payrollConfig?.standardHoursPerMonth) || 208
@@ -449,6 +452,7 @@ export default function PayrollBuilder () {
   const [revert]         = useRevertPayrollRunMutation()
   const [markPaid]       = useMarkPayrollRunPaidMutation()
   const [deleteDraft]    = useDeletePayrollRunMutation()
+  const [fetchAttendance] = useLazyGetBranchAttendanceByPeriodQuery()
 
   const payrollConfig = branchSettings?.payroll || null
 
@@ -662,6 +666,82 @@ export default function PayrollBuilder () {
       loanNote:            s.inputs?.loanNote            || '',
       extraNote:           s.inputs?.extraNote           || '',
     }))
+  }
+
+  // ── Import worked/OT hours from attendance punches for this month ──────────
+  async function handleImportAttendance () {
+    if (!isAdminOrManager || locked) return
+
+    const hasExisting = staffList.some(s => {
+      const inp = slipInputs[s.id]
+      return inp && (inp.workedHours || inp.workedDays || inp.otHours)
+    })
+    if (
+      hasExisting &&
+      !confirm(
+        'Import will replace Hours/Days Worked and OT for this month from attendance punches. ' +
+        'Bonuses, penalties, allowances and notes are kept. Continue?'
+      )
+    ) return
+
+    setBusy(true); setError('')
+    try {
+      const mStart = startOfMonth(new Date(year, month - 1, 1))
+      const mEnd = endOfMonth(mStart)
+      const startStr = format(mStart, 'yyyy-MM-dd')
+      const endStr = format(mEnd, 'yyyy-MM-dd')
+      // Query a ±1 day buffer so overnight shifts crossing the month boundary
+      // pair correctly; we then keep only computed days inside the month.
+      const bufStart = format(subDays(mStart, 1), 'yyyy-MM-dd')
+      const bufEnd = format(addDays(mEnd, 1), 'yyyy-MM-dd')
+
+      const punches = await fetchAttendance({
+        companyId, branchId, startDate: bufStart, endDate: bufEnd,
+      }).unwrap()
+
+      const settings = branchSettings?.attendance || {}
+
+      const updates = {}
+      let imported = 0
+      let skippedFixed = 0
+      for (const staff of staffList) {
+        if (staff.fixedSalaryNoAttendance) { skippedFixed++; continue }
+        const mine = (punches || []).filter(p => p.staffId === staff.id)
+        if (!mine.length) continue
+        const { days } = computeAttendance({ punches: mine, staff, settings })
+        const inMonth = days.filter(d => d.date >= startStr && d.date <= endStr)
+        if (!inMonth.length) continue
+        const basic = round2(inMonth.reduce((s, d) => s + d.basic, 0))
+        const ot = round2(inMonth.reduce((s, d) => s + d.ot, 0))
+        const daysWorked = inMonth.filter(d => d.worked > 0).length
+        const mode = staff.salaryMode || payrollConfig?.defaultPayMode || 'hours'
+        updates[staff.id] = { mode, basic, ot, daysWorked }
+        imported++
+      }
+
+      setSlipInputs(prev => {
+        const next = { ...prev }
+        for (const [id, u] of Object.entries(updates)) {
+          const base = prev[id] || buildDefaultInputs()
+          next[id] = {
+            ...base,
+            ...(u.mode === 'hours'
+              ? { workedHours: u.basic ? String(u.basic) : '' }
+              : { workedDays: u.daysWorked ? String(u.daysWorked) : '' }),
+            otHours: u.ot ? String(u.ot) : '',
+          }
+        }
+        return next
+      })
+
+      const parts = [`Imported attendance for ${imported} staff`]
+      if (skippedFixed) parts.push(`${skippedFixed} fixed-salary skipped`)
+      flash('ok', `${parts.join(' · ')}. Review and adjust before saving.`)
+    } catch (e) {
+      flash('error', e.message || 'Failed to import attendance')
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function handleSaveDraft () {
@@ -881,6 +961,16 @@ export default function PayrollBuilder () {
                 Excel
               </button>
             </>
+          )}
+          {!locked && staffList.length > 0 && (
+            <button
+              onClick={handleImportAttendance}
+              disabled={busy}
+              title='Fill Hours/Days & OT from kiosk attendance for this month'
+              className='px-5 py-2.5 rounded-xl border border-indigo-200 text-indigo-700 text-sm font-medium hover:bg-indigo-50 disabled:opacity-50 transition-colors'
+            >
+              ⏱ Import from Attendance
+            </button>
           )}
           {!locked && (
             <button

@@ -648,6 +648,22 @@ export default function StaffModal ({
                 </h3>
               </div>
 
+              <label className='flex items-start gap-3 p-3 bg-amber-50/70 border border-amber-100 rounded-xl cursor-pointer'>
+                <input
+                  type='checkbox'
+                  name='fixedSalaryNoAttendance'
+                  checked={!!form.fixedSalaryNoAttendance}
+                  onChange={e => change({ target: { name: 'fixedSalaryNoAttendance', value: e.target.checked } })}
+                  className='w-5 h-5 mt-0.5 accent-amber-500'
+                />
+                <div className='flex flex-col'>
+                  <span className='text-sm font-bold text-amber-800'>Fixed monthly salary (no attendance)</span>
+                  <span className='text-[11px] text-amber-700/80'>
+                    For owners/salaried staff. Payroll pays the flat Basic Salary and skips this person when importing hours from attendance.
+                  </span>
+                </div>
+              </label>
+
               <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
                 <Field label='Kiosk PIN Code (4 Digits)' required error={errors.pinCode}>
                   <input

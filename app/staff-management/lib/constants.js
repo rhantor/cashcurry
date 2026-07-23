@@ -63,6 +63,9 @@ export const EMPTY_FORM = {
   bankAccountHolderName: '',
   pinCode: '',
   employmentType: 'full-time',
+  // Salaried staff (e.g. owner/manager) paid a flat monthly amount with no
+  // kiosk attendance — payroll's "Import from Attendance" skips them.
+  fixedSalaryNoAttendance: false,
   basicHoursPerDay: 8,
   hasPaidBreak: false,
   requireFullShiftForBreak: false,
