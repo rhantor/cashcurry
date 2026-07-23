@@ -112,16 +112,16 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
   const { data: settings } = useGetBranchSettingsQuery(
     baseArgs ? baseArgs : skipToken
   )
-  const { data: sales = [] } = useGetSalesEntriesQuery(
+  const { data: sales = [], isLoading: loadingSales } = useGetSalesEntriesQuery(
     baseArgs ? baseArgs : skipToken
   )
-  const { data: costs = [] } = useGetCostEntriesQuery(
+  const { data: costs = [], isLoading: loadingCosts } = useGetCostEntriesQuery(
     baseArgs ? baseArgs : skipToken
   )
-  const { data: advanceEntries = [] } = useGetAdvanceEntriesQuery(
+  const { data: advanceEntries = [], isLoading: loadingAdvances } = useGetAdvanceEntriesQuery(
     baseArgs ? baseArgs : skipToken
   )
-  const { data: staffLoans = [] } = useGetStaffLoansQuery(
+  const { data: staffLoans = [], isLoading: loadingStaffLoans } = useGetStaffLoansQuery(
     baseArgs ? baseArgs : skipToken
   )
   // Merge staff loans into advances for cash-flow calculation.
@@ -142,16 +142,16 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
         _source:        'staffLoan',
       })),
   ]
-  const { data: deposits = [] } = useGetDepositEntryQuery(
+  const { data: deposits = [], isLoading: loadingDeposits } = useGetDepositEntryQuery(
     baseArgs ? baseArgs : skipToken
   )
-  const { data: salaries = [] } = useGetSalaryEntriesQuery(
+  const { data: salaries = [], isLoading: loadingSalaries } = useGetSalaryEntriesQuery(
     baseArgs ? baseArgs : skipToken
   )
-  const { data: withdrawals = [] } = useGetWithdrawEntriesQuery(
+  const { data: withdrawals = [], isLoading: loadingWithdrawals } = useGetWithdrawEntriesQuery(
     baseArgs ? baseArgs : skipToken
   )
-  const { data: loanActs = [] } = useGetLoanActivitiesQuery(
+  const { data: loanActs = [], isLoading: loadingLoanActs } = useGetLoanActivitiesQuery(
     baseArgs
       ? { ...baseArgs, direction: 'all', status: 'approved', type: 'all' }
       : skipToken
@@ -160,6 +160,20 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
   const { data: currentBranch } = useGetSingleBranchQuery(
     baseArgs ? baseArgs : skipToken
   )
+
+  // `ready` only reports company/branch resolution — the queries above are still
+  // in flight after it flips, so consumers that render totals need this instead.
+  // Otherwise a fully-zeroed table flashes before the real numbers arrive.
+  const isLoading =
+    !ready ||
+    loadingSales ||
+    loadingCosts ||
+    loadingAdvances ||
+    loadingStaffLoans ||
+    loadingDeposits ||
+    loadingSalaries ||
+    loadingWithdrawals ||
+    loadingLoanActs
   const { data: company } = useGetCompanyDetailsQuery(companyId ?? skipToken)
 
   const companyName = company?.name || 'Unknown Company'
@@ -582,6 +596,9 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
         type: 'daily',
         date: d,
         tenders: tendersForDay,
+        // Raw entries for consumers that break costs down by category; the
+        // costCash/costBank split below stays the source of truth for cash flow.
+        costEntries: dailyCosts,
         advance,
         staffLoanGiven,
         cost: costCash + costBank,
@@ -763,6 +780,7 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
 
   return {
     ready,
+    isLoading,
     branchName,
     companyName,
     computed,
