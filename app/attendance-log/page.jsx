@@ -121,7 +121,7 @@ export default function AttendanceLogPage() {
             reportData.push({
                "Date": day.date,
                "Name": staff.firstName + " " + staff.lastName,
-               ...(shiftsOn ? { "Shift": day.shiftName || "—" } : {}),
+               ...(shiftsOn ? { "Shift": day.shift || "—" } : {}),
                "In 1": p1?.in || "—",
                "Out 1": p1?.out || "—",
                "In 2": p2?.in || "—",

@@ -85,7 +85,7 @@ export default function OtRequests({
               </p>
               <p>
                 <span className="font-semibold">Shift:</span>{" "}
-                {req.shiftName || "-"} (starts {req.shiftStart || "-"})
+                {req.shiftStart || "-"} – {req.shiftEnd || "-"}
               </p>
               <p>
                 <span className="font-semibold">Punched in at:</span>{" "}

@@ -12,7 +12,7 @@ import {
 import { useGetSingleBranchQuery } from '@/lib/redux/api/branchApiSlice'
 import { useGetBranchSettingsQuery } from '@/lib/redux/api/branchSettingsApiSlice'
 import { skipToken } from '@reduxjs/toolkit/query'
-import { getShifts, shiftsEnabled } from '@/lib/attendance/shifts'
+import { shiftsEnabled } from '@/lib/attendance/shifts'
 import { findDuplicateEnrollmentGroups } from '@/lib/face/faceApi'
 import { AlertTriangle } from 'lucide-react'
 
@@ -39,11 +39,9 @@ export default function StaffManagementPage () {
   )
   const payrollConfig = branchSettings?.payroll || null
   const faceEnabled = !!branchSettings?.attendance?.faceEnabled
-  // Empty unless the branch turned shift templates on — the modal hides the
-  // shift picker entirely when there are none.
-  const shifts = shiftsEnabled(branchSettings?.attendance)
-    ? getShifts(branchSettings?.attendance)
-    : []
+  // The modal hides the shift time fields entirely when the branch hasn't
+  // turned shift rules on.
+  const shiftsOn = shiftsEnabled(branchSettings?.attendance)
   const branchName = branchData?.name || 'Selected Branch'
 
   const [addStaff] = useAddStaffMutation()
@@ -243,7 +241,7 @@ export default function StaffManagementPage () {
           initialData={modalMode === 'edit' ? editTarget : null}
           payrollConfig={payrollConfig}
           faceEnabled={faceEnabled}
-          shifts={shifts}
+          shiftsEnabled={shiftsOn}
           enrolledFaces={enrolledFaces}
           onSave={handleSave}
           onClose={() => {

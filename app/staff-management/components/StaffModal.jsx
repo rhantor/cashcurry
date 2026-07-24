@@ -17,6 +17,7 @@ import {
   ScanFace,
   CheckCircle2,
   Clock,
+  MoonStar,
   Wallet
 } from 'lucide-react'
 import Field from './Field'
@@ -30,7 +31,7 @@ import {
 } from '../lib/constants'
 import { RULES, validate } from '../lib/validation'
 import { COUNTRIES } from '../lib/countries'
-import { shiftLabel, shiftWindow } from '@/lib/attendance/shifts'
+import { isOvernight, shiftWindow, staffShift as resolveShiftFromForm } from '@/lib/attendance/shifts'
 import useCurrency from '@/app/hooks/useCurrency'
 
 // Tabs, in order. Each groups a use case. `fields` lists the validated fields in
@@ -48,7 +49,7 @@ export default function StaffModal ({
   initialData = null,
   payrollConfig = null,   // branch payroll settings (for deduction overrides)
   faceEnabled = false,    // branch has face recognition attendance turned on
-  shifts = [],            // branch shift templates (empty unless shifts are on)
+  shiftsEnabled = false,  // branch runs shift times (start/end per staff)
   enrolledFaces = [],     // other staff's faces — one face can't belong to two people
   onSave,
   onClose
@@ -70,15 +71,16 @@ export default function StaffModal ({
   const isMY = (form.nationality || '').toLowerCase() === 'malaysian'
   const isNonMY = !!form.nationality && !isMY
 
-  // Shift template chosen on the Attendance tab (empty list when shifts are off)
-  const selectedShift = useMemo(
-    () => shifts.find(s => s.id === form.shiftId) || null,
-    [shifts, form.shiftId]
+  // This staff member's own shift times (Attendance tab); null until both are set
+  const staffShift = useMemo(
+    () => resolveShiftFromForm(form),
+    [form.shiftStart, form.shiftEnd, form.shiftBreakMinutes]
   )
-  const selectedShiftWindow = useMemo(
-    () => (selectedShift ? shiftWindow('2000-01-01', selectedShift) : null),
-    [selectedShift]
+  const staffShiftWindow = useMemo(
+    () => (staffShift ? shiftWindow('2000-01-01', staffShift) : null),
+    [staffShift]
   )
+  const shiftIsOvernight = isOvernight(staffShift)
 
   // Seed when edit
   useEffect(() => {
@@ -777,21 +779,60 @@ export default function StaffModal ({
                   </Field>
                 </div>
 
-                {shifts.length > 0 && (
-                  <div className='mb-4'>
-                    <Field label='Default Shift'>
-                      <select name='shiftId' value={form.shiftId || ''} onChange={change} className={inputClass('shiftId')}>
-                        <option value=''>— No shift (use Basic Hours Per Day) —</option>
-                        {shifts.map(s => (
-                          <option key={s.id} value={s.id}>{shiftLabel(s)}</option>
-                        ))}
-                      </select>
-                      <p className='text-[10px] text-gray-400 mt-1'>
-                        {selectedShift
-                          ? `Lateness and OT are measured against this shift (${selectedShiftWindow ? `${selectedShiftWindow.hours.toFixed(2)}h paid` : 'invalid times'}). Early arrivals past the threshold need approval.`
-                          : 'Without a shift, OT simply starts after the daily hours below.'}
-                      </p>
-                    </Field>
+                {shiftsEnabled && (
+                  <div className='mb-4 p-3 bg-white border border-gray-200 rounded-xl'>
+                    <div className='flex items-center justify-between mb-3'>
+                      <h4 className='text-[11px] font-extrabold uppercase tracking-wider text-blue-600'>
+                        Shift Times
+                      </h4>
+                      {staffShiftWindow && (
+                        <span className='inline-flex items-center gap-1.5 text-[11px] font-bold text-gray-500'>
+                          {staffShiftWindow.hours.toFixed(2)}h paid
+                          {shiftIsOvernight && (
+                            <span className='inline-flex items-center gap-1 text-indigo-600'>
+                              <MoonStar size={12} /> overnight
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className='grid grid-cols-1 sm:grid-cols-3 gap-4'>
+                      <Field label='Shift Start'>
+                        <input
+                          type='time'
+                          name='shiftStart'
+                          value={form.shiftStart || ''}
+                          onChange={change}
+                          className={inputClass('shiftStart')}
+                        />
+                      </Field>
+                      <Field label='Shift End'>
+                        <input
+                          type='time'
+                          name='shiftEnd'
+                          value={form.shiftEnd || ''}
+                          onChange={change}
+                          className={inputClass('shiftEnd')}
+                        />
+                      </Field>
+                      <Field label='Unpaid Break (Min)'>
+                        <input
+                          type='number'
+                          name='shiftBreakMinutes'
+                          value={form.shiftBreakMinutes ?? ''}
+                          onChange={change}
+                          className={inputClass('shiftBreakMinutes')}
+                          placeholder='0'
+                        />
+                      </Field>
+                    </div>
+
+                    <p className='text-[10px] text-gray-400 mt-2'>
+                      {staffShift
+                        ? 'Lateness and OT are measured against these times. Arriving well before the start needs approval to count as OT.'
+                        : 'Leave blank for no fixed shift — OT then simply starts after the daily hours below. An end time earlier than the start means the shift crosses midnight.'}
+                    </p>
                   </div>
                 )}
 
@@ -802,13 +843,13 @@ export default function StaffModal ({
                       name='basicHoursPerDay'
                       value={form.basicHoursPerDay}
                       onChange={change}
-                      disabled={!!selectedShift}
+                      disabled={!!staffShift}
                       className={inputClass('basicHoursPerDay')}
                       placeholder='8'
                     />
                     <p className='text-[10px] text-gray-400 mt-1'>
-                      {selectedShift
-                        ? 'Overridden by the shift above.'
+                      {staffShift
+                        ? 'Overridden by the shift times above.'
                         : 'Daily OT starts after this amount.'}
                     </p>
                   </Field>
