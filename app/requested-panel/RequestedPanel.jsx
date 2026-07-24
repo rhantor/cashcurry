@@ -85,6 +85,7 @@ export default function RequestedPanel() {
     data: otRequests,
     isLoading: otLoading,
     isError: otError,
+    error: otErrorDetail,
   } = useGetOtRequestsQuery(
     { companyId, branchId },
     { skip: !companyId || !branchId || !otTabEnabled, pollingInterval: 5000 }
@@ -332,6 +333,7 @@ export default function RequestedPanel() {
           loading={otLoading}
           error={otError}
           errorMsg={otErrorMsg}
+          errorDetail={otErrorDetail}
           items={pendingOt}
           workingId={otWorkingId}
           onAction={handleOtAction}

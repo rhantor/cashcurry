@@ -11,6 +11,7 @@ import { Clock, Sunrise } from "lucide-react";
 export default function OtRequests({
   loading,
   error,
+  errorDetail,
   errorMsg,
   items,
   workingId,
@@ -18,8 +19,25 @@ export default function OtRequests({
   canApprove,
 }) {
   if (loading) return <p className="p-4">Loading...</p>;
-  if (error)
-    return <p className="p-4 text-red-600">Failed to load early-OT requests.</p>;
+  if (error) {
+    // Firestore's own message, not a generic one — the usual cause is that the
+    // otRequests security rule hasn't been deployed yet.
+    const detail = errorDetail?.message || errorDetail?.error || "";
+    const isPermission = /permission|insufficient/i.test(detail);
+    return (
+      <div className="rounded-lg border border-red-300 bg-red-50 p-4 text-sm">
+        <p className="font-semibold text-red-700">Failed to load early-OT requests.</p>
+        {detail && <p className="mt-1 font-mono text-xs text-red-600">{detail}</p>}
+        {isPermission && (
+          <p className="mt-2 text-red-700">
+            The <code className="font-mono">otRequests</code> security rule is in{" "}
+            <code className="font-mono">firestore.rules</code> but has not been deployed. Run{" "}
+            <code className="font-mono">firebase deploy --only firestore:rules</code>.
+          </p>
+        )}
+      </div>
+    );
+  }
 
   const fmtTime = (iso) => {
     if (!iso) return "-";
