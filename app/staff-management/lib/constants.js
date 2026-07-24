@@ -67,6 +67,9 @@ export const EMPTY_FORM = {
   // kiosk attendance — payroll's "Import from Attendance" skips them.
   fixedSalaryNoAttendance: false,
   basicHoursPerDay: 8,
+  // Default shift template (settings.attendance.shifts). Blank = no shift, so
+  // hours fall back to basicHoursPerDay.
+  shiftId: '',
   hasPaidBreak: false,
   requireFullShiftForBreak: false,
   fullShiftHours: 7.5,

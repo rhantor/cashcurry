@@ -3,12 +3,17 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
-import { useKioskPunchMutation, useGetBranchAttendanceTokensQuery } from "@/lib/redux/api/attendanceApiSlice";
+import {
+  useKioskPunchMutation,
+  useGetBranchAttendanceTokensQuery,
+  useCreateOtRequestMutation,
+} from "@/lib/redux/api/attendanceApiSlice";
 import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
 import { Clock, LogIn, LogOut, Camera, Lock, ChevronLeft, Fingerprint, Loader2, ScanFace, User } from "lucide-react";
 import { verifyBiometric } from "@/lib/biometricUtils";
 import FaceKioskScanner from "./FaceKioskScanner";
-import { todayLocalStr } from "@/lib/attendance/computeHours";
+import { getAttendanceDate, todayLocalStr } from "@/lib/attendance/computeHours";
+import { otRequestId, resolveStaffShift, shiftRules, shiftWindow } from "@/lib/attendance/shifts";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 function todayStr() {
@@ -328,6 +333,7 @@ export default function KioskPage() {
   );
 
   const [kioskPunch] = useKioskPunchMutation();
+  const [createOtRequest] = useCreateOtRequestMutation();
 
   // UI state
   const [selectedStaff, setSelectedStaff] = useState(null);
@@ -365,6 +371,51 @@ export default function KioskPage() {
       return punches[0].type === "in" ? "out" : "in";
     },
     [todayPunches]
+  );
+
+  // Punching in well before the shift starts raises an early-OT request for a
+  // GM/admin to approve in the Requested Panel — until then those extra minutes
+  // aren't paid. Silent no-op when shifts are off or the staff member has none.
+  const maybeRequestEarlyOt = useCallback(
+    async (staff, type) => {
+      if (type !== "in") return;
+      const shift = resolveStaffShift(staff, attendanceSettings);
+      if (!shift) return;
+
+      const now = new Date();
+      const date = getAttendanceDate(
+        { seconds: Math.floor(now.getTime() / 1000) },
+        attendanceSettings.dayCutoffTime
+      );
+      const win = shiftWindow(date, shift);
+      if (!win) return;
+
+      const earlyMinutes = (win.start.getTime() - now.getTime()) / 60000;
+      const { earlyOtMinutes } = shiftRules(attendanceSettings);
+      if (earlyMinutes < earlyOtMinutes) return;
+
+      try {
+        await createOtRequest({
+          companyId,
+          branchId,
+          id: otRequestId(staff.id, date),
+          data: {
+            staffId: staff.id,
+            staffName: `${staff.firstName} ${staff.lastName}`,
+            date,
+            shiftId: shift.id,
+            shiftName: shift.name || "",
+            shiftStart: shift.start,
+            punchInAt: now.toISOString(),
+            earlyMinutes: Math.round(earlyMinutes),
+          },
+        }).unwrap();
+      } catch (err) {
+        // Never block a punch over the approval record.
+        console.error("Early-OT request failed:", err);
+      }
+    },
+    [attendanceSettings, companyId, branchId, createOtRequest]
   );
 
   // Staff selection flow
@@ -448,6 +499,7 @@ export default function KioskPage() {
 
       setToast({ name: staff.firstName, type: punchType });
       refetchPunches();
+      maybeRequestEarlyOt(staff, punchType);
     } catch (err) {
       alert("Punch failed: " + (err?.message || "Unknown error"));
     }
@@ -516,6 +568,7 @@ export default function KioskPage() {
 
       setToast({ name: staff.firstName, type });
       refetchPunches();
+      maybeRequestEarlyOt(staff, type);
       return { ok: true, type };
     } catch (err) {
       return { ok: false, message: err?.message || "Punch failed" };

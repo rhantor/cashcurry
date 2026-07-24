@@ -14,6 +14,7 @@ import {
   descriptorToArray,
   captureThumbnail,
   processFrame,
+  findDuplicateEnrollment,
 } from "@/lib/face/faceApi";
 
 // Guided head-pose steps. "center" calibrates the per-person baseline; the rest
@@ -39,7 +40,11 @@ const CIRC = 2 * Math.PI * R;
 // Auto-capturing face enrollment. Streams the camera, walks the user through
 // head poses, and captures a descriptor at each pose automatically as a
 // progress ring fills to 100%. Hands the parent { descriptors, thumb }.
-export default function FaceEnroll({ staffName, onEnrolled, onClose }) {
+//
+// `enrolledFaces` — [{ id, name, descriptors }] for every OTHER staff member
+// with a face on file. Enrolling a face that already belongs to one of them is
+// refused: it would let that person punch in under two names.
+export default function FaceEnroll({ staffName, enrolledFaces = [], onEnrolled, onClose }) {
   const videoRef = useRef(null);
   const faceapiRef = useRef(null);
   const streamRef = useRef(null);
@@ -119,6 +124,19 @@ export default function FaceEnroll({ staffName, onEnrolled, onClose }) {
     }, 700);
   }, [onEnrolled, stopStream]);
 
+  // Someone else already owns this face — stop the whole enrollment.
+  const rejectDuplicate = useCallback((dupe) => {
+    capturedRef.current = [];
+    thumbRef.current = null;
+    stopStream();
+    setErrorMsg(
+      `This face is already enrolled as ${dupe.name}. One face can only belong ` +
+      `to one staff member — remove it from ${dupe.name} first if this is the ` +
+      `same person.`
+    );
+    setPhase("error");
+  }, [stopStream]);
+
   // Capture a descriptor for the current step, then advance.
   const captureStep = useCallback(async (step) => {
     const faceapi = faceapiRef.current;
@@ -130,7 +148,17 @@ export default function FaceEnroll({ staffName, onEnrolled, onClose }) {
       const input = proc?.input || video;
       const res = await detectDescriptor(faceapi, input);
       if (!res) return; // lost the face mid-capture; loop will retry
-      capturedRef.current = [...capturedRef.current, descriptorToArray(res.descriptor)];
+
+      // Checked on every capture, so a swap mid-enrollment can't slip through
+      // either. The first (center) capture makes it fail fast.
+      const descriptor = descriptorToArray(res.descriptor);
+      const dupe = findDuplicateEnrollment(descriptor, enrolledFaces);
+      if (dupe) {
+        rejectDuplicate(dupe);
+        return;
+      }
+
+      capturedRef.current = [...capturedRef.current, descriptor];
       if (step.key === "center") thumbRef.current = captureThumbnail(input);
 
       holdRef.current = 0;
@@ -143,7 +171,7 @@ export default function FaceEnroll({ staffName, onEnrolled, onClose }) {
     } finally {
       capturingRef.current = false;
     }
-  }, [finish, total]);
+  }, [finish, total, enrolledFaces, rejectDuplicate]);
 
   // Live pose loop.
   useEffect(() => {

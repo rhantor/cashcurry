@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import SettingsSection from "./SettingsSection";
 import { FieldRow, TextField, NumberField, Toggle, SectionCard } from "./fields";
+import ShiftTemplatesEditor from "./ShiftTemplatesEditor";
 import { useGetStaffListQuery, useUpdateStaffMutation } from "@/lib/redux/api/staffApiSlice";
 import { registerBiometric, isBiometricAvailable } from "@/lib/biometricUtils";
 import { Fingerprint, CheckCircle2, ShieldAlert, Loader2, Camera } from "lucide-react";
@@ -119,6 +120,9 @@ export default function AttendanceSettingsSection({ role, companyId, branchId, v
                 </div>
               </SectionCard>
             </div>
+
+            {/* Shift templates (opt-in) */}
+            <ShiftTemplatesEditor value={v} patch={patch} can={can} />
 
             {/* Kiosk Mode Toggles */}
             <SectionCard title="Kiosk Interaction" subtitle="Enable/disable verification methods.">

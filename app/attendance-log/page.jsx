@@ -1,8 +1,9 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
-import { 
-  useGetBranchAttendanceTokensQuery, 
+import {
+  useGetBranchAttendanceTokensQuery,
   useGetBranchAttendanceByPeriodQuery,
+  useGetOtRequestsQuery,
   useAddAttendancePunchMutation,
   useUpdateAttendancePunchMutation,
   useDeleteAttendancePunchMutation
@@ -16,6 +17,7 @@ import {
 import * as XLSX from "xlsx";
 import Cookies from "js-cookie";
 import { computeAttendance, formatHours as fmtHours, toLocalDateStr } from "@/lib/attendance/computeHours";
+import { shiftsEnabled } from "@/lib/attendance/shifts";
 
 export default function AttendanceLogPage() {
   const [user, setUser] = useState(null);
@@ -59,6 +61,26 @@ export default function AttendanceLogPage() {
     !skip ? { companyId, branchId } : { skip: true }
   );
   const attendanceSettings = settings?.attendance || {};
+  const shiftsOn = shiftsEnabled(attendanceSettings);
+
+  // Early-OT decisions for the month — they change how the engine pays an early
+  // punch-in, so the log must agree with what the approver decided.
+  const { data: otRequests = [] } = useGetOtRequestsQuery(
+    !skip && shiftsOn
+      ? { companyId, branchId, startDate: currentMonthStart, endDate: currentMonthEnd }
+      : { skip: true },
+    { skip: skip || !shiftsOn }
+  );
+
+  // { [staffId]: { [date]: status } }
+  const otApprovalsByStaff = useMemo(() => {
+    const map = {};
+    otRequests.forEach((r) => {
+      if (!r.staffId || !r.date) return;
+      (map[r.staffId] = map[r.staffId] || {})[r.date] = r.status;
+    });
+    return map;
+  }, [otRequests]);
 
   const [addPunch] = useAddAttendancePunchMutation();
   const [updatePunch] = useUpdateAttendancePunchMutation();
@@ -87,13 +109,19 @@ export default function AttendanceLogPage() {
          const myPunches = monthlyPunches.filter(p => p.staffId === staff.id);
          if (myPunches.length === 0) return;
 
-         const { days } = computeAttendance({ punches: myPunches, staff, settings: attendanceSettings });
+         const { days } = computeAttendance({
+            punches: myPunches,
+            staff,
+            settings: attendanceSettings,
+            otApprovals: otApprovalsByStaff[staff.id]
+         });
 
          days.forEach(day => {
             const [p1, p2, p3] = day.pairs;
             reportData.push({
                "Date": day.date,
                "Name": staff.firstName + " " + staff.lastName,
+               ...(shiftsOn ? { "Shift": day.shiftName || "—" } : {}),
                "In 1": p1?.in || "—",
                "Out 1": p1?.out || "—",
                "In 2": p2?.in || "—",
@@ -105,7 +133,15 @@ export default function AttendanceLogPage() {
                "OT Hrs": formatHours(day.ot),
                "Bonus": day.bonus ? "1.00" : "0.00",
                "Total": formatHours(day.total),
-               "EST Earnings": (day.total * (Number(staff.basicPerHour) || 0)).toFixed(2)
+               "EST Earnings": (day.total * (Number(staff.basicPerHour) || 0)).toFixed(2),
+               ...(shiftsOn
+                 ? {
+                     "Late (Min)": Math.round(day.lateMinutes),
+                     "Left Early (Min)": Math.round(day.earlyLeaveMinutes),
+                     "Early OT": day.otApproval === "none" ? "—" : day.otApproval,
+                     "Notes": day.notes.join("; ")
+                   }
+                 : {})
             });
          });
       });
@@ -130,7 +166,12 @@ export default function AttendanceLogPage() {
       const myPunches = monthlyPunches.filter(p => p.staffId === staff.id);
       if (myPunches.length === 0) return null;
 
-      const { totals } = computeAttendance({ punches: myPunches, staff, settings: attendanceSettings });
+      const { totals } = computeAttendance({
+        punches: myPunches,
+        staff,
+        settings: attendanceSettings,
+        otApprovals: otApprovalsByStaff[staff.id]
+      });
 
       return {
         id: staff.id,
@@ -139,10 +180,13 @@ export default function AttendanceLogPage() {
         days: totals.daysWorked,
         worked: totals.worked,
         basic: totals.basic,
-        ot: totals.ot
+        ot: totals.ot,
+        lateDays: totals.lateDays,
+        lateMinutes: totals.lateMinutes,
+        pendingOtDays: totals.pendingOtDays
       };
     }).filter(s => s !== null);
-  }, [monthlyPunches, staffList, attendanceSettings]);
+  }, [monthlyPunches, staffList, attendanceSettings, otApprovalsByStaff]);
 
   const sortedDaily = [...punches].sort((a, b) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
 
@@ -324,22 +368,44 @@ export default function AttendanceLogPage() {
         ) : (
           <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
             <div className="grid grid-cols-12 gap-4 px-6 py-4 bg-gray-900 text-[10px] font-black text-gray-400 uppercase tracking-widest">
-              <div className="col-span-3 text-white">Staff Member</div>
-              <div className="col-span-2">Dept</div>
+              <div className={`${shiftsOn ? "col-span-3" : "col-span-3"} text-white`}>Staff Member</div>
+              <div className={shiftsOn ? "col-span-1" : "col-span-2"}>Dept</div>
               <div className="col-span-1 text-center font-black">Days</div>
               <div className="col-span-2 text-right">Worked (H)</div>
               <div className="col-span-2 text-right">Basic (H)</div>
-              <div className="col-span-2 text-right text-orange-400">OT (H)</div>
+              <div className={`${shiftsOn ? "col-span-1" : "col-span-2"} text-right text-orange-400`}>OT (H)</div>
+              {shiftsOn && <div className="col-span-2 text-right text-red-400">Late</div>}
             </div>
             <div className="divide-y divide-gray-50">
                {monthlySummaries.map(s => (
                  <div key={s.id} className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-blue-50/30 transition text-sm">
-                    <div className="col-span-3 font-black text-gray-900">{s.name}</div>
-                    <div className="col-span-2 text-xs text-gray-400 font-bold uppercase">{s.dept}</div>
+                    <div className="col-span-3 font-black text-gray-900">
+                      {s.name}
+                      {shiftsOn && s.pendingOtDays > 0 && (
+                        <span className="ml-2 inline-block px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-black align-middle">
+                          {s.pendingOtDays} OT pending
+                        </span>
+                      )}
+                    </div>
+                    <div className={`${shiftsOn ? "col-span-1" : "col-span-2"} text-xs text-gray-400 font-bold uppercase truncate`}>{s.dept}</div>
                     <div className="col-span-1 text-center font-black text-gray-900">{s.days}</div>
                     <div className="col-span-2 text-right font-bold text-gray-600">{formatHours(s.worked)}</div>
                     <div className="col-span-2 text-right font-black text-blue-600">{formatHours(s.basic)}</div>
-                    <div className="col-span-2 text-right font-black text-orange-500">{formatHours(s.ot)}</div>
+                    <div className={`${shiftsOn ? "col-span-1" : "col-span-2"} text-right font-black text-orange-500`}>{formatHours(s.ot)}</div>
+                    {shiftsOn && (
+                      <div className="col-span-2 text-right">
+                        {s.lateDays > 0 ? (
+                          <span className="font-black text-red-600">
+                            {Math.round(s.lateMinutes)} min
+                            <span className="ml-1 text-[10px] font-bold text-red-400">
+                              ({s.lateDays}d)
+                            </span>
+                          </span>
+                        ) : (
+                          <span className="text-xs font-bold text-gray-300">—</span>
+                        )}
+                      </div>
+                    )}
                  </div>
                ))}
             </div>

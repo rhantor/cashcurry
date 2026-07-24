@@ -1,11 +1,15 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
-import { useGetBranchAttendanceByPeriodQuery } from "@/lib/redux/api/attendanceApiSlice";
+import {
+  useGetBranchAttendanceByPeriodQuery,
+  useGetOtRequestsQuery,
+} from "@/lib/redux/api/attendanceApiSlice";
 import { useGetStaffLoansQuery } from "@/lib/redux/api/staffLoanApiSlice";
 import { useGetAdvanceEntriesQuery } from "@/lib/redux/api/AdvanceApiSlice";
 import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
 import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
 import { computeAttendance, toLocalDateStr } from "@/lib/attendance/computeHours";
+import { shiftsEnabled } from "@/lib/attendance/shifts";
 import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/utils/formatMoney";
 import { skipToken } from "@reduxjs/toolkit/query";
@@ -87,6 +91,22 @@ export default function StaffProfilePage() {
       : skipToken
   );
 
+  // Own early-OT decisions, so displayed earnings match what payroll will pay.
+  const otEnabled = canAttendance && shiftsEnabled(attendanceSettings);
+  const { data: otRequests = [] } = useGetOtRequestsQuery(
+    otEnabled
+      ? { companyId: user.companyId, branchId: user.branchId, startDate: bufStartStr, endDate: todayStr }
+      : skipToken
+  );
+
+  const myOtApprovals = useMemo(() => {
+    const map = {};
+    otRequests
+      .filter(r => r.staffId === staffData?.id)
+      .forEach(r => { if (r.date) map[r.date] = r.status; });
+    return map;
+  }, [otRequests, staffData?.id]);
+
   const { data: allLoans = [] } = useGetStaffLoansQuery(
     !skip ? { companyId: user.companyId, branchId: user.branchId } : { skip: true }
   );
@@ -97,7 +117,10 @@ export default function StaffProfilePage() {
 
   // Calculations — uses the shared attendance engine (same as payroll/log).
   const stats = useMemo(() => {
-    const base = { isFixed: false, totalHours: 0, basicHours: 0, otHours: 0, earnings: 0, loanDebt: 0, advanceDebt: 0 };
+    const base = {
+      isFixed: false, totalHours: 0, basicHours: 0, otHours: 0, earnings: 0,
+      loanDebt: 0, advanceDebt: 0, lateDays: 0, lateMinutes: 0, pendingOtDays: 0,
+    };
     if (!staffData) return base;
 
     // Financials (independent of attendance)
@@ -116,7 +139,12 @@ export default function StaffProfilePage() {
     if (!period) return { ...base, loanDebt, advanceDebt };
 
     const mine = periodPunches.filter(p => p.staffId === staffData.id);
-    const { days } = computeAttendance({ punches: mine, staff: staffData, settings: attendanceSettings });
+    const { days } = computeAttendance({
+      punches: mine,
+      staff: staffData,
+      settings: attendanceSettings,
+      otApprovals: myOtApprovals,
+    });
     const inPeriod = days.filter(d => d.date >= period.startStr);
     const basicHours = inPeriod.reduce((s, d) => s + d.basic, 0);
     const otHours = inPeriod.reduce((s, d) => s + d.ot, 0);
@@ -124,8 +152,19 @@ export default function StaffProfilePage() {
       basicHours * (Number(staffData.basicPerHour) || 0) +
       otHours * (Number(staffData.OTPerHour) || 0);
 
-    return { isFixed: false, totalHours: basicHours + otHours, basicHours, otHours, earnings, loanDebt, advanceDebt };
-  }, [staffData, period, periodPunches, attendanceSettings, allLoans, allAdvances, user]);
+    return {
+      isFixed: false,
+      totalHours: basicHours + otHours,
+      basicHours,
+      otHours,
+      earnings,
+      loanDebt,
+      advanceDebt,
+      lateDays: inPeriod.filter(d => d.lateMinutes > 0).length,
+      lateMinutes: inPeriod.reduce((s, d) => s + d.lateMinutes, 0),
+      pendingOtDays: inPeriod.filter(d => d.otApproval === "pending").length,
+    };
+  }, [staffData, period, periodPunches, attendanceSettings, myOtApprovals, allLoans, allAdvances, user]);
 
   const handleLogout = async () => {
     try {
@@ -185,16 +224,33 @@ export default function StaffProfilePage() {
             Fixed monthly salary — attendance is not tracked for your account.
           </div>
         ) : (
-          <div className="grid grid-cols-2 gap-4">
-             <div>
-                <p className="text-xs opacity-70 mb-1 font-medium">Basic Hours</p>
-                <div className="text-2xl font-black">{stats.basicHours.toFixed(1)}<span className="text-xs font-medium opacity-50 ml-1">hrs</span></div>
-             </div>
-             <div>
-                <p className="text-xs opacity-70 mb-1 font-medium text-orange-200">Overtime (OT)</p>
-                <div className="text-2xl font-black text-orange-300">+{stats.otHours.toFixed(1)}<span className="text-xs font-medium opacity-50 ml-1">hrs</span></div>
-             </div>
-          </div>
+          <>
+            <div className="grid grid-cols-2 gap-4">
+               <div>
+                  <p className="text-xs opacity-70 mb-1 font-medium">Basic Hours</p>
+                  <div className="text-2xl font-black">{stats.basicHours.toFixed(1)}<span className="text-xs font-medium opacity-50 ml-1">hrs</span></div>
+               </div>
+               <div>
+                  <p className="text-xs opacity-70 mb-1 font-medium text-orange-200">Overtime (OT)</p>
+                  <div className="text-2xl font-black text-orange-300">+{stats.otHours.toFixed(1)}<span className="text-xs font-medium opacity-50 ml-1">hrs</span></div>
+               </div>
+            </div>
+
+            {(stats.pendingOtDays > 0 || stats.lateDays > 0) && (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {stats.pendingOtDays > 0 && (
+                  <span className="rounded-full bg-amber-400/20 px-3 py-1 text-[11px] font-bold text-amber-200">
+                    {stats.pendingOtDays} early-OT day(s) awaiting approval
+                  </span>
+                )}
+                {stats.lateDays > 0 && (
+                  <span className="rounded-full bg-red-400/20 px-3 py-1 text-[11px] font-bold text-red-200">
+                    Late {Math.round(stats.lateMinutes)} min over {stats.lateDays} day(s)
+                  </span>
+                )}
+              </div>
+            )}
+          </>
         )}
 
         <div className="mt-6 pt-6 border-t border-white/10 flex justify-between items-end">

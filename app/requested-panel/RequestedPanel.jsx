@@ -10,10 +10,17 @@ import {
   useApproveRepaymentWithAllocationMutation,
   useRejectRepaymentEntryMutation,
 } from "@/lib/redux/api/loanApiSlice";
+import {
+  useGetOtRequestsQuery,
+  useUpdateOtRequestMutation,
+} from "@/lib/redux/api/attendanceApiSlice";
+import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
 import { useGetBranchesBasicQuery } from "@/lib/redux/api/branchApiSlice";
+import { shiftsEnabled } from "@/lib/attendance/shifts";
 import { serverTimestamp } from "firebase/firestore";
 import AdvanceRequests from "./AdvanceRequests";
 import LoanRequests from "./LoanRequests";
+import OtRequests from "./OtRequests";
 
 export default function RequestedPanel() {
   const [companyId, setCompanyId] = useState(null);
@@ -26,6 +33,8 @@ export default function RequestedPanel() {
   const [advErrorMsg, setAdvErrorMsg] = useState("");
   const [loanWorkingId, setLoanWorkingId] = useState(null);
   const [loanErrorMsg, setLoanErrorMsg] = useState("");
+  const [otWorkingId, setOtWorkingId] = useState(null);
+  const [otErrorMsg, setOtErrorMsg] = useState("");
 
   useEffect(() => {
     const storedUser = localStorage.getItem("user");
@@ -65,7 +74,24 @@ export default function RequestedPanel() {
     { skip: !companyId || !branchId, pollingInterval: 5000 }
   );
 
+  // Early-OT approvals only exist when the branch runs shift templates.
+  const { data: branchSettings } = useGetBranchSettingsQuery(
+    { companyId, branchId },
+    { skip: !companyId || !branchId }
+  );
+  const otTabEnabled = shiftsEnabled(branchSettings?.attendance);
+
+  const {
+    data: otRequests,
+    isLoading: otLoading,
+    isError: otError,
+  } = useGetOtRequestsQuery(
+    { companyId, branchId },
+    { skip: !companyId || !branchId || !otTabEnabled, pollingInterval: 5000 }
+  );
+
   const [updateAdvance] = useUpdateAdvanceEntryMutation();
+  const [updateOtRequest] = useUpdateOtRequestMutation();
   const [updateLoan] = useUpdateLoanEntryMutation();
   const [approveRepayment] = useApproveRepaymentWithAllocationMutation();
   const [rejectRepayment] = useRejectRepaymentEntryMutation();
@@ -80,6 +106,11 @@ export default function RequestedPanel() {
   const pendingLoans = useMemo(
     () => (loans || []).filter((l) => l.status === "pending"),
     [loans]
+  );
+
+  const pendingOt = useMemo(
+    () => (otRequests || []).filter((r) => r.status === "pending"),
+    [otRequests]
   );
 
   // Permissions
@@ -182,6 +213,36 @@ export default function RequestedPanel() {
     }
   };
 
+  const handleOtAction = async (req, action) => {
+    setOtErrorMsg("");
+    if (!["approved", "rejected"].includes(action)) return;
+    setOtWorkingId(req.id);
+    try {
+      await updateOtRequest({
+        companyId,
+        branchId,
+        id: req.id,
+        data: {
+          status: action,
+          approvedBy: {
+            id: user?.uid || "",
+            name: user?.username || "Unknown",
+            role: user?.role || "N/A",
+            timestamp: serverTimestamp(),
+          },
+        },
+      }).unwrap();
+    } catch (err) {
+      console.error(err);
+      setOtErrorMsg("Failed to update early-OT request. Please try again.");
+    } finally {
+      setOtWorkingId(null);
+    }
+  };
+
+  // The OT tab disappears if shifts get turned off while it's open.
+  const currentTab = activeTab === "ot" && !otTabEnabled ? "advance" : activeTab;
+
   if (!companyId || !branchId) return <p className="p-6">Loading...</p>;
 
   return (
@@ -194,7 +255,7 @@ export default function RequestedPanel() {
       <div className="flex gap-4 mb-6">
         <button
           className={`relative px-4 py-2 rounded-lg font-medium ${
-            activeTab === "advance"
+            currentTab === "advance"
               ? "bg-mint-600 text-white"
               : "bg-mint-200 text-black"
           }`}
@@ -210,7 +271,7 @@ export default function RequestedPanel() {
 
         <button
           className={`relative px-4 py-2 rounded-lg font-medium ${
-            activeTab === "loan"
+            currentTab === "loan"
               ? "bg-mint-600 text-white"
               : "bg-mint-200 text-black"
           }`}
@@ -223,10 +284,28 @@ export default function RequestedPanel() {
             </span>
           )}
         </button>
+
+        {otTabEnabled && (
+          <button
+            className={`relative px-4 py-2 rounded-lg font-medium ${
+              currentTab === "ot"
+                ? "bg-mint-600 text-white"
+                : "bg-mint-200 text-black"
+            }`}
+            onClick={() => setActiveTab("ot")}
+          >
+            OT Approvals
+            {pendingOt.length > 0 && (
+              <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full">
+                {pendingOt.length}
+              </span>
+            )}
+          </button>
+        )}
       </div>
 
       {/* Panels */}
-      {activeTab === "advance" ? (
+      {currentTab === "advance" && (
         <AdvanceRequests
           loading={advLoading}
           error={advError}
@@ -235,7 +314,8 @@ export default function RequestedPanel() {
           workingId={advWorkingId}
           onAction={handleAdvanceAction}
         />
-      ) : (
+      )}
+      {currentTab === "loan" && (
         <LoanRequests
           loading={loanLoading}
           error={loanError}
@@ -245,6 +325,17 @@ export default function RequestedPanel() {
           onAction={handleLoanAction}
           canApprove={canApproveLoans}
           getBranchName={getBranchName}
+        />
+      )}
+      {currentTab === "ot" && (
+        <OtRequests
+          loading={otLoading}
+          error={otError}
+          errorMsg={otErrorMsg}
+          items={pendingOt}
+          workingId={otWorkingId}
+          onAction={handleOtAction}
+          canApprove={canApproveLoans}
         />
       )}
     </div>

@@ -323,6 +323,14 @@ service cloud.firestore {
           allow write: if canWrite(companyId, branchId);
         }
 
+        // ── Early-OT Requests (shift templates) ──────────────────────────────
+        // Raised by the kiosk on an early punch-in, approved in the Requested
+        // Panel. Same access shape as attendance.
+        match /otRequests/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if canWrite(companyId, branchId);
+        }
+
         // ── Vendor Bills ─────────────────────────────────────────────────────
         match /vendorBills/{docId} {
           allow read: if canRead(companyId, branchId);

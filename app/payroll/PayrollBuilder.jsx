@@ -18,7 +18,11 @@ import {
   useMarkPayrollRunPaidMutation,
   useDeletePayrollRunMutation,
 } from '@/lib/redux/api/payrollRunApiSlice'
-import { useLazyGetBranchAttendanceByPeriodQuery } from '@/lib/redux/api/attendanceApiSlice'
+import {
+  useLazyGetBranchAttendanceByPeriodQuery,
+  useLazyGetOtRequestsQuery
+} from '@/lib/redux/api/attendanceApiSlice'
+import { shiftsEnabled } from '@/lib/attendance/shifts'
 import { calcPayroll, fmtAmt, toPeriodKey, periodLabel } from '@/utils/payrollCalculations'
 import { exportPayrollToPDF, exportPayrollToExcel, exportPayslipToPDF } from '@/utils/export/exportPayroll'
 import { computeAttendance } from '@/lib/attendance/computeHours'
@@ -453,6 +457,7 @@ export default function PayrollBuilder () {
   const [markPaid]       = useMarkPayrollRunPaidMutation()
   const [deleteDraft]    = useDeletePayrollRunMutation()
   const [fetchAttendance] = useLazyGetBranchAttendanceByPeriodQuery()
+  const [fetchOtRequests] = useLazyGetOtRequestsQuery()
 
   const payrollConfig = branchSettings?.payroll || null
 
@@ -701,16 +706,35 @@ export default function PayrollBuilder () {
 
       const settings = branchSettings?.attendance || {}
 
+      // Early-OT decisions for the month. Anything still pending is imported as
+      // unpaid (paid from shift start) — we warn so it can be approved first.
+      let otByStaff = {}
+      if (shiftsEnabled(settings)) {
+        const otRequests = await fetchOtRequests({
+          companyId, branchId, startDate: bufStart, endDate: bufEnd,
+        }).unwrap()
+        otRequests.forEach(r => {
+          if (!r.staffId || !r.date) return
+          ;(otByStaff[r.staffId] = otByStaff[r.staffId] || {})[r.date] = r.status
+        })
+      }
+
       const updates = {}
       let imported = 0
       let skippedFixed = 0
+      let pendingOt = 0
+      let lateDays = 0
       for (const staff of staffList) {
         if (staff.fixedSalaryNoAttendance) { skippedFixed++; continue }
         const mine = (punches || []).filter(p => p.staffId === staff.id)
         if (!mine.length) continue
-        const { days } = computeAttendance({ punches: mine, staff, settings })
+        const { days } = computeAttendance({
+          punches: mine, staff, settings, otApprovals: otByStaff[staff.id],
+        })
         const inMonth = days.filter(d => d.date >= startStr && d.date <= endStr)
         if (!inMonth.length) continue
+        pendingOt += inMonth.filter(d => d.otApproval === 'pending').length
+        lateDays += inMonth.filter(d => d.lateMinutes > 0).length
         const basic = round2(inMonth.reduce((s, d) => s + d.basic, 0))
         const ot = round2(inMonth.reduce((s, d) => s + d.ot, 0))
         const daysWorked = inMonth.filter(d => d.worked > 0).length
@@ -736,6 +760,8 @@ export default function PayrollBuilder () {
 
       const parts = [`Imported attendance for ${imported} staff`]
       if (skippedFixed) parts.push(`${skippedFixed} fixed-salary skipped`)
+      if (lateDays) parts.push(`${lateDays} late day(s)`)
+      if (pendingOt) parts.push(`⚠ ${pendingOt} early-OT day(s) still pending — approve in the Requested Panel and re-import to pay them`)
       flash('ok', `${parts.join(' · ')}. Review and adjust before saving.`)
     } catch (e) {
       flash('error', e.message || 'Failed to import attendance')

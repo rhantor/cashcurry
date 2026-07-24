@@ -30,6 +30,7 @@ import {
 } from '../lib/constants'
 import { RULES, validate } from '../lib/validation'
 import { COUNTRIES } from '../lib/countries'
+import { shiftLabel, shiftWindow } from '@/lib/attendance/shifts'
 import useCurrency from '@/app/hooks/useCurrency'
 
 // Tabs, in order. Each groups a use case. `fields` lists the validated fields in
@@ -47,6 +48,8 @@ export default function StaffModal ({
   initialData = null,
   payrollConfig = null,   // branch payroll settings (for deduction overrides)
   faceEnabled = false,    // branch has face recognition attendance turned on
+  shifts = [],            // branch shift templates (empty unless shifts are on)
+  enrolledFaces = [],     // other staff's faces — one face can't belong to two people
   onSave,
   onClose
 }) {
@@ -66,6 +69,16 @@ export default function StaffModal ({
   const [photoCleared, setPhotoCleared] = useState(false)
   const isMY = (form.nationality || '').toLowerCase() === 'malaysian'
   const isNonMY = !!form.nationality && !isMY
+
+  // Shift template chosen on the Attendance tab (empty list when shifts are off)
+  const selectedShift = useMemo(
+    () => shifts.find(s => s.id === form.shiftId) || null,
+    [shifts, form.shiftId]
+  )
+  const selectedShiftWindow = useMemo(
+    () => (selectedShift ? shiftWindow('2000-01-01', selectedShift) : null),
+    [selectedShift]
+  )
 
   // Seed when edit
   useEffect(() => {
@@ -764,6 +777,24 @@ export default function StaffModal ({
                   </Field>
                 </div>
 
+                {shifts.length > 0 && (
+                  <div className='mb-4'>
+                    <Field label='Default Shift'>
+                      <select name='shiftId' value={form.shiftId || ''} onChange={change} className={inputClass('shiftId')}>
+                        <option value=''>— No shift (use Basic Hours Per Day) —</option>
+                        {shifts.map(s => (
+                          <option key={s.id} value={s.id}>{shiftLabel(s)}</option>
+                        ))}
+                      </select>
+                      <p className='text-[10px] text-gray-400 mt-1'>
+                        {selectedShift
+                          ? `Lateness and OT are measured against this shift (${selectedShiftWindow ? `${selectedShiftWindow.hours.toFixed(2)}h paid` : 'invalid times'}). Early arrivals past the threshold need approval.`
+                          : 'Without a shift, OT simply starts after the daily hours below.'}
+                      </p>
+                    </Field>
+                  </div>
+                )}
+
                 <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 items-end'>
                   <Field label='Basic Hours Per Day'>
                     <input
@@ -771,10 +802,15 @@ export default function StaffModal ({
                       name='basicHoursPerDay'
                       value={form.basicHoursPerDay}
                       onChange={change}
+                      disabled={!!selectedShift}
                       className={inputClass('basicHoursPerDay')}
                       placeholder='8'
                     />
-                    <p className='text-[10px] text-gray-400 mt-1'>Daily OT starts after this amount.</p>
+                    <p className='text-[10px] text-gray-400 mt-1'>
+                      {selectedShift
+                        ? 'Overridden by the shift above.'
+                        : 'Daily OT starts after this amount.'}
+                    </p>
                   </Field>
 
                   <div className='flex flex-col gap-3 p-3 bg-white border border-gray-200 rounded-xl'>
@@ -989,6 +1025,7 @@ export default function StaffModal ({
         <div onClick={e => e.stopPropagation()}>
           <FaceEnroll
             staffName={`${form.firstName || ''} ${form.lastName || ''}`.trim() || 'this staff member'}
+            enrolledFaces={enrolledFaces}
             onClose={() => setShowFaceEnroll(false)}
             onEnrolled={({ descriptors, thumb }) => {
               setForm(prev => ({
