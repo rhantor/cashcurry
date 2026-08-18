@@ -27,7 +27,7 @@ import ItemFilterBar, { filterItems } from "@/app/components/purchases/ItemFilte
 import useToast from "@/app/components/purchases/useToast";
 import { uploadInvoiceFile } from "@/utils/storage/uploadInvoice";
 import useCurrency from "@/app/hooks/useCurrency";
-import buildPurchaseOrderPdf, { loadLogo } from "@/utils/pdf/purchaseOrderPdf";
+import buildPurchaseOrderPdf, { loadLogo, poReference } from "@/utils/pdf/purchaseOrderPdf";
 import {
   FileText,
   Send,
@@ -605,7 +605,7 @@ export default function PurchaseOrdersPage() {
 
               <div className="text-xs text-slate-500 space-y-1 mb-4">
                 <p className="flex justify-between gap-2">
-                  <span className="font-mono text-slate-400">{order.poNo || "—"}</span>
+                  <span className="font-mono text-slate-400">{poReference(order)}</span>
                   <span>
                     {order.items?.length || 0} items ·{" "}
                     {order.createdAt ? new Date(order.createdAt.seconds * 1000).toLocaleDateString() : "-"}

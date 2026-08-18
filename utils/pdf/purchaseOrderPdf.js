@@ -22,6 +22,27 @@ const LINE = [226, 232, 240];
 
 const text = (v) => String(v ?? "").trim();
 
+/**
+ * The reference a supplier will read back to you.
+ *
+ * Orders raised before document numbering existed have no `poNo`, and printing
+ * their 20-character Firestore id gave the supplier a string nobody can read
+ * over a phone or copy onto a delivery note. Fall back to something short and
+ * dated instead — still unique enough to find the order, and sayable out loud.
+ */
+export function poReference(order) {
+  if (text(order?.poNo)) return text(order.poNo);
+
+  const created = order?.createdAt?.seconds ? new Date(order.createdAt.seconds * 1000) : new Date();
+  const stamp =
+    String(created.getFullYear()).slice(2) +
+    String(created.getMonth() + 1).padStart(2, "0") +
+    String(created.getDate()).padStart(2, "0");
+  const tail = String(order?.id || "").replace(/[^a-zA-Z0-9]/g, "").slice(0, 4).toUpperCase();
+
+  return `PO-${stamp}${tail ? `-${tail}` : ""}`;
+}
+
 /** Squash an address object (or string) into printable lines. */
 function addressLines(address) {
   if (!address) return [];
@@ -107,6 +128,7 @@ export default function buildPurchaseOrderPdf({
   logoDataUrl = null,
 }) {
   const doc = new jsPDF({ unit: "mm", format: "a4" });
+  const reference = poReference(order);
   const received = order.status === "Received";
   const lines = received && order.receivedItems?.length ? order.receivedItems : order.items || [];
 
@@ -160,7 +182,7 @@ export default function buildPurchaseOrderPdf({
 
   const created = order.createdAt?.seconds ? new Date(order.createdAt.seconds * 1000) : null;
   const meta = [
-    ["No.", text(order.poNo) || order.id],
+    ["No.", reference],
     ["Date", created ? created.toLocaleDateString() : "—"],
     ["Status", text(order.status) || "Pending"],
   ];
@@ -359,13 +381,12 @@ export default function buildPurchaseOrderPdf({
     doc.setFontSize(7.5);
     doc.setTextColor(...MUTED);
     doc.text(
-      `${text(order.poNo) || order.id}  ·  Generated ${new Date().toLocaleDateString()}`,
+      `${reference}  ·  Generated ${new Date().toLocaleDateString()}`,
       MARGIN,
       288
     );
     doc.text(`Page ${page} of ${pages}`, RIGHT, 288, { align: "right" });
   }
 
-  const safeName = (text(order.poNo) || `PO_${text(order.vendorName)}`).replace(/[^\w-]+/g, "_");
-  doc.save(`${safeName}.pdf`);
+  doc.save(`${reference.replace(/[^\w-]+/g, "_")}.pdf`);
 }
