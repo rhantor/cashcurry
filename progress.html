@@ -1,0 +1,481 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Purchases Module — Progress</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --panel: #ffffff;
+    --ink: #0f172a;
+    --muted: #64748b;
+    --faint: #94a3b8;
+    --line: #e2e8f0;
+    --accent: #0d9488;
+    --accent-soft: #ccfbf1;
+    --done: #059669;
+    --done-soft: #d1fae5;
+    --todo: #b45309;
+    --todo-soft: #fef3c7;
+    --defer: #4f46e5;
+    --defer-soft: #e0e7ff;
+    --danger: #dc2626;
+    --shadow: 0 1px 3px rgba(15, 23, 42, .06), 0 8px 24px rgba(15, 23, 42, .04);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0b1120;
+      --panel: #111a2e;
+      --ink: #e2e8f0;
+      --muted: #94a3b8;
+      --faint: #64748b;
+      --line: #1e293b;
+      --accent: #2dd4bf;
+      --accent-soft: #134e4a;
+      --done: #34d399;
+      --done-soft: #064e3b;
+      --todo: #fbbf24;
+      --todo-soft: #451a03;
+      --defer: #a5b4fc;
+      --defer-soft: #1e1b4b;
+      --danger: #f87171;
+      --shadow: 0 1px 3px rgba(0, 0, 0, .4);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 40px 20px 80px;
+    background: var(--bg);
+    color: var(--ink);
+    font: 15px/1.6 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; }
+
+  header { margin-bottom: 32px; }
+  h1 { font-size: 30px; line-height: 1.2; margin: 0 0 6px; letter-spacing: -.02em; }
+  .sub { color: var(--muted); margin: 0; }
+  .stamp { color: var(--faint); font-size: 13px; margin-top: 10px; font-variant-numeric: tabular-nums; }
+
+  .bar-wrap { margin: 24px 0 8px; }
+  .bar { height: 10px; background: var(--line); border-radius: 99px; overflow: hidden; }
+  .bar > span { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+  .bar-label { display: flex; justify-content: space-between; font-size: 13px; color: var(--muted); margin-top: 8px; }
+
+  h2 {
+    font-size: 13px; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--faint); margin: 40px 0 14px; font-weight: 700;
+  }
+
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 20px 22px;
+    margin-bottom: 14px;
+    box-shadow: var(--shadow);
+  }
+  .card-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 4px; }
+  .card-head h3 { font-size: 17px; margin: 0; flex: 1; letter-spacing: -.01em; }
+  .why { color: var(--muted); font-size: 14px; margin: 2px 0 14px; }
+
+  .pill {
+    font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+    padding: 4px 10px; border-radius: 99px; white-space: nowrap; flex-shrink: 0;
+  }
+  .pill.done   { background: var(--done-soft);  color: var(--done); }
+  .pill.todo   { background: var(--todo-soft);  color: var(--todo); }
+  .pill.defer  { background: var(--defer-soft); color: var(--defer); }
+  .num {
+    font-size: 12px; font-weight: 700; color: var(--accent);
+    background: var(--accent-soft); border-radius: 6px; padding: 3px 8px;
+    flex-shrink: 0; font-variant-numeric: tabular-nums;
+  }
+
+  ul.checks { list-style: none; padding: 0; margin: 0; }
+  ul.checks li {
+    display: flex; gap: 10px; align-items: baseline;
+    padding: 7px 0; border-top: 1px solid var(--line); font-size: 14px;
+  }
+  ul.checks li:first-child { border-top: none; }
+  .mark { flex-shrink: 0; width: 16px; font-weight: 700; }
+  .mark.ok { color: var(--done); }
+  .mark.no { color: var(--faint); }
+  .mark.df { color: var(--defer); }
+
+  code {
+    font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+    font-size: .88em; background: var(--bg); border: 1px solid var(--line);
+    padding: 1px 5px; border-radius: 5px; color: var(--ink); white-space: nowrap;
+  }
+  .files { margin-top: 14px; padding-top: 12px; border-top: 1px dashed var(--line); }
+  .files strong { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); }
+  .files ul { list-style: none; padding: 0; margin: 8px 0 0; }
+  .files li { font-size: 13px; color: var(--muted); padding: 2px 0; }
+
+  .callout {
+    border-left: 3px solid var(--danger);
+    background: var(--panel);
+    border-radius: 0 12px 12px 0;
+    padding: 16px 20px;
+    margin-bottom: 14px;
+    box-shadow: var(--shadow);
+  }
+  .callout.info { border-left-color: var(--defer); }
+  .callout h3 { margin: 0 0 6px; font-size: 15px; }
+  .callout p { margin: 0; color: var(--muted); font-size: 14px; }
+  .callout ol { margin: 10px 0 0; padding-left: 20px; color: var(--muted); font-size: 14px; }
+  .callout ol li { margin: 4px 0; }
+
+  footer { margin-top: 48px; color: var(--faint); font-size: 13px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Purchases Module — Progress</h1>
+    <p class="sub">Order Guides → Purchase Orders → GRN → Vendor Bills. Rebuild status and what is left.</p>
+    <p class="stamp">Last updated: 19 Aug 2026 &nbsp;·&nbsp; branch <code>main</code> &nbsp;·&nbsp; <code>next build</code> passing</p>
+
+    <div class="bar-wrap">
+      <div class="bar"><span style="width:100%"></span></div>
+      <div class="bar-label"><span>10 of 10 planned phases complete</span><span>100%</span></div>
+    </div>
+  </header>
+
+  <div class="callout">
+    <h3>⚠ One deploy step is required</h3>
+    <p>Purchase order numbering writes to a new <code>counters</code> collection. Until the rules are pushed, orders still save correctly &mdash; they just come out without a <code>PO-…</code> number and fall back to the document id.</p>
+    <ol>
+      <li>Review the new <code>counters</code> block in <code>firestore.rules</code></li>
+      <li><code>firebase deploy --only firestore:rules</code></li>
+      <li>Create one test order and confirm a number like <code>PO-KL-2608-0001</code> appears on the card</li>
+      <li>Set a short <code>code</code> on each branch (Settings → General) — it becomes the tag in the number; without one the branch name is used</li>
+    </ol>
+  </div>
+
+  <div class="callout info">
+    <h3>To switch the approval step on</h3>
+    <p>Settings → <strong>Operations &amp; Staff</strong> → <strong>Purchasing Controls</strong> → “Require approval before sending a purchase order”. Off by default, so nothing changes until you flip it. Only owner and branch admin can change the policy itself.</p>
+  </div>
+
+  <h2>Phases</h2>
+
+  <!-- Phase 1 -->
+  <div class="card">
+    <div class="card-head">
+      <span class="num">01</span>
+      <h3>Atomic goods receipt &amp; correct due dates</h3>
+      <span class="pill done">Done</span>
+    </div>
+    <p class="why">Receiving used to run three unrelated writes in a row. A failure between them left a vendor bill posted against an order that still read “Sent”, so the obvious retry posted the invoice a second time and double-counted the vendor balance.</p>
+    <ul class="checks">
+      <li><span class="mark ok">✓</span><span>New <code>receivePurchaseOrder</code> mutation puts the bill, the vendor balance and the PO status in one transaction</span></li>
+      <li><span class="mark ok">✓</span><span>Receiving an already-received or cancelled order is rejected inside the transaction</span></li>
+      <li><span class="mark ok">✓</span><span>Bill due date now follows the vendor’s credit terms instead of being set to the invoice date, which made every GRN bill instantly overdue</span></li>
+      <li><span class="mark ok">✓</span><span>Invoice date is editable at receipt time rather than always being today</span></li>
+      <li><span class="mark ok">✓</span><span>Actual cost lands in <code>lastPurchasePrice</code> / <code>lastPurchaseDate</code>; the company-wide <code>defaultPrice</code> is no longer silently rewritten by one branch’s invoice</span></li>
+      <li><span class="mark ok">✓</span><span>The generated bill links back with <code>sourcePoId</code>, and the PO stores its <code>billId</code></span></li>
+    </ul>
+    <div class="files">
+      <strong>Files</strong>
+      <ul>
+        <li><code>lib/redux/api/requisitionsApiSlice.js</code> — <code>receivePurchaseOrder</code>, <code>addDaysISO</code></li>
+        <li><code>app/purchases/purchase-orders/page.jsx</code> — receive modal</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Phase 2 -->
+  <div class="card">
+    <div class="card-head">
+      <span class="num">02</span>
+      <h3>Edit an order after it is created</h3>
+      <span class="pill done">Done</span>
+    </div>
+    <p class="why">There was no way to correct an order. A wrong quantity or a forgotten item meant cancelling and rebuilding the whole thing from the guide.</p>
+    <ul class="checks">
+      <li><span class="mark ok">✓</span><span>Edit button on every Pending or Sent order</span></li>
+      <li><span class="mark ok">✓</span><span>Change quantity and estimated price per line, with a live line total</span></li>
+      <li><span class="mark ok">✓</span><span>Remove a line, or add any catalog item not already on the order</span></li>
+      <li><span class="mark ok">✓</span><span>The add-item list respects the order’s vendor — items mapped to other vendors are not offered</span></li>
+      <li><span class="mark ok">✓</span><span>Notes are editable; the estimated total recalculates on save</span></li>
+      <li><span class="mark ok">✓</span><span>Edits are stamped with <code>lastEditedBy</code> / <code>lastEditedAt</code> and shown on the card</span></li>
+      <li><span class="mark ok">✓</span><span>Received and cancelled orders are locked — an accounting document already exists against them</span></li>
+    </ul>
+    <div class="files">
+      <strong>Files</strong>
+      <ul><li><code>app/purchases/purchase-orders/page.jsx</code> — edit modal</li></ul>
+    </div>
+  </div>
+
+  <!-- Phase 3 -->
+  <div class="card">
+    <div class="card-head">
+      <span class="num">03</span>
+      <h3>One board, one status vocabulary</h3>
+      <span class="pill done">Done</span>
+    </div>
+    <p class="why">A second screen at <code>/purchases/requisitions</code> wrote to the same collection using Approved / Rejected. Those documents landed on the Purchase Orders board with an unrecognised grey badge and no buttons at all.</p>
+    <ul class="checks">
+      <li><span class="mark ok">✓</span><span>Legacy <code>Approved</code> and <code>Rejected</code> map onto the PO pipeline for display and actions; the stored value is left untouched</span></li>
+      <li><span class="mark ok">✓</span><span>The old route now redirects to Purchase Orders, so bookmarks keep working and nothing new is written in the old shape</span></li>
+      <li><span class="mark ok">✓</span><span>Existing documents created by the old screen remain fully usable</span></li>
+    </ul>
+    <div class="files">
+      <strong>Files</strong>
+      <ul>
+        <li><code>app/purchases/requisitions/page.jsx</code> — replaced with a redirect</li>
+        <li><code>app/purchases/purchase-orders/page.jsx</code> — <code>LEGACY_STATUS_MAP</code></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Phase 4 -->
+  <div class="card">
+    <div class="card-head">
+      <span class="num">04</span>
+      <h3>PO numbers, filters and a read cap</h3>
+      <span class="pill done">Done</span>
+    </div>
+    <p class="why">The PDF sent to vendors carried a 20-character Firestore id, and the board fetched every order ever raised into an unfiltered card grid.</p>
+    <ul class="checks">
+      <li><span class="mark ok">✓</span><span>Per-branch monthly sequence — <code>PO-2608-0001</code> — shown on the card and printed on the PDF</span></li>
+      <li><span class="mark ok">✓</span><span>Numbering degrades gracefully: if the counter cannot be written, the order still saves and falls back to the document id</span></li>
+      <li><span class="mark ok">✓</span><span>Search across PO number, vendor, item names and notes</span></li>
+      <li><span class="mark ok">✓</span><span>Status and vendor filters, defaulting to open orders so settled history stays out of the way</span></li>
+      <li><span class="mark ok">✓</span><span>Query capped at the 200 newest orders (<code>limitCount</code>, pass 0 to opt out)</span></li>
+      <li><span class="mark ok">✓</span><span><code>counters</code> rule added to <code>firestore.rules</code> — <em>needs deploying</em></span></li>
+    </ul>
+    <div class="files">
+      <strong>Files</strong>
+      <ul>
+        <li><code>lib/redux/api/requisitionsApiSlice.js</code> — <code>reservePoNumber</code>, <code>limitCount</code></li>
+        <li><code>firestore.rules</code> — <code>counters</code> block</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Phase 5 -->
+  <div class="card">
+    <div class="card-head">
+      <span class="num">05</span>
+      <h3>Items catalog hardening</h3>
+      <span class="pill done">Done</span>
+    </div>
+    <p class="why">Re-importing the same spreadsheet silently doubled the catalog, and deleting an item broke every guide and past order that referenced it.</p>
+    <ul class="checks">
+      <li><span class="mark ok">✓</span><span>Excel import skips names already in the catalog, and duplicates within the sheet, then reports what it skipped</span></li>
+      <li><span class="mark ok">✓</span><span>Manual add refuses a duplicate name, and points at the Retired tab when the clash is a retired row</span></li>
+      <li><span class="mark ok">✓</span><span>Delete replaced by retire (<code>isActive: false</code>) so guides and history still resolve a real name and unit</span></li>
+      <li><span class="mark ok">✓</span><span>Retired tab with one-click restore</span></li>
+      <li><span class="mark ok">✓</span><span>Import maps a <code>Vendor</code> column by name (comma-separated for several) and flags names it did not recognise</span></li>
+      <li><span class="mark ok">✓</span><span>Rows show the last price actually paid alongside the planning price</span></li>
+    </ul>
+    <div class="files">
+      <strong>Files</strong>
+      <ul>
+        <li><code>lib/redux/api/itemsApiSlice.js</code> — <code>itemKey</code>, <code>retireItem</code>, <code>restoreItem</code>, dedupe in <code>addMultipleItems</code></li>
+        <li><code>app/purchases/items/page.jsx</code></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Phase 6 -->
+  <div class="card">
+    <div class="card-head">
+      <span class="num">06</span>
+      <h3>Order guides that actually speed up ordering</h3>
+      <span class="pill done">Done</span>
+    </div>
+    <p class="why">A guide stored nothing but a list of item ids, so every order started from a blank sheet — and the builder offered every item in the company regardless of which vendor the guide was for.</p>
+    <ul class="checks">
+      <li><span class="mark ok">✓</span><span>Par quantity per item, prefilled into the order sheet and overridable</span></li>
+      <li><span class="mark ok">✓</span><span>Builder only lists items this vendor supplies; unmapped items stay available to everyone</span></li>
+      <li><span class="mark ok">✓</span><span>Estimated price prefers the last price actually paid over the planning price</span></li>
+      <li><span class="mark ok">✓</span><span>Items missing from the catalog are counted on the card and skipped at order time, instead of appearing as “Unknown Item” at 0.00</span></li>
+      <li><span class="mark ok">✓</span><span>Stored as <code>guideItems</code> with <code>itemIds</code> kept in sync, so older guides open unchanged</span></li>
+    </ul>
+    <div class="files">
+      <strong>Files</strong>
+      <ul><li><code>app/purchases/order-guides/page.jsx</code> — <code>guideRows</code> compatibility helper</li></ul>
+    </div>
+  </div>
+
+  <!-- Phase 7 -->
+  <div class="card">
+    <div class="card-head">
+      <span class="num">07</span>
+      <h3>Approve / reject before an order goes out</h3>
+      <span class="pill done">Done</span>
+    </div>
+    <p class="why">Orders went from a guide straight to the vendor with nobody signing off. The approve and reject logic only ever existed on the retired requisitions screen, so in practice there was no gate at all.</p>
+    <ul class="checks">
+      <li><span class="mark ok">✓</span><span>New pipeline when enabled: <code>Pending</code> → <code>Approved</code> → <code>Sent</code> → <code>Received</code>, with <code>Rejected</code> as a reversible dead end</span></li>
+      <li><span class="mark ok">✓</span><span>Controlled by a branch setting, <strong>off by default</strong> — Settings → Operations &amp; Staff → Purchasing Controls. With it off, Pending still sends straight out exactly as before</span></li>
+      <li><span class="mark ok">✓</span><span>Owner, GM, branch admin and manager can approve. Everyone else sees “Awaiting approval” instead of a button</span></li>
+      <li><span class="mark ok">✓</span><span>Self-approval is allowed so a one-manager branch cannot deadlock, but it is stamped <code>selfApproved</code> and carries a visible badge on the card</span></li>
+      <li><span class="mark ok">✓</span><span>Rejection requires a written reason, shown on the card; an approver can reopen a rejected order back to Pending</span></li>
+      <li><span class="mark ok">✓</span><span>Editing an approved order clears the approval and returns it to Pending — nothing gets sent at quantities nobody signed off</span></li>
+      <li><span class="mark ok">✓</span><span><code>Approved</code> and <code>Rejected</code> are now first-class statuses, so the legacy documents that used them became correct rather than merely tolerated</span></li>
+    </ul>
+    <div class="files">
+      <strong>Files</strong>
+      <ul>
+        <li><code>lib/redux/api/branchSettingsApiSlice.js</code> — <code>purchases.requirePoApproval</code></li>
+        <li><code>app/components/settings/PurchasesSection.jsx</code> — new toggle</li>
+        <li><code>app/branch-settings/page.jsx</code> — mounted under Operations</li>
+        <li><code>app/purchases/purchase-orders/page.jsx</code> — <code>APPROVER_ROLES</code>, approve / reject / reopen</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Phase 8 -->
+  <div class="card">
+    <div class="card-head">
+      <span class="num">08</span>
+      <h3>The invoice image is now mandatory at receipt</h3>
+      <span class="pill done">Done</span>
+    </div>
+    <p class="why">Whoever received the goods typed the final prices in by hand and nothing was kept to check them against. A bill could be posted at any figure with no evidence behind it.</p>
+    <ul class="checks">
+      <li><span class="mark ok">✓</span><span>Receive GRN will not submit without a photo or PDF of the vendor invoice — enforced in the UI <em>and</em> again in the mutation</span></li>
+      <li><span class="mark ok">✓</span><span>Reuses the existing <code>UploadInvoice</code> widget: drag-drop, paste, or phone camera, with images auto-compressed</span></li>
+      <li><span class="mark ok">✓</span><span>Upload runs before the transaction, so a failed upload leaves nothing behind and a posted bill always has its evidence</span></li>
+      <li><span class="mark ok">✓</span><span>Stored on the bill as <code>attachments</code> and on the order as <code>invoiceAttachment</code>, so it surfaces in Due Bills as well</span></li>
+      <li><span class="mark ok">✓</span><span>Received cards link straight to the scan, labelled with the invoice number</span></li>
+      <li><span class="mark ok">✓</span><span>Live upload percentage on the submit button; invoice date is editable, not hardcoded to today</span></li>
+      <li><span class="mark ok">✓</span><span>No storage rule change needed — <code>bills/{companyId}/{branchId}/…</code> was already covered</span></li>
+    </ul>
+    <div class="files">
+      <strong>Files</strong>
+      <ul>
+        <li><code>app/purchases/purchase-orders/page.jsx</code> — receive modal upload</li>
+        <li><code>lib/redux/api/requisitionsApiSlice.js</code> — <code>attachment</code> is a hard requirement</li>
+        <li><code>app/components/purchases/UploadInvoice.jsx</code>, <code>utils/storage/uploadInvoice.js</code> — reused unchanged</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Phase 9 -->
+  <div class="card">
+    <div class="card-head">
+      <span class="num">09</span>
+      <h3>Keeping branches out of each other's way</h3>
+      <span class="pill done">Done</span>
+    </div>
+    <p class="why">Orders, guides, bills and payments were already per-branch, but three things leaked across them: every branch saw every product, one branch's invoice rewrote the price other branches saw, and two branches would hand the same vendor an identically numbered PO.</p>
+    <ul class="checks">
+      <li><span class="mark ok">✓</span><span><strong>Products are branch-scoped.</strong> <code>branchIds</code> on each item; empty means every branch, which is exactly what pre-existing items look like, so nothing changed for them</span></li>
+      <li><span class="mark ok">✓</span><span>Items page has three views — <strong>This branch</strong>, <strong>All company items</strong>, <strong>Retired</strong>. Rows not stocked here are dimmed and labelled</span></li>
+      <li><span class="mark ok">✓</span><span><strong>Pull a product another branch already set up</strong> with one click, or stop stocking it here without touching other branches. Uses <code>arrayUnion</code> / <code>arrayRemove</code>, so two branches acting at once cannot overwrite each other</span></li>
+      <li><span class="mark ok">✓</span><span>Add and Edit carry a “Stocked at” branch picker; Excel import follows whichever view you are in, and says which in the confirm</span></li>
+      <li><span class="mark ok">✓</span><span><strong>Last-paid price is now per branch</strong> — <code>lastPurchaseByBranch.{branchId}</code>, written on a dotted field path so branches never clobber each other. Guides and orders prefer this branch's figure, falling back to the company-wide one for a branch that has never bought the item</span></li>
+      <li><span class="mark ok">✓</span><span>The item row says whether a price is <em>“last paid here”</em> or borrowed from another branch</span></li>
+      <li><span class="mark ok">✓</span><span><strong>PO numbers carry a branch tag</strong> — <code>PO-KL-2608-0001</code>, taken from the branch <code>code</code>, then its name, then the id. Two branches can no longer issue the same number to one vendor</span></li>
+      <li><span class="mark ok">✓</span><span>Ordering screens only ever offer what the branch stocks; the full company catalog stays reachable from the Items page alone</span></li>
+    </ul>
+    <div class="files">
+      <strong>Files</strong>
+      <ul>
+        <li><code>lib/redux/api/itemsApiSlice.js</code> — <code>itemInBranch</code>, <code>branchLastPrice</code>, <code>addItemToBranch</code>, <code>removeItemFromBranch</code>, <code>recordBranchPurchasePrice</code></li>
+        <li><code>app/purchases/items/page.jsx</code> — scope views, <code>BranchPicker</code></li>
+        <li><code>lib/redux/api/requisitionsApiSlice.js</code> — <code>branchTag</code></li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Phase 10 -->
+  <div class="card">
+    <div class="card-head">
+      <span class="num">10</span>
+      <h3>Built for a phone in a stock room</h3>
+      <span class="pill done">Done</span>
+    </div>
+    <p class="why">These screens are used on a phone or tablet by people who do not spend their day in software. What was there had spreadsheet tables scrolling sideways, 80px number boxes, a “Hold Ctrl/Cmd to select multiple” hint, and blocking browser dialogs.</p>
+    <ul class="checks">
+      <li><span class="mark ok">✓</span><span><strong>Tap instead of type.</strong> A big − / value / + stepper on every quantity, with <code>inputMode="decimal"</code> so the phone opens the number pad rather than the full keyboard</span></li>
+      <li><span class="mark ok">✓</span><span><strong>Tables are gone.</strong> Every item is a card that stacks: name, price, then the stepper across the full width. Nothing scrolls sideways any more</span></li>
+      <li><span class="mark ok">✓</span><span><strong>Bottom sheets.</strong> Dialogs rise from the bottom of the screen with a grab handle, a pinned title, and a pinned action bar — the running total and the Submit button never scroll out of reach</span></li>
+      <li><span class="mark ok">✓</span><span><strong>Every target is thumb-sized</strong> (44–52px). The main action on each card is full width; secondary actions are icons pushed aside</span></li>
+      <li><span class="mark ok">✓</span><span><strong>No more <code>alert</code> / <code>confirm</code> / <code>prompt</code>.</strong> Toasts for feedback, proper sheets for confirmation. This also fixes a real defect: several mobile browsers suppress <code>prompt()</code>, which silently cancelled the reject-with-reason flow</span></li>
+      <li><span class="mark ok">✓</span><span><strong>Multi-select works on touch.</strong> The “Hold Ctrl/Cmd” <code>&lt;select multiple&gt;</code> for suppliers and branches — a gesture that does not exist on a tablet — is now a tick list</span></li>
+      <li><span class="mark ok">✓</span><span><strong>Plain words.</strong> “Goods Arrived” rather than “Receive GRN”, “Send to Supplier”, “To do / Completed” tabs, and a one-line explanation under every status badge</span></li>
+      <li><span class="mark ok">✓</span><span>Search on the order sheet, the guide builder and the catalog, so a long list is still workable one-handed</span></li>
+      <li><span class="mark ok">✓</span><span>Chosen rows tint green with a tick; short deliveries tint amber — state is visible without reading anything</span></li>
+      <li><span class="mark ok">✓</span><span>The required invoice photo now leads the receive sheet with a camera prompt, instead of hiding below a table</span></li>
+      <li><span class="mark ok">✓</span><span>Fixed a live bug found on the way: <code>animate-in</code> / <code>slide-in-from-bottom</code> were used in several places but <code>tailwindcss-animate</code> was never installed, so they did nothing. The keyframes are now defined in <code>globals.css</code>, with a <code>prefers-reduced-motion</code> opt-out</span></li>
+    </ul>
+    <div class="files">
+      <strong>New shared components</strong>
+      <ul>
+        <li><code>app/components/purchases/Sheet.jsx</code> — bottom sheet on mobile, dialog on desktop</li>
+        <li><code>app/components/purchases/QtyStepper.jsx</code> — − / value / + quantity control</li>
+        <li><code>app/components/purchases/MoneyInput.jsx</code> — currency field with a numeric keypad</li>
+        <li><code>app/components/purchases/ConfirmSheet.jsx</code> — replaces confirm and prompt</li>
+        <li><code>app/components/purchases/useToast.jsx</code> — replaces alert</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>Known by design</h2>
+
+  <div class="callout info">
+    <h3>Vendor balances are company-wide totals</h3>
+    <p><code>vendor.currentBalance</code>, <code>totalBilled</code> and <code>totalPaid</code> sum every branch — that is deliberate, and <code>SyncVendorMetrics.jsx</code> rebuilds them that way on purpose. Per-branch bill lists on Due Bills and Payments are correctly scoped; it is only the vendor's headline balance that spans the company. Concurrent writes are safe (<code>increment()</code> is atomic server-side), so this is an aggregation choice, not a race. Say the word if a per-branch vendor balance is wanted.</p>
+  </div>
+
+  <h2>Deliberately deferred</h2>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="num">—</span>
+      <h3>Inventory / stock movement</h3>
+      <span class="pill defer">Waiting on POS</span>
+    </div>
+    <p class="why">Receiving goods does not touch stock. Nothing in the app decrements stock yet, so wiring receipts up now would only ever grow the numbers and produce stock reports nobody could trust. It lands with the POS module, where consumption is recorded.</p>
+    <ul class="checks">
+      <li><span class="mark df">◦</span><span><code>TODO(pos-inventory)</code> marker sits inside the receive transaction, at the exact point where stock-in belongs</span></li>
+      <li><span class="mark df">◦</span><span>Target collections already exist in <code>firestore.rules</code>: <code>itemStock</code>, <code>inventoryMovements</code>, <code>stockCounts</code> — no code writes them yet</span></li>
+      <li><span class="mark df">◦</span><span>Plan: inside the same transaction, increment <code>itemStock/{itemId}.qty</code> and append a <code>PURCHASE_RECEIPT</code> movement</span></li>
+    </ul>
+    <div class="files">
+      <strong>Marker</strong>
+      <ul><li><code>lib/redux/api/requisitionsApiSlice.js</code> → <code>receivePurchaseOrder</code>, end of the transaction body</li></ul>
+    </div>
+  </div>
+
+  <h2>Backlog — not started</h2>
+
+  <div class="card">
+    <div class="card-head">
+      <span class="num">—</span>
+      <h3>Open items</h3>
+      <span class="pill todo">Not started</span>
+    </div>
+    <ul class="checks">
+      <li><span class="mark no">○</span><span><strong>Audit trail.</strong> The audit log has a Vendor Bills category but nothing for purchase orders, order guides or catalog changes. Approvals and rejections are stamped on the order itself, but there is no central log of them.</span></li>
+      <li><span class="mark no">○</span><span><strong>Price variance flagging.</strong> The invoice scan is now always on file, but nothing compares the final price against the estimate and calls out a line that came in high.</span></li>
+      <li><span class="mark no">○</span><span><strong>Partial receipt.</strong> Receiving is all-or-nothing; a short delivery closes the order at the reduced quantity with no back-order.</span></li>
+      <li><span class="mark no">○</span><span><strong>The rest of Purchases still uses native dialogs.</strong> Order Guides, Purchase Orders and Items are done; Vendors, Due Bills, Payments and New Bill still use <code>alert()</code> and desktop-width tables.</span></li>
+      <li><span class="mark no">○</span><span><strong>Date-range paging.</strong> The 200-order cap is a stopgap; real paging needs a composite index on <code>(vendorId, createdAt)</code>.</span></li>
+      <li><span class="mark no">○</span><span><strong>Cost report link.</strong> Purchases never reach the cost report — the two live side by side without meeting.</span></li>
+      <li><span class="mark no">○</span><span><strong>Button variants.</strong> <code>Button</code> only implements <code>primary</code> and <code>ghost</code>; pages passing <code>outline</code> or <code>secondary</code> silently render as primary.</span></li>
+    </ul>
+  </div>
+
+  <h2>Notes</h2>
+
+  <div class="callout info">
+    <h3>Every change is additive</h3>
+    <p>No field was renamed or removed and no migration is needed. New fields — <code>poNo</code>, <code>billId</code>, <code>sourcePoId</code>, <code>invoiceAttachment</code>, <code>approvedBy</code>, <code>selfApproved</code>, <code>rejectionReason</code>, <code>branchIds</code>, <code>lastPurchaseByBranch</code>, <code>lastPurchasePrice</code>, <code>isActive</code>, <code>guideItems</code>, <code>lastEditedBy</code> — are all read with fallbacks, so documents written before today behave exactly as they did. An item with no <code>branchIds</code> is treated as stocked everywhere, which is what every existing item looks like. The one behaviour change that is not opt-in is the mandatory invoice attachment, which was asked for explicitly.</p>
+  </div>
+
+  <footer>Regenerated as work lands · cash_curry_v2</footer>
+</div>
+</body>
+</html>

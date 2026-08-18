@@ -40,3 +40,44 @@
 button {
   cursor: pointer;
 }
+
+/* Sheet / toast entrance animations.
+   The codebase already writes `animate-in slide-in-from-bottom fade-in` in a few
+   places, but the tailwindcss-animate plugin those come from is not installed,
+   so they silently did nothing. Defining them here makes the existing markup
+   work and gives the purchase sheets the slide-up a touch UI needs to feel
+   anchored to the thumb. */
+@keyframes cc-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes cc-slide-up {
+  from { opacity: 0; transform: translateY(100%); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes cc-slide-up-sm {
+  from { opacity: 0; transform: translateY(1rem); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes cc-zoom-in {
+  from { opacity: 0; transform: scale(.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+.animate-in            { animation: cc-fade-in .2s ease-out both; }
+.fade-in               { animation-name: cc-fade-in; }
+.slide-in-from-bottom  { animation-name: cc-slide-up; }
+.slide-in-from-bottom-2,
+.slide-in-from-bottom-4,
+.slide-in-from-bottom-5 { animation-name: cc-slide-up-sm; }
+.zoom-in-95            { animation-name: cc-zoom-in; }
+
+/* Above the small breakpoint a sheet is a centred dialog, so it should scale in
+   rather than slide up from an edge it is no longer attached to. */
+@media (min-width: 640px) {
+  .sm\:zoom-in-95 { animation-name: cc-zoom-in; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-in { animation: none; }
+}
