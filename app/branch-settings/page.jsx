@@ -6,6 +6,7 @@ import BasicInfoSection from "@/app/components/settings/BasicInfoSection";
 import FinanceSalesSection from "@/app/components/settings/FinanceSalesSection";
 import StaffRolesSection from "@/app/components/settings/StaffRolesSection";
 import LoansFinanceSection from "@/app/components/settings/LoansFinanceSection";
+import PurchasesSection from "@/app/components/settings/PurchasesSection";
 import OtherSection from "@/app/components/settings/OtherSection";
 import AttendanceSettingsSection from "@/app/components/settings/AttendanceSettingsSection";
 import PayrollSettingsSection from "@/app/components/settings/PayrollSettingsSection";
@@ -114,6 +115,15 @@ export default function BranchSettingsPage() {
                     role={role}
                     value={form.loansFinance}
                     onChange={(v) => setForm((prev) => ({ ...prev, loansFinance: v }))}
+                  />
+               </div>
+               <hr className="border-slate-100" />
+               <div>
+                  <h2 className="text-lg font-bold text-slate-800 mb-6">Purchasing Controls</h2>
+                  <PurchasesSection
+                    role={role}
+                    value={form.purchases}
+                    onChange={(v) => setForm((prev) => ({ ...prev, purchases: v }))}
                   />
                </div>
              </div>

@@ -350,6 +350,16 @@ service cloud.firestore {
                           (isAuth() && userData().companyId == companyId && userData().branchId == branchId);
         }
 
+        // ── Document number counters (PO numbers, etc.) ───────────────────────
+        // One document per series, holding one field per YYMM period. Anyone
+        // allowed to raise the underlying document must be able to draw a
+        // number, so this mirrors the requisitions write rule.
+        match /counters/{seriesId} {
+          allow read: if canRead(companyId, branchId);
+          allow write: if canWrite(companyId, branchId) ||
+                          (isAuth() && userData().companyId == companyId && userData().branchId == branchId);
+        }
+
         // ── POS: Order Guides ────────────────────────────────────────────────
         match /orderGuides/{docId} {
           allow read: if canRead(companyId, branchId);
