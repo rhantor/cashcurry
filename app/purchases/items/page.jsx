@@ -21,6 +21,7 @@ import { useGetVendorsQuery } from "@/lib/redux/api/vendorsApiSlice";
 import { useGetBranchesBasicQuery } from "@/lib/redux/api/branchApiSlice";
 import Sheet from "@/app/components/purchases/Sheet";
 import ConfirmSheet from "@/app/components/purchases/ConfirmSheet";
+import ItemFilterBar, { filterItems } from "@/app/components/purchases/ItemFilterBar";
 import useToast from "@/app/components/purchases/useToast";
 import * as XLSX from "xlsx";
 import {
@@ -34,7 +35,6 @@ import {
   DownloadCloud,
   MinusCircle,
   Check,
-  Search,
 } from "lucide-react";
 
 /** Shared field styling — one place so every input keeps a thumb-sized target. */
@@ -219,6 +219,7 @@ export default function ItemsCatalogPage() {
   const [editOpen, setEditOpen] = useState(false);
   const [editForm, setEditForm] = useState(null);
   const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("");
 
   const fileInputRef = useRef(null);
 
@@ -428,12 +429,7 @@ export default function ItemsCatalogPage() {
   };
 
   // Group items by category for simple display
-  const itemsByCategory = items
-    .filter((i) => {
-      const q = search.trim().toLowerCase();
-      if (!q) return true;
-      return i.name?.toLowerCase().includes(q) || i.category?.toLowerCase().includes(q);
-    })
+  const itemsByCategory = filterItems(items, { search, category })
     .reduce((acc, item) => {
       const cat = item.category || "Uncategorized";
       if (!acc[cat]) acc[cat] = [];
@@ -526,17 +522,14 @@ export default function ItemsCatalogPage() {
         )}
       </div>
 
-      <div className="relative">
-        <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Find a product…"
-          className="w-full min-h-[48px] pl-10 pr-4 text-[15px] border border-slate-200 rounded-2xl bg-white
-                     focus:border-mint-500 focus:ring-2 focus:ring-mint-500/20 outline-none transition-colors"
-        />
-      </div>
+      <ItemFilterBar
+        items={items}
+        search={search}
+        onSearchChange={setSearch}
+        category={category}
+        onCategoryChange={setCategory}
+        placeholder="Find a product…"
+      />
 
       {scope === SCOPE_COMPANY && (
         <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-3.5 text-sm text-blue-900 leading-relaxed">

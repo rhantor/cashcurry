@@ -14,6 +14,7 @@ import { useAddRequisitionMutation } from "@/lib/redux/api/requisitionsApiSlice"
 import Sheet from "@/app/components/purchases/Sheet";
 import QtyStepper from "@/app/components/purchases/QtyStepper";
 import ConfirmSheet from "@/app/components/purchases/ConfirmSheet";
+import ItemFilterBar, { filterItems } from "@/app/components/purchases/ItemFilterBar";
 import useToast from "@/app/components/purchases/useToast";
 import useCurrency from "@/app/hooks/useCurrency";
 import {
@@ -23,7 +24,6 @@ import {
   ShoppingCart,
   ListChecks,
   AlertTriangle,
-  Search,
   Check,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -69,9 +69,11 @@ export default function OrderGuidesPage() {
   const [openGuideBuilder, setOpenGuideBuilder] = useState(false);
   const [builderForm, setBuilderForm] = useState({ id: null, name: "", vendorId: "", rows: [] });
   const [builderSearch, setBuilderSearch] = useState("");
+  const [builderCategory, setBuilderCategory] = useState("");
 
   const handleOpenBuilder = (guide = null) => {
     setBuilderSearch("");
+    setBuilderCategory("");
     if (guide) {
       setBuilderForm({
         id: guide.id,
@@ -92,20 +94,19 @@ export default function OrderGuidesPage() {
   // Anything already on the guide stays listed even when it no longer matches
   // the vendor, otherwise switching vendor on an existing guide would hide rows
   // that are still being saved, with no way to uncheck them.
-  const selectableItems = useMemo(() => {
+  // Everything this vendor can supply — the pool the category chips count from.
+  const vendorItems = useMemo(() => {
     const selected = new Set(builderForm.rows.map((r) => r.itemId));
-    const base = !builderForm.vendorId
-      ? items
-      : items.filter(
-          (i) => selected.has(i.id) || !i.vendorIds?.length || i.vendorIds.includes(builderForm.vendorId)
-        );
-
-    const q = builderSearch.trim().toLowerCase();
-    if (!q) return base;
-    return base.filter(
-      (i) => i.name?.toLowerCase().includes(q) || i.category?.toLowerCase().includes(q)
+    if (!builderForm.vendorId) return items;
+    return items.filter(
+      (i) => selected.has(i.id) || !i.vendorIds?.length || i.vendorIds.includes(builderForm.vendorId)
     );
-  }, [items, builderForm.vendorId, builderForm.rows, builderSearch]);
+  }, [items, builderForm.vendorId, builderForm.rows]);
+
+  const selectableItems = useMemo(
+    () => filterItems(vendorItems, { search: builderSearch, category: builderCategory }),
+    [vendorItems, builderSearch, builderCategory]
+  );
 
   const rowFor = (itemId) => builderForm.rows.find((r) => r.itemId === itemId);
 
@@ -185,10 +186,12 @@ export default function OrderGuidesPage() {
   const [selectedGuide, setSelectedGuide] = useState(null);
   const [orderItems, setOrderItems] = useState([]);
   const [orderSearch, setOrderSearch] = useState("");
+  const [orderCategory, setOrderCategory] = useState("");
 
   const handleOpenOrder = (guide) => {
     setSelectedGuide(guide);
     setOrderSearch("");
+    setOrderCategory("");
     const defaultRows = guideRows(guide)
       .filter((r) => itemsById.has(r.itemId)) // skip retired/deleted catalog entries
       .map((r) => {
@@ -219,13 +222,10 @@ export default function OrderGuidesPage() {
     0
   );
 
-  const visibleOrderItems = useMemo(() => {
-    const q = orderSearch.trim().toLowerCase();
-    if (!q) return orderItems;
-    return orderItems.filter(
-      (i) => i.name.toLowerCase().includes(q) || i.category?.toLowerCase().includes(q)
-    );
-  }, [orderItems, orderSearch]);
+  const visibleOrderItems = useMemo(
+    () => filterItems(orderItems, { search: orderSearch, category: orderCategory }),
+    [orderItems, orderSearch, orderCategory]
+  );
 
   const handleSubmitOrder = async () => {
     if (chosen.length === 0) {
@@ -397,22 +397,24 @@ export default function OrderGuidesPage() {
         ) : (
           <>
             {orderItems.length > 6 && (
-              <div className="relative mb-3">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="search"
-                  value={orderSearch}
-                  onChange={(e) => setOrderSearch(e.target.value)}
+              <div className="mb-3">
+                <ItemFilterBar
+                  items={orderItems}
+                  search={orderSearch}
+                  onSearchChange={setOrderSearch}
+                  category={orderCategory}
+                  onCategoryChange={setOrderCategory}
                   placeholder="Find an item…"
-                  className="w-full min-h-[48px] pl-10 pr-4 text-[15px] border border-slate-200 rounded-2xl
-                             bg-slate-50 focus:bg-white focus:border-mint-500 focus:ring-2 focus:ring-mint-500/20
-                             outline-none transition-colors"
                 />
               </div>
             )}
 
+            {/* Filtering only hides rows; quantities already entered still count
+                towards the order, so say so rather than let it look lost. */}
             <p className="text-sm text-slate-500 mb-3">
-              Quantities are prefilled from your usual amounts. Change what you need, leave the rest at zero.
+              {orderCategory || orderSearch
+                ? `Showing ${visibleOrderItems.length} of ${orderItems.length}. Amounts you already entered are still in the order.`
+                : "Quantities are prefilled from your usual amounts. Change what you need, leave the rest at zero."}
             </p>
 
             <div className="space-y-2.5">
@@ -517,17 +519,15 @@ export default function OrderGuidesPage() {
               <span className="text-xs text-slate-400">{builderForm.rows.length} selected</span>
             </div>
 
-            {items.length > 6 && (
-              <div className="relative mb-2.5">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-                <input
-                  type="search"
-                  value={builderSearch}
-                  onChange={(e) => setBuilderSearch(e.target.value)}
+            {vendorItems.length > 6 && (
+              <div className="mb-3">
+                <ItemFilterBar
+                  items={vendorItems}
+                  search={builderSearch}
+                  onSearchChange={setBuilderSearch}
+                  category={builderCategory}
+                  onCategoryChange={setBuilderCategory}
                   placeholder="Find an item…"
-                  className="w-full min-h-[48px] pl-10 pr-4 text-[15px] border border-slate-200 rounded-2xl
-                             bg-slate-50 focus:bg-white focus:border-mint-500 focus:ring-2 focus:ring-mint-500/20
-                             outline-none transition-colors"
                 />
               </div>
             )}
@@ -535,7 +535,9 @@ export default function OrderGuidesPage() {
             <div className="space-y-2">
               {selectableItems.length === 0 ? (
                 <p className="py-8 text-center text-sm text-slate-500">
-                  {builderForm.vendorId
+                  {builderSearch || builderCategory
+                    ? "Nothing matches that filter."
+                    : builderForm.vendorId
                     ? "No items are linked to this supplier yet."
                     : "No items in the catalog for this branch."}
                 </p>

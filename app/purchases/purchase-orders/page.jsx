@@ -23,6 +23,7 @@ import Sheet from "@/app/components/purchases/Sheet";
 import QtyStepper from "@/app/components/purchases/QtyStepper";
 import MoneyInput from "@/app/components/purchases/MoneyInput";
 import ConfirmSheet from "@/app/components/purchases/ConfirmSheet";
+import ItemFilterBar, { filterItems } from "@/app/components/purchases/ItemFilterBar";
 import useToast from "@/app/components/purchases/useToast";
 import { uploadInvoiceFile } from "@/utils/storage/uploadInvoice";
 import useCurrency from "@/app/hooks/useCurrency";
@@ -252,7 +253,9 @@ export default function PurchaseOrdersPage() {
   /* --------------------------------- edit ---------------------------------- */
   const [openEditSheet, setOpenEditSheet] = useState(false);
   const [editData, setEditData] = useState({ items: [], notes: "" });
-  const [addItemId, setAddItemId] = useState("");
+  const [showPicker, setShowPicker] = useState(false);
+  const [pickSearch, setPickSearch] = useState("");
+  const [pickCategory, setPickCategory] = useState("");
   const [confirmReapproval, setConfirmReapproval] = useState(false);
 
   const canEdit = (order) => ["Pending", "Approved", "Sent", "Rejected"].includes(normalizeStatus(order.status));
@@ -264,7 +267,9 @@ export default function PurchaseOrdersPage() {
       items: (order.items || []).map((i) => ({ ...i, requestedQty: String(i.requestedQty ?? ""), estPrice: String(i.estPrice ?? "") })),
       notes: order.notes || "",
     });
-    setAddItemId("");
+    setShowPicker(false);
+    setPickSearch("");
+    setPickCategory("");
     setOpenEditSheet(true);
   };
 
@@ -291,9 +296,12 @@ export default function PurchaseOrdersPage() {
     );
   }, [catalog, editData.items, selectedOrder]);
 
-  const handleAddEditRow = () => {
-    const item = catalog.find((i) => i.id === addItemId);
-    if (!item) return;
+  const pickableItems = useMemo(
+    () => filterItems(addableItems, { search: pickSearch, category: pickCategory }),
+    [addableItems, pickSearch, pickCategory]
+  );
+
+  const handleAddEditRow = (item) => {
     setEditData((prev) => ({
       ...prev,
       items: [
@@ -308,7 +316,6 @@ export default function PurchaseOrdersPage() {
         },
       ],
     }));
-    setAddItemId("");
   };
 
   const editTotal = sumLines(editData.items);
@@ -833,35 +840,61 @@ export default function PurchaseOrdersPage() {
         </div>
 
         <div className="mt-5 pt-5 border-t border-slate-100 space-y-4">
+          {/* A dropdown of a couple of hundred products is unusable on a phone,
+              so adding is a searchable, category-filtered list instead. */}
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Add an item</label>
-            <div className="flex gap-2">
-              <select
-                value={addItemId}
-                onChange={(e) => setAddItemId(e.target.value)}
-                className="flex-1 min-w-0 min-h-[48px] px-4 text-[15px] border border-slate-200 rounded-2xl
-                           bg-slate-50 focus:bg-white focus:border-mint-500 focus:ring-2 focus:ring-mint-500/20
-                           outline-none transition-colors"
-              >
-                <option value="">
-                  {addableItems.length ? "Choose an item…" : "Nothing left to add"}
-                </option>
-                {addableItems.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name} ({item.unit})
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={handleAddEditRow}
-                disabled={!addItemId}
-                aria-label="Add item"
-                className="w-14 min-h-[48px] shrink-0 flex items-center justify-center rounded-2xl
-                           bg-mint-600 text-white active:bg-mint-700 disabled:opacity-40 transition-colors"
-              >
-                <Plus className="w-5 h-5" />
-              </button>
-            </div>
+            <button
+              onClick={() => setShowPicker((v) => !v)}
+              disabled={!addableItems.length}
+              className="w-full min-h-[48px] rounded-2xl border border-dashed border-slate-300 text-slate-700
+                         font-semibold flex items-center justify-center gap-2 active:bg-slate-50
+                         disabled:opacity-40 transition-colors"
+            >
+              <Plus className="w-5 h-5" />
+              {!addableItems.length
+                ? "Nothing left to add"
+                : showPicker
+                ? "Done adding"
+                : `Add an item (${addableItems.length} available)`}
+            </button>
+
+            {showPicker && addableItems.length > 0 && (
+              <div className="mt-3 space-y-3">
+                <ItemFilterBar
+                  items={addableItems}
+                  search={pickSearch}
+                  onSearchChange={setPickSearch}
+                  category={pickCategory}
+                  onCategoryChange={setPickCategory}
+                  placeholder="Find an item to add…"
+                />
+
+                <div className="max-h-72 overflow-y-auto rounded-2xl border border-slate-200 divide-y divide-slate-100">
+                  {pickableItems.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => handleAddEditRow(item)}
+                      className="w-full flex items-center gap-3 p-3.5 text-left active:bg-mint-50 transition-colors"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-semibold text-slate-900 text-[15px] truncate">
+                          {item.name}
+                        </span>
+                        <span className="block text-xs text-slate-500 mt-0.5">
+                          {item.category || "Uncategorized"} · {item.unit}
+                        </span>
+                      </span>
+                      <span className="w-9 h-9 shrink-0 flex items-center justify-center rounded-full bg-mint-50 text-mint-700">
+                        <Plus className="w-4 h-4" />
+                      </span>
+                    </button>
+                  ))}
+                  {pickableItems.length === 0 && (
+                    <p className="py-8 text-center text-sm text-slate-500">Nothing matches that filter.</p>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           <div>
