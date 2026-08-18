@@ -143,7 +143,7 @@
 
     <div class="bar-wrap">
       <div class="bar"><span style="width:100%"></span></div>
-      <div class="bar-label"><span>10 of 10 planned phases complete</span><span>100%</span></div>
+      <div class="bar-label"><span>11 of 11 planned phases complete</span><span>100%</span></div>
     </div>
   </header>
 
@@ -418,6 +418,36 @@
         <li><code>app/components/purchases/MoneyInput.jsx</code> — currency field with a numeric keypad</li>
         <li><code>app/components/purchases/ConfirmSheet.jsx</code> — replaces confirm and prompt</li>
         <li><code>app/components/purchases/useToast.jsx</code> — replaces alert</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- Phase 11 -->
+  <div class="card">
+    <div class="card-head">
+      <span class="num">11</span>
+      <h3>A purchase order the supplier can actually work from</h3>
+      <span class="pill done">Done</span>
+    </div>
+    <p class="why">This is the one document that leaves the building. It was printing a bare title, the vendor's name and a table at fixed coordinates — no letterhead, no address to deliver to, no way to tell who authorised it, and notes that collided with the total as soon as they ran long.</p>
+    <ul class="checks">
+      <li><span class="mark ok">✓</span><span><strong>Letterhead</strong> — company name and logo, branch name and code, address, phone, email, registration number</span></li>
+      <li><span class="mark ok">✓</span><span><strong>Supplier block</strong> with the full address, phone, email and tax number. Only the name was printed before</span></li>
+      <li><span class="mark ok">✓</span><span><strong>Deliver-to block</strong> — a supplier serving several branches could not tell where the goods were meant to go</span></li>
+      <li><span class="mark ok">✓</span><span><strong>Received orders print differently</strong>: Ordered and Received become separate columns, prices are the invoiced ones, the total reads Invoice Total, and the supplier's invoice number appears in the header</span></li>
+      <li><span class="mark ok">✓</span><span><strong>Signature lines</strong> for prepared-by and approved-by, filled from the order — meaningful now that approvals exist</span></li>
+      <li><span class="mark ok">✓</span><span><strong>Payment terms</strong> printed from the vendor's credit days</span></li>
+      <li><span class="mark ok">✓</span><span><strong>Nothing collides any more.</strong> Every block measures itself and the next starts below it; totals, terms, notes and signatures are kept together rather than orphaning a signature at the top of a page</span></li>
+      <li><span class="mark ok">✓</span><span>Footer with the PO number and <em>Page n of m</em> on every page; long item names wrap instead of overflowing</span></li>
+      <li><span class="mark ok">✓</span><span>Sensible filename — <code>PO-KL-2608-0007.pdf</code> rather than a unix timestamp</span></li>
+      <li><span class="mark ok">✓</span><span>Degrades gracefully: a company with no logo, address or vendor details still gets a clean document, and a CORS-blocked logo is skipped rather than breaking the export</span></li>
+      <li><span class="mark ok">✓</span><span>Verified by capturing every text draw and asserting no out-of-bounds coordinates and no overlapping blocks, across long, received and bare-minimum orders</span></li>
+    </ul>
+    <div class="files">
+      <strong>Files</strong>
+      <ul>
+        <li><code>utils/pdf/purchaseOrderPdf.js</code> — the whole document, extracted out of the page</li>
+        <li><code>app/purchases/purchase-orders/page.jsx</code> — pulls company and branch details for the letterhead</li>
       </ul>
     </div>
   </div>

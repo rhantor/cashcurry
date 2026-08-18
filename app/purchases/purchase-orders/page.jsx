@@ -16,6 +16,8 @@ import {
   branchLastPrice,
 } from "@/lib/redux/api/itemsApiSlice";
 import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
+import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
+import { useGetCompanyDetailsQuery } from "@/lib/redux/api/authApiSlice";
 import UploadInvoice from "@/app/components/purchases/UploadInvoice";
 import Sheet from "@/app/components/purchases/Sheet";
 import QtyStepper from "@/app/components/purchases/QtyStepper";
@@ -24,8 +26,7 @@ import ConfirmSheet from "@/app/components/purchases/ConfirmSheet";
 import useToast from "@/app/components/purchases/useToast";
 import { uploadInvoiceFile } from "@/utils/storage/uploadInvoice";
 import useCurrency from "@/app/hooks/useCurrency";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import buildPurchaseOrderPdf, { loadLogo } from "@/utils/pdf/purchaseOrderPdf";
 import {
   FileText,
   Send,
@@ -91,6 +92,9 @@ export default function PurchaseOrdersPage() {
   // would be a mistake, not a convenience.
   const { data: catalog = [] } = useGetItemsQuery(args);
   const { data: branchSettings } = useGetBranchSettingsQuery(args);
+  // Letterhead details for the printed order.
+  const { data: branch } = useGetSingleBranchQuery(args);
+  const { data: company } = useGetCompanyDetailsQuery(ready && companyId ? companyId : skipToken);
 
   // Approval is a per-branch policy, off by default — see PurchasesSection in
   // branch settings.
@@ -478,51 +482,30 @@ export default function PurchaseOrdersPage() {
   };
 
   /* ---------------------------------- pdf ---------------------------------- */
-  const exportPDF = (order) => {
-    const doc = new jsPDF();
-    doc.setFontSize(20);
-    doc.text("PURCHASE ORDER", 14, 22);
+  const [printing, setPrinting] = useState(null);
 
-    doc.setFontSize(10);
-    doc.text(`PO Ref: ${order.poNo || order.id}`, 14, 30);
-    doc.text(`Date: ${order.createdAt ? new Date(order.createdAt.seconds * 1000).toLocaleDateString() : "-"}`, 14, 35);
-    doc.text(`Status: ${order.status}`, 14, 40);
+  const exportPDF = async (order) => {
+    setPrinting(order.id);
+    try {
+      // The logo is fetched per print rather than cached: it is one small
+      // request, and a stale data URL is worse than a slightly slower export.
+      const logoDataUrl = await loadLogo(company?.logo);
 
-    doc.setFontSize(12);
-    doc.text("Vendor Details:", 130, 22);
-    doc.setFontSize(10);
-    doc.text(`Name: ${order.vendorName}`, 130, 28);
-
-    doc.line(14, 45, 196, 45);
-
-    const tableData = (order.items || []).map((i, index) => [
-      index + 1,
-      i.name,
-      `${i.requestedQty} ${i.unit}`,
-      `${currency} ${money(i.estPrice)}`,
-      `${currency} ${money(lineTotal(i))}`,
-    ]);
-
-    autoTable(doc, {
-      startY: 50,
-      head: [["#", "Item", "Quantity", "Unit Price (Est)", "Total (Est)"]],
-      body: tableData,
-      theme: "grid",
-      headStyles: { fillColor: [34, 160, 130] },
-    });
-
-    const finalY = doc.lastAutoTable.finalY || 60;
-    doc.setFontSize(12);
-    doc.text(`Estimated Total: ${currency} ${money(order.totalEst)}`, 140, finalY + 10);
-
-    if (order.notes) {
-      doc.setFontSize(10);
-      doc.text("Notes:", 14, finalY + 10);
-      doc.setFont("helvetica", "italic");
-      doc.text(doc.splitTextToSize(order.notes, 100), 14, finalY + 15);
+      buildPurchaseOrderPdf({
+        order,
+        vendor: vendors.find((v) => v.id === order.vendorId),
+        company,
+        branch,
+        branchBasic: branchSettings?.basic,
+        currency,
+        logoDataUrl,
+      });
+    } catch (e) {
+      console.error(e);
+      toastError("Could not build the PDF.");
+    } finally {
+      setPrinting(null);
     }
-
-    doc.save(`PO_${order.vendorName.replace(/\s+/g, "_")}_${new Date().getTime()}.pdf`);
   };
 
   /* --------------------------------- render -------------------------------- */
@@ -725,8 +708,13 @@ export default function PurchaseOrdersPage() {
                       <Pencil className="w-4 h-4" />
                     </button>
                   )}
-                  <button onClick={() => exportPDF(order)} aria-label="Download PDF" className={iconBtn}>
-                    <FileText className="w-4 h-4" />
+                  <button
+                    onClick={() => exportPDF(order)}
+                    disabled={printing === order.id}
+                    aria-label="Download PDF"
+                    className={`${iconBtn} disabled:opacity-50`}
+                  >
+                    <FileText className={`w-4 h-4 ${printing === order.id ? "animate-pulse" : ""}`} />
                   </button>
                   {canCancel(order) && (
                     <button
