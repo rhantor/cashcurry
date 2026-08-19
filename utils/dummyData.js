@@ -18,7 +18,8 @@ export const sidebarItems = {
         { label: 'Due Bills', path: '/purchases/due-bills', allowedRoles: ['manager', 'accountant', 'branchAdmin'] },
         { label: 'Payments', path: '/purchases/payments', allowedRoles: ['manager', 'accountant', 'branchAdmin'] },
         { label: 'Vendors', path: '/purchases/vendors', allowedRoles: ['manager', 'accountant', 'branchAdmin', 'supervisor'] },
-        { label: 'Items Catalog', path: '/purchases/items', allowedRoles: ['manager', 'accountant', 'branchAdmin', 'supervisor'] }
+        { label: 'Items Catalog', path: '/purchases/items', allowedRoles: ['manager', 'accountant', 'branchAdmin', 'supervisor'] },
+        { label: 'Purchase Report', path: '/purchases/reports', allowedRoles: ['manager', 'accountant', 'branchAdmin'] }
       ]
     },
     {
@@ -233,7 +234,8 @@ export const sidebarItems = {
         { label: 'Due Bills', path: '/purchases/due-bills' },
         { label: 'Payments', path: '/purchases/payments' },
         { label: 'Vendors', path: '/purchases/vendors' },
-        { label: 'Items Catalog', path: '/purchases/items' }
+        { label: 'Items Catalog', path: '/purchases/items' },
+        { label: 'Purchase Report', path: '/purchases/reports' }
       ]
     },
     {
