@@ -39,6 +39,7 @@ export default function BranchManagement() {
     note: "",
   });
   const [editingBranch, setEditingBranch] = useState(null);
+  const [branchErrorMsg, setBranchErrorMsg] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   // --- Branch Admin form state ---
   const [adminForm, setAdminForm] = useState({
@@ -73,25 +74,51 @@ export default function BranchManagement() {
 
   const handleCreateBranch = async (e) => {
     e.preventDefault();
-    if (!user?.companyId) return;
+    setBranchErrorMsg("");
 
-    if (editingBranch) {
-      await updateBranch({
-        companyId: user.companyId,
-        branchId: editingBranch,
-        updates: form,
-      }).unwrap();
-      setEditingBranch(null);
-    } else {
-      await addBranch({ companyId: user.companyId, ...form }).unwrap();
+    if (!user?.companyId) {
+      setBranchErrorMsg(
+        "Your account has no company assigned. Sign out and back in, or contact support."
+      );
+      return;
     }
 
-    setForm({ name: "", address: "", contact: "", email: "", note: "" });
+    try {
+      if (editingBranch) {
+        await updateBranch({
+          companyId: user.companyId,
+          branchId: editingBranch,
+          updates: form,
+        }).unwrap();
+        setEditingBranch(null);
+      } else {
+        await addBranch({ companyId: user.companyId, ...form }).unwrap();
+      }
+
+      setForm({ name: "", address: "", contact: "", email: "", note: "" });
+    } catch (err) {
+      console.error("Failed to save branch:", err);
+      setBranchErrorMsg(
+        err?.code === "permission-denied"
+          ? "You do not have permission to save branches."
+          : err?.message || "Failed to save branch. Please try again."
+      );
+    }
   };
 
   const handleDeleteBranch = async (id) => {
     if (!user?.companyId) return;
-    await deleteBranch({ companyId: user.companyId, branchId: id }).unwrap();
+    setBranchErrorMsg("");
+    try {
+      await deleteBranch({ companyId: user.companyId, branchId: id }).unwrap();
+    } catch (err) {
+      console.error("Failed to delete branch:", err);
+      setBranchErrorMsg(
+        err?.code === "permission-denied"
+          ? "You do not have permission to delete branches."
+          : err?.message || "Failed to delete branch. Please try again."
+      );
+    }
   };
 
   const handleEditBranch = (branch) => {
@@ -186,6 +213,7 @@ export default function BranchManagement() {
         editingBranch={editingBranch}
         disableForm={!!editingBranch} // Disable form if editing
         isAddingBranch={isAddingBranch}
+        errorMsg={branchErrorMsg}
       />
 
       {/* Assign Branch Admin Form */}
