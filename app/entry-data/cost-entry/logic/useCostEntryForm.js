@@ -12,6 +12,10 @@ export function useCostEntryForm () {
   const [filePreview, setFilePreview] = useState(null)
   const [uploadProgress, setUploadProgress] = useState(0)
 
+  // Optional second attachment: proof of payment (bank slip, card receipt, …)
+  const [receiptFile, setReceiptFile] = useState(null)
+  const [receiptProgress, setReceiptProgress] = useState(0)
+
   const [companyId, setCompanyId] = useState(null)
   const [branchId, setBranchId] = useState(null)
   const [isSaving, setIsSaving] = useState(false)
@@ -129,6 +133,7 @@ export function useCostEntryForm () {
     setCustomCategory('')
     setDescription('')
     setFile(null)
+    setReceiptFile(null)
 
     setFilePreview(prev => {
       if (prev) URL.revokeObjectURL(prev)
@@ -136,6 +141,7 @@ export function useCostEntryForm () {
     })
 
     setUploadProgress(0)
+    setReceiptProgress(0)
     setPaidFromOffice('front')
     setPaidMethod('cash')
   }
@@ -158,6 +164,10 @@ export function useCostEntryForm () {
     setFilePreview, // Expose setFilePreview for ImageCaptureEditor
     uploadProgress,
     setUploadProgress,
+    receiptFile,
+    setReceiptFile,
+    receiptProgress,
+    setReceiptProgress,
     companyId,
     branchId,
     isSaving,

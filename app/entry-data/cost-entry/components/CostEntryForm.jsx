@@ -32,14 +32,20 @@ export default function CostEntryForm ({ form, onSave }) {
     setPaidMethod,
     isSaving,
     handleDescriptionKeyDown,
-    setFile
+    setFile,
+    receiptFile,
+    setReceiptFile,
+    receiptProgress
   } = form
 
   const [showImageCapture, setShowImageCapture] = useState(false)
   const currency = useCurrency()
 
-  const isDisabled =
-    isSaving || (uploadProgress > 0 && uploadProgress < 100) || !amount
+  const isUploading =
+    (uploadProgress > 0 && uploadProgress < 100) ||
+    (receiptProgress > 0 && receiptProgress < 100)
+
+  const isDisabled = isSaving || isUploading || !amount
 
   // Handle files from ImageCaptureEditor
   const handleFilesReady = files => {
@@ -245,6 +251,22 @@ export default function CostEntryForm ({ form, onSave }) {
           </button>
         </div>
 
+        {/* Payment Receipt — optional second attachment */}
+        <div className='bg-white rounded-lg shadow p-4 mb-4'>
+          <UploadInvoice
+            file={receiptFile}
+            onChange={setReceiptFile}
+            progress={receiptProgress}
+            allowCamera={true}
+            enablePaste={false}
+            label='Payment Receipt (optional)'
+          />
+          <p className='text-xs text-gray-500 mt-2'>
+            Proof of payment — bank slip, card slip or transfer confirmation.
+            Leave empty if you do not have one.
+          </p>
+        </div>
+
         {/* Save Button */}
         <button
           type='button'
@@ -259,7 +281,9 @@ export default function CostEntryForm ({ form, onSave }) {
           {isSaving
             ? 'Saving...'
             : uploadProgress > 0 && uploadProgress < 100
-            ? `Uploading ${Math.round(uploadProgress)}%`
+            ? `Uploading invoice ${Math.round(uploadProgress)}%`
+            : receiptProgress > 0 && receiptProgress < 100
+            ? `Uploading receipt ${Math.round(receiptProgress)}%`
             : 'Save'}
         </button>
       </div>

@@ -23,6 +23,11 @@ export default function UploadInvoice({
   compressMaxWidthOrHeight = 1600,
   /** Allow camera capture button on mobile */
   allowCamera = true,
+  /** Field label shown above the drop zone */
+  label = "Invoice (PDF or Image)",
+  /** Listen for Ctrl/Cmd+V image pastes. Turn OFF when more than one
+   *  uploader is on the page, otherwise a paste lands in every one. */
+  enablePaste = true,
 }) {
   const [previewUrl, setPreviewUrl] = useState(null);
   const [localError, setLocalError] = useState("");
@@ -129,6 +134,7 @@ export default function UploadInvoice({
 
   // Paste (Ctrl/Cmd+V) images directly
   useEffect(() => {
+    if (!enablePaste) return;
     const onPaste = async (e) => {
       if (!e.clipboardData?.items) return;
       const item = Array.from(e.clipboardData.items).find((it) =>
@@ -140,7 +146,7 @@ export default function UploadInvoice({
     };
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
-  }, [handleFileInternal]);
+  }, [handleFileInternal, enablePaste]);
 
   // Sync preview when parent file changes (both for resets and external updates)
   useEffect(() => {
@@ -177,7 +183,7 @@ export default function UploadInvoice({
   return (
     <div className="space-y-2">
       <label className="block text-sm font-medium text-gray-600">
-        Invoice (PDF or Image)
+        {label}
       </label>
 
       {/* Drop zone / picker */}
@@ -217,7 +223,7 @@ export default function UploadInvoice({
           </div>
 
           <div className="text-xs sm:text-sm text-gray-600">
-            Drag & drop a PDF or image, or paste an image.
+            Drag & drop a PDF or image{enablePaste ? ", or paste an image" : ""}.
             <div className="text-[11px] sm:text-xs text-gray-500">
               Max {maxFileSizeMB} MB. Images auto-compressed.
             </div>

@@ -25,6 +25,8 @@ export default function CostEntryPage () {
     date,
     file,
     setUploadProgress,
+    receiptFile,
+    setReceiptProgress,
     setIsSaving,
     resetForm
   } = form
@@ -61,6 +63,20 @@ export default function CostEntryPage () {
         onProgress: setUploadProgress
       })
 
+      // Optional proof of payment. Uploaded after the invoice so each one
+      // drives its own progress bar.
+      const receiptURL = await uploadCostFile({
+        storage,
+        file: receiptFile,
+        companyId,
+        branchId,
+        resolvedCategory,
+        paidFromOffice,
+        date,
+        onProgress: setReceiptProgress,
+        kind: 'receipt'
+      })
+
       const storedUser = localStorage.getItem('user')
       const createdBy = storedUser ? JSON.parse(storedUser) : {}
 
@@ -70,6 +86,11 @@ export default function CostEntryPage () {
         category: resolvedCategory,
         description: description?.trim() || '',
         fileURL: fileURL || null,
+        receiptURL: receiptURL || null,
+
+        // Reports, the attachment viewer and the exports all read `attachments`
+        // first and fall back to `fileURL`, so keep both in sync.
+        attachments: [fileURL, receiptURL].filter(Boolean),
 
         paidFromOffice, // "front" | "back"
         paidMethod: paidFromOffice === 'front' ? 'cash' : paidMethod,
