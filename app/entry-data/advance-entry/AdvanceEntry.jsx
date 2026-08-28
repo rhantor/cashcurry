@@ -166,7 +166,7 @@ const AdvanceForm = ({ staffList, staffLoading, companyId, branchId, isAdminOrMa
 
   const set = e => setForm(p => ({ ...p, [e.target.name]: e.target.value }))
   const amount = Number(form.amount) || 0
-  const canSubmit = !!staffId && amount > 0 && !!form.reason && !isLoading
+  const canSubmit = !!staffId && amount > 0 && !isLoading
   const deduction = getNextMonthDeduction(form.date)
 
   const handleSubmit = async e => {
@@ -185,7 +185,7 @@ const AdvanceForm = ({ staffList, staffLoading, companyId, branchId, isAdminOrMa
           staffName:      getStaffName(selectedStaff),
           amount,
           advanceType:    form.advanceType,
-          reason:         form.reason,
+          reason:         form.reason.trim(),
           date:           form.date,
           deductionMonth: form.deductionMonth,
           paidFromOffice: form.paidFromOffice,  // 'front' | 'back'
@@ -250,8 +250,8 @@ const AdvanceForm = ({ staffList, staffLoading, companyId, branchId, isAdminOrMa
           </Field>
         </div>
 
-        <Field label='Reason' required>
-          <textarea name='reason' value={form.reason} onChange={set} rows={3} placeholder='Reason for advance…' required className={`${inputCls} resize-none`} />
+        <Field label='Reason' hint='(optional)'>
+          <textarea name='reason' value={form.reason} onChange={set} rows={3} placeholder='Reason for advance…' className={`${inputCls} resize-none`} />
         </Field>
       </Section>
 
