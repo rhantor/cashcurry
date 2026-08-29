@@ -26,6 +26,16 @@ service cloud.firestore {
       return isAuth() && userData().companyId == companyId && userData().role == 'owner';
     }
 
+    // Company-level administrator: owner or superAdmin.
+    // superAdmin sits above branches (same as in canWrite), so anything the
+    // owner may do to company/branch/user records, a superAdmin may do too.
+    // Legacy all-lowercase 'superadmin' is accepted for pre-existing user docs.
+    function isCompanyAdmin(companyId) {
+      let u = userData();
+      return isAuth() && u.companyId == companyId &&
+        u.role in ['owner', 'superAdmin', 'superadmin'];
+    }
+
     // Can the user READ this branch?
     // - owner / gm / superAdmin: can read ALL branches in their company
     // - all other authenticated roles in same company: can read their assigned branch
@@ -64,11 +74,11 @@ service cloud.firestore {
       );
     }
 
-    // Can the user manage branch settings? (owner or branchAdmin only)
+    // Can the user manage branch settings? (owner / superAdmin, or this branch's admin)
     function canManageSettings(companyId, branchId) {
       let u = userData();
       return isAuth() && u.companyId == companyId && (
-        u.role == 'owner' ||
+        u.role in ['owner', 'superAdmin', 'superadmin'] ||
         (isBranchAdmin(u) && u.branchId == branchId)
       );
     }
@@ -112,11 +122,12 @@ service cloud.firestore {
       allow read: if isAuth() && request.auth.uid == uid;
 
       // Allow create when:
-      //   - owner is creating a user for their own company (secondary auth keeps owner signed in)
+      //   - owner/superAdmin is creating a user for their own company
+      //     (secondary auth keeps the creator signed in)
       //   - new user creating their own profile (signup flow)
       allow create: if isAuth() && (
         request.auth.uid == uid ||
-        isOwner(request.resource.data.companyId)
+        isCompanyAdmin(request.resource.data.companyId)
       );
 
       allow delete: if false;
@@ -142,7 +153,7 @@ service cloud.firestore {
       // ── Company Users Sub-collection ───────────────────────────────────────
       match /users/{uid} {
         allow read: if belongsToCompany(companyId);
-        allow write: if isOwner(companyId) || (isAuth() && request.auth.uid == uid);
+        allow write: if isCompanyAdmin(companyId) || (isAuth() && request.auth.uid == uid);
 
         // Individual users can manage their own device tokens
         match /fcmTokens/{token} {
@@ -233,10 +244,10 @@ service cloud.firestore {
         }
 
         // ── Branch Admins ─────────────────────────────────────────────────────
-        // Only the owner can assign/remove branch admins
+        // Only owner / superAdmin can assign/remove branch admins
         match /admins/{uid} {
           allow read: if belongsToCompany(companyId);
-          allow write: if isOwner(companyId);
+          allow write: if isCompanyAdmin(companyId);
         }
 
         // ── Branch Users ──────────────────────────────────────────────────────

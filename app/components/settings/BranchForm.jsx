@@ -10,6 +10,7 @@ const BranchForm = ({
   branches,
   disableForm,
   isAddingBranch,
+  errorMsg,
 }) => {
   const isMaxBranches = branches?.length >= 5;
 
@@ -110,6 +111,10 @@ const BranchForm = ({
             {isAddingBranch ? "adding branch.." : "Add Branch"}
           </button>
         </div>
+
+        {errorMsg && (
+          <p className="text-red-600 text-sm md:col-span-2">{errorMsg}</p>
+        )}
 
         {isMaxBranches && (
           <p className="text-red-500 text-sm md:col-span-2">

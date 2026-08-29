@@ -1,3 +1,4 @@
+/* eslint-disable react/prop-types */
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
 import { FaUpload, FaTimes } from "react-icons/fa";
@@ -41,6 +42,15 @@ export default function EditCostModal({ cost, onClose, onSuccess }) {
   const [filePreview, setFilePreview] = useState(cost?.fileURL || null);
   const [uploadProgress, setUploadProgress] = useState(0);
 
+  // Optional proof of payment. Only entries that carry an explicit
+  // `receiptURL` are treated as having one — a vendor-bill cost stores several
+  // invoices in `attachments` with no receipt among them, and guessing at the
+  // last element there would let the user overwrite an invoice.
+  const [receiptFile, setReceiptFile] = useState(null);
+  const [receiptPreview, setReceiptPreview] = useState(cost?.receiptURL || null);
+  const [receiptProgress, setReceiptProgress] = useState(0);
+  const [receiptRemoved, setReceiptRemoved] = useState(false);
+
   const [paidFromOffice, setPaidFromOffice] = useState(cost?.paidFromOffice || "front");
   const [paidMethod, setPaidMethod] = useState(cost?.paidMethod || "cash");
 
@@ -68,18 +78,23 @@ export default function EditCostModal({ cost, onClose, onSuccess }) {
     return category === 'Other' ? (customCategory || 'Other').trim() : category;
   }, [category, customCategory]);
 
+  const processPickedFile = async (selectedFile) => {
+    let processedFile = selectedFile;
+    let preview = null;
+    if (selectedFile.type.startsWith('image/')) {
+      const options = { maxSizeMB: 0.5, maxWidthOrHeight: 1024, useWebWorker: true };
+      processedFile = await imageCompression(selectedFile, options);
+      preview = URL.createObjectURL(processedFile);
+    }
+    return { processedFile, preview };
+  };
+
   const handleFileChange = async (e) => {
     try {
       const selectedFile = e.target.files[0];
       if (!selectedFile) return;
-      let processedFile = selectedFile;
-      if (selectedFile.type.startsWith('image/')) {
-        const options = { maxSizeMB: 0.5, maxWidthOrHeight: 1024, useWebWorker: true };
-        processedFile = await imageCompression(selectedFile, options);
-        setFilePreview(URL.createObjectURL(processedFile));
-      } else {
-        setFilePreview(null);
-      }
+      const { processedFile, preview } = await processPickedFile(selectedFile);
+      setFilePreview(preview);
       setFile(processedFile);
     } catch (err) {
       console.error('File processing error:', err);
@@ -87,21 +102,43 @@ export default function EditCostModal({ cost, onClose, onSuccess }) {
     }
   };
 
-  const uploadFile = async () => {
-    if (!file || !companyId || !branchId) return null;
+  const handleReceiptChange = async (e) => {
+    try {
+      const selectedFile = e.target.files[0];
+      if (!selectedFile) return;
+      const { processedFile, preview } = await processPickedFile(selectedFile);
+      setReceiptPreview(preview);
+      setReceiptFile(processedFile);
+      setReceiptRemoved(false);
+    } catch (err) {
+      console.error('Receipt processing error:', err);
+      alert('Failed to process receipt. Try again.');
+    }
+  };
+
+  const handleRemoveReceipt = () => {
+    setReceiptFile(null);
+    setReceiptPreview(null);
+    setReceiptRemoved(true);
+    setReceiptProgress(0);
+  };
+
+  const uploadFile = async (target = file, onProgress = setUploadProgress, kind = 'invoice') => {
+    if (!target || !companyId || !branchId) return null;
     return new Promise((resolve, reject) => {
       try {
-        const fileExtension = file.name.split('.').pop();
+        const fileExtension = target.name.split('.').pop();
         const safeCategory = (resolvedCategory || 'uncategorized').replace(/[^\w-]+/g, '_');
         const officeFolder = paidFromOffice === 'front' ? 'front' : 'back';
-        const filePath = `costs/${companyId}/${branchId}/${safeCategory}/${officeFolder}/${Date.now()}.${fileExtension}`;
+        const kindFolder = kind === 'receipt' ? 'receipts/' : '';
+        const filePath = `costs/${companyId}/${branchId}/${safeCategory}/${officeFolder}/${kindFolder}${Date.now()}.${fileExtension}`;
         const storageRef = ref(storage, filePath);
-        
-        const uploadTask = uploadBytesResumable(storageRef, file);
+
+        const uploadTask = uploadBytesResumable(storageRef, target);
         uploadTask.on('state_changed',
           snapshot => {
             const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-            setUploadProgress(progress);
+            onProgress(progress);
           },
           error => {
             console.error('Upload failed:', error);
@@ -123,9 +160,45 @@ export default function EditCostModal({ cost, onClose, onSuccess }) {
     if (paidFromOffice === 'back' && !paidMethod) return alert('Please select a payment method for Back Office.');
 
     try {
+      // Viewers and exports read `attachments` in preference to `fileURL`, so
+      // every change has to be mirrored into the array by identity — otherwise
+      // the report keeps showing the old file. Anything we did not touch
+      // (a vendor-bill cost carries several invoices here) is left alone.
       let fileURL = cost?.fileURL;
+      let receiptURL = cost?.receiptURL || null;
+      let attachments = Array.isArray(cost?.attachments)
+        ? [...cost.attachments]
+        : null;
+
       if (file) {
-        fileURL = await uploadFile();
+        const newURL = await uploadFile(file, setUploadProgress, 'invoice');
+        if (attachments) {
+          const i = attachments.indexOf(cost?.fileURL);
+          if (i >= 0) attachments[i] = newURL;
+          else attachments = [newURL, ...attachments];
+        }
+        fileURL = newURL;
+      }
+
+      if (receiptFile) {
+        const newURL = await uploadFile(receiptFile, setReceiptProgress, 'receipt');
+        if (attachments) {
+          const i = receiptURL ? attachments.indexOf(receiptURL) : -1;
+          if (i >= 0) attachments[i] = newURL;
+          else attachments.push(newURL);
+        }
+        receiptURL = newURL;
+      } else if (receiptRemoved) {
+        if (attachments && receiptURL) {
+          attachments = attachments.filter((u) => u !== receiptURL);
+        }
+        receiptURL = null;
+      }
+
+      // Entry pre-dates the attachments array — build one now that it holds
+      // more than a single file.
+      if (!attachments && receiptURL) {
+        attachments = [fileURL, receiptURL].filter(Boolean);
       }
 
       const data = {
@@ -134,6 +207,8 @@ export default function EditCostModal({ cost, onClose, onSuccess }) {
         category: resolvedCategory,
         description: description?.trim() || '',
         fileURL: fileURL || null,
+        receiptURL: receiptURL || null,
+        ...(attachments ? { attachments } : {}),
         paidFromOffice,
         paidMethod: paidFromOffice === 'front' ? 'cash' : paidMethod,
         isFrontOffice: paidFromOffice === 'front',
@@ -262,7 +337,7 @@ export default function EditCostModal({ cost, onClose, onSuccess }) {
 
               <div className="bg-indigo-50/40 p-4 rounded-xl border border-indigo-100 border-dashed">
                 <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-3">
-                  <label className="block text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-indigo-700">Attachment File</label>
+                  <label className="block text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-indigo-700">Invoice / Attachment</label>
                   <label className="cursor-pointer inline-flex w-full sm:w-auto justify-center items-center gap-2 px-4 py-2 bg-white text-indigo-700 text-xs font-semibold rounded-lg border border-indigo-200 shadow-sm hover:shadow hover:bg-indigo-50 transition-all">
                     <FaUpload className="text-indigo-500" />
                     <span>Upload New File</span>
@@ -304,6 +379,66 @@ export default function EditCostModal({ cost, onClose, onSuccess }) {
                   </div>
                 )}
               </div>
+
+              {/* Payment receipt — optional second attachment */}
+              <div className="bg-emerald-50/40 p-4 rounded-xl border border-emerald-100 border-dashed">
+                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-3">
+                  <label className="block text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-emerald-700">
+                    Payment Receipt <span className="text-emerald-500/70 normal-case font-medium">(optional)</span>
+                  </label>
+                  <div className="flex w-full sm:w-auto gap-2">
+                    {receiptPreview && (
+                      <button
+                        type="button"
+                        onClick={handleRemoveReceipt}
+                        className="inline-flex flex-1 sm:flex-none justify-center items-center gap-2 px-3 py-2 bg-white text-red-600 text-xs font-semibold rounded-lg border border-red-200 shadow-sm hover:bg-red-50 transition-all"
+                      >
+                        <FaTimes />
+                        <span>Remove</span>
+                      </button>
+                    )}
+                    <label className="cursor-pointer inline-flex flex-1 sm:flex-none justify-center items-center gap-2 px-4 py-2 bg-white text-emerald-700 text-xs font-semibold rounded-lg border border-emerald-200 shadow-sm hover:shadow hover:bg-emerald-50 transition-all">
+                      <FaUpload className="text-emerald-500" />
+                      <span>{receiptPreview ? 'Replace Receipt' : 'Upload Receipt'}</span>
+                      <input type="file" accept=".pdf,image/*" onChange={handleReceiptChange} className="hidden" />
+                    </label>
+                  </div>
+                </div>
+
+                {receiptPreview ? (
+                  <div className="mt-3">
+                    <div className="w-full h-40 sm:h-56 border border-emerald-100 rounded-xl overflow-hidden bg-gray-50 flex items-center justify-center p-2 shadow-inner relative">
+                      {receiptPreview.match(/\.(jpeg|jpg|gif|png|webp|bmp)(?:\?.*)?$/i) || receiptPreview.startsWith('blob:') ? (
+                        <img
+                          src={receiptPreview}
+                          alt="Receipt preview"
+                          className="max-w-full max-h-full object-contain rounded-lg"
+                        />
+                      ) : (
+                        <iframe
+                          src={receiptPreview}
+                          className="w-full h-full rounded-lg"
+                          title="Payment Receipt Preview"
+                        />
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="py-6 flex flex-col items-center justify-center text-emerald-400 bg-white/50 rounded-xl border border-emerald-50">
+                    <span className="text-xs font-medium">No payment receipt attached</span>
+                  </div>
+                )}
+
+                {receiptProgress > 0 && receiptProgress < 100 && (
+                  <div className="w-full bg-gray-200 rounded-full h-1.5 mt-4 overflow-hidden">
+                    <motion.div
+                      className="bg-emerald-500 h-1.5 rounded-full"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${receiptProgress}%` }}
+                    />
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
@@ -314,7 +449,7 @@ export default function EditCostModal({ cost, onClose, onSuccess }) {
             </button>
             <button 
               onClick={handleSave} 
-              disabled={isUpdating || (uploadProgress > 0 && uploadProgress < 100)} 
+              disabled={isUpdating || (uploadProgress > 0 && uploadProgress < 100) || (receiptProgress > 0 && receiptProgress < 100)} 
               className="w-full sm:w-auto px-6 py-2.5 rounded-xl font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md hover:shadow-lg active:scale-[0.98] transition-all disabled:opacity-50 text-sm flex items-center justify-center gap-2"
             >
               {isUpdating ? (

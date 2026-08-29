@@ -43,7 +43,7 @@ export default function AdvanceRequests({
                 {Number(req.amount).toFixed(2)}
               </p>
               <p>
-                <span className="font-semibold">Reason:</span> {req.reason}
+                <span className="font-semibold">Reason:</span> {req.reason || "-"}
               </p>
               <p>
                 <span className="font-semibold">Date:</span>{" "}

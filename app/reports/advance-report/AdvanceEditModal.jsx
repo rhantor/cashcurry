@@ -138,14 +138,13 @@ export default function AdvanceEditModal ({
             {/* Reason */}
             <div>
               <label className='block text-sm font-medium text-gray-700 mb-1.5'>
-                Reason <span className='text-red-500'>*</span>
+                Reason <span className='ml-1 text-xs font-normal text-gray-400'>(optional)</span>
               </label>
               <textarea
                 name='reason'
                 value={form.reason}
                 onChange={handleChange}
                 rows={3}
-                required
                 className='w-full border-2 border-mint-300 rounded-lg px-3 py-2.5 text-sm bg-white focus:outline-none focus:border-mint-500 transition-colors resize-none'
                 placeholder='Reason for the advance…'
               />

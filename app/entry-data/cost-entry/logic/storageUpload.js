@@ -8,7 +8,9 @@ export const uploadCostFile = ({
   resolvedCategory,
   paidFromOffice,
   date,
-  onProgress
+  onProgress,
+  /** 'invoice' (default) or 'receipt' — receipts go in their own sub-folder */
+  kind = 'invoice'
 }) => {
   if (!file || !companyId || !branchId) return Promise.resolve(null)
 
@@ -20,10 +22,11 @@ export const uploadCostFile = ({
         '_'
       )
       const officeFolder = paidFromOffice === 'front' ? 'front' : 'back'
+      const kindFolder = kind === 'receipt' ? 'receipts/' : ''
 
       // ✅ Avoid overwrite on same date/category/office
       const uniqueSuffix = Date.now()
-      const filePath = `costs/${companyId}/${branchId}/${safeCategory}/${officeFolder}/${date}_${uniqueSuffix}.${ext}`
+      const filePath = `costs/${companyId}/${branchId}/${safeCategory}/${officeFolder}/${kindFolder}${date}_${uniqueSuffix}.${ext}`
 
       const storageRef = ref(storage, filePath)
       const task = uploadBytesResumable(storageRef, file)

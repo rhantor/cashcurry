@@ -19,20 +19,28 @@ service firebase.storage {
       return u.role == 'branchAdmin' || u.role == 'branchadmin';
     }
 
+    // Company-level roles sit above branches and reach every branch's files.
+    // Mirrors canRead/canWrite in firestore.rules. Legacy all-lowercase
+    // 'superadmin' is accepted for pre-existing user docs.
+    function isCompanyRole(u) {
+      return u.role in ['owner', 'gm', 'superAdmin', 'superadmin'];
+    }
+
     // Can the user access files belonging to this company's branch?
     function canAccessBranch(companyId, branchId) {
       let u = userData();
       return isAuth() && u.companyId == companyId && (
-        u.role == 'owner' ||
+        isCompanyRole(u) ||
         u.branchId == branchId
       );
     }
 
-    // Can the user upload? Owner or writer roles on their assigned branch.
+    // Can the user upload? Company-level roles, or writer roles on their
+    // assigned branch.
     function canUpload(companyId, branchId) {
       let u = userData();
       return isAuth() && u.companyId == companyId && (
-        u.role == 'owner' ||
+        isCompanyRole(u) ||
         (u.branchId == branchId &&
           (isBranchAdmin(u) || u.role in ['manager', 'accountant', 'supervisor']))
       );
