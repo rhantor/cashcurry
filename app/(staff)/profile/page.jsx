@@ -127,8 +127,13 @@ export default function StaffProfilePage() {
     const loanDebt = allLoans
       .filter(l => l.staffId === staffData.id && l.status !== "closed")
       .reduce((sum, l) => sum + (l.remainingAmount || 0), 0);
+    // Only money advances count as debt — the same collection also holds the
+    // staff portal's medical/annual leave requests, which carry no amount.
+    // "personal" is what the staff form stores for its Salary Advance option;
+    // "salary" and "emergency" come from the back-office advance entry.
+    const MONEY_ADVANCE_TYPES = ["personal", "salary", "emergency"];
     const advanceDebt = allAdvances
-      .filter(a => (a.staffId === staffData.id || a.createdBy?.uid === user?.uid) && a.status === "approved" && a.advanceType === "personal")
+      .filter(a => (a.staffId === staffData.id || a.createdBy?.uid === user?.uid) && a.status === "approved" && MONEY_ADVANCE_TYPES.includes(a.advanceType))
       .reduce((sum, a) => sum + (a.amount || 0), 0);
 
     // Fixed-salary staff: flat monthly Basic Salary, no attendance tracking.

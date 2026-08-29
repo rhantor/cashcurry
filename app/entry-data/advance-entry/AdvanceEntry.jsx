@@ -142,14 +142,26 @@ const StaffDropdown = ({ staffList, value, onChange }) => {
   )
 }
 
-// ─── Helper: compute next-month deduction label ───────────────────────────────
+// ─── Helper: payroll month an advance is deducted from ───────────────────────
+// The month the advance was given. Parsed straight off the YYYY-MM-DD string —
+// new Date('YYYY-MM-DD') is UTC midnight and can render as the previous month.
 
-const getNextMonthDeduction = fromDateStr => {
-  const base = fromDateStr ? new Date(fromDateStr) : new Date()
-  base.setDate(1)
-  base.setMonth(base.getMonth() + 1)
-  const label = base.toLocaleString('default', { month: 'long', year: 'numeric' })
-  const value = `${base.getFullYear()}-${String(base.getMonth() + 1).padStart(2, '0')}`
+const getDeductionMonth = fromDateStr => {
+  let year, month // month is 1-12
+  const parts = /^(\d{4})-(\d{2})/.exec(fromDateStr || '')
+  if (parts) {
+    year = Number(parts[1])
+    month = Number(parts[2])
+  } else {
+    const now = new Date()
+    year = now.getFullYear()
+    month = now.getMonth() + 1
+  }
+  const value = `${year}-${String(month).padStart(2, '0')}`
+  const label = new Date(year, month - 1, 1).toLocaleString('default', {
+    month: 'long',
+    year: 'numeric'
+  })
   return { label, value }
 }
 
@@ -159,7 +171,7 @@ const AdvanceForm = ({ staffList, staffLoading, companyId, branchId, isAdminOrMa
   const today = new Date().toISOString().split('T')[0]
 
   const [staffId, setStaffId] = useState('')
-  const [form, setForm] = useState({ amount: '', advanceType: 'personal', reason: '', date: today, deductionMonth: getNextMonthDeduction(today).value, paidFromOffice: 'front', approvalNotes: '' })
+  const [form, setForm] = useState({ amount: '', advanceType: 'salary', reason: '', date: today, deductionMonth: getDeductionMonth(today).value, paidFromOffice: 'front', approvalNotes: '' })
   const [successMsg, setSuccessMsg] = useState('')
 
   const [addAdvanceEntry, { isLoading, isError, error }] = useAddAdvanceEntryMutation()
@@ -167,7 +179,6 @@ const AdvanceForm = ({ staffList, staffLoading, companyId, branchId, isAdminOrMa
   const set = e => setForm(p => ({ ...p, [e.target.name]: e.target.value }))
   const amount = Number(form.amount) || 0
   const canSubmit = !!staffId && amount > 0 && !isLoading
-  const deduction = getNextMonthDeduction(form.date)
 
   const handleSubmit = async e => {
     e.preventDefault()
@@ -197,7 +208,7 @@ const AdvanceForm = ({ staffList, staffLoading, companyId, branchId, isAdminOrMa
       }).unwrap()
 
       setStaffId('')
-      setForm({ amount: '', advanceType: 'personal', reason: '', date: today, deductionMonth: getNextMonthDeduction(today).value, paidFromOffice: 'front', approvalNotes: '' })
+      setForm({ amount: '', advanceType: 'salary', reason: '', date: today, deductionMonth: getDeductionMonth(today).value, paidFromOffice: 'front', approvalNotes: '' })
       setSuccessMsg(approved
         ? `Advance recorded. Deducted from ${form.paidFromOffice === 'back' ? 'back office (bank)' : 'front office (cash)'}.`
         : 'Advance request submitted — pending manager approval.')
