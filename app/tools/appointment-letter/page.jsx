@@ -24,6 +24,31 @@ import {
   Info
 } from "lucide-react";
 
+// Draw an image scaled to fit inside a box without distorting it, then return
+// the height it actually used. addImage() stretches to whatever width/height it
+// is handed, so a near-square logo dropped into a wide letterhead box comes out
+// smeared. This mirrors the on-screen preview's `object-contain object-left`:
+// aspect preserved, pinned to the left edge, centred vertically in the box.
+const drawImageContained = (pdf, dataUrl, format, x, y, boxW, boxH) => {
+  let w = boxW;
+  let h = boxH;
+
+  try {
+    const props = pdf.getImageProperties(dataUrl);
+    if (props?.width > 0 && props?.height > 0) {
+      const scale = Math.min(boxW / props.width, boxH / props.height);
+      w = props.width * scale;
+      h = props.height * scale;
+    }
+  } catch (e) {
+    // Unreadable header — fall back to filling the box, as before.
+    console.error("Could not read image dimensions:", e);
+  }
+
+  pdf.addImage(dataUrl, format, x, y + (boxH - h) / 2, w, h, undefined, 'FAST');
+  return boxH;
+};
+
 // Predefined templates for different employment types
 const TEMPLATES = {
   fullTime: {
@@ -599,7 +624,7 @@ export default function AppointmentLetterGenerator() {
         // --- Header Section ---
         if (logo) {
           try {
-            pdf.addImage(logo, 'PNG', margin, y, 40, 13, undefined, 'FAST');
+            drawImageContained(pdf, logo, 'PNG', margin, y, 40, 13);
             y += 15;
           } catch (e) {
             console.error("Error adding logo to application PDF:", e);
@@ -1006,7 +1031,7 @@ export default function AppointmentLetterGenerator() {
         if (logo) {
           try {
             // Place logo at top-left
-            pdf.addImage(logo, 'PNG', margin, y, 45, 15, undefined, 'FAST');
+            drawImageContained(pdf, logo, 'PNG', margin, y, 45, 15);
             y += 18;
           } catch (e) {
             console.error("Error adding logo to PDF:", e);
