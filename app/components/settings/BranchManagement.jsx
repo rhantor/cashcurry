@@ -164,7 +164,11 @@ export default function BranchManagement() {
           "This branch already has the maximum of 2 admins assigned."
         );
       } else {
-        setErrorMsg("Failed to assign admin. Please try again.");
+        setErrorMsg(
+          err?.error
+            ? `Failed to assign admin: ${err.error}`
+            : "Failed to assign admin. Please try again."
+        );
       }
     }
   };

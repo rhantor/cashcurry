@@ -22,8 +22,24 @@ const TABS = [
 ];
 
 export default function BranchSettingsPage() {
-  const { role, form, setForm, save, saving, isDirty } = useBranchSettingsForm();
+  const { role, form, setForm, save, saving, saveError, loadError, isDirty } =
+    useBranchSettingsForm();
   const [activeTab, setActiveTab] = useState("general");
+
+  if (loadError) {
+    return (
+      <div className="p-6 max-w-lg mx-auto mt-10 bg-white border border-red-200 rounded-2xl shadow-sm text-center">
+        <h1 className="text-lg font-bold text-slate-800">
+          Branch settings couldn&apos;t be loaded
+        </h1>
+        <p className="text-sm text-slate-500 mt-2">
+          {loadError?.message ||
+            loadError?.error?.message ||
+            "Your account may not have access to this branch's settings."}
+        </p>
+      </div>
+    );
+  }
 
   if (!form) return <div className="p-6 text-slate-500 animate-pulse">Loading settings...</div>;
 
@@ -48,6 +64,12 @@ export default function BranchSettingsPage() {
           {saving ? "Saving..." : "Save Settings"}
         </button>
       </div>
+
+      {saveError && (
+        <div className="mb-6 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+          {saveError}
+        </div>
+      )}
 
       {/* Tabs / Content Layout */}
       <div className="flex flex-col md:flex-row gap-8">

@@ -135,10 +135,15 @@ const AssignBranchAdminForm = ({
         </p>
       </div>
 
-      {errorMsg ===
-        "This branch already has the maximum of 2 admins assigned." && (
-        <p className="text-xs text-red-500 mt-1">{errorMsg}</p>
-      )}
+      {/* Anything not already shown inline next to a specific field. Without
+          this, generic failures (permissions, network) left the form silent. */}
+      {errorMsg &&
+        errorMsg !== "This username is already taken. Please choose another." &&
+        errorMsg !== "This email is already in use by another account." && (
+          <p className="md:col-span-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
+            {errorMsg}
+          </p>
+        )}
       {/* Submit */}
       <div className="md:col-span-2 flex justify-end">
         <button

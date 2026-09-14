@@ -42,17 +42,18 @@ export default function useBranchSettingsForm() {
   }, []);
 
   const skip = !companyId || !branchId;
-  const { data: branch } = useGetSingleBranchQuery(
+  const { data: branch, error: branchError } = useGetSingleBranchQuery(
     { companyId, branchId },
     { skip }
   );
-  const { data: settings } = useGetBranchSettingsQuery(
+  const { data: settings, error: settingsError } = useGetBranchSettingsQuery(
     { companyId, branchId },
     { skip }
   );
 
   const [form, setForm] = useState(null);
   const [initialFormText, setInitialFormText] = useState(null);
+  const [saveError, setSaveError] = useState("");
 
   // seed the form once both are loaded
   useEffect(() => {
@@ -132,15 +133,20 @@ export default function useBranchSettingsForm() {
 
   const save = async () => {
     if (!form) return;
+    setSaveError("");
 
     // 1) Split updates: what goes to branch vs settings
     const branchUpdates = {};
     const settingsPatch = { ...form };
 
-    // move locked fields into branchUpdates
+    // Move locked fields into branchUpdates — but only the ones that actually
+    // changed. Writing branch metadata needs owner/branchAdmin rights, so
+    // re-sending an unchanged name/code used to make every manager save fail
+    // before the settings write was even attempted.
     BRANCH_LOCKED_FIELDS.forEach((k) => {
-      if (form.basic?.[k] !== undefined) {
-        branchUpdates[k] = form.basic[k];
+      const next = form.basic?.[k];
+      if (next !== undefined && next !== (branch?.[k] ?? "")) {
+        branchUpdates[k] = next;
       }
     });
 
@@ -158,11 +164,26 @@ export default function useBranchSettingsForm() {
     settingsPatch.financeSales = { ...fs, tenders };
 
     // 3) Perform writes
-    if (Object.keys(branchUpdates).length) {
-      await updateBranch({ companyId, branchId, updates: branchUpdates });
+    try {
+      if (Object.keys(branchUpdates).length) {
+        await updateBranch({
+          companyId,
+          branchId,
+          updates: branchUpdates,
+        }).unwrap();
+      }
+      await updateSettings({
+        companyId,
+        branchId,
+        patch: settingsPatch,
+      }).unwrap();
+    } catch (e) {
+      setSaveError(
+        e?.message || e?.error?.message || "Could not save settings."
+      );
+      return;
     }
-    await updateSettings({ companyId, branchId, patch: settingsPatch });
-    
+
     // Reset dirty state on successful save
     setInitialFormText(JSON.stringify({ ...form, basic: { ...form.basic, ...branchUpdates } }));
   };
@@ -177,6 +198,8 @@ export default function useBranchSettingsForm() {
     setForm,
     save,
     saving,
+    saveError,
+    loadError: branchError || settingsError,
     isDirty: form ? JSON.stringify(form) !== initialFormText : false,
   };
 }
