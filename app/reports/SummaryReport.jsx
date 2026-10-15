@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 "use client";
 
 import React, { useState, useMemo } from "react";
@@ -8,7 +7,6 @@ import SummaryModeSwitch from "./components/SummaryModeSwitch";
 import KpiCards from "./components/KpiCards";
 import SummaryTable from "./components/SummaryTable";
 import { useSummaryReportLogic } from "@/hook/useSummaryReportLogic";
-import { skipToken } from "@reduxjs/toolkit/query";
 
 const SUMMARY_MODES = [
   { id: "front", label: "Front Office" },
@@ -33,7 +31,6 @@ export default function SummaryReport() {
     companyName,
     computed,
     tenderDefs,
-    finalSummary,
     filterBadgeText,
     commonMeta,
   } = useSummaryReportLogic(filterState, summaryMode);

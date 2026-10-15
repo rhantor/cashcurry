@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 import React from "react";
 import SettingsSection from "./SettingsSection";
 import { FieldRow, NumberField, Toggle } from "./fields";

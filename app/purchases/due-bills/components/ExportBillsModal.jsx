@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, FileText, CheckSquare, Square, Download, FileSpreadsheet } from 'lucide-react';
+import { X, CheckSquare, Square, Download, FileSpreadsheet } from 'lucide-react';
 
 export default function ExportBillsModal({ 
   isOpen, 

@@ -1,7 +1,6 @@
-/* eslint-disable react/prop-types */
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useGetLoanActivitiesQuery } from "@/lib/redux/api/loanApiSlice";
 import { useGetBranchesBasicQuery } from "@/lib/redux/api/branchApiSlice";
 import useCurrency from "@/app/hooks/useCurrency";
@@ -19,7 +18,7 @@ const fmtDate = (v) => {
 
 export default function LoanActivityFeed({ fromMs = null, toMs = null, periodLabel = "All Time" }) {
   const currency = useCurrency();
-  const { ready, companyId, branchId, user } = useResolvedCompanyBranch();
+  const { ready, companyId, branchId } = useResolvedCompanyBranch();
 
   // UI filters
   const [direction, setDirection] = useState("incoming"); // "incoming" | "outgoing" | "all"

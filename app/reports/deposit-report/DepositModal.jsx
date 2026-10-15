@@ -1,5 +1,4 @@
 /* eslint-disable react/no-unknown-property */
-/* eslint-disable react/prop-types */
 import React, { useState } from "react";
 import { format } from "date-fns";
 import {

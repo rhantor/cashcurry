@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 // components/settings/users/modals/AddCompanyUserModal.jsx
 "use client";
 

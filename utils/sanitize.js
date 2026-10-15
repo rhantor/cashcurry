@@ -1,4 +1,3 @@
-/* eslint-disable no-unused-vars */
 // utils/sanitize.js
 export const sanitizeUpdates = (obj, { dropEmptyStrings = true } = {}) =>
   Object.fromEntries(

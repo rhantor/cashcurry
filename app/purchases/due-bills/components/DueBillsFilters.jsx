@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 'use client'
 import React, { useState, useRef, useEffect } from 'react'
 import { Search, ChevronDown, X, Building2 } from 'lucide-react'

@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 "use client";
 import React, { useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -542,7 +541,7 @@ export default function CostsReport() {
                   "Invoice",
                   "Created By",
                   "Added Time",
-                ].map((label, idx) => (
+                ].map((label) => (
                   <th
                     key={label}
                     className={[

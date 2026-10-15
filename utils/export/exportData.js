@@ -698,7 +698,7 @@ export const handleShareImage = async (
         return null; // Handled by native share
       }
       throw new Error("Share skipped for desktop");
-    } catch (shareErr) {
+    } catch {
       // 2. Fallback: Copy to Clipboard (Great for Desktop WhatsApp/Web)
       try {
         if (navigator.clipboard && window.ClipboardItem) {
@@ -711,7 +711,7 @@ export const handleShareImage = async (
           return null; // Handled by clipboard
         }
         throw new Error("Clipboard not supported");
-      } catch (clipErr) {
+      } catch {
         // 3. Ultimate Fallback: Return the data URL so the Modal can display it on screen
         return dataUrl;
       }

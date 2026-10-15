@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
 import { FaUpload, FaTimes } from "react-icons/fa";
@@ -27,7 +26,7 @@ const BACK_OFFICE_METHODS = [
 
 export default function EditCostModal({ cost, onClose, onSuccess }) {
   const currency = useCurrency();
-  const { ready, companyId, branchId } = useResolvedCompanyBranch();
+  const { companyId, branchId } = useResolvedCompanyBranch();
   const [updateCostEntry, { isLoading: isUpdating }] = useUpdateCostEntryMutation();
 
   const [date, setDate] = useState(() => {

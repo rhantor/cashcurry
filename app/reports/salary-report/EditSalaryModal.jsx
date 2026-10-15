@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 import React, { useState, useEffect } from "react";
 import { useUpdateSalaryEntryMutation, useDeleteSalaryEntryMutation } from "@/lib/redux/api/salaryApiSlice";
 import { getSessionUser } from "@/lib/session";

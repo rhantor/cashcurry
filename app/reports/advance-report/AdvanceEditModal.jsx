@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 'use client'
 import React, { useState } from 'react'
 import { useUpdateAdvanceEntryMutation, useDeleteAdvanceEntryMutation } from '@/lib/redux/api/AdvanceApiSlice'

@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 "use client";
 
 import React, { useEffect, useMemo, useState } from "react";
@@ -268,7 +267,7 @@ export default function SalesEntry() {
     return { ...base, doUpdate, doDelete };
   }
   
-  const { canEdit, canDelete, confirmingDelete, setConfirmingDelete, doUpdate, doDelete, updating } = useSalesCrud();
+  const { canEdit, confirmingDelete, setConfirmingDelete, doUpdate, doDelete, updating } = useSalesCrud();
   
   // Fetch this month's sales to compute "Grand Total (This Month)" for the modal
   const selectedMonthStr = date?.slice(0, 7) || new Date().toISOString().slice(0, 7);

@@ -11,7 +11,7 @@ import { getDocsSince } from "@/lib/redux/api/recordQueries";
 import { currencyInfo } from "@/lib/region";
 import {
   saleDay, costDay, advanceDay, depositDay, withdrawalDay, salaryDay, staffLoanDay,
-  isCashCost, isMigratedStaffLoan, paidOutOf, loanActivityDay, COLLECTION, DATE_FIELD,
+  isCashCost, isMigratedStaffLoan, paidOutOf, loanActivityDay, COLLECTION, DATE_FIELD, dayKey,
 } from "@/lib/finance/rules";
 import { getSessionUser } from "@/lib/session";
 
@@ -23,14 +23,9 @@ const toDate = (ts) => {
   return new Date(ts);
 };
 const num = (v) => (Number.isFinite(parseFloat(v)) ? parseFloat(v) : 0);
-const byDateKey = (d) => {
-  const dt = toDate(d);
-  if (!dt) return "";
-  const y = dt.getFullYear();
-  const m = String(dt.getMonth() + 1).padStart(2, "0");
-  const dd = String(dt.getDate()).padStart(2, "0");
-  return `${y}-${m}-${dd}`;
-};
+// Chart bucketing key: the same day the money figures use. (It used to read
+// "2026-02-01" as UTC midnight and take the local day — 31 Jan west of UTC.)
+const byDateKey = (d) => dayKey(d) || "";
 const sortByDateKey = (arr) =>
   [...arr].sort((a, b) => +new Date(a.date) - +new Date(b.date));
 

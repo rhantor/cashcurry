@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { db } from "@/lib/firebase";
-import { collection, getDocs, doc, writeBatch } from "firebase/firestore";
+import { collection, getDocs, writeBatch } from "firebase/firestore";
 import Button from "@/app/components/common/Button";
 
 export default function SyncVendorMetrics({ companyId }) {

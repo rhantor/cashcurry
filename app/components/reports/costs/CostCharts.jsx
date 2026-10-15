@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 "use client";
 import { dayKey } from "@/lib/finance/rules";
 import React, { useMemo, useState } from "react";

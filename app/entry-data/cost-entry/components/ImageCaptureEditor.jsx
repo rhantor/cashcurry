@@ -9,8 +9,7 @@ import {
   FaEdit,
   FaCrop,
   FaFilePdf,
-  FaCheck,
-  FaTimes
+  FaCheck
 } from 'react-icons/fa'
 import imageCompression from 'browser-image-compression'
 import { jsPDF } from 'jspdf'

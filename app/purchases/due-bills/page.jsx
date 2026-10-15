@@ -45,7 +45,7 @@ const makeFmtRM = (currency) => v =>
     maximumFractionDigits: 2
   })}`
 
-const addAttachmentToPdf = async (doc, url, vendorName, refLabel, attachmentIndex, totalAttachments) => {
+const addAttachmentToPdf = async (doc, url, vendorName, refLabel, attachmentIndex) => {
   return new Promise(async (resolve) => {
     const isPdf = url.toLowerCase().split('?')[0].endsWith('.pdf');
     const pdfWidth = doc.internal.pageSize.getWidth();
@@ -87,10 +87,10 @@ const addAttachmentToPdf = async (doc, url, vendorName, refLabel, attachmentInde
       
       try {
         doc.addImage(img, 'JPEG', xPos, startY, finalW, finalH);
-      } catch (e) {
+      } catch {
         try {
           doc.addImage(img, 'PNG', xPos, startY, finalW, finalH);
-        } catch (err) {
+        } catch {
           doc.setFontSize(10);
           doc.setTextColor(220, 38, 38);
           doc.text("Failed to embed image. Click to view:", 14, startY + 10);

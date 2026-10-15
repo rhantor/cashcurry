@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 'use client'
 import { useUpdateStaffLoanMutation, useDeleteStaffLoanMutation } from '@/lib/redux/api/staffLoanApiSlice'
 import { getSessionUser } from '@/lib/session'

@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 "use client";
 /**
  * LoanTermsModal — lets branchAdmin / manager edit the repayment schedule

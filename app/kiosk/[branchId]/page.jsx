@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 "use client";
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";

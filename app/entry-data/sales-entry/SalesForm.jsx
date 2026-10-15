@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 import React from "react";
 import { FaUpload } from "react-icons/fa";
 // 1. Import the library

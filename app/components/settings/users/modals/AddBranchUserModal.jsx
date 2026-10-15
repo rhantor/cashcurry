@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 // components/settings/users/modals/AddBranchUserModal.jsx
 "use client";
 import React, { useEffect, useState } from "react";

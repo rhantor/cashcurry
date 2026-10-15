@@ -3,7 +3,7 @@ import { signOut } from "@/lib/session";
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, MessageCircle, FileText, Pickaxe, LogOut, User } from "lucide-react";
+import { Home, MessageCircle, FileText, LogOut, User } from "lucide-react";
 
 export default function StaffLayout({ children }) {
   const pathname = usePathname();

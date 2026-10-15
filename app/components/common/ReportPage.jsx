@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 "use client";
 import React, { useState, useMemo } from "react";
 import Pagination from "@/app/components/common/Pagination";
@@ -415,7 +414,7 @@ export default function ReportPage({
           <table className="min-w-full table-fixed divide-y divide-slate-100">
             <thead className="sticky top-0 z-20">
               <tr className="bg-white/90 backdrop-blur-md supports-[backdrop-filter]:bg-white/60">
-                {columns.map((col, idx) => (
+                {columns.map((col) => (
                   <th
                     key={col.key}
                     className={[

@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 // app/components/common/RowActions.jsx
 "use client";
 import React from "react";
