@@ -4,6 +4,7 @@ import { Lock } from "lucide-react"; // Make sure you have lucide-react, or use 
 import SettingsSection from "./SettingsSection";
 import { FieldRow, NumberField, TextField } from "./fields";
 import TendersEditor from "./TendersEditor";
+import { formatMoney } from "@/lib/region";
 
 export default function FinanceSalesSection({ role, value, onChange }) {
   const v = value || {};
@@ -67,12 +68,8 @@ export default function FinanceSalesSection({ role, value, onChange }) {
                 </div>
               </FieldRow>
 
-              <FieldRow label="Currency" hint="3-letter code">
-                <TextField
-                  value={v.currency || "MYR"}
-                  onChange={(currency) => patch({ currency })}
-                  disabled={!can("currency")}
-                />
+              <FieldRow label="Currency" hint="Set under General → Region & business day">
+                <p className="text-sm text-slate-700">{formatMoney(1234.5, v.currency)}</p>
               </FieldRow>
             </div>
 

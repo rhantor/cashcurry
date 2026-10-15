@@ -15,8 +15,9 @@ export const KL = "demo-kl";
 export const PJ = "demo-pj";
 
 const BRANCHES = {
-  [KL]: { name: "Demo Branch KL", code: "DKL", address: "1 Jalan Demo, Kuala Lumpur", openingCash: 1000 },
-  [PJ]: { name: "Demo Branch PJ", code: "DPJ", address: "2 Jalan Contoh, Petaling Jaya", openingCash: 200 },
+  // KL trades past midnight (day ends 05:00); PJ closes before midnight.
+  [KL]: { name: "Demo Branch KL", code: "DKL", address: "1 Jalan Demo, Kuala Lumpur", openingCash: 1000, dayCutoffTime: "05:00" },
+  [PJ]: { name: "Demo Branch PJ", code: "DPJ", address: "2 Jalan Contoh, Petaling Jaya", openingCash: 200, dayCutoffTime: "" },
 };
 
 const TENDERS = [
@@ -226,9 +227,11 @@ export function buildDemoCompany(today = new Date()) {
     basic: {
       name: BRANCHES[branchId].name, code: BRANCHES[branchId].code, companyName: "Demo Curry House Sdn Bhd",
       phone: "", email: "", address: { line1: BRANCHES[branchId].address, city: "", state: "", postcode: "", country: "Malaysia" },
+      timeZone: "Asia/Kuala_Lumpur",
     },
+    attendance: { dayCutoffTime: BRANCHES[branchId].dayCutoffTime },
     financeSales: {
-      currency: "RM", openingBalance: BRANCHES[branchId].openingCash, openingBankBalance: 0,
+      currency: "MYR", openingBalance: BRANCHES[branchId].openingCash, openingBankBalance: 0,
       tax: { type: "SST", rate: 0 }, serviceCharge: 0, tenders: TENDERS,
     },
     loansFinance: { allowInterBranchLoans: true, maxLoanLimit: 5000, salaryAdvanceLimitPercent: 30 },

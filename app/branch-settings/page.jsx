@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { FaBuilding, FaMoneyBillWave, FaUserCog, FaCogs, FaMoneyCheckAlt, FaClock } from "react-icons/fa";
 
 import BasicInfoSection from "@/app/components/settings/BasicInfoSection";
+import RegionSection from "@/app/components/settings/RegionSection";
 import FinanceSalesSection from "@/app/components/settings/FinanceSalesSection";
 import StaffRolesSection from "@/app/components/settings/StaffRolesSection";
 import LoansFinanceSection from "@/app/components/settings/LoansFinanceSection";
@@ -106,6 +107,9 @@ export default function BranchSettingsPage() {
                 value={form.basic}
                 onChange={(v) => setForm((prev) => ({ ...prev, basic: v }))}
               />
+              <div className="mt-8">
+                <RegionSection role={role} form={form} setForm={setForm} />
+              </div>
             </div>
           )}
 
