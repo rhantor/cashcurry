@@ -28,6 +28,7 @@ walkthrough figures are computed from the same list of entries, and
 |---|---|
 | `npm run local:seed` | Builds the local copy with the **demo company** (made up, no client data): two branches, 7 days ending today, round numbers. Writes a day-by-day walkthrough of what every screen should show to `.local/DEMO_GUIDE.md`. **Wipes** any previous local data. |
 | `npm run local:seed:backup` | Same, but from a real company backup instead (see Requirements). |
+| `npm run summaries:rebuild` | Recomputes every branch's monthly totals in the running emulators (the seed already does this; the Cloud Functions keep them up to date as you work). |
 | `npm run dev:local` | Starts the emulators + the app at http://localhost:3000. Changes you make are kept between runs. Stop with **Ctrl+C** (waits a few seconds to save). |
 
 Emulator dashboard (browse the data, users, function logs): http://127.0.0.1:4000
