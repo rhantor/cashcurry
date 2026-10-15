@@ -78,7 +78,7 @@ vi.mock("@/lib/redux/api/branchApiSlice", rtk);
 vi.mock("@/lib/redux/api/loanApiSlice", rtk);
 vi.mock("@/lib/redux/api/authApiSlice", rtk);
 vi.mock("@/lib/redux/api/summaryApiSlice", rtk);
-vi.mock("@/lib/redux/api/since", async () => (await import("./fakeBackend")).since);
+vi.mock("@/lib/redux/api/recordQueries", async () => (await import("./fakeBackend")).since);
 vi.mock("firebase/firestore", async () => (await import("./fakeBackend")).firestore);
 vi.mock("@/lib/firebase", () => ({ db: {} }));
 // The signed-in user, as the session would report it: an owner of the dataset's company.

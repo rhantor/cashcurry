@@ -72,7 +72,7 @@ const branchCollection = (name) => (args) => {
   return result(rows);
 };
 
-/** lib/redux/api/since.js */
+/** lib/redux/api/recordQueries.js getDocsSince */
 export const since = {
   getDocsSince: async (ref, field, day, { paidOut = false } = {}) => {
     const rows = rowsSince(rowsAt(ref.path), null, field, day, paidOut);

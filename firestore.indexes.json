@@ -76,6 +76,24 @@
         { "fieldPath": "paidMethod", "order": "ASCENDING" },
         { "fieldPath": "createdAtClient", "order": "ASCENDING" }
       ]
+    },
+    {
+      "_usedBy": "attendanceApiSlice.getBranchAttendanceByPeriod — the staff app reads one person's punches (staffId + date range, by date)",
+      "collectionGroup": "attendance",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "staffId", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "_usedBy": "attendanceApiSlice.getOtRequests — the staff app reads one person's early-OT requests (staffId + date range, newest first)",
+      "collectionGroup": "otRequests",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "staffId", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

@@ -398,8 +398,9 @@ export default function PayrollBuilder () {
 
   const companyName = companyData?.name || ''
   const branchName  = branchDoc?.name || branchSettings?.basic?.name || 'Branch'
-  const { data: advanceList = [] }  = useGetAdvanceEntriesQuery({ companyId, branchId }, { skip })
-  const { data: loanList = [] }     = useGetStaffLoansQuery({ companyId, branchId }, { skip })
+  // Only approved ones can have an instalment to deduct (repaid ones are closed).
+  const { data: advanceList = [] }  = useGetAdvanceEntriesQuery({ companyId, branchId, status: 'approved' }, { skip })
+  const { data: loanList = [] }     = useGetStaffLoansQuery({ companyId, branchId, status: 'approved' }, { skip })
   const { data: runs = [] }         = useGetPayrollRunsQuery(skip ? skipToken : { companyId, branchId, period })
 
   // Existing run for this period (if any) — defined early so slips query can use runId

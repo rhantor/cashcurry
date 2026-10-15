@@ -2,7 +2,7 @@
 // (`npm run test:rules`). Each test is one statement about who may do what.
 // The database rules are the real security boundary: screens and middleware
 // only hide buttons; anyone can talk to Firestore directly from a browser.
-import { describe, it, beforeAll, afterAll, beforeEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import fs from "node:fs";
 import { initializeTestEnvironment, assertSucceeds, assertFails } from "@firebase/rules-unit-testing";
 
@@ -20,7 +20,8 @@ const PEOPLE = {
   klAccountant: { companyId: CO, branchId: "kl", role: "accountant" },
   klSupervisor: { companyId: CO, branchId: "kl", role: "supervisor" },
   klCashier: { companyId: CO, branchId: "kl", role: "cashier" },
-  klStaff: { companyId: CO, branchId: "kl", role: "staff" },
+  klStaff: { companyId: CO, branchId: "kl", role: "staff", staffId: "st-me" },
+  klStaffNoLink: { companyId: CO, branchId: "kl", role: "staff" },
   pjAdmin: { companyId: CO, branchId: "pj", role: "branchAdmin" },
   noBranchManager: { companyId: CO, role: "manager" },
   outsider: { companyId: EVIL, branchId: "x", role: "owner" },
@@ -68,6 +69,15 @@ beforeEach(async () => {
       await d.doc(`${B(b)}/sales/s1`).set({ date: "2026-10-10", cash: "100", total: 100 });
       await d.doc(`${B(b)}/summaries/2026-09`).set({ period: "2026-09", engineVersion: 1, cashChange: 100, bankChange: 0 });
       await d.doc(`${B(b)}/staff/st1`).set({ firstName: "Ali", basicSalary: "1800", passportNumber: "A123", bankAccountNumber: "999" });
+    }
+    for (const [id, staffId] of [["mine", "st-me"], ["other", "st1"]]) {
+      await d.doc(`${B()}/attendance/${id}`).set({ staffId, date: "2026-10-10", type: "in" });
+      await d.doc(`${B()}/otRequests/${id}`).set({ staffId, date: "2026-10-10", status: "pending" });
+    }
+    // Entered by a manager for klStaff, and for a colleague.
+    for (const col of ["advances", "loans"]) {
+      await d.doc(`${B()}/${col}/forMe`).set(request({ staffId: "st-me", status: "approved", createdBy: { uid: "klManager" } }));
+      await d.doc(`${B()}/${col}/forOther`).set(request({ staffId: "st1", status: "approved", createdBy: { uid: "klManager" } }));
     }
     await d.doc(`${B()}/settings/settings`).set({
       basic: { phone: "1", timeZone: "Asia/Kuala_Lumpur" },
@@ -199,6 +209,37 @@ describe("who can see what", () => {
   it("staff cannot read sales, salaries or colleagues' personal details", async () => {
     await assertFails(as("klStaff").doc(`${B()}/sales/s1`).get());
     await assertFails(as("klStaff").doc(`${B()}/staff/st1`).get());
+  });
+
+  it("staff see their own advances and loans — asked by them or entered for them — and no one else's", async () => {
+    const d = as("klStaff");
+    for (const col of ["advances", "loans"]) {
+      const mine = await assertSucceeds(d.collection(`${B()}/${col}`).where("staffId", "==", "st-me").get());
+      expect(mine.docs.map((x) => x.id)).toEqual(["forMe"]);
+      await assertSucceeds(d.collection(`${B()}/${col}`).where("createdBy.uid", "==", "klStaff").get());
+      await assertFails(d.collection(`${B()}/${col}`).where("staffId", "==", "st1").get());
+      await assertFails(d.collection(`${B()}/${col}`).get());
+      await assertFails(d.doc(`${B()}/${col}/forOther`).get());
+    }
+  });
+
+  it("staff see their own punches and OT requests, not colleagues'", async () => {
+    const d = as("klStaff");
+    for (const col of ["attendance", "otRequests"]) {
+      const mine = await assertSucceeds(
+        d.collection(`${B()}/${col}`).where("staffId", "==", "st-me").where("date", ">=", "2026-10-01").where("date", "<=", "2026-10-31").get()
+      );
+      expect(mine.docs.map((x) => x.id)).toEqual(["mine"]);
+      await assertFails(d.collection(`${B()}/${col}`).where("date", ">=", "2026-10-01").get());
+      await assertFails(d.doc(`${B()}/${col}/other`).get());
+    }
+    // A login not linked to a staff record sees none.
+    await assertFails(as("klStaffNoLink").collection(`${B()}/attendance`).where("staffId", "==", "").get());
+  });
+
+  it("staff cannot re-link their login to a colleague's staff record", async () => {
+    await assertFails(as("klStaff").doc("users/klStaff").update({ staffId: "st1" }));
+    await assertFails(as("klCashier").doc("users/klCashier").update({ staffId: "st-me" }));
   });
 
   it("signed-out visitors read nothing", async () => {

@@ -85,6 +85,9 @@ export async function POST(req) {
       role: "staff",
       companyId,
       branchId,
+      // Which staff record this login is: the rules let staff read only rows
+      // with this staffId (their own advances, punches…). Users cannot change it.
+      staffId,
       createdBy: caller.uid,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });

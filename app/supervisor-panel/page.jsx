@@ -21,14 +21,16 @@ export default function SupervisorPanel() {
     }
   }, []);
 
+  // Only what this person raised.
+  const mine = user?.uid ? { uid: user.uid } : undefined;
   const { data: advances = [], isLoading: advLoading } = useGetAdvanceEntriesQuery(
-    { companyId, branchId },
-    { skip: !companyId || !branchId }
+    { companyId, branchId, mine },
+    { skip: !companyId || !branchId || !mine }
   );
 
   const { data: loans = [], isLoading: loanLoading } = useGetStaffLoansQuery(
-    { companyId, branchId },
-    { skip: !companyId || !branchId }
+    { companyId, branchId, mine },
+    { skip: !companyId || !branchId || !mine }
   );
 
   const myAdvances = useMemo(() => 
