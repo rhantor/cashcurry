@@ -1,9 +1,9 @@
 "use client";
 import React, { useMemo, useState } from "react";
 import { useGetLoanActivitiesQuery } from "@/lib/redux/api/loanApiSlice";
-import { FaHandHoldingUsd, FaClock, FaExchangeAlt } from "react-icons/fa";
 import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
 import useCurrency from "@/app/hooks/useCurrency";
+import { HandCoins, Clock, ArrowLeftRight } from "lucide-react";
 
 const tsToMs = (v) => {
   if (!v) return null;
@@ -66,7 +66,7 @@ function LoanCard({ item, branchId, currency }) {
               ? "bg-indigo-50 text-indigo-700 border-indigo-200"
               : "bg-slate-100 text-slate-700 border-slate-200"
           }`}>
-            {isRepayment ? <FaExchangeAlt className="h-3 w-3" /> : <FaHandHoldingUsd className="h-3 w-3" />}
+            {isRepayment ? <ArrowLeftRight className="h-3 w-3" /> : <HandCoins className="h-3 w-3" />}
             {isRepayment ? "Repayment" : "Loan"}
           </span>
 
@@ -88,7 +88,7 @@ function LoanCard({ item, branchId, currency }) {
         </div>
 
         <div className="flex items-center gap-1 text-xs text-slate-400 shrink-0">
-          <FaClock className="h-3 w-3" />
+          <Clock className="h-3 w-3" />
           {created}
         </div>
       </div>

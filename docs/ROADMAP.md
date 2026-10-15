@@ -91,12 +91,16 @@ Needed before staff phones get direct access to the database (Phase 4).
 
 | # | Task | Status |
 |---|------|--------|
-| 3.1 | **Design system**: colours, type, spacing (light + dark), components — button, input, select, date picker, dialog, bottom sheet, toast, table, badge, empty state, skeleton. One icon set. A `/ui` preview page to review them | ⬜ |
+| 3.1 | **Design system** — `app/components/ui`: colour tokens for light and dark (mint brand kept; screens use bg-surface, text-fg, bg-brand…), motion presets (quick springs; reduced-motion respected), Button (press, loading, success check), Card, Badge, Skeleton (shimmer), Loader, CountUp numbers, Field/Input/Select/Textarea (error shake), Switch, Tabs (sliding highlight), Dialog, bottom Sheet (drag to close), Toasts (stack, pause, swipe, promise), EmptyState, Stagger, page progress bar, Popover, Menu, Tooltip, Avatar, DatePicker/DateRangePicker (business-day aware), DataTable (sort, paging, cards on phones). One icon set (lucide); react-icons removed. Review at `/ui` | ✅ |
 | 3.2 | **App shell**: new sidebar + top bar, branch switcher, search/command bar (Ctrl+K), mobile bottom navigation, instant page frame while data loads | ⬜ |
 | 3.3 | Replace all 113 `alert()` and 21 `confirm()` with toasts and proper dialogs | ⬜ |
 | 3.4 | Redesign screens, one pull request each: dashboards → sales & cost entry → summary/reports → approvals → staff → payroll → purchases → settings | ⬜ |
 | 3.5 | Split the largest files (appointment letter 2.7k lines, payroll, purchase orders…) as each screen is redesigned | ⬜ |
 
+- **4.8 Why this option:** compared on 16 Oct 2026 with clocking in on staff phones (QR/GPS — depends on each phone and its signal),
+  a roster with exceptions (a daily manager task, feels dated) and the branch's NGTeco W2 machine (tied to NGTeco's own
+  app/cloud). Only the own kiosk meets all of the owner's conditions: one system, works offline, no staff-phone
+  dependency, no daily manager task.
 - **3.1 How you check:** open `/ui`, review every component on desktop and phone before any real screen changes.
 
 ## Phase 4 — Staff workspace
@@ -111,6 +115,7 @@ Needed before staff phones get direct access to the database (Phase 4).
 | 4.5 | **Issues**: staff raise an issue → assigned → resolved, with photos and its own thread | ⬜ |
 | 4.6 | **Staff app**: home, my salary/advances/loan balance, attendance, requests, chat, issues, profile. Android first | ⬜ |
 | 4.7 | Retire the old staff portal pages once the app replaces them | ⬜ |
+| 4.8 | **Attendance kiosk** *(proposed — not final; pilot decides)*: Cash Curry's own kiosk app on one Android tablet per branch (by the entrance, not the busy POS tablet). Face recognition on the tablet as the main way, PIN only after face fails twice; a photo kept with every punch; works offline (punches queue on the tablet, sync when online; clock checked against the server, changes while offline flagged). Liveness ("blink") switch per branch, off at first. Face data: written consent, stored apart from staff records, deleted when staff leave. No staff phone, no third-party app or machine. Pilot one branch 2–3 weeks, then the rest; then retire today's PIN/fingerprint kiosk. Face code removed in Oct 2026 is in git history to build on | ⏸ |
 
 ## Phase 5 — Bangladesh launch kit
 
@@ -167,5 +172,6 @@ rehearsed on the local copy first.
 | Do the Eggcellence branches trade past midnight? (sets their "day ends at") | release |
 | A company with branches in two countries: one company per country, or company dashboard per currency? (today it warns) | 5.x |
 | Banked sales: follow the branch settings (now, as the summary report always did) or the flag saved on each sale? Only Eggcellence BB Jan 2026 differs (RM 70) | any time — one line in `lib/finance` |
+| Attendance: confirm the kiosk plan (4.8) after a one-branch pilot; liveness check on or off; which tablets | 4.8 |
 | Staff app technology and login method | 4.0 |
 | Separate staging Firebase project (recommended before Phase 4) | 4.x deploys |

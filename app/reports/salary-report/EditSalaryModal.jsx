@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useUpdateSalaryEntryMutation, useDeleteSalaryEntryMutation } from "@/lib/redux/api/salaryApiSlice";
 import { getSessionUser } from "@/lib/session";
-import { FaTimes, FaSpinner, FaSave, FaUpload, FaFilePdf, FaTrash, FaEye } from "react-icons/fa";
 import { storage } from "@/lib/firebase";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import useCurrency from "@/app/hooks/useCurrency";
+import { X, LoaderCircle, SaveIcon, Upload, FileText, Trash2, Eye } from "lucide-react";
 
 const PAID_METHODS = [
   { value: "cash", label: "Cash" },
@@ -153,7 +153,7 @@ export default function EditSalaryModal({ item, onClose, companyId, branchId }) 
         <div className="bg-gray-50 px-6 py-4 border-b border-gray-100 flex justify-between items-center">
           <h3 className="font-bold text-gray-800">Edit Salary Entry</h3>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <FaTimes />
+            <X size="1em" />
           </button>
         </div>
 
@@ -228,7 +228,7 @@ export default function EditSalaryModal({ item, onClose, companyId, branchId }) 
 
             {!pdfName && !existingUrl ? (
               <label className="cursor-pointer flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-mint-200 rounded-lg hover:bg-mint-50 transition-colors">
-                <FaUpload className="text-mint-400 text-xl mb-1" />
+                <Upload size="1em" className="text-mint-400 text-xl mb-1" />
                 <span className="text-sm text-gray-600 font-medium">Click to attach PDF</span>
                 <input type="file" accept="application/pdf" onChange={handleFileChange} className="hidden" />
               </label>
@@ -236,7 +236,7 @@ export default function EditSalaryModal({ item, onClose, companyId, branchId }) 
               <div className="space-y-2">
                 <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-100">
                   <div className="flex items-center gap-3 min-w-0">
-                    <FaFilePdf className="text-red-500 text-xl shrink-0" />
+                    <FileText size="1em" className="text-red-500 text-xl shrink-0" />
                     <div className="min-w-0">
                       <p className="text-sm font-medium text-gray-700 truncate">
                         {pdfName || "Current salary sheet"}
@@ -254,7 +254,7 @@ export default function EditSalaryModal({ item, onClose, companyId, branchId }) 
                       title="View PDF"
                       className="text-gray-400 hover:text-blue-500 p-2 transition-colors"
                     >
-                      <FaEye />
+                      <Eye size="1em" />
                     </a>
                     <button
                       onClick={handleRemoveFile}
@@ -262,7 +262,7 @@ export default function EditSalaryModal({ item, onClose, companyId, branchId }) 
                       title="Remove"
                       className="text-gray-400 hover:text-red-500 p-2 transition-colors disabled:opacity-50"
                     >
-                      <FaTrash />
+                      <Trash2 size="1em" />
                     </button>
                   </div>
                 </div>
@@ -310,7 +310,7 @@ export default function EditSalaryModal({ item, onClose, companyId, branchId }) 
               disabled={isLoading || isDeleting || isUploading}
               className="flex items-center gap-2 px-6 py-2 text-sm font-medium text-white bg-mint-500 hover:bg-mint-600 rounded-lg shadow-sm transition-all disabled:opacity-50"
             >
-              {(isLoading || isUploading) ? <FaSpinner className="animate-spin" /> : <FaSave />}
+              {(isLoading || isUploading) ? <LoaderCircle size="1em" className="animate-spin" /> : <SaveIcon size="1em" />}
               <span>{isUploading ? "Uploading..." : "Save Changes"}</span>
             </button>
           </div>

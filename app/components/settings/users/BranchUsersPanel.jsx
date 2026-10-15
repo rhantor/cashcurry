@@ -3,7 +3,7 @@
 import React from "react";
 import RoleBadge from "./RoleBadge";
 import IconButton from "./IconButton";
-import { FaEdit, FaTrash, FaPlus } from "react-icons/fa";
+import { Pencil, Trash2, Plus } from "lucide-react";
 
 const canShowActions = (role) => {
   const r = String(role || "").toLowerCase();
@@ -75,14 +75,14 @@ export default function BranchUsersPanel({
                               title="Edit admin"
                               className="text-blue-600 hover:text-blue-700"
                             >
-                              <FaEdit className="h-4 w-4" />
+                              <Pencil className="h-4 w-4" />
                             </IconButton>
                             <IconButton
                               onClick={() => onDeleteAdmin?.(b.id, a)}
                               title="Delete admin"
                               className="text-red-600 hover:text-red-700"
                             >
-                              <FaTrash className="h-4 w-4" />
+                              <Trash2 className="h-4 w-4" />
                             </IconButton>
                           </div>
                         </td>
@@ -125,14 +125,14 @@ export default function BranchUsersPanel({
                       title="Edit admin"
                       className="text-blue-600 hover:text-blue-700"
                     >
-                      <FaEdit className="h-4 w-4" />
+                      <Pencil className="h-4 w-4" />
                     </IconButton>
                     <IconButton
                       onClick={() => onDeleteAdmin?.(b.id, a)}
                       title="Delete admin"
                       className="text-red-600 hover:text-red-700"
                     >
-                      <FaTrash className="h-4 w-4" />
+                      <Trash2 className="h-4 w-4" />
                     </IconButton>
                   </div>
                 )}
@@ -152,7 +152,7 @@ export default function BranchUsersPanel({
                   onClick={() => onAddUser?.(b.id)}
                   className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-mint-600 text-white hover:bg-mint-700"
                 >
-                  <FaPlus className="h-3 w-3" /> Add User
+                  <Plus className="h-3 w-3" /> Add User
                 </button>
               )}
             </div>
@@ -187,14 +187,14 @@ export default function BranchUsersPanel({
                               title="Edit user"
                               className="text-blue-600 hover:text-blue-700"
                             >
-                              <FaEdit className="h-4 w-4" />
+                              <Pencil className="h-4 w-4" />
                             </IconButton>
                             <IconButton
                               onClick={() => onDeleteUser?.(b.id, u)}
                               title="Delete user"
                               className="text-red-600 hover:text-red-700"
                             >
-                              <FaTrash className="h-4 w-4" />
+                              <Trash2 className="h-4 w-4" />
                             </IconButton>
                           </div>
                         </td>
@@ -225,7 +225,7 @@ export default function BranchUsersPanel({
                   onClick={() => onAddUser?.(b.id)}
                   className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-mint-600 text-white hover:bg-mint-700"
                 >
-                  <FaPlus className="h-3 w-3" /> Add
+                  <Plus className="h-3 w-3" /> Add
                 </button>
               )}
             </div>
@@ -247,14 +247,14 @@ export default function BranchUsersPanel({
                       title="Edit user"
                       className="text-blue-600 hover:text-blue-700"
                     >
-                      <FaEdit className="h-4 w-4" />
+                      <Pencil className="h-4 w-4" />
                     </IconButton>
                     <IconButton
                       onClick={() => onDeleteUser?.(b.id, u)}
                       title="Delete user"
                       className="text-red-600 hover:text-red-700"
                     >
-                      <FaTrash className="h-4 w-4" />
+                      <Trash2 className="h-4 w-4" />
                     </IconButton>
                   </div>
                 )}

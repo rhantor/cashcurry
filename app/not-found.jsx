@@ -5,7 +5,7 @@ import React from "react";
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { FaArrowLeft } from "react-icons/fa";
+import { ArrowLeft } from "lucide-react";
 
 export default function NotFound() {
   return (
@@ -32,7 +32,7 @@ export default function NotFound() {
         href="/"
         className="mt-8 inline-flex items-center gap-2 rounded-2xl bg-white px-5 py-3 text-black font-semibold shadow-lg hover:bg-[#f88cd8] hover:text-black transition-all duration-300"
       >
-        <FaArrowLeft /> Go Back Home
+        <ArrowLeft size="1em" /> Go Back Home
       </Link>
     </section>
   );

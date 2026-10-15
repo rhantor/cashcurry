@@ -1,7 +1,7 @@
 import React from "react";
-import { FaUpload } from "react-icons/fa";
 // 1. Import the library
 import { NumericFormat } from "react-number-format";
+import { UploadIcon } from "lucide-react";
 
 export default function SalesForm({
   date,
@@ -108,7 +108,7 @@ export default function SalesForm({
         
         {!zReportPreview ? (
           <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
-            <FaUpload className="text-gray-400 text-2xl mb-2" />
+            <UploadIcon size="1em" className="text-gray-400 text-2xl mb-2" />
             <span className="text-sm text-gray-500 font-medium">Click to upload Z Report</span>
             <input
               type="file"

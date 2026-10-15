@@ -1,6 +1,6 @@
 "use client";
 import {React, useState, useEffect } from "react";
-import { FaTimes } from "react-icons/fa";
+import { X } from "lucide-react";
 
 export default function UserModal({
   isOpen,
@@ -49,7 +49,7 @@ export default function UserModal({
             onClick={onClose}
             className="text-gray-500 hover:text-gray-800"
           >
-            <FaTimes />
+            <X size="1em" />
           </button>
         </div>
 

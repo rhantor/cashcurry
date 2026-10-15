@@ -1,6 +1,5 @@
 "use client";
 import React, { useState, useEffect, useMemo } from "react";
-import { FaUpload, FaTimes } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
 import imageCompression from "browser-image-compression";
 import { format } from "date-fns";
@@ -9,6 +8,7 @@ import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { useUpdateCostEntryMutation } from "@/lib/redux/api/costApiSlice";
 import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
 import useCurrency from "@/app/hooks/useCurrency";
+import { UploadIcon, X } from "lucide-react";
 
 const CATEGORIES = [
   'Utilities', 'Inventory', 'Maintenance', 'Staff Cost', 'Rent/Deposit',
@@ -259,7 +259,7 @@ export default function EditCostModal({ cost, onClose, onSuccess }) {
               onClick={onClose} 
               className="p-2 text-gray-400 hover:text-red-500 bg-white rounded-full hover:bg-red-50 hover:shadow-sm transition-all absolute right-4 top-4"
             >
-              <FaTimes size={16}/>
+              <X size={16}/>
             </button>
           </div>
 
@@ -338,7 +338,7 @@ export default function EditCostModal({ cost, onClose, onSuccess }) {
                 <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-3">
                   <label className="block text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-indigo-700">Invoice / Attachment</label>
                   <label className="cursor-pointer inline-flex w-full sm:w-auto justify-center items-center gap-2 px-4 py-2 bg-white text-indigo-700 text-xs font-semibold rounded-lg border border-indigo-200 shadow-sm hover:shadow hover:bg-indigo-50 transition-all">
-                    <FaUpload className="text-indigo-500" />
+                    <UploadIcon size="1em" className="text-indigo-500" />
                     <span>Upload New File</span>
                     <input type="file" accept=".pdf,image/*" onChange={handleFileChange} className="hidden" />
                   </label>
@@ -392,12 +392,12 @@ export default function EditCostModal({ cost, onClose, onSuccess }) {
                         onClick={handleRemoveReceipt}
                         className="inline-flex flex-1 sm:flex-none justify-center items-center gap-2 px-3 py-2 bg-white text-red-600 text-xs font-semibold rounded-lg border border-red-200 shadow-sm hover:bg-red-50 transition-all"
                       >
-                        <FaTimes />
+                        <X size="1em" />
                         <span>Remove</span>
                       </button>
                     )}
                     <label className="cursor-pointer inline-flex flex-1 sm:flex-none justify-center items-center gap-2 px-4 py-2 bg-white text-emerald-700 text-xs font-semibold rounded-lg border border-emerald-200 shadow-sm hover:shadow hover:bg-emerald-50 transition-all">
-                      <FaUpload className="text-emerald-500" />
+                      <UploadIcon size="1em" className="text-emerald-500" />
                       <span>{receiptPreview ? 'Replace Receipt' : 'Upload Receipt'}</span>
                       <input type="file" accept=".pdf,image/*" onChange={handleReceiptChange} className="hidden" />
                     </label>

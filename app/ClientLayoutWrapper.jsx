@@ -31,7 +31,8 @@ export default function ClientLayoutWrapper({ children }) {
   // 3) Register FCM token once we know user + companyId (real push)
   //    This hook must NOT be behind a conditional return.
   const authPages = ["/login", "/signup", "/signup/verify", "/reset-password"];
-  const staffPages = ["/staff-portal", "/requests", "/chat", "/kiosk", "/profile"];
+  // No sidebar/top bar on these (the staff app, the kiosk, and the /ui design preview).
+  const staffPages = ["/staff-portal", "/requests", "/chat", "/kiosk", "/profile", "/ui"];
   const isAuthPage = authPages.some((path) => pathname.startsWith(path));
   const isStaffPage = staffPages.some((path) => pathname.startsWith(path));
   const isLoggedIn = status === "signedIn" && !!user?.role;
