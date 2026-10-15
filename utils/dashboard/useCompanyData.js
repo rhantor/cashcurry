@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
+import { format } from "date-fns";
+import { dayKey } from "./utils";
 
 // ====== helpers (copy-kept in this file; if you prefer, extract to a shared helpers file) ======
 const toDate = (ts) => {
@@ -264,18 +266,23 @@ export default function useCompanyData(filter) {
     };
   }, [companyId]);
 
+  // Compare calendar days, not instants, like the branch hook and the
+  // summary report — a filter carrying the time of day must not drop part of
+  // its first or last day.
+  const fromKey = format(filter.from, "yyyy-MM-dd");
+  const toKey = format(filter.to, "yyyy-MM-dd");
   const inRange = (d) => {
-    const t = +toDate(d);
-    return t >= +filter.from && t <= +filter.to;
+    const k = dayKey(d);
+    return !!k && k >= fromKey && k <= toKey;
   };
 
   // Cumulative filter: everything up to end of the selected period.
   // Used for "balance" KPIs (cash on hand, bank expected) so they include
   // pre-period history and match the branch reports page exactly.
-  const cutoff = +filter.to;
+  const cutoff = toKey;
   const upto = (d) => {
-    const t = +toDate(d);
-    return !!t && t <= cutoff;
+    const k = dayKey(d);
+    return !!k && k <= cutoff;
   };
 
   // filter by date window

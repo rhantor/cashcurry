@@ -1,9 +1,27 @@
 // Plain JS helpers shared across components
+import { format } from "date-fns";
 
 export const toDate = (x) =>
   x?.seconds ? new Date(x.seconds * 1000) : new Date(x);
 
+// Chart bucketing key. Note: UTC, so only safe for "yyyy-MM-dd" strings; use
+// dayKey for anything that decides which records are counted.
 export const byDateKey = (date) => toDate(date).toISOString().slice(0, 10);
+
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * The local calendar day ("yyyy-MM-dd") a record belongs to, or null.
+ * A business `date` string is taken as written — it already names the day.
+ * Timestamps (Firestore, ISO strings, Date) are placed on the local day, the
+ * same way the summary report does.
+ */
+export const dayKey = (v) => {
+  if (!v) return null;
+  if (typeof v === "string" && DATE_ONLY.test(v)) return v;
+  const d = toDate(v);
+  return Number.isNaN(+d) ? null : format(d, "yyyy-MM-dd");
+};
 
 export const num = (v) => Number(v || 0);
 
