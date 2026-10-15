@@ -85,7 +85,7 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
   )
   const { data: loanActs = [], isLoading: loadingLoanActs } = useGetLoanActivitiesQuery(
     baseArgs
-      ? { ...baseArgs, direction: 'all', status: 'approved', type: 'all' }
+      ? { ...baseArgs, direction: 'all', status: 'approved', type: 'all', pageLimit: 0 } // every loan: cash needs the full history
       : skipToken
   )
   const { data: branches = [] } = useGetBranchesBasicQuery(companyId || skipToken)

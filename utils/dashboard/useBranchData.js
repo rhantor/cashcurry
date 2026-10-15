@@ -149,7 +149,8 @@ export default function useBranchData (filter) {
           branchId,
           direction: 'all',
           status: 'approved',
-          type: 'all'
+          type: 'all',
+          pageLimit: 0 // every loan: cash needs the full history
         }
       : skipToken
   const { data: loanActivities = [], isLoading: loanLoading } =

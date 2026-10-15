@@ -196,6 +196,21 @@ describe("cash rules (hand-made example)", () => {
     expect(c.effectiveBankedAfterWithdrawals).toBe(300);
   });
 
+  // The loan query used to return only the newest 100 records, so once a
+  // company passed 100 loans/repayments the older ones fell out of cash.
+  it("counts every loan between branches, not just the newest 100", async () => {
+    const many = Array.from({ length: 150 }, (_, i) => ({
+      id: `M${i}`, type: "loan", status: "approved", amount: 10,
+      requestFromBranchId: "B", requestedToBranchId: "A",
+      createdAt: new Date(2026, 8, 1, 12, 0, i).toISOString(), // all on 1 Sep
+    }));
+    const busy = { ...example, companyCols: { loans: [...example.companyCols.loans, ...many] } };
+    // A lent 150 × RM 10 more than in the plain example.
+    expect(summaryForMonth(busy, "A", "2026-09").handInCash).toBe(880 - 1500);
+    expect(branchDashboard(busy, "A", monthFilter("2026-09")).handInCash).toBe(880 - 1500);
+    expect((await companyDashboard(busy, monthFilter("2026-09"))).estCashOnHand).toBe(880 + 150);
+  });
+
   // Roadmap 1.4 — money should move only when a request is approved AND paid.
   it.todo("a pending or rejected advance does not reduce hand in cash");
 });
