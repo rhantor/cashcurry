@@ -71,7 +71,7 @@ Needed before staff phones get direct access to the database (Phase 4).
 | # | Task | Status |
 |---|------|--------|
 | 2.1 | **Real access control** — the database and storage rules are the security boundary (screens and middleware only hide buttons). One shared rules file for v2 + POS; closed: anyone could make themselves owner of any company, staff could read all finances and colleagues' personal data, anyone could approve/pay their own advance, anyone could claim usernames, open create-staff and image-proxy endpoints. 46 rules tests (`npm run test:rules`). Login-token claims deferred: not needed for security now that rules are tight | ✅ |
-| 2.2 | One shared "current user / company / branch" source, replacing 34 separate browser-storage reads | ⬜ |
+| 2.2 | One shared "current user / company / branch" source (`lib/session`, `useSession`), replacing 44 separate browser-storage reads in 37 files and three helpers. Profile comes from the database (a changed role/branch applies on next load); one active branch for every screen; signing out anywhere returns to login | ✅ |
 | 2.3 | Dashboards read the monthly totals the server already keeps + only the current month's records (no more downloading all history). **First make the totals trustworthy:** the rollup functions don't follow the engine's rules (they count pending/unpaid advances, ignore staff loans, sum stored totals) and they can drift — Lazeez BB Sep 2026 costs: stored RM 13,873.25 vs records RM 11,305.05. Compute them with the same rules and add a check/repair that recomputes a month | ⬜ |
 | 2.4 | Reports load by date range with paging | ⬜ |
 | 2.5 | Remove dead/unsafe code (old `onShiftClosed` function, unused helpers) | ⬜ |

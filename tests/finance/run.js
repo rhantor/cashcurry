@@ -100,7 +100,6 @@ export function branchCharts(dataset, branchId, filter) {
 /** Chart series on the company dashboard. */
 export async function companyCharts(dataset, filter) {
   useDataset(dataset, null);
-  localStorage.setItem("user", JSON.stringify({ companyId: dataset.companyId, role: "owner" }));
   const { result, unmount } = renderHook(() => useCompanyData(filter));
   await waitFor(() => {
     if (result.current.loading) throw new Error("still loading");
@@ -122,7 +121,6 @@ export function branchDashboard(dataset, branchId, filter) {
 /** Company dashboard KPIs for a dashboard filter. Loads asynchronously. */
 export async function companyDashboard(dataset, filter) {
   useDataset(dataset, null);
-  localStorage.setItem("user", JSON.stringify({ companyId: dataset.companyId, role: "owner" }));
   const { result, unmount } = renderHook(() => useCompanyData(filter));
   await waitFor(() => {
     if (result.current.loading) throw new Error("still loading");

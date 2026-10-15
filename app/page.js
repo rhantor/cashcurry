@@ -4,6 +4,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { sidebarItems } from "@/utils/dummyData";
+import useSession from "@/app/hooks/useSession";
 import {
   MdOutlineSpaceDashboard,
   MdOutlineBarChart,
@@ -60,20 +61,9 @@ function getGreeting() {
   return "Good evening";
 }
 
-/* ─── read user from localStorage ─── */
+/* ─── the signed-in user (shared session) ─── */
 function useUser() {
-  const [user, setUser] = useState(null);
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem("user");
-      if (raw) setUser(JSON.parse(raw));
-      else {
-        const role = localStorage.getItem("role");
-        if (role) setUser({ role });
-      }
-    } catch { /* ignore */ }
-  }, []);
-  return user;
+  return useSession().user;
 }
 
 /* ─── role helpers ─── */

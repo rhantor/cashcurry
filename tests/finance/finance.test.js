@@ -77,6 +77,11 @@ vi.mock("@/lib/redux/api/loanApiSlice", rtk);
 vi.mock("@/lib/redux/api/authApiSlice", rtk);
 vi.mock("firebase/firestore", async () => (await import("./fakeBackend")).firestore);
 vi.mock("@/lib/firebase", () => ({ db: {} }));
+// The signed-in user, as the session would report it: an owner of the dataset's company.
+vi.mock("@/lib/session", async () => {
+  const fb = await import("./fakeBackend");
+  return { getSessionUser: () => ({ uid: "test-owner", role: "owner", companyId: fb.currentCompanyId() }) };
+});
 vi.mock("@/utils/export/exportSummary", () => ({ makeFilterText: () => "" }));
 vi.mock("@/utils/useResolvedCompanyBranch", async () => {
   const fb = await import("./fakeBackend");

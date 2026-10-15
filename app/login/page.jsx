@@ -3,9 +3,9 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import Cookies from "js-cookie";
 import { useLoginMutation } from "@/lib/redux/api/authApiSlice";
 import { USE_EMULATOR } from "@/lib/firebase";
+import { signedIn } from "@/lib/session";
 
 // Local development only. `npm run dev:local` passes the seeded accounts and
 // their shared local password; production builds never set these variables,
@@ -69,22 +69,8 @@ export default function LoginPage() {
         throw new Error(res?.error?.error || "Login failed");
       }
 
-      const user = res.data.user;
-
-      localStorage.setItem("user", JSON.stringify(user));
-      window.dispatchEvent(new Event("storage"));
-
-      const cookieOpts = {
-        path: "/",
-        sameSite: "lax",
-        secure: process.env.NODE_ENV === "production",
-        expires: 30,
-      };
-
-      Cookies.set("isLoggedIn", "true", cookieOpts);
-      Cookies.set("role", user.role ?? "", cookieOpts);
-      Cookies.set("companyId", user.companyId ?? "", cookieOpts);
-      if (user.branchId) Cookies.set("branchId", user.branchId, cookieOpts);
+      // The session caches the profile and sets the routing cookies.
+      signedIn(res.data.user);
 
       router.replace("/");
     } catch (err) {
