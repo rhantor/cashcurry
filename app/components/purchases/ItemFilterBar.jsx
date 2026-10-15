@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 "use client";
 import React, { useMemo, useState } from "react";
 import { Search, X } from "lucide-react";

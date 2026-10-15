@@ -271,7 +271,7 @@ export default function NewBillPage() {
         createdBy: user || {},
       };
 
-      const { id: billId } = await addVendorBill({
+      await addVendorBill({
         companyId,
         branchId,
         bill: billPayload,

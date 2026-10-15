@@ -1,7 +1,6 @@
-/* eslint-disable react/prop-types */
 "use client";
-import React, { useMemo, useState, useEffect } from "react";
-import { format, startOfMonth, endOfMonth } from "date-fns";
+import React, { useMemo, useState } from "react";
+import { format } from "date-fns";
 import { useGetSalaryEntriesQuery } from "@/lib/redux/api/salaryApiSlice";
 import ReportPage from "@/app/components/common/ReportPage";
 import ReportErrorState from "@/app/components/common/ReportErrorState";

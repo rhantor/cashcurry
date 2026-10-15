@@ -1,8 +1,7 @@
 // /* eslint-disable no-unused-vars */
-/* eslint-disable react/prop-types */
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useAddRepaymentEntryMutation } from "@/lib/redux/api/loanApiSlice";
 import { useGetBranchesBasicQuery } from "@/lib/redux/api/branchApiSlice";
 import useCurrency from "@/app/hooks/useCurrency";

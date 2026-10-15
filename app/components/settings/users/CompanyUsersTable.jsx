@@ -1,5 +1,4 @@
 // components/settings/users/CompanyUsersTable.jsx
-/* eslint-disable react/prop-types */
 "use client";
 import React from "react";
 import RoleBadge from "./RoleBadge";

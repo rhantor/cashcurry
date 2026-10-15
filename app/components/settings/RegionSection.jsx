@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 // Branch region: time zone, business-day cut-off and currency (see lib/region).
 // Edits three existing settings groups, so it takes the whole settings form.
 import React, { useEffect, useState } from "react";

@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 "use client";
 // Approved advances and staff loans that have not been handed over yet.
 // "Mark paid" records when and from where the money left (paidOut); only then

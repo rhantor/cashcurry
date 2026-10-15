@@ -5,10 +5,6 @@ import { formatMoney } from "@/lib/region/currency";
 export const toDate = (x) =>
   x?.seconds ? new Date(x.seconds * 1000) : new Date(x);
 
-// Chart bucketing key. Note: UTC, so only safe for "yyyy-MM-dd" strings; use
-// dayKey for anything that decides which records are counted.
-export const byDateKey = (date) => toDate(date).toISOString().slice(0, 10);
-
 const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
@@ -23,6 +19,11 @@ export const dayKey = (v) => {
   const d = toDate(v);
   return Number.isNaN(+d) ? null : format(d, "yyyy-MM-dd");
 };
+
+// Chart bucketing key: the same day the money figures use (a business date
+// as written; a timestamp on the local day). It used to be the UTC day, which
+// moved late-night records to the day before in Malaysia.
+export const byDateKey = (date) => dayKey(date) || "";
 
 export const num = (v) => Number(v || 0);
 

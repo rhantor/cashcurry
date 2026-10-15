@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 "use client";
 import { mkFmt, mkCompact } from "@/utils/dashboard/utils";
 import React from "react";

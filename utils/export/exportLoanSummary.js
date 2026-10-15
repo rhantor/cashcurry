@@ -14,64 +14,6 @@ const fmtDate = (ms) => {
   try { return new Date(ms).toLocaleDateString(); } catch { return "—"; }
 };
 
-const safeStr = (v) => (v == null ? "" : String(v));
-
-/* ─── build flat rows for export ─── */
-const buildRows = (visible, nameOf, currency) => {
-  const rows = [];
-
-  Object.entries(visible).forEach(([bid, s]) => {
-    const branchName = nameOf(bid);
-
-    // Branch summary header row
-    rows.push({
-      branch:   branchName,
-      type:     "summary",
-      provided: Number(s?.provided || 0),
-      taken:    Number(s?.taken    || 0),
-      net:      Number(s?.net      || 0),
-    });
-
-    // Provided loans (as lender)
-    (s?.providedDetails || []).forEach((r) => {
-      const counterparty = r.requestFrom || nameOf(r.fromBranchId);
-      rows.push({
-        branch:       branchName,
-        type:         "provided",
-        counterparty,
-        reason:       safeStr(r.reason),
-        original:     Number(r.amount      || 0),
-        outstanding:  Number(r.outstanding ?? r.amount ?? 0),
-        settled:      r.settled ? "Yes" : "No",
-        requestedDate: fmtDate(r.createdAt),
-        durationDays: r.durationDays ?? 0,
-        requestedBy:  r.requestedBy?.username || "—",
-        approvedBy:   r.approvedBy?.name || r.approvedBy?.username || "—",
-      });
-    });
-
-    // Taken loans (as borrower)
-    (s?.takenDetails || []).forEach((r) => {
-      const counterparty = r.requestedTo || nameOf(r.toBranchId);
-      rows.push({
-        branch:       branchName,
-        type:         "taken",
-        counterparty,
-        reason:       safeStr(r.reason),
-        original:     Number(r.amount      || 0),
-        outstanding:  Number(r.outstanding ?? r.amount ?? 0),
-        settled:      r.settled ? "Yes" : "No",
-        requestedDate: fmtDate(r.createdAt),
-        durationDays: r.durationDays ?? 0,
-        requestedBy:  r.requestedBy?.username || "—",
-        approvedBy:   r.approvedBy?.name || r.approvedBy?.username || "—",
-      });
-    });
-  });
-
-  return rows;
-};
-
 /* ══════════════════════════════════════════════
    EXCEL EXPORT
 ══════════════════════════════════════════════ */

@@ -22,21 +22,13 @@ export default function OwnerDashboardPage() {
   const {
     loading,
     // charts
-    salesTrend,
-    salesBreakdown,
     salesVsCosts,
-    cashVsCost,
-    bankedVsWdr,
-    loanTimeline,
     recent,
     // kpis
-    bankedSales,
     totalWdr,
     effectiveBankedAfterWithdrawals,
     estCashOnHand,
     totalCosts,
-    totalCostsFront,
-    totalCostsBack,
     totalSal,
     totalAdv,
     totalStaffLoanCash,
@@ -44,7 +36,6 @@ export default function OwnerDashboardPage() {
     // labels
     tenderKeys,
     tenderLabelsByKey,
-    bankedTenderLabelList,
     branchPerf,
     fSales,
     branchesList,

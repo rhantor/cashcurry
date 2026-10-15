@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 'use client'
 import React, { useEffect, useRef, useState } from 'react'
 import { useBusinessToday } from '@/app/hooks/useRegion'

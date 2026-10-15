@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 'use client'
 import React, { useEffect, useState, useRef } from 'react'
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion'

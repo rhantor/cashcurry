@@ -1,5 +1,4 @@
 /* eslint-disable no-unused-vars */
-/* eslint-disable react/prop-types */
 "use client";
 
 import React, { useMemo, useState } from "react";

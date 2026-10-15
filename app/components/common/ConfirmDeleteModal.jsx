@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 // app/components/common/ConfirmDeleteModal.jsx
 "use client";
 import React, { useState } from "react";

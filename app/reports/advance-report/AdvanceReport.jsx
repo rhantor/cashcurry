@@ -1,7 +1,6 @@
 'use client'
 import React, { useMemo, useState } from 'react'
-import { format, startOfMonth, endOfMonth } from 'date-fns'
-import { skipToken } from '@reduxjs/toolkit/query'
+import { format } from 'date-fns'
 
 import { useGetAdvanceEntriesQuery } from '@/lib/redux/api/AdvanceApiSlice'
 import useReportData from '@/app/hooks/useReportData'
@@ -12,7 +11,7 @@ import AdvanceModal from './AdvanceModal'
 import AdvanceEditModal from './AdvanceEditModal'
 import StaffSummaryModal from './StaffSummary'
 import useCurrency from '@/app/hooks/useCurrency'
-import { FaCalendarAlt, FaMoneyBillWave, FaEdit, FaFilePdf, FaUserTie } from 'react-icons/fa'
+import { FaEdit } from 'react-icons/fa'
 
 // ✅ Entries (list) exports
 import {

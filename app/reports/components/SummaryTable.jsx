@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 import React from "react";
 import { format, parseISO } from "date-fns";
 import useCurrency from "@/app/hooks/useCurrency";
@@ -9,10 +8,6 @@ const fmt = (v) => {
   return isFinite(n) && Math.abs(n) >= 1e-9
     ? n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     : "-";
-};
-const fmtRMFactory = (currency) => (v) => {
-  const s = fmt(v);
-  return s === "-" ? "-" : `${currency} ${s}`;
 };
 const fmtRM = (v, currency) => {
   const s = fmt(v);

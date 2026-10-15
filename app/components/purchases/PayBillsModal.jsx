@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 "use client";
 import { businessToday } from "@/lib/region";
 import React, { useMemo, useEffect, useState } from "react";

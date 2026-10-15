@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 'use client'
 
 import React, { useState } from 'react'
@@ -77,8 +76,6 @@ export function Payslip ({ slip, branchName, companyName, period }) {
     slip.penalty > 0         && { label: slip.penaltyNote ? `Penalty (${slip.penaltyNote})` : 'Penalty',                             amount: slip.penalty },
     slip.otherDeductions > 0 && { label: slip.otherDeductionsNote || 'Other Deductions',                                             amount: slip.otherDeductions },
   ].filter(Boolean)
-
-  const statusColor = slip.status === 'paid' ? '#166534' : slip.status === 'finalized' ? '#1e40af' : '#92400e'
 
   return (
     <div id='payslip-print-root' className='print-root' style={{ fontFamily: 'Arial, sans-serif', maxWidth: 680, margin: '0 auto', background: '#ffffff', padding: '24px 32px' }}>
@@ -309,12 +306,6 @@ export function PayrollSummaryTable ({ slips, branchName, companyName, period, r
   const statusColor = status==='paid'?'#166534':status==='finalized'?'#1e40af':'#92400e'
 
   // helpers
-  const numCell = (v, color) => (
-    <td style={TD({ textAlign:'right', color: v>0?(color||'#1e293b'):'#94a3b8' })}>
-      {v > 0 ? `${currency} ${fmtAmt(v)}` : '—'}
-    </td>
-  )
-
   const totalsCells = (data) => (
     <>
       <td style={TD({ textAlign:'right', fontWeight:700 })}>{currency} {fmtAmt(data.basePay||0)}</td>

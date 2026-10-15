@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 "use client";
 import React  from "react";
 import { FaChevronLeft, FaChevronRight } from "react-icons/fa";

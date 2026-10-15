@@ -268,8 +268,8 @@ export function exportPayrollToPDF (slips = [], branchName = '', period = '', ru
     // Convert to autoTable format
     const tableBody = bodyRows.map(r => {
       if (r.isDept)     return [{ content: r.label, colSpan: flatHeaders.length, styles: { fontStyle:'bold', fillColor:[241,245,249], textColor:[55,65,81], fontSize:10 } }]
-      if (r.isSubtotal) return r.row.map((v,i) => ({ content: String(v), styles: { fontStyle:'bold', fillColor:[241,245,249], textColor:[55,65,81] } }))
-      if (r.isGrand)    return r.row.map((v,i) => ({ content: String(v), styles: { fontStyle:'bold', fillColor:[226,232,240], textColor:[30,41,59], fontSize:11 } }))
+      if (r.isSubtotal) return r.row.map((v) => ({ content: String(v), styles: { fontStyle:'bold', fillColor:[241,245,249], textColor:[55,65,81] } }))
+      if (r.isGrand)    return r.row.map((v) => ({ content: String(v), styles: { fontStyle:'bold', fillColor:[226,232,240], textColor:[30,41,59], fontSize:11 } }))
       return r.row.map(v => String(v))
     })
 
@@ -824,7 +824,6 @@ export function exportPayrollToExcel (slips = [], branchName = '', period = '', 
       [],
     ]
     for (const s of slips) {
-      const isH = s.salaryMode === 'hours'
       ws2Data.push([`STAFF: ${s.staffName}`, `Designation: ${s.designation||''}`, `Dept: ${s.department||''}`])
       ws2Data.push(['EARNINGS', '', 'DEDUCTIONS', ''])
       ws2Data.push(['Basic Pay', num(s.basePay), 'Statutory Deductions', ''])

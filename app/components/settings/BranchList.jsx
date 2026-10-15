@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 "use client";
 import { useRouter } from "next/navigation";
 import React from "react";

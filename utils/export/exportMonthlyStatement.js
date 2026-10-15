@@ -28,7 +28,7 @@ const fmtComma = (v, digits = 2) =>
 const dashOrComma = (v) => (isZeroish(v) ? "-" : fmtComma(v));
 
 const safeFilePart = (s) =>
-  String(s || "statement").replace(/[^\w\-]+/g, "_").toLowerCase();
+  String(s || "statement").replace(/[^\w-]+/g, "_").toLowerCase();
 
 const fmtDay = (d) => {
   try {

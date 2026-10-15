@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 // components/settings/users/IconButton.jsx
 "use client";
 import React from "react";

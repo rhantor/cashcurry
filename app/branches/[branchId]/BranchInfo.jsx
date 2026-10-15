@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 import React from "react";
 import { FaEdit, FaSpinner, FaTrashAlt, FaUserPlus } from "react-icons/fa";
 

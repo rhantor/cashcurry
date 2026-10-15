@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 // BranchForm.jsx
 import React from "react";
 

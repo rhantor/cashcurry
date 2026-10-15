@@ -1,6 +1,5 @@
-/* eslint-disable react/prop-types */
 "use client";
-import React, { useState } from "react";
+import React from "react";
 import { nanoid } from "nanoid";
 
 const BASIS_OPTIONS = [

@@ -1,7 +1,6 @@
-/* eslint-disable react/prop-types */
 /* eslint-disable react/no-unknown-property */
 "use client";
-import React, { useMemo, useState, useRef, useEffect } from "react";
+import React, { useMemo, useState, useRef } from "react";
 import { format } from "date-fns";
 import {
   exportToExcel,

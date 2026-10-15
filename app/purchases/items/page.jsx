@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 "use client";
 import React, { useMemo, useState, useRef } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";

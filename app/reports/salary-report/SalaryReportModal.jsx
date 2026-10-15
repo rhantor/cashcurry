@@ -1,5 +1,4 @@
 // app/salary-report/SalaryReportModal.jsx
-/* eslint-disable react/prop-types */
 "use client";
 import React from "react";
 import { format } from "date-fns";

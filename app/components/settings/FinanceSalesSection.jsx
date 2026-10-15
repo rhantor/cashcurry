@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 import React from "react";
 import { Lock } from "lucide-react"; // Make sure you have lucide-react, or use a text emoji 🔒
 import SettingsSection from "./SettingsSection";

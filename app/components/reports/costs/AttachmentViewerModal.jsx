@@ -11,7 +11,6 @@ export default function AttachmentViewerModal({ costEntry, onClose }) {
   const [activeIndex, setActiveIndex] = useState(0);
 
   const activeUrl = attachments[activeIndex];
-  const isImage = activeUrl && activeUrl.match(/\.(jpeg|jpg|gif|png|webp)(\?|$)/i) !== null;
   const isPDF = activeUrl && activeUrl.match(/\.(pdf)(\?|$)/i) !== null;
 
   return (

@@ -1,4 +1,3 @@
-/* eslint-disable react/prop-types */
 "use client";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import imageCompression from "browser-image-compression";
