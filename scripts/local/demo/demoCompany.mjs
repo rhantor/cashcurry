@@ -67,6 +67,9 @@ const EVENTS = [
   { day: 7, branch: KL, sale: [650, 450, 200, 150] },
   { day: 7, branch: KL, withdrawal: { amount: 300, category: "Staff Salary", text: "Cash for Siti's salary" } },
   { day: 7, branch: KL, salary: { staff: "staff-siti", amount: 1200 } },
+  // Open requests: no money has moved, so they change no figure below.
+  { day: 7, branch: KL, request: { kind: "advance", staff: "staff-kumar", amount: 150, status: "pending", by: "kl_cashier", text: "Rent due" } },
+  { day: 6, branch: KL, request: { kind: "staffLoan", staff: "staff-siti", amount: 600, months: 6, status: "approved", by: "kl_supervisor", approver: "kl_manager", text: "Family wedding" } },
   ...[1, 2, 3, 4, 5, 6, 7].map((day) => ({ day, branch: PJ, sale: [200, 100, 0, 0] })),
   { day: 2, branch: PJ, cost: { amount: 50, from: "front", method: "cash", category: "Utilities", text: "Cleaning supplies" } },
 ];
@@ -142,6 +145,30 @@ export function buildDemoCompany(today = new Date()) {
         installments: [{ month, paidAt: null, status: "pending", amount: a.amount, index: 1 }],
         companyId: COMPANY_ID, branchId: e.branch, createdBy: by(adminOf[e.branch]), createdAt: at(e.day),
       });
+    }
+    if (e.request) {
+      const q = e.request;
+      const month = date.slice(0, 7);
+      const common = {
+        staffId: q.staff, staffName: staffName(q.staff), amount: q.amount, reason: q.text, date,
+        paidFromOffice: "front", status: q.status, paidOut: null,
+        ...(q.approver ? { approvedBy: { id: uid(q.approver), name: q.approver, role: userByName[q.approver].role } } : {}),
+        companyId: COMPANY_ID, branchId: e.branch, createdBy: by(q.by), createdAt: at(e.day, 12),
+      };
+      if (q.kind === "advance") {
+        push(e.branch, "advances", {
+          id: id("req"), ...common, advanceType: "salary", deductionMonth: month,
+          repaymentInstallments: 1, repaymentPerInstallment: q.amount, remainingAmount: q.amount, totalPaid: 0,
+          installments: [{ month, paidAt: null, status: "pending", amount: q.amount, index: 1 }],
+        });
+      } else {
+        const per = Math.round((q.amount / q.months) * 100) / 100;
+        push(e.branch, "loans", {
+          id: id("req"), ...common, source: "new", durationMonths: q.months, repaymentStartDate: null,
+          installments: Array.from({ length: q.months }, (_, i) => ({ index: i + 1, month, amount: per, status: "pending", paidAt: null })),
+          remainingAmount: q.amount, totalPaid: 0,
+        });
+      }
     }
     if (e.deposit) {
       push(e.branch, "deposits", {
@@ -369,6 +396,14 @@ export function demoGuide(demo) {
         const last = i === rows.length - 1;
         lines.push(`| ${i === 0 ? d : ""} | ${i === 0 ? days[d] : ""} | ${what} | ${cash} | ${bank} | ${last ? `**${rm(expected[branchId].byDay[d].cash)}**` : ""} |`);
       });
+    }
+    const open = events.filter((e) => e.branch === branchId && e.request);
+    if (open.length) {
+      lines.push("", "**Open requests — no money has moved, so they are not in the figures:**", "");
+      for (const e of open) {
+        const q = e.request;
+        lines.push(`- Day ${e.day}: ${q.kind === "advance" ? "advance" : `staff loan (${q.months} months)`} of ${rm(q.amount)} for ${q.staff.replace("staff-", "").replace(/^./, (c) => c.toUpperCase())} — ${q.status === "pending" ? "waiting for approval (Requested Panel)" : "approved, waiting to be paid (Mark paid)"}`);
+      }
     }
     const x = expected[branchId];
     lines.push("", `**After 7 days:** cash in hand **${rm(x.handInCash)}**, bank **${rm(x.bank)}**, total sales **${rm(x.totalSales)}**` +

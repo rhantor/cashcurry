@@ -2,6 +2,7 @@
 'use client'
 import React, { useEffect, useRef, useState } from 'react'
 import { useBusinessToday } from '@/app/hooks/useRegion'
+import PayOutQueue from '@/app/components/requests/PayOutQueue'
 import { NumericFormat } from 'react-number-format'
 import {
   useAddAdvanceEntryMutation,
@@ -22,6 +23,9 @@ const ADVANCE_TYPES = [
 const LOAN_DURATIONS = [3, 6, 9, 12, 18, 24]
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// Who paid, for paidOut.by — the same shape the pay-out action records.
+const payerOf = user => ({ uid: user?.uid || '', name: user?.username || user?.name || '', role: user?.role || '' })
 
 const getStaffName = staff => {
   if (!staff) return ''
@@ -208,6 +212,10 @@ const AdvanceForm = ({ staffList, staffLoading, companyId, branchId, isAdminOrMa
           deductionMonth: form.deductionMonth,
           paidFromOffice: form.paidFromOffice,  // 'front' | 'back'
           status:         approved ? 'approved' : 'pending',
+          // A manager entering an advance hands it over now: approved and paid in one
+          // step. Anyone else's entry is a request — no money moves until it is
+          // approved and then paid out.
+          paidOut:        approved ? { date: form.date, from: form.paidFromOffice, by: payerOf(createdBy) } : null,
           deducted:       false,
           approvalNotes:  approved ? form.approvalNotes : '',
           createdBy,
@@ -413,6 +421,11 @@ const LoanForm = ({ staffList, staffLoading, companyId, branchId, isAdminOrManag
           source:              isMigration ? 'migration' : 'new',
           approvalNotes:       approved ? form.approvalNotes : '',
           status:              approved ? 'approved' : 'pending',
+          // Approved by the person entering it = paid now. A migration loan was paid
+          // out before the app (it never counts as cash here, but payroll deducts it).
+          paidOut:             approved || isMigration
+            ? { date: form.date, from: form.paidFromOffice, by: payerOf(createdBy), ...(isMigration ? { migrated: true } : {}) }
+            : null,
           createdBy,
         }
       }).unwrap()
@@ -627,12 +640,14 @@ const AdvanceLoanEntry = () => {
   const [companyId,       setCompanyId]       = useState(null)
   const [branchId,        setBranchId]        = useState(null)
   const [currentUserRole, setCurrentUserRole] = useState(null)
+  const [currentUser, setCurrentUser] = useState(null)
 
   useEffect(() => {
     const parsed = JSON.parse(localStorage.getItem('user') || '{}')
     setCompanyId(parsed.companyId || null)
     setBranchId(parsed.branchId   || null)
     setCurrentUserRole(parsed.role || null)
+    setCurrentUser(parsed)
   }, [])
 
   const { data: staffList = [], isLoading: staffLoading } = useGetStaffListQuery(
@@ -662,6 +677,9 @@ const AdvanceLoanEntry = () => {
         {!isAdminOrManager && (
           <Alert type='warning' message='Your request will be sent to the manager for approval before cash is released.' />
         )}
+
+        {/* Approved requests whose money has not been handed over yet */}
+        <PayOutQueue companyId={companyId} branchId={branchId} user={currentUser} />
 
         {/* Tabs */}
         <div className='flex gap-1 p-1 bg-gray-200/60 rounded-xl'>

@@ -44,7 +44,7 @@ Nothing here changes what users see. It lets us change things without fear.
 | 1.1 | Fix "Last 7 / Last 30 Days" dropping the first day from dashboard cash on hand; date label and pickers showed the day before (UTC) | ✅ |
 | 1.2 | **One finance engine** (`lib/finance/`) used by the summary report and both dashboards — replaces the three copies | ✅ |
 | 1.3 | **Time zone, currency and business day per company/branch** (Malaysia = Asia/Kuala_Lumpur, RM; Bangladesh = Asia/Dhaka, ৳). Optional day cut-off for restaurants that close after midnight. Replaces every UTC "today" | ✅ |
-| 1.4 | **Money request lifecycle**: requested → approved / rejected → **paid** (who paid, when, from front cash or bank). Only *paid* moves cash; payroll deducts only paid. Manager entering directly = approve + pay in one step (today's workflow keeps working). Existing records count as paid on their date, so today's numbers stay the same | ⬜ |
+| 1.4 | **Money request lifecycle**: requested → approved / rejected → **paid** (who paid, when, from front cash or bank). Only *paid* moves cash; payroll deducts only paid. Manager entering directly = approve + pay in one step (today's workflow keeps working). Existing records count as paid on their date, so today's numbers stay the same | ✅ |
 | 1.5 | ~~Promotion in Total Sales~~ — **decided: keep as is.** Promotion is free food served after an order and the owners want it counted; each branch's "include in total" setting stays in control | ✅ |
 
 - **1.1 How you check:** branch dashboard, Lazeez BB, "Last 7 Days" shows the same cash as the summary report for the same dates.
@@ -58,7 +58,11 @@ Nothing here changes what users see. It lets us change things without fear.
   a sale form opened at 1:30am defaults to the previous day. Settings live in existing fields
   (`attendance.dayCutoffTime` is the same cut-off the POS uses); a branch with no cut-off
   stays on midnight. The company dashboard warns when branches use different currencies.
-- **1.4 How you check:** a rejected advance does not change hand-in-cash; an approved one changes it only after "Mark paid".
+- **1.4 How you check:** a cashier's advance request appears in Requested Panel; approving it moves it to
+  "Waiting to be paid" (Requested Panel and Advance & Loan page) and changes no figure; "Mark paid"
+  (date + till/bank) moves the money on that date. Pending staff loans can now be approved too (they had
+  no approval screen). Payroll deducts only paid-out advances/loans. Also fixed: an advance's "paid from
+  bank" was never saved, so every advance counted as cash; advances/loans paid by transfer now reduce the bank.
 
 ## Phase 2 — Speed and security foundation
 
@@ -66,7 +70,7 @@ Needed before staff phones get direct access to the database (Phase 4).
 
 | # | Task | Status |
 |---|------|--------|
-| 2.1 | **Real access control**: role, company and branch stored in the login token (Firebase custom claims); database rules check the token, not browser cookies. Close the "no branchId → can read all branches" gap | ⬜ |
+| 2.1 | **Real access control**: role, company and branch stored in the login token (Firebase custom claims); database rules check the token, not browser cookies. Close the "no branchId → can read all branches" gap. Requests: today **any** user of a branch (staff, cashier) can write any advance — including approving or paying their own; rules must allow staff/cashier to create only pending requests, approvers to approve, payers to set `paidOut`. Add cashiers as payers (they cannot write staff loans today) | ⬜ |
 | 2.2 | One shared "current user / company / branch" source, replacing 34 separate browser-storage reads | ⬜ |
 | 2.3 | Dashboards read the monthly totals the server already keeps + only the current month's records (no more downloading all history) | ⬜ |
 | 2.4 | Reports load by date range with paging | ⬜ |
@@ -125,7 +129,8 @@ rehearsed on the local copy first.
       document with its own `id` field loses its real id (payroll salary entries —
       42 of them collapsed in the Sep 2026 backup). Export the id separately.
 - [ ] Back up production with the fixed script, and test-restore it locally
-- [ ] Data fix: mark existing advances / staff loans as paid on their date (1.4)
+- [ ] Optional data fix: write `paidOut` on existing approved/closed advances and staff loans (the engine
+      already treats them as paid on their date, so figures don't change either way)
 - [ ] Branch settings: set each branch's time zone (Asia/Kuala_Lumpur) and confirm its
       "day ends at" — Lazeez BB and Lazeez Bistro have 05:00; the two Eggcellence branches have
       none (midnight). Note: until now every form defaulted to the UTC date, which in Malaysia
@@ -138,6 +143,7 @@ rehearsed on the local copy first.
 
 | Decision | Needed before |
 |---|---|
+| Were any past advances actually paid by bank transfer? The form asked, but the answer was never saved, so all 136 counted as cash. If some were by bank, they can be corrected | release |
 | Do the Eggcellence branches trade past midnight? (sets their "day ends at") | release |
 | A company with branches in two countries: one company per country, or company dashboard per currency? (today it warns) | 5.x |
 | Banked sales: follow the branch settings (now, as the summary report always did) or the flag saved on each sale? Only Eggcellence BB Jan 2026 differs (RM 70) | any time — one line in `lib/finance` |

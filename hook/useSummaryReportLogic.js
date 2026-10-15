@@ -18,7 +18,7 @@ import { useGetCompanyDetailsQuery } from '@/lib/redux/api/authApiSlice'
 import { buildLedger } from '@/lib/finance/ledger'
 import { useBusinessToday } from '@/app/hooks/useRegion'
 import {
-  num, isPaidFromTill, saleDay, costDay, advanceDay, staffLoanDay, depositDay,
+  num, saleDay, costDay, advanceDay, staffLoanDay, depositDay,
   salaryDay, withdrawalDay, branchLoanMovements,
 } from '@/lib/finance/rules'
 
@@ -319,7 +319,7 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
       rec.withdrawals.forEach(wd =>
         rows.push({ type: 'withdraw', date: d, label: 'Cash Withdrawal', amount: num(wd.amount), runningCash })
       )
-      rec.advances.filter(isPaidFromTill).forEach(a =>
+      rec.advancesTill.forEach(a =>
         rows.push({
           type: 'staffAdvance',
           date: d,
@@ -328,7 +328,7 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
           runningCash
         })
       )
-      rec.staffLoans.filter(isPaidFromTill).forEach(l =>
+      rec.staffLoansTill.forEach(l =>
         rows.push({
           type: 'staffLoan',
           date: d,
