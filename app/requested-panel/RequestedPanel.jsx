@@ -5,6 +5,11 @@ import {
   useUpdateAdvanceEntryMutation,
 } from "@/lib/redux/api/AdvanceApiSlice";
 import {
+  useGetStaffLoansQuery,
+  useUpdateStaffLoanMutation,
+} from "@/lib/redux/api/staffLoanApiSlice";
+import PayOutQueue from "@/app/components/requests/PayOutQueue";
+import {
   useGetLoanEntriesQuery,
   useUpdateLoanEntryMutation,
   useApproveRepaymentWithAllocationMutation,
@@ -65,6 +70,12 @@ export default function RequestedPanel() {
     { skip: !companyId || !branchId, pollingInterval: 5000 }
   );
 
+  // Staff loans requested by a cashier/supervisor wait here for approval too.
+  const { data: staffLoans } = useGetStaffLoansQuery(
+    { companyId, branchId },
+    { skip: !companyId || !branchId, pollingInterval: 5000 }
+  );
+
   const {
     data: loans,
     isLoading: loanLoading,
@@ -92,6 +103,7 @@ export default function RequestedPanel() {
   );
 
   const [updateAdvance] = useUpdateAdvanceEntryMutation();
+  const [updateStaffLoan] = useUpdateStaffLoanMutation();
   const [updateOtRequest] = useUpdateOtRequestMutation();
   const [updateLoan] = useUpdateLoanEntryMutation();
   const [approveRepayment] = useApproveRepaymentWithAllocationMutation();
@@ -99,8 +111,11 @@ export default function RequestedPanel() {
 
   // Pending filters (UI list props)
   const pendingAdvances = useMemo(
-    () => (advances || []).filter((a) => a.status === "pending"),
-    [advances]
+    () => [
+      ...(advances || []).filter((a) => a.status === "pending").map((a) => ({ ...a, kind: "advance" })),
+      ...(staffLoans || []).filter((l) => l.status === "pending").map((l) => ({ ...l, kind: "staffLoan" })),
+    ],
+    [advances, staffLoans]
   );
 
   // Loans coming IN to this branch are already filtered by the API; just keep pending
@@ -129,13 +144,18 @@ export default function RequestedPanel() {
     if (!["approved", "rejected"].includes(action)) return;
     setAdvWorkingId(req.id);
     try {
-      await updateAdvance({
+      const update = req.kind === "staffLoan" ? updateStaffLoan : updateAdvance;
+      await update({
         companyId,
         branchId,
         id: req.id,
         user: user,
         data: {
           status: action,
+          // Approval is not payment: no money moves until someone marks it paid
+          // (PayOutQueue). Set explicitly — older requests have no field, and
+          // an approved record without one counts as already paid.
+          paidOut: req.paidOut ?? null,
           approvedBy: {
             id: user?.uid || "",
             name: user?.username || "Unknown",
@@ -306,6 +326,11 @@ export default function RequestedPanel() {
       </div>
 
       {/* Panels */}
+      {currentTab === "advance" && (
+        <div className="mb-6">
+          <PayOutQueue companyId={companyId} branchId={branchId} user={user} />
+        </div>
+      )}
       {currentTab === "advance" && (
         <AdvanceRequests
           loading={advLoading}
