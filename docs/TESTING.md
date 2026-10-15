@@ -6,6 +6,20 @@ npm run test:watch          # re-run on save
 npm run test:golden:update  # re-record finance goldens (see below — rarely)
 ```
 
+## Security rules (`tests-rules/`)
+
+```bash
+npm run test:rules
+```
+
+`firestore.rules` and `storage.rules` are the real security boundary — anyone
+can call Firestore directly, whatever the screens show. Each test states who
+may or may not do something ("a stranger cannot make themselves owner of an
+existing company", "staff cannot read sales", "a cashier marks an approved
+advance paid — once"). They run on their own emulators (ports 8280/9399,
+`firebase.test-rules.json`), so they never touch `dev:local` data and can run
+while the app is running. Change a rule → add or update the test that says why.
+
 ## Where the money rules live
 
 All cash and bank figures come from one engine:

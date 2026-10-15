@@ -70,13 +70,15 @@ Needed before staff phones get direct access to the database (Phase 4).
 
 | # | Task | Status |
 |---|------|--------|
-| 2.1 | **Real access control**: role, company and branch stored in the login token (Firebase custom claims); database rules check the token, not browser cookies. Close the "no branchId → can read all branches" gap. Requests: today **any** user of a branch (staff, cashier) can write any advance — including approving or paying their own; rules must allow staff/cashier to create only pending requests, approvers to approve, payers to set `paidOut`. Add cashiers as payers (they cannot write staff loans today) | ⬜ |
+| 2.1 | **Real access control** — the database and storage rules are the security boundary (screens and middleware only hide buttons). One shared rules file for v2 + POS; closed: anyone could make themselves owner of any company, staff could read all finances and colleagues' personal data, anyone could approve/pay their own advance, anyone could claim usernames, open create-staff and image-proxy endpoints. 46 rules tests (`npm run test:rules`). Login-token claims deferred: not needed for security now that rules are tight | ✅ |
 | 2.2 | One shared "current user / company / branch" source, replacing 34 separate browser-storage reads | ⬜ |
 | 2.3 | Dashboards read the monthly totals the server already keeps + only the current month's records (no more downloading all history). **First make the totals trustworthy:** the rollup functions don't follow the engine's rules (they count pending/unpaid advances, ignore staff loans, sum stored totals) and they can drift — Lazeez BB Sep 2026 costs: stored RM 13,873.25 vs records RM 11,305.05. Compute them with the same rules and add a check/repair that recomputes a month | ⬜ |
 | 2.4 | Reports load by date range with paging | ⬜ |
 | 2.5 | Remove dead/unsafe code (old `onShiftClosed` function, unused helpers) | ⬜ |
 
-- **2.1 How you check:** a cashier account cannot open or read finance pages/data even by editing cookies.
+- **2.1 How you check:** `npm run test:rules` — 46 statements about who may read/write what, run against the
+  emulator (e.g. "a stranger cannot make themselves owner of an existing company", "a cashier marks an approved
+  advance paid — once"). Cashiers can now "Mark paid". Staff logins get a random one-time password.
 - **2.3 How you check:** company dashboard opens in about a second; Firebase read count drops sharply (we'll compare before/after).
 
 ## Phase 3 — New UI
@@ -135,7 +137,11 @@ rehearsed on the local copy first.
       "day ends at" — Lazeez BB and Lazeez Bistro have 05:00; the two Eggcellence branches have
       none (midnight). Note: until now every form defaulted to the UTC date, which in Malaysia
       behaved like an 08:00 cut-off.
-- [ ] Deploy new database rules and Cloud Functions
+- [ ] Rules: v2 and the POS share one Firebase project, and both repos had their own firestore.rules —
+      deploying either one would lock the other app out. Deploy ONLY v2's firestore.rules and storage.rules
+      (they include the POS sections); retire the POS repo's copy. First download the live rules and diff
+      them against v2's, to catch anything deployed from elsewhere.
+- [ ] Deploy Cloud Functions
 - [ ] Merge `dev` into `main` and push (Vercel deploys the web app)
 - [ ] Re-run the golden check against production numbers
 

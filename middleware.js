@@ -1,4 +1,9 @@
 // middleware.js
+//
+// Page routing only: sends people to the screens their role uses. It reads
+// cookies the browser could change, so it is NOT security — the database and
+// storage rules (firestore.rules, storage.rules) decide what anyone can read
+// or write, and API routes check the caller's ID token themselves.
 import { NextResponse } from "next/server";
 import { ROLES } from "@/lib/authz/roles";
 
