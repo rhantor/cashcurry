@@ -12,4 +12,14 @@ export default defineConfig([
     languageOptions: { globals: globals.browser },
   },
   pluginReact.configs.flat.recommended,
+  {
+    // Run in Node, not the browser.
+    files: ["scripts/**", "lib/server/**", "functions/**"],
+    languageOptions: { globals: globals.node },
+  },
+  {
+    // Next.js inlines process.env.NEXT_PUBLIC_* into client code.
+    files: ["**/*.{js,jsx}"],
+    languageOptions: { globals: { process: "readonly" } },
+  },
 ]);

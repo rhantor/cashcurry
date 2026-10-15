@@ -48,3 +48,8 @@ serviceAccountKey.json
 lib/server/serviceAccountKey.json
 
 certificates
+# local emulator data, dev password and account list
+.local/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log

@@ -31,7 +31,7 @@ Nothing here changes what users see. It lets us change things without fear.
 | # | Task | Status |
 |---|------|--------|
 | 0.1 | Tidy git: commit the two pending access fixes (supervisor kiosk / attendance menu), start the local `dev` branch | ✅ |
-| 0.2 | Local Firebase emulator, seeded from the Saffron Empire backup, so development never touches live data | ⬜ |
+| 0.2 | Local Firebase emulator, seeded from the Saffron Empire backup, so development never touches live data — see [LOCAL_DEV.md](LOCAL_DEV.md) | ✅ |
 | 0.3 | Test setup (Vitest) + **golden finance tests**: hand-in-cash per branch per month, company total, must equal today's verified numbers | ⬜ |
 
 - **0.2 How you check:** `npm run dev:local` opens the app with real-looking data; changes you make there do not appear in production.
@@ -113,7 +113,10 @@ system and permissions, and plan its own improvements.
 Things that must happen on production at release time, in order. Each one is
 rehearsed on the local copy first.
 
-- [ ] Back up production (same export as `backup_saffron_empire`)
+- [ ] Fix the backup export script first: it writes `{ id: doc.id, ...data }`, so any
+      document with its own `id` field loses its real id (payroll salary entries —
+      42 of them collapsed in the Sep 2026 backup). Export the id separately.
+- [ ] Back up production with the fixed script, and test-restore it locally
 - [ ] Data fix: mark existing advances / staff loans as paid on their date (1.4)
 - [ ] Deploy new database rules and Cloud Functions
 - [ ] Merge `dev` into `main` and push (Vercel deploys the web app)
