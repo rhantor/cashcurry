@@ -72,7 +72,7 @@ Needed before staff phones get direct access to the database (Phase 4).
 |---|------|--------|
 | 2.1 | **Real access control**: role, company and branch stored in the login token (Firebase custom claims); database rules check the token, not browser cookies. Close the "no branchId → can read all branches" gap. Requests: today **any** user of a branch (staff, cashier) can write any advance — including approving or paying their own; rules must allow staff/cashier to create only pending requests, approvers to approve, payers to set `paidOut`. Add cashiers as payers (they cannot write staff loans today) | ⬜ |
 | 2.2 | One shared "current user / company / branch" source, replacing 34 separate browser-storage reads | ⬜ |
-| 2.3 | Dashboards read the monthly totals the server already keeps + only the current month's records (no more downloading all history) | ⬜ |
+| 2.3 | Dashboards read the monthly totals the server already keeps + only the current month's records (no more downloading all history). **First make the totals trustworthy:** the rollup functions don't follow the engine's rules (they count pending/unpaid advances, ignore staff loans, sum stored totals) and they can drift — Lazeez BB Sep 2026 costs: stored RM 13,873.25 vs records RM 11,305.05. Compute them with the same rules and add a check/repair that recomputes a month | ⬜ |
 | 2.4 | Reports load by date range with paging | ⬜ |
 | 2.5 | Remove dead/unsafe code (old `onShiftClosed` function, unused helpers) | ⬜ |
 
