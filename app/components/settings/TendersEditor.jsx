@@ -1,5 +1,5 @@
 import React from "react";
-import { FaCheckCircle, FaTrashAlt, FaTruck, FaUniversity, FaCalculator } from "react-icons/fa";
+import { CircleCheck, Trash2, Truck, Landmark, Calculator } from "lucide-react";
 
 export default function TendersEditor({ value = [], onChange, can }) {
   const tenders = [...value].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
@@ -57,7 +57,7 @@ export default function TendersEditor({ value = [], onChange, can }) {
                   ]);
                 }}
               >
-                {exists ? <FaCheckCircle className="text-mint-400" /> : "+"} {p.label}
+                {exists ? <CircleCheck size="1em" className="text-mint-400" /> : "+"} {p.label}
               </button>
             );
           })}
@@ -142,7 +142,7 @@ export default function TendersEditor({ value = [], onChange, can }) {
                   disabled={!canEdit}
                 />
                 <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700">
-                  <FaCalculator className={t.includeInTotal ? 'text-mint-500' : 'text-slate-400'} size={11} /> 
+                  <Calculator className={t.includeInTotal ? 'text-mint-500' : 'text-slate-400'} size={11} /> 
                   Count in Total
                 </div>
               </label>
@@ -157,7 +157,7 @@ export default function TendersEditor({ value = [], onChange, can }) {
                   disabled={!canEdit}
                 />
                 <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700">
-                  <FaUniversity className={t.banked ? 'text-sky-500' : 'text-slate-400'} size={11} /> 
+                  <Landmark className={t.banked ? 'text-sky-500' : 'text-slate-400'} size={11} /> 
                   Sent to Bank
                 </div>
               </label>
@@ -172,7 +172,7 @@ export default function TendersEditor({ value = [], onChange, can }) {
                   disabled={!canEdit}
                 />
                 <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700">
-                  <FaTruck className={t.delivery ? 'text-orange-500' : 'text-slate-400'} size={11} /> 
+                  <Truck className={t.delivery ? 'text-orange-500' : 'text-slate-400'} size={11} /> 
                   Delivery Platform (Grab/Foodpanda logic)
                 </div>
               </label>
@@ -198,7 +198,7 @@ export default function TendersEditor({ value = [], onChange, can }) {
                 disabled={!canEdit}
                 title="Delete this payment method"
               >
-                <FaTrashAlt size={13} />
+                <Trash2 size={13} />
               </button>
             </div>
           </div>

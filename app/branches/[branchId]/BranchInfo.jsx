@@ -1,5 +1,5 @@
 import React from "react";
-import { FaEdit, FaSpinner, FaTrashAlt, FaUserPlus } from "react-icons/fa";
+import { Pencil, LoaderCircle, Trash2, UserPlus } from "lucide-react";
 
 const BranchInfo = ({
   branchData,
@@ -48,7 +48,7 @@ const BranchInfo = ({
             }`}
           >
             {isUpdatingBranch ? (
-              <FaSpinner className="animate-spin" />
+              <LoaderCircle size="1em" className="animate-spin" />
             ) : (
               "Save Changes"
             )}
@@ -119,7 +119,7 @@ const BranchInfo = ({
                       setModalType("admin");
                     }}
                   >
-                    <FaEdit size={18} />
+                    <Pencil size={18} />
                   </button>
                   <button
                     className="text-red-600 hover:text-red-700 transition-colors"
@@ -127,9 +127,9 @@ const BranchInfo = ({
                     disabled={isDeletingAdmin}
                   >
                     {isDeletingAdmin ? (
-                      <FaSpinner className="animate-spin" />
+                      <LoaderCircle size="1em" className="animate-spin" />
                     ) : (
-                      <FaTrashAlt size={18} />
+                      <Trash2 size={18} />
                     )}
                   </button>
                 </div>
@@ -154,7 +154,7 @@ const BranchInfo = ({
               onClick={onAddStaff}
               className="flex items-center gap-2 px-3 py-1.5 bg-mint-600 hover:bg-mint-700 text-white text-sm rounded-lg transition-colors"
             >
-              <FaUserPlus size={14} />
+              <UserPlus size={14} />
               Add Staff
             </button>
           )}
@@ -189,7 +189,7 @@ const BranchInfo = ({
                       setModalType("user");
                     }}
                   >
-                    <FaEdit size={18} />
+                    <Pencil size={18} />
                   </button>
                   <button
                     className="text-red-600 hover:text-red-700 transition-colors"
@@ -197,9 +197,9 @@ const BranchInfo = ({
                     disabled={isDeletingUser}
                   >
                     {isDeletingUser ? (
-                      <FaSpinner className="animate-spin" />
+                      <LoaderCircle size="1em" className="animate-spin" />
                     ) : (
-                      <FaTrashAlt size={18} />
+                      <Trash2 size={18} />
                     )}
                   </button>
                 </div>

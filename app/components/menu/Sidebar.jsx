@@ -4,50 +4,16 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Cookies from "js-cookie";
 import { sidebarItems } from "@/utils/dummyData";
-import {
-  MdAppRegistration,
-  MdAttachMoney,
-  MdOutlineAccountBalanceWallet,
-  MdOutlineAttachMoney,
-  MdOutlineBarChart,
-  MdOutlineDynamicFeed,
-  MdOutlineRequestPage,
-  MdOutlineSupportAgent,
-  MdOutlineSpaceDashboard,
-  MdOutlineMoneyOffCsred,
-  MdOutlineCalendarMonth,
-  MdOutlineInsights,
-  MdShoppingCart,
-  MdOutlineManageSearch,
-} from "react-icons/md";
-import { GrTransaction } from "react-icons/gr";
-import { SiRedhatopenshift } from "react-icons/si";
-import { FcSalesPerformance } from "react-icons/fc";
-import { IoSettingsSharp } from "react-icons/io5";
+import { menuIcon } from "@/app/components/ui/icons";
 import { useGetBranchesQuery, useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
 import { useGetCompanyDetailsQuery, useUpdateUserDefaultBranchMutation } from "@/lib/redux/api/authApiSlice";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { getSessionUser, updateSessionUser, setActiveBranch as setSessionBranch } from "@/lib/session";
 
-const iconMap = {
-  MdAppRegistration: <MdAppRegistration size={20} />,
-  GrTransaction: <GrTransaction size={20} />,
-  SiRedhatopenshift: <SiRedhatopenshift size={20} />,
-  FcSalesPerformance: <FcSalesPerformance size={20} />,
-  IoSettingsSharp: <IoSettingsSharp size={20} />,
-  MdOutlineSupportAgent: <MdOutlineSupportAgent size={20} />,
-  MdOutlineAttachMoney: <MdOutlineAttachMoney size={20} />,
-  MdOutlineAccountBalanceWallet: <MdOutlineAccountBalanceWallet size={20} />,
-  MdOutlineBarChart: <MdOutlineBarChart size={20} />,
-  MdOutlineRequestPage: <MdOutlineRequestPage size={20} />,
-  MdOutlineDynamicFeed: <MdOutlineDynamicFeed size={20} />,
-  MdAttachMoney: <MdAttachMoney size={20} />,
-  MdOutlineSpaceDashboard: <MdOutlineSpaceDashboard size={20} />,
-  MdOutlineMoneyOffCsred: <MdOutlineMoneyOffCsred size={20} />,
-  MdOutlineCalendarMonth: <MdOutlineCalendarMonth size={20} />,
-  MdOutlineInsights: <MdOutlineInsights size={20} />,
-  MdShoppingCart: <MdShoppingCart size={20} />,
-  MdOutlineManageSearch: <MdOutlineManageSearch size={20} />,
+// Menu items name their icon (utils/dummyData.js); see app/components/ui/icons.js.
+const MenuIcon = ({ name }) => {
+  const Icon = menuIcon(name);
+  return <Icon size={20} strokeWidth={1.75} />;
 };
 export default function Sidebar({ onLogout, onNavigate }) {
   const pathname = usePathname();
@@ -303,7 +269,7 @@ export default function Sidebar({ onLogout, onNavigate }) {
                   }`}
                 >
                   <span className={`transition-transform duration-200 group-hover:scale-110 ${pathname === item.path ? 'text-mint-600' : 'text-slate-400'}`}>
-                    {iconMap[item.icon]}
+                    <MenuIcon name={item.icon} />
                   </span>
                   <span className="capitalize tracking-tight">{item.label}</span>
                 </Link>
@@ -343,7 +309,7 @@ function DropdownItem({ item, role, pathname, onNavigate }) {
       >
         <span className="flex items-center gap-3">
           <span className={`transition-transform duration-200 group-hover:scale-110 ${activeChild ? 'text-mint-600' : 'text-slate-400'}`}>
-            {iconMap[item.icon]}
+            <MenuIcon name={item.icon} />
           </span>
           <span className="capitalize tracking-tight">{item.label}</span>
         </span>

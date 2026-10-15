@@ -2,7 +2,7 @@
 import React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { FaRedo } from "react-icons/fa";
+import { RotateCw } from "lucide-react";
 
 export default function GlobalError({ error, reset }) {
   return (
@@ -30,7 +30,7 @@ export default function GlobalError({ error, reset }) {
           onClick={() => reset()}
           className="inline-flex items-center gap-2 rounded-2xl bg-mint-500 px-5 py-3 text-white font-semibold shadow-lg hover:bg-mint-600 transition-colors"
         >
-          <FaRedo /> Try Again
+          <RotateCw size="1em" /> Try Again
         </button>
         <Link
           href="/"

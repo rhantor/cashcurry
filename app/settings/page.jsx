@@ -1,23 +1,16 @@
 // app/settings/page.jsx
 "use client";
 import { React, useState } from "react";
-import {
-  FaUsers,
-  FaBuilding,
-  FaPalette,
-  FaShieldAlt,
-  FaBars,
-  FaTimes,
-} from "react-icons/fa";
 import BranchManagement from "../components/settings/BranchManagement";
 import UserManagement from "../components/settings/users/UserMangement";
+import { Users, Building2, Palette, Shield, Menu, X } from "lucide-react";
 
 const sections = [
-  { id: "users", name: "User Management", icon: FaUsers },
-  { id: "company", name: "Company Profile", icon: FaBuilding },
-  { id: "branch", name: "Branch Management", icon: FaBuilding },
-  { id: "theme", name: "Theme & Branding", icon: FaPalette },
-  { id: "security", name: "Security", icon: FaShieldAlt },
+  { id: "users", name: "User Management", icon: Users },
+  { id: "company", name: "Company Profile", icon: Building2 },
+  { id: "branch", name: "Branch Management", icon: Building2 },
+  { id: "theme", name: "Theme & Branding", icon: Palette },
+  { id: "security", name: "Security", icon: Shield },
 ];
 
 export default function SettingsPage() {
@@ -33,7 +26,7 @@ export default function SettingsPage() {
           onClick={() => setSidebarOpen(!sidebarOpen)}
           className="text-gray-700 text-2xl"
         >
-          {sidebarOpen ? <FaTimes /> : <FaBars />}
+          {sidebarOpen ? <X size="1em" /> : <Menu size="1em" />}
         </button>
       </div>
 

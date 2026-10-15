@@ -4,41 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { sidebarItems } from "@/utils/dummyData";
 import useSession from "@/app/hooks/useSession";
-import {
-  MdOutlineSpaceDashboard,
-  MdOutlineBarChart,
-  MdAttachMoney,
-  MdOutlineInsights,
-  MdOutlineSupportAgent,
-  MdOutlineDynamicFeed,
-  MdOutlineRequestPage,
-  MdOutlineAccountBalanceWallet,
-  MdOutlineMoneyOffCsred,
-  MdOutlineCalendarMonth,
-  MdOutlineAttachMoney as MdOutlineAttachMoney2,
-  MdOutlineSettings,
-  MdOutlinePeople,
-} from "react-icons/md";
-import { GrTransaction } from "react-icons/gr";
-import { IoSettingsSharp } from "react-icons/io5";
-
-const ICONS = {
-  MdOutlineSpaceDashboard,
-  MdOutlineBarChart,
-  MdAttachMoney,
-  MdOutlineInsights,
-  MdOutlineSupportAgent,
-  MdOutlineDynamicFeed,
-  MdOutlineRequestPage,
-  MdOutlineAccountBalanceWallet,
-  MdOutlineMoneyOffCsred,
-  MdOutlineCalendarMonth,
-  IoSettingsSharp,
-  GrTransaction,
-  MdOutlineAttachMoney2,
-  MdOutlineSettings,
-  MdOutlinePeople,
-};
+import { menuIcon } from "@/app/components/ui/icons";
 
 // Card accent colours — cycles through these for visual variety
 const CARD_ACCENTS = [
@@ -119,7 +85,7 @@ const Skeleton = () => (
 
 /* ─── sub-page modal ─── */
 function SubPageModal({ card, accent, onClose }) {
-  const Icon = ICONS[card.iconName] || MdOutlineSpaceDashboard;
+  const Icon = menuIcon(card.iconName);
 
   // close on backdrop click
   const handleBackdrop = (e) => {
@@ -179,7 +145,7 @@ function SubPageModal({ card, accent, onClose }) {
 
 /* ─── nav card ─── */
 function NavCard({ label, path, iconName, children, accent }) {
-  const Icon = ICONS[iconName] || MdOutlineSpaceDashboard;
+  const Icon = menuIcon(iconName);
   const hasMultiple = children?.length > 1;
   const [open, setOpen] = useState(false);
 

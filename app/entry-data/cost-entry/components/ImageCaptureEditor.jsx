@@ -2,17 +2,9 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import PropTypes from 'prop-types'
-import {
-  FaCamera,
-  FaImage,
-  FaTrash,
-  FaEdit,
-  FaCrop,
-  FaFilePdf,
-  FaCheck
-} from 'react-icons/fa'
 import imageCompression from 'browser-image-compression'
 import { jsPDF } from 'jspdf'
+import { Camera, ImageIcon, Trash2, Pencil, CropIcon, FileText, Check } from "lucide-react";
 
 export default function ImageCaptureEditor ({ onFilesReady }) {
   const [capturedImages, setCapturedImages] = useState([])
@@ -397,7 +389,7 @@ export default function ImageCaptureEditor ({ onFilesReady }) {
           onClick={() => cameraInputRef.current?.click()}
           className='flex items-center gap-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition'
         >
-          <FaCamera />
+          <Camera size="1em" />
           Take Photo
         </button>
 
@@ -406,7 +398,7 @@ export default function ImageCaptureEditor ({ onFilesReady }) {
           onClick={() => fileInputRef.current?.click()}
           className='flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg transition'
         >
-          <FaImage />
+          <ImageIcon size="1em" />
           Select Images
         </button>
 
@@ -417,7 +409,7 @@ export default function ImageCaptureEditor ({ onFilesReady }) {
               onClick={convertToPDF}
               className='flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition'
             >
-              <FaFilePdf />
+              <FileText size="1em" />
               Convert to PDF
             </button>
 
@@ -475,14 +467,14 @@ export default function ImageCaptureEditor ({ onFilesReady }) {
                   onClick={() => startEditing(idx)}
                   className='p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-full'
                 >
-                  <FaEdit />
+                  <Pencil size="1em" />
                 </button>
                 <button
                   type='button'
                   onClick={() => removeImage(img.id)}
                   className='p-2 bg-red-500 hover:bg-red-600 text-white rounded-full'
                 >
-                  <FaTrash />
+                  <Trash2 size="1em" />
                 </button>
               </div>
 
@@ -598,7 +590,7 @@ export default function ImageCaptureEditor ({ onFilesReady }) {
                       : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
                   }`}
                 >
-                  {cropMode ? <FaCheck /> : <FaCrop />}
+                  {cropMode ? <Check size="1em" /> : <CropIcon size="1em" />}
                   {cropMode ? 'Cropping (Click Apply to Save)' : 'Enable Crop'}
                 </button>
               </div>

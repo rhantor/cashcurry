@@ -1,6 +1,6 @@
 "use client";
 import React  from "react";
-import { FaChevronLeft, FaChevronRight } from "react-icons/fa";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 export default function Pagination({ currentPage, totalPages, onPageChange }) {
   return (
@@ -10,7 +10,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange }) {
         disabled={currentPage === 1}
         className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
       >
-        <FaChevronLeft />
+        <ChevronLeft size="1em" />
       </button>
 
       <span className="text-sm">
@@ -22,7 +22,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange }) {
         disabled={currentPage === totalPages}
         className="px-3 py-1 rounded bg-gray-200 hover:bg-gray-300 disabled:opacity-50"
       >
-        <FaChevronRight />
+        <ChevronRight size="1em" />
       </button>
     </div>
   );

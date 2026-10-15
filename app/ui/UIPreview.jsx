@@ -1,14 +1,16 @@
 "use client";
 import { useEffect, useState } from "react";
 import {
-  ArrowDownLeft, ArrowUpRight, Banknote, Check, Landmark, Monitor, Moon, Plus, Receipt, RotateCcw,
-  Search, Send, Sun, TrendingUp, Wallet,
+  ArrowDownLeft, ArrowUpRight, Banknote, Check, Copy, Download, Landmark, Monitor, Moon, MoreHorizontal, Pencil,
+  Plus, Receipt, RotateCcw, Search, Send, Sun, Trash2, TrendingUp, Wallet,
 } from "lucide-react";
 import {
-  Badge, Button, Card, CardBody, CardHeader, CountUp, Dialog, EmptyState, Field, Input, Loader, Select, Sheet,
-  Skeleton, SkeletonRows, SkeletonStat, Stagger, Switch, Tabs, Textarea, TopProgressBar, UIProvider, useTheme, useToast,
+  Avatar, Badge, Button, Card, CardBody, CardHeader, CountUp, DataTable, DatePicker, DateRangePicker, Dialog, EmptyState,
+  Field, Input, Loader, Menu, Select, Sheet, Skeleton, SkeletonRows, SkeletonStat, Stagger, Switch, Tabs, Textarea,
+  Tooltip, TopProgressBar, UIProvider, useTheme, useToast,
 } from "@/app/components/ui";
 import { formatMoney } from "@/lib/region";
+import { useBusinessToday } from "@/app/hooks/useRegion";
 
 const rm = (v) => formatMoney(v, "MYR");
 
@@ -116,6 +118,19 @@ function Gallery() {
         <Section title="Lists" note="Rows appear one by one; skeletons while loading; a friendly empty state.">
           <ListDemo />
         </Section>
+
+        <Section title="Table" note="Tap a column header to sort. On a phone each row becomes a card. Loading shows skeleton rows.">
+          <TableDemo />
+        </Section>
+
+        <div className="grid gap-10 lg:grid-cols-2">
+          <Section title="Dates" note="The month slides as you move. Range: tap the first day, then the last; the span fills in as you go. Today is the branch business day.">
+            <DatesDemo />
+          </Section>
+          <Section title="Menus, tooltips, people" note="The more-menu works with arrow keys and Esc. Hover the edit buttons for a tooltip.">
+            <PeopleDemo />
+          </Section>
+        </div>
 
         <div className="grid gap-10 lg:grid-cols-2">
           <Section title="Dialog and bottom sheet" note="The dialog pops in. The sheet slides up — drag its handle down to close (try it on a phone).">
@@ -417,6 +432,125 @@ function MiscDemo() {
         Show page progress bar
       </Button>
       <TopProgressBar active={bar} />
+    </Card>
+  );
+}
+
+const SALES = [
+  ["2026-10-15", 1600, 480, "Demo Branch KL", "KL Cashier"],
+  ["2026-10-14", 1350, 410, "Demo Branch KL", "KL Cashier"],
+  ["2026-10-14", 920, 260, "Demo Branch PJ", "PJ Admin"],
+  ["2026-10-13", 1180, 350, "Demo Branch KL", "KL Supervisor"],
+  ["2026-10-13", 760, 180, "Demo Branch PJ", "PJ Admin"],
+  ["2026-10-12", 1420, 520, "Demo Branch KL", "KL Cashier"],
+  ["2026-10-12", 640, 120, "Demo Branch PJ", "PJ Admin"],
+  ["2026-10-11", 1250, 300, "Demo Branch KL", "KL Manager"],
+  ["2026-10-11", 880, 240, "Demo Branch PJ", "PJ Admin"],
+  ["2026-10-10", 1500, 450, "Demo Branch KL", "KL Cashier"],
+  ["2026-10-10", 700, 150, "Demo Branch PJ", "PJ Admin"],
+  ["2026-10-09", 1320, 390, "Demo Branch KL", "KL Cashier"],
+].map(([date, total, card, branch, by], i) => ({ id: `s${i}`, date, total, card, cash: total - card, branch, by }));
+
+function TableDemo() {
+  const toast = useToast();
+  const [state, setState] = useState("rows");
+  const columns = [
+    { key: "date", label: "Date", primary: true, sortable: true, render: (r) => <span className="font-medium">{r.date}</span> },
+    { key: "branch", label: "Branch", sortable: true, hideOnMobile: true },
+    { key: "cash", label: "Cash", align: "right", sortable: true, render: (r) => rm(r.cash) },
+    { key: "card", label: "Card", align: "right", sortable: true, render: (r) => rm(r.card) },
+    { key: "total", label: "Total", align: "right", sortable: true, render: (r) => <span className="font-semibold">{rm(r.total)}</span> },
+    {
+      key: "by",
+      label: "Entered by",
+      render: (r) => (
+        <span className="inline-flex items-center gap-2">
+          <Avatar name={r.by} size="sm" />
+          <span className="text-muted">{r.by}</span>
+        </span>
+      ),
+    },
+  ];
+  const sum = (k) => SALES.reduce((n, r) => n + r[k], 0);
+  return (
+    <div className="space-y-3">
+      <Tabs
+        size="sm"
+        value={state}
+        onChange={setState}
+        tabs={[
+          { value: "rows", label: "Data" },
+          { value: "loading", label: "Loading" },
+          { value: "empty", label: "Empty" },
+        ]}
+      />
+      <DataTable
+        columns={columns}
+        rows={state === "empty" ? [] : SALES}
+        loading={state === "loading"}
+        pageSize={5}
+        defaultSort={{ key: "date", dir: "desc" }}
+        onRowClick={(r) => toast.info(`Sale on ${r.date}`, { description: `${r.branch} · ${rm(r.total)}` })}
+        footer={{ date: "Total", cash: rm(sum("cash")), card: rm(sum("card")), total: rm(sum("total")) }}
+        empty={{ title: "No sales in this period", description: "Try another date range.", action: <Button size="sm" icon={Plus}>Enter sales</Button> }}
+      />
+    </div>
+  );
+}
+
+function DatesDemo() {
+  const today = useBusinessToday();
+  const [day, setDay] = useState("");
+  const [range, setRange] = useState({ from: "", to: "" });
+  return (
+    <Card className="space-y-4 p-5">
+      <Field label="Sale date" hint={day ? `Saved as ${day}` : "Future dates are blocked"}>
+        {() => <DatePicker value={day} onChange={setDay} max={today} />}
+      </Field>
+      <Field label="Report period" hint={range.from ? `${range.from} → ${range.to}` : "Use a preset or pick two days"}>
+        {() => <DateRangePicker value={range} onChange={setRange} />}
+      </Field>
+    </Card>
+  );
+}
+
+function PeopleDemo() {
+  const toast = useToast();
+  const people = [
+    ["Ali Hassan", "Kitchen", "online"],
+    ["Siti Aminah", "Front", "busy"],
+    ["Kumar Raj", "Front", "away"],
+  ];
+  return (
+    <Card className="divide-y divide-line">
+      {people.map(([name, dept, status]) => (
+        <div key={name} className="flex items-center gap-3 px-5 py-3">
+          <Avatar name={name} status={status} />
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-semibold">{name}</p>
+            <p className="text-xs text-muted">{dept}</p>
+          </div>
+          <Tooltip label="Edit">
+            <Button variant="ghost" size="icon" aria-label="Edit">
+              <Pencil className="size-4" />
+            </Button>
+          </Tooltip>
+          <Menu
+            align="end"
+            trigger={(p) => (
+              <Button {...p} variant="ghost" size="icon" aria-label="More">
+                <MoreHorizontal className="size-4" />
+              </Button>
+            )}
+            items={[
+              { label: "Copy staff ID", icon: Copy, onSelect: () => toast.success("Copied") },
+              { label: "Download payslip", icon: Download, hint: "PDF", onSelect: () => toast.info("Payslip ready") },
+              "divider",
+              { label: "Remove", icon: Trash2, danger: true, onSelect: () => toast.error(`${name} removed (demo)`) },
+            ]}
+          />
+        </div>
+      ))}
     </Card>
   );
 }

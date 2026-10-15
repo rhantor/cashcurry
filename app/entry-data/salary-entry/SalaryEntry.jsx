@@ -5,12 +5,12 @@ import { NumericFormat } from "react-number-format";
 import { useAddSalaryEntryMutation } from "@/lib/redux/api/salaryApiSlice";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
-import { FaUpload, FaFilePdf, FaFileAlt, FaSpinner, FaTrash, FaExclamationCircle, FaCheckCircle, FaEye } from "react-icons/fa";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import useCurrency from "@/app/hooks/useCurrency";
 import { useDefaultDate } from "@/app/hooks/useRegion";
 import { format } from "date-fns";
 import { getSessionUser } from "@/lib/session";
+import { UploadIcon, FileText, LoaderCircle, Trash2, CircleAlert, CircleCheck, Eye } from "lucide-react";
 
 /** ---- tiny helpers ---- */
 // Local calendar dates. (These used toISOString, which is UTC: in Malaysia the
@@ -316,7 +316,7 @@ export default function SalaryEntryPage() {
 
           {!pdfName ? (
             <label className="cursor-pointer flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-mint-200 rounded-lg hover:bg-mint-50 transition-colors">
-              <FaUpload className="text-mint-400 text-xl mb-1" />
+              <UploadIcon size="1em" className="text-mint-400 text-xl mb-1" />
               <span className="text-sm text-gray-600 font-medium">Click to attach PDF</span>
               <input
                 type="file"
@@ -330,7 +330,7 @@ export default function SalaryEntryPage() {
                {/* File Info Bar */}
                <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-100">
                   <div className="flex items-center gap-3">
-                    <FaFilePdf className="text-red-500 text-xl" />
+                    <FileText size="1em" className="text-red-500 text-xl" />
                     <div>
                       <p className="text-sm font-medium text-gray-700 truncate max-w-[200px] md:max-w-sm">{pdfName}</p>
                       {isUploading && <p className="text-xs text-mint-500">Uploading {uploadProgress.toFixed(0)}%</p>}
@@ -341,7 +341,7 @@ export default function SalaryEntryPage() {
                     disabled={isUploading}
                     className="text-gray-400 hover:text-red-500 p-2 transition-colors"
                   >
-                    <FaTrash />
+                    <Trash2 size="1em" />
                   </button>
                </div>
                
@@ -349,7 +349,7 @@ export default function SalaryEntryPage() {
                {previewUrl && (
                   <div className="border border-gray-200 rounded-lg overflow-hidden bg-gray-100">
                     <div className="bg-gray-200 px-3 py-1 flex items-center gap-2 text-xs text-gray-600 font-bold uppercase">
-                       <FaEye /> Preview
+                       <Eye size="1em" /> Preview
                     </div>
                     <iframe 
                         src={previewUrl} 
@@ -374,7 +374,7 @@ export default function SalaryEntryPage() {
         {/* Global Message */}
         {msg.text && (
             <div className={`p-3 rounded-lg flex items-center gap-2 text-sm ${msg.type === 'error' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
-                {msg.type === 'error' ? <FaExclamationCircle /> : <FaCheckCircle />}
+                {msg.type === 'error' ? <CircleAlert size="1em" /> : <CircleCheck size="1em" />}
                 {msg.text}
             </div>
         )}
@@ -393,7 +393,7 @@ export default function SalaryEntryPage() {
         >
           {(isSaving || isUploading) ? (
             <>
-              <FaSpinner className="animate-spin" />
+              <LoaderCircle size="1em" className="animate-spin" />
               <span>{isUploading ? "Uploading..." : "Saving..."}</span>
             </>
           ) : (
@@ -434,7 +434,7 @@ export default function SalaryEntryPage() {
                 <div className="flex justify-between items-center pt-2 border-t border-gray-200">
                   <span className="text-gray-500">Attachment</span>
                   <div className="flex items-center gap-1 text-xs bg-red-50 text-red-600 px-2 py-1 rounded">
-                     <FaFilePdf /> PDF Included
+                     <FileText size="1em" /> PDF Included
                   </div>
                 </div>
               )}
@@ -452,7 +452,7 @@ export default function SalaryEntryPage() {
                 disabled={isSaving || isUploading}
                 className="flex-1 py-2.5 rounded-xl bg-mint-500 hover:bg-mint-600 text-white font-bold transition-colors flex justify-center items-center gap-2"
               >
-                {(isSaving || isUploading) ? <FaSpinner className="animate-spin" /> : "Confirm"}
+                {(isSaving || isUploading) ? <LoaderCircle size="1em" className="animate-spin" /> : "Confirm"}
               </button>
             </div>
           </div>

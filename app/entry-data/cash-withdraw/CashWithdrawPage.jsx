@@ -5,10 +5,10 @@ import { NumericFormat } from "react-number-format";
 import { useAddWithdrawEntryMutation } from "@/lib/redux/api/cashWithdrawApiSlice";
 import { storage } from "@/lib/firebase";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { FaUpload, FaFileAlt, FaFilePdf, FaTrash, FaSpinner, FaCheckCircle, FaExclamationCircle } from "react-icons/fa";
 import useCurrency from "@/app/hooks/useCurrency";
 import { useDefaultDate } from "@/app/hooks/useRegion";
 import { getSessionUser } from "@/lib/session";
+import { UploadIcon, FileText, Trash2, LoaderCircle, CircleCheck, CircleAlert } from "lucide-react";
 
 const CATEGORIES = [
   "Supplier Payment",
@@ -182,7 +182,7 @@ export default function CashWithdrawPage() {
 
   // Helper to determine icon based on file type
   const getFileIcon = (fileName) => {
-    return fileName.toLowerCase().endsWith(".pdf") ? <FaFilePdf className="text-red-500" /> : <FaFileAlt className="text-blue-500" />;
+    return fileName.toLowerCase().endsWith(".pdf") ? <FileText size="1em" className="text-red-500" /> : <FileText size="1em" className="text-blue-500" />;
   };
 
   return (
@@ -299,7 +299,7 @@ export default function CashWithdrawPage() {
           </div>
 
           <label className="cursor-pointer flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-mint-200 rounded-lg hover:bg-mint-50 transition-colors">
-            <FaUpload className="text-mint-400 text-xl mb-1" />
+            <UploadIcon size="1em" className="text-mint-400 text-xl mb-1" />
             <span className="text-sm text-gray-600 font-medium">Click to attach files</span>
             <span className="text-xs text-gray-400">(PDF, JPG, PNG allowed)</span>
             <input
@@ -325,7 +325,7 @@ export default function CashWithdrawPage() {
                     onClick={() => removeFile(idx)}
                     className="text-gray-400 hover:text-red-500 p-1 transition-colors"
                   >
-                    <FaTrash size={14} />
+                    <Trash2 size={14} />
                   </button>
                 </div>
               ))}
@@ -352,7 +352,7 @@ export default function CashWithdrawPage() {
         {/* Global Message */}
         {msg.text && (
             <div className={`p-3 rounded-lg flex items-center gap-2 text-sm ${msg.type === 'error' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
-                {msg.type === 'error' ? <FaExclamationCircle /> : <FaCheckCircle />}
+                {msg.type === 'error' ? <CircleAlert size="1em" /> : <CircleCheck size="1em" />}
                 {msg.text}
             </div>
         )}
@@ -365,7 +365,7 @@ export default function CashWithdrawPage() {
         >
           {(isSaving || isUploading) ? (
             <>
-              <FaSpinner className="animate-spin" />
+              <LoaderCircle size="1em" className="animate-spin" />
               <span>{isUploading ? "Uploading..." : "Saving..."}</span>
             </>
           ) : (
@@ -424,7 +424,7 @@ export default function CashWithdrawPage() {
                 disabled={isSaving || isUploading}
                 className="flex-1 py-2.5 rounded-xl bg-mint-500 hover:bg-mint-600 text-white font-bold transition-colors flex justify-center items-center gap-2"
               >
-                 {(isSaving || isUploading) ? <FaSpinner className="animate-spin" /> : "Confirm"}
+                 {(isSaving || isUploading) ? <LoaderCircle size="1em" className="animate-spin" /> : "Confirm"}
               </button>
             </div>
           </div>

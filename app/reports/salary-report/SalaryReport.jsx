@@ -11,10 +11,10 @@ import {
   exportSalariesToExcel,
   exportSalariesToPDF,
 } from "@/utils/export/exportSalary";
-import { FaCalendarAlt, FaMoneyBillWave, FaEdit, FaFilePdf } from "react-icons/fa";
 import useCurrency from "@/app/hooks/useCurrency";
 import { hasRole, ALLOWED_EDIT_ROLES } from "@/lib/authz/roles";
 import { getSessionUser } from "@/lib/session";
+import { Calendar, Banknote, Pencil, FileText } from "lucide-react";
 
 export default function SalaryReport() {
   const [dateMode, setDateMode] = useState("salary");
@@ -62,7 +62,7 @@ export default function SalaryReport() {
       label: "Salary Period",
       render: (val) => (
         <div className="flex items-center gap-2 font-medium text-gray-700">
-           <div className="p-1.5 bg-blue-50 text-blue-600 rounded-md"><FaCalendarAlt size={12}/></div>
+           <div className="p-1.5 bg-blue-50 text-blue-600 rounded-md"><Calendar size={12}/></div>
            {val ? format(new Date(`${val}-01`), "MMM yyyy") : "—"}
         </div>
       ),
@@ -93,7 +93,7 @@ export default function SalaryReport() {
             }}
             className="flex items-center gap-1 text-xs font-semibold px-2 py-1 bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors border border-red-100"
           >
-            <FaFilePdf /> View
+            <FileText size="1em" /> View
           </button>
         ) : (
           <span className="text-gray-300 text-xs italic">No PDF</span>
@@ -124,7 +124,7 @@ export default function SalaryReport() {
           className="p-2 text-gray-400 hover:text-mint-600 hover:bg-mint-50 rounded-full transition-all"
           title="Edit Entry"
         >
-          <FaEdit />
+          <Pencil size="1em" />
         </button>
       ),
     });
@@ -139,7 +139,7 @@ export default function SalaryReport() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
         <div>
            <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-             <FaMoneyBillWave className="text-green-500"/> Salary Report
+             <Banknote size="1em" className="text-green-500"/> Salary Report
            </h1>
            <p className="text-sm text-gray-400 mt-0.5">Manage and track staff payroll</p>
         </div>

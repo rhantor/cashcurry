@@ -3,7 +3,7 @@
 import React from "react";
 import RoleBadge from "./RoleBadge";
 import IconButton from "./IconButton";
-import { FaEdit, FaTrash, FaUserPlus } from "react-icons/fa";
+import { Pencil, Trash2, UserPlus } from "lucide-react";
 
 const canShowActions = (role) => {
   const r = String(role || "").toLowerCase();
@@ -29,7 +29,7 @@ export default function CompanyUsersTable({
             onClick={onAddNew}
             className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-gray-900 text-white hover:bg-gray-800 text-sm"
           >
-            <FaUserPlus className="h-4 w-4" />
+            <UserPlus className="h-4 w-4" />
             Add User
           </button>
         )}
@@ -44,7 +44,7 @@ export default function CompanyUsersTable({
               onClick={onAddNew}
               className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-gray-900 text-white hover:bg-gray-800 text-sm"
             >
-              <FaUserPlus className="h-4 w-4" />
+              <UserPlus className="h-4 w-4" />
               Add User
             </button>
           )}
@@ -88,7 +88,7 @@ export default function CompanyUsersTable({
                               disabled={isOwnerRow}
                               className="text-blue-600 hover:text-blue-700"
                             >
-                              <FaEdit className="h-4 w-4" />
+                              <Pencil className="h-4 w-4" />
                             </IconButton>
                             <IconButton
                               onClick={() => onDeleteUser?.(u)}
@@ -96,7 +96,7 @@ export default function CompanyUsersTable({
                               disabled={isOwnerRow}
                               className="text-red-600 hover:text-red-700"
                             >
-                              <FaTrash className="h-4 w-4" />
+                              <Trash2 className="h-4 w-4" />
                             </IconButton>
                           </div>
                         </td>
@@ -132,7 +132,7 @@ export default function CompanyUsersTable({
                         disabled={isOwnerRow}
                         className="text-blue-600 hover:text-blue-700"
                       >
-                        <FaEdit className="h-4 w-4" />
+                        <Pencil className="h-4 w-4" />
                       </IconButton>
                       <IconButton
                         onClick={() => onDeleteUser?.(u)}
@@ -140,7 +140,7 @@ export default function CompanyUsersTable({
                         disabled={isOwnerRow}
                         className="text-red-600 hover:text-red-700"
                       >
-                        <FaTrash className="h-4 w-4" />
+                        <Trash2 className="h-4 w-4" />
                       </IconButton>
                     </div>
                   )}

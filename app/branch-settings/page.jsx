@@ -1,6 +1,5 @@
 "use client";
 import React, { useState } from "react";
-import { FaBuilding, FaMoneyBillWave, FaUserCog, FaCogs, FaMoneyCheckAlt, FaClock } from "react-icons/fa";
 
 import BasicInfoSection from "@/app/components/settings/BasicInfoSection";
 import RegionSection from "@/app/components/settings/RegionSection";
@@ -12,14 +11,15 @@ import OtherSection from "@/app/components/settings/OtherSection";
 import AttendanceSettingsSection from "@/app/components/settings/AttendanceSettingsSection";
 import PayrollSettingsSection from "@/app/components/settings/PayrollSettingsSection";
 import useBranchSettingsForm from "./useBranchSettingsForm";
+import { Building2, Banknote, UserCog, Settings2, ReceiptText, Clock } from "lucide-react";
 
 const TABS = [
-  { id: "general",    label: "General",          icon: FaBuilding },
-  { id: "finance",    label: "Finance & Sales",   icon: FaMoneyBillWave },
-  { id: "operations", label: "Operations & Staff", icon: FaUserCog },
-  { id: "attendance", label: "Attendance",          icon: FaClock },
-  { id: "payroll",    label: "Payroll",            icon: FaMoneyCheckAlt },
-  { id: "advanced",   label: "Advanced",           icon: FaCogs },
+  { id: "general",    label: "General",          icon: Building2 },
+  { id: "finance",    label: "Finance & Sales",   icon: Banknote },
+  { id: "operations", label: "Operations & Staff", icon: UserCog },
+  { id: "attendance", label: "Attendance",          icon: Clock },
+  { id: "payroll",    label: "Payroll",            icon: ReceiptText },
+  { id: "advanced",   label: "Advanced",           icon: Settings2 },
 ];
 
 export default function BranchSettingsPage() {

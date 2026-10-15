@@ -11,7 +11,6 @@ import AdvanceModal from './AdvanceModal'
 import AdvanceEditModal from './AdvanceEditModal'
 import StaffSummaryModal from './StaffSummary'
 import useCurrency from '@/app/hooks/useCurrency'
-import { FaEdit } from 'react-icons/fa'
 
 // ✅ Entries (list) exports
 import {
@@ -20,6 +19,7 @@ import {
   exportAdvanceAllStaffToPDF,
   exportAdvanceAllStaffToExcel
 } from '@/utils/export/exportAdvanceData'
+import { Pencil } from "lucide-react";
 
 /* ---------------------------
    Helpers
@@ -185,7 +185,7 @@ export default function AdvanceReport () {
                   className="p-2 text-gray-400 hover:text-mint-600 hover:bg-mint-50 rounded-full transition-all"
                   title="Edit Entry"
                 >
-                  <FaEdit />
+                  <Pencil size="1em" />
                 </button>
               )
             }

@@ -12,13 +12,13 @@ import {
   useDeleteBranchUserMutation,
   useAddBranchUserMutation,
 } from "@/lib/redux/api/branchApiSlice";
-import { FaSpinner } from "react-icons/fa";
 import Sidebar from "./Sidebar";
 import AdminModal from "./AdminModal";
 import BranchInfo from "./BranchInfo";
 import Settings from "./Settings";
 import UserModal from "./UserModal";
 import AddBranchUserModal from "@/app/components/settings/users/modals/AddBranchUserModal";
+import { LoaderCircle } from "lucide-react";
 
 const BranchDetailsPage = () => {
   const user = getSessionUser();
@@ -207,7 +207,7 @@ const BranchDetailsPage = () => {
   if (isLoading)
     return (
       <div className="flex justify-center items-center h-screen bg-gray-100">
-        <FaSpinner className="animate-spin text-4xl text-blue-600" />
+        <LoaderCircle size="1em" className="animate-spin text-4xl text-blue-600" />
         <p className="ml-4 text-xl text-gray-700">Loading branch details...</p>
       </div>
     );
