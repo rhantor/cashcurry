@@ -1,6 +1,7 @@
 /* eslint-disable react/prop-types */
 'use client'
 
+import { isPaidOut } from '@/lib/finance/rules'
 import React, { useEffect, useMemo, useState } from 'react'
 import { useGetStaffListQuery } from '@/lib/redux/api/staffApiSlice'
 import { useGetBranchSettingsQuery } from '@/lib/redux/api/branchSettingsApiSlice'
@@ -476,7 +477,8 @@ export default function PayrollBuilder () {
   const advanceByStaff = useMemo(() => {
     const map = {}
     for (const adv of advanceList) {
-      if (!adv.staffId || adv.status !== 'approved') continue
+      // Deduct only what was actually handed over (approved AND paid out).
+      if (!adv.staffId || adv.status !== 'approved' || !isPaidOut(adv)) continue
       const inst = (adv.installments || []).find(i => i.month === period && i.status === 'pending')
       if (!inst) continue
       map[adv.staffId] = (map[adv.staffId] || []).concat({
@@ -489,7 +491,7 @@ export default function PayrollBuilder () {
   const loanByStaff = useMemo(() => {
     const map = {}
     for (const ln of loanList) {
-      if (!ln.staffId || ln.status !== 'approved') continue
+      if (!ln.staffId || ln.status !== 'approved' || !isPaidOut(ln)) continue
       const inst = (ln.installments || []).find(i => i.month === period && i.status === 'pending')
       if (!inst) continue
       map[ln.staffId] = (map[ln.staffId] || []).concat({
