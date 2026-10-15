@@ -7,12 +7,14 @@ import {
   filterToInput,
   dayKeyOfFilter,
 } from "@/utils/dashboard/dateFilters";
+import { useBusinessToday } from "@/app/hooks/useRegion";
 
 const Filters = ({ filter, setFilter }) => {
-  const now = new Date();
+  // Presets end on today's business date (after the branch's day cut-off).
+  const today = useBusinessToday();
   const current = dayKeyOfFilter(filter);
   const isActive = (preset) => {
-    const p = dayKeyOfFilter(presetFilter(preset, now));
+    const p = dayKeyOfFilter(presetFilter(preset, new Date(), today));
     return current.from === p.from && current.to === p.to;
   };
 
@@ -20,7 +22,7 @@ const Filters = ({ filter, setFilter }) => {
   const isLast7     = isActive("week");
   const isLast30    = isActive("days30");
 
-  const apply = (preset) => setFilter(presetFilter(preset, new Date()));
+  const apply = (preset) => setFilter(presetFilter(preset, new Date(), today));
 
   const btnCls = (active) =>
     `px-3 py-2 rounded-xl shadow text-sm transition ${

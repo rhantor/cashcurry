@@ -1,3 +1,4 @@
+import { businessToday } from "@/lib/region";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 
@@ -15,7 +16,7 @@ export function uploadInvoiceFile(
       const ext = file.name.split(".").pop();
       const safeInv = (invoiceNo || "noinv").replace(/[^\w-]+/g, "_");
       const safeDate = (
-        invoiceDate || new Date().toISOString().slice(0, 10)
+        invoiceDate || businessToday()
       ).replace(/[^\d-]/g, "");
       const path = `bills/${companyId}/${branchId}/${vendorId}/${safeDate}_${safeInv}.${ext}`;
       const storageRef = ref(storage, path);

@@ -23,6 +23,12 @@ describe("presetFilter", () => {
     expect(presetFilter("month", now).from).toEqual(at(2026, 9, 1));
   });
 
+  it("ends on the business day it is given (before the day cut-off)", () => {
+    // 1:30am on 1 Oct, but the branch's day runs until 05:00 → still 30 Sep
+    const f = presetFilter("month", at(2026, 10, 1, 1, 30), "2026-09-30");
+    expect(dayKeyOfFilter(f)).toEqual({ from: "2026-09-01", to: "2026-09-30" });
+  });
+
   it("works early in the morning, before 8am (UTC is still yesterday)", () => {
     const early = at(2026, 10, 1, 1, 30);
     expect(dayKeyOfFilter(presetFilter("month", early))).toEqual({ from: "2026-10-01", to: "2026-10-01" });

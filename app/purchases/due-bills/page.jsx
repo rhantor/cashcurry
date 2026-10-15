@@ -1,5 +1,6 @@
 'use client'
 
+import { businessToday } from "@/lib/region";
 import React, { useMemo, useState } from 'react'
 import { skipToken } from '@reduxjs/toolkit/query'
 import { useRouter } from 'next/navigation'
@@ -166,7 +167,7 @@ export default function DueBillsPage () {
   // --- Logic ---
 
   const allBills = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10)
+    const today = businessToday()
     return [...unpaid, ...partial]
       .map(b => ({
         ...b,
@@ -389,7 +390,7 @@ const handleSaveEdit = async (billId, formData) => {
             branchId,
             vendorId,
             invoiceNo: `receipt_${Date.now()}`,
-            invoiceDate: new Date().toISOString().slice(0, 10),
+            invoiceDate: businessToday(),
           },
           file,
           () => {} // optional progress

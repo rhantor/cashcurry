@@ -1,5 +1,6 @@
 /* eslint-disable react/prop-types */
 "use client";
+import { dayKey } from "@/lib/finance/rules";
 import React, { useMemo, useState } from "react";
 import { format } from "date-fns";
 import {
@@ -38,7 +39,8 @@ export default function CostCharts({
     const map = new Map();
     for (const r of rows) {
       if (!r?.date) continue;
-      const key = new Date(r.date).toISOString().slice(0, 10); // yyyy-mm-dd
+      const key = dayKey(r.date); // yyyy-mm-dd, local day
+      if (!key) continue;
       map.set(key, (map.get(key) || 0) + toNum(r.amount));
     }
     const arr = Array.from(map.entries())

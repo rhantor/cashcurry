@@ -7,6 +7,7 @@ import { storage } from "@/lib/firebase";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { FaUpload, FaFileAlt, FaFilePdf, FaTrash, FaSpinner, FaCheckCircle, FaExclamationCircle } from "react-icons/fa";
 import useCurrency from "@/app/hooks/useCurrency";
+import { useDefaultDate } from "@/app/hooks/useRegion";
 
 const CATEGORIES = [
   "Supplier Payment",
@@ -24,8 +25,8 @@ const METHODS = ["ATM Withdraw", "Online Transfer", "Other"];
 
 export default function CashWithdrawPage() {
   const currency = useCurrency();
-  const today = new Date().toISOString().slice(0, 10);
-  const [date, setDate] = useState(today);
+  // Defaults to today on the branch's clock, after its day cut-off.
+  const [date, setDate] = useDefaultDate();
   const [companyId, setCompanyId] = useState(null);
   const [branchId, setBranchId] = useState(null);
 

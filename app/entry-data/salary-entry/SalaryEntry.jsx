@@ -8,10 +8,13 @@ import { db, storage } from "@/lib/firebase";
 import { FaUpload, FaFilePdf, FaFileAlt, FaSpinner, FaTrash, FaExclamationCircle, FaCheckCircle, FaEye } from "react-icons/fa";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import useCurrency from "@/app/hooks/useCurrency";
+import { useDefaultDate } from "@/app/hooks/useRegion";
+import { format } from "date-fns";
 
 /** ---- tiny helpers ---- */
-const toISODate = (d) => new Date(d).toISOString().slice(0, 10);
-const toISOMonth = (d) => new Date(d).toISOString().slice(0, 7);
+// Local calendar dates. (These used toISOString, which is UTC: in Malaysia the
+// 1st of a month at midnight came out as the last day of the month before.)
+const toISODate = (d) => format(new Date(d), "yyyy-MM-dd");
 const monthStartEnd = (yyyyMM) => {
   const [y, m] = yyyyMM.split("-").map(Number);
   const start = new Date(y, m - 1, 1);
@@ -30,10 +33,9 @@ const PAID_METHODS = [
 
 export default function SalaryEntryPage() {
   const currency = useCurrency();
-  const thisMonth = toISOMonth(new Date());
-  const [month, setMonth] = useState(thisMonth);
-  const today = toISODate(new Date());
-  const [paymentDate, setPaymentDate] = useState(today);
+  // Today and this month on the branch's clock, after its day cut-off.
+  const [paymentDate, setPaymentDate, today] = useDefaultDate();
+  const [month, setMonth] = useState(() => today.slice(0, 7));
 
   const [companyId, setCompanyId] = useState(null);
   const [branchId, setBranchId] = useState(null);
