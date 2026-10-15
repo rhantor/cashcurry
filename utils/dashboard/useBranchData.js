@@ -17,18 +17,15 @@ import { useGetBranchSettingsQuery } from '@/lib/redux/api/branchSettingsApiSlic
 import useResolvedCompanyBranch from '../useResolvedCompanyBranch'
 import { skipToken } from '@reduxjs/toolkit/query'
 import { aggregateLoanMovements } from '../finance/loanAgg'
+import { buildLedger } from '@/lib/finance/ledger'
+import {
+  saleDay, costDay, advanceDay, depositDay, withdrawalDay, salaryDay, staffLoanDay,
+  isCashCost, isPaidFromTill, isMigratedStaffLoan
+} from '@/lib/finance/rules'
 
-/* ------------------------ tiny helpers ------------------------ */
-const N = v => (v ? Number(v) : 0)
-
-const tsToMs = v => {
-  if (!v) return 0
-  if (typeof v === 'number') return v
-  if (v?.seconds) return v.seconds * 1000 // Firestore TS
-  const ms = Date.parse(v)
-  return Number.isNaN(ms) ? 0 : ms
-}
-
+/* ------------------------ chart label helpers ------------------------ */
+// The money rules live in lib/finance. These only name and order the payment
+// types shown in the sales-breakdown chart and the "Banked" card label.
 const titleCase = str =>
   (str || '')
     .replace(/[_-]+/g, ' ')
@@ -36,54 +33,6 @@ const titleCase = str =>
       /\w\S*/g,
       w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
     )
-
-const derivePaidFrom = c => {
-  if (c?.paidFromOffice === 'front' || c?.paidFromOffice === 'back')
-    return c.paidFromOffice
-  if (c?.paidMethod && c?.paidMethod !== 'cash') return 'back'
-  return 'front'
-}
-const derivePaidMethod = c => {
-  if (c?.paidMethod) return c.paidMethod
-  return derivePaidFrom(c) === 'front' ? 'cash' : ''
-}
-
-const isCashCost = c => {
-  const office = String(c?.paidFromOffice || '').toLowerCase()
-  const method = String(c?.paidMethod || c?.method || '').toLowerCase()
-  return office === 'front' || method === 'cash'
-}
-// const isBankCost = (c) => !isCashCost(c);
-
-// Mirror summary's pickSalaryDate / pickWithdrawDate / amount helpers so that
-// dashboard period filtering and totals match the reports page exactly.
-const pickSalaryDate = s => {
-  const prefer =
-    s?.paymentDate || s?.date || s?.payDate || s?.createdAt || s?.monthEnd || s?.month
-  const ms =
-    (typeof prefer === 'string' ? Date.parse(prefer) : tsToMs(prefer)) ||
-    Date.now()
-  return format(new Date(ms), 'yyyy-MM-dd')
-}
-const getSalaryAmount = s =>
-  N(s?.totalSalary ?? s?.amount ?? s?.total ?? s?.total_amount ?? 0)
-
-const pickWithdrawDate = w => {
-  const prefer = w?.date || w?.withdrawDate || w?.createdAt
-  const ms =
-    (typeof prefer === 'string' ? Date.parse(prefer) : tsToMs(prefer)) ||
-    Date.now()
-  return format(new Date(ms), 'yyyy-MM-dd')
-}
-const getWithdrawAmount = w => N(w?.amount)
-
-const isCashMethod = m => {
-  const x = String(m || '')
-    .trim()
-    .toLowerCase()
-  if (!x) return true
-  return /(cash|hand\s*cash|cash-in-hand|voucher|petty)/i.test(x)
-}
 
 // fields that are NOT tenders
 const META_KEYS = new Set([
@@ -121,8 +70,6 @@ const DEFAULT_BANKED_KEYS = new Set([
   'grab',
   'foodpanda'
 ])
-const DEFAULT_DELIVERY_KEYS = new Set(['grab', 'foodpanda'])
-
 const normalizeTenderDef = (key, cand = {}) => {
   const def = DEFAULT_DEF_MAP.get(key)
   return {
@@ -131,46 +78,6 @@ const normalizeTenderDef = (key, cand = {}) => {
     order: Number.isFinite(cand.order) ? cand.order : def?.order ?? 9999,
     includeInTotal: cand.includeInTotal !== false
   }
-}
-
-// keys to include when computing sale total
-const includedTenderKeys = s => {
-  if (Array.isArray(s?.tenderMeta) && s.tenderMeta.length) {
-    return s.tenderMeta.filter(t => t?.includeInTotal !== false).map(t => t.key)
-  }
-  return Object.keys(s || {}).filter(k => {
-    if (META_KEYS.has(k)) return false
-    if (k === 'promotion') return false
-    const n = parseFloat(s[k])
-    return Number.isFinite(n)
-  })
-}
-
-// cent-safe sale total (prefer saved total)
-const saleTotalDynamic = s => {
-  const saved = parseFloat(s?.total)
-  if (Number.isFinite(saved)) return saved
-  const cents = includedTenderKeys(s).reduce(
-    (sum, k) => sum + Math.round((parseFloat(s?.[k]) || 0) * 100),
-    0
-  )
-  return cents / 100
-}
-
-// 🔹 settings-driven banked calc
-const saleBankedAmount = (s, bankedSet) => {
-  // Prefer per-row tenderMeta
-  if (Array.isArray(s?.tenderMeta) && s.tenderMeta.length) {
-    const keys = s.tenderMeta.filter(t => t?.banked).map(t => t.key)
-    return keys.reduce((sum, k) => sum + (parseFloat(s?.[k]) || 0), 0)
-  }
-  // Else: use settings-derived bankedSet (with fallback)
-  const set = bankedSet?.size ? bankedSet : DEFAULT_BANKED_KEYS
-  return Object.keys(s || {}).reduce((sum, k) => {
-    if (META_KEYS.has(k)) return sum
-    if (set.has(k)) return sum + (parseFloat(s[k]) || 0)
-    return sum
-  }, 0)
 }
 
 // union tender defs across filtered sales (prefer tenderMeta)
@@ -248,454 +155,99 @@ export default function useBranchData (filter) {
   const { data: loanActivities = [], isLoading: loanLoading } =
     useGetLoanActivitiesQuery(loanArgs)
 
-  // Compare calendar days, not instants: the opening balance below counts
-  // everything dated before `from` by day, so the period must start on the
-  // same day boundary or the first day falls in neither (it did, when a
-  // preset carried the time of day).
+  // Whole calendar days, like the summary report: a filter carrying a time
+  // of day must not drop part of its first or last day.
   const fromKey = format(filter.from, 'yyyy-MM-dd')
   const toKey = format(filter.to, 'yyyy-MM-dd')
-  const inRange = d => {
-    const k = dayKey(d)
-    return !!k && k >= fromKey && k <= toKey
-  }
+  const inPeriod = day => !!day && day >= fromKey && day <= toKey
 
-  /* --------------- filtered windows --------------- */
-  const fSales = useMemo(
-    () => sales.filter(s => inRange(s.date)),
-    [sales, filter]
-  )
-  const fCosts = useMemo(
-    () => costs.filter(x => inRange(x.date || x.createdAt)),
-    [costs, filter]
-  )
-  const fAdv = useMemo(
-    () => advances.filter(x => inRange(x.date || x.createdAt)),
-    [advances, filter]
-  )
-  const fDep = useMemo(
-    () => deposits.filter(x => inRange(x.date || x.createdAt)),
-    [deposits, filter]
-  )
-  // Use the same date-picking helpers as the summary/reports page so
-  // period filtering matches exactly (e.g. payroll entries without a `date`
-  // field still get picked up via paymentDate/monthEnd/etc).
-  const fWdr = useMemo(() => {
-    const fromStr = format(filter.from, 'yyyy-MM-dd')
-    const toStr = format(filter.to, 'yyyy-MM-dd')
-    return withdrawals.filter(w => {
-      const d = pickWithdrawDate(w)
-      return d >= fromStr && d <= toStr
-    })
-  }, [withdrawals, filter])
-  const fSal = useMemo(() => {
-    const fromStr = format(filter.from, 'yyyy-MM-dd')
-    const toStr = format(filter.to, 'yyyy-MM-dd')
-    return salaries.filter(s => {
-      const d = pickSalaryDate(s)
-      return d >= fromStr && d <= toStr
-    })
-  }, [salaries, filter])
-
-  // Staff loans that are a cash outflow in this period.
-  // Mirrors the summary/reports page: only exclude migration loans (cash was given
-  // before the app was adopted). Do NOT filter by status — summary treats every
-  // non-migration loan as an actual disbursement, and the user has confirmed
-  // the summary numbers are correct.
+  /* --------------- the period's records (charts and lists) --------------- */
+  const fSales = useMemo(() => sales.filter(s => inPeriod(saleDay(s))), [sales, fromKey, toKey])
+  const fCosts = useMemo(() => costs.filter(x => inPeriod(costDay(x))), [costs, fromKey, toKey])
+  const fAdv = useMemo(() => advances.filter(x => inPeriod(advanceDay(x))), [advances, fromKey, toKey])
+  const fDep = useMemo(() => deposits.filter(x => inPeriod(depositDay(x))), [deposits, fromKey, toKey])
+  const fWdr = useMemo(() => withdrawals.filter(w => inPeriod(withdrawalDay(w))), [withdrawals, fromKey, toKey])
+  const fSal = useMemo(() => salaries.filter(s => inPeriod(salaryDay(s))), [salaries, fromKey, toKey])
+  // Staff loans paid out of the till in this period.
   const fStaffLoans = useMemo(
-    () => staffLoans.filter(x =>
-      inRange(x.date) &&
-      x.source !== 'migration' &&
-      String(x.paidFromOffice || 'front').toLowerCase() !== 'back'
-    ),
-    [staffLoans, filter]
+    () => staffLoans.filter(x => inPeriod(staffLoanDay(x)) && !isMigratedStaffLoan(x) && isPaidFromTill(x)),
+    [staffLoans, fromKey, toKey]
   )
-
   const fLoans = useMemo(
-    () => loanActivities.filter(x => inRange(x.date || x.createdAt)),
-    [loanActivities, filter]
+    () => loanActivities.filter(x => inPeriod(dayKey(x.date || x.createdAt))),
+    [loanActivities, fromKey, toKey]
   )
 
-  // 🔹 settings → derive banked & delivery sets
-  const { bankedSet, deliveryKeys } = useMemo(() => {
-    const list = branchSettings?.financeSales?.tenders || []
-    if (!Array.isArray(list) || !list.length) {
-      return {
-        bankedSet: new Set(DEFAULT_BANKED_KEYS),
-        deliveryKeys: Array.from(DEFAULT_DELIVERY_KEYS)
-      }
+  /* --------------- money: the shared finance engine --------------- */
+  // Same cash book as the summary report, so the cards always agree with it.
+  const ledger = useMemo(
+    () =>
+      buildLedger({
+        branchId,
+        settings: branchSettings,
+        records: { sales, costs, advances, staffLoans, deposits, salaries, withdrawals, loanActivities },
+        from: fromKey,
+        to: toKey
+      }),
+    [branchId, branchSettings, sales, costs, advances, staffLoans, deposits, salaries, withdrawals, loanActivities, fromKey, toKey]
+  )
+
+  // What one sale adds to total sales and to the bank, by the ledger's rules.
+  const { saleTotal, bankedOfSale } = useMemo(() => {
+    const { keys, countsInTotal, isBanked } = ledger.tenders
+    return {
+      saleTotal: s => keys.reduce((a, k) => a + (countsInTotal(k) ? num(s[k]) : 0), 0),
+      bankedOfSale: s => keys.reduce((a, k) => a + (isBanked(k) ? num(s[k]) : 0), 0)
     }
-    const banked = new Set(list.filter(t => t.banked).map(t => t.key))
-    const explicitDelivery = list.filter(t => t.delivery).map(t => t.key)
-    const delivery =
-      explicitDelivery.length > 0
-        ? explicitDelivery
-        : ['grab', 'foodpanda'].filter(k => list.some(t => t.key === k))
-    return { bankedSet: banked, deliveryKeys: delivery }
+  }, [ledger])
+
+  // Payment types named in the "Banked" card label.
+  const bankedSet = useMemo(() => {
+    const list = branchSettings?.financeSales?.tenders || []
+    return list.length ? new Set(list.filter(t => t.banked).map(t => t.key)) : new Set(DEFAULT_BANKED_KEYS)
   }, [branchSettings])
 
-  /* --------------- normalize loans like Summary (cash/bank deltas) --------------- */
-  // Normalize ALL loan activities (not the period-filtered fLoans) so that
-  // pre-period cash/bank deltas can be included in openingCash. The summary
-  // does the same — see useSummaryReportLogic.js `normalized`.
-  const normalizedLoans = useMemo(() => {
-    return (loanActivities || [])
-      .map(e => {
-        const typ = String(e.type || '').toLowerCase() // loan | repayment
-        const from = e._fromBranchId ?? e.fromBranchId ?? e.requestFromBranchId
-        const to = e._toBranchId ?? e.toBranchId ?? e.requestedToBranchId
-        const rawMethod = String(
-          e.paymentMethod || e.method || ''
-        ).toLowerCase()
-
-        let role
-        if (to === branchId) role = 'lender'
-        else if (from === branchId) role = 'borrower'
-
-        const amt = N(e.amount)
-        let cashDelta = 0
-        let bankDelta = 0
-
-        if (typ === 'loan') {
-          // force loans as cash channel per Summary logic
-          if (role === 'lender') cashDelta -= amt
-          else if (role === 'borrower') cashDelta += amt
-        } else if (typ === 'repayment') {
-          const isCash = isCashMethod(rawMethod)
-          if (role === 'lender') {
-            if (isCash) cashDelta += amt
-            else bankDelta += amt
-          } else if (role === 'borrower') {
-            if (isCash) cashDelta -= amt
-            else bankDelta -= amt
-          }
-        }
-
-        // pick deterministic date string
-        const prefer =
-          e.payDate ||
-          e.paymentDate ||
-          e.repayDate ||
-          e.loanDate ||
-          e.date ||
-          e.createdAt
-        const ms =
-          (typeof prefer === 'string' ? Date.parse(prefer) : tsToMs(prefer)) ||
-          Date.now()
-        const dateStr = format(new Date(ms), 'yyyy-MM-dd')
-
-        return {
-          type: typ,
-          amount: amt,
-          paymentMethod: rawMethod || '-',
-          fromBranchId: from,
-          toBranchId: to,
-          role,
-          cashDelta,
-          bankDelta,
-          dateStr
-        }
-      })
-      .filter(x => x.role && x.dateStr)
-  }, [loanActivities, branchId])
-
-  /* --------------- totals & high-level metrics (aligned with Summary) --------------- */
   const totals = useMemo(() => {
-    const fromStr = format(filter.from, 'yyyy-MM-dd')
-    const toStr = format(filter.to, 'yyyy-MM-dd')
-    const inRangeStr = d => d >= fromStr && d <= toStr
-
-    // ---------- PRE-RANGE opening cash ----------
-    const preSalesCash = sales
-      .filter(s => s?.date && s.date < fromStr)
-      .reduce((sum, s) => sum + N(s.cash), 0)
-
-    const preCostsCash = costs
-      .filter(c => {
-        const raw = c?.date || c?.createdAt
-        if (!raw) return false
-        const d = format(new Date(tsToMs(raw) || Date.parse(raw)), 'yyyy-MM-dd')
-        return d < fromStr && isCashCost(c)
-      })
-      .reduce((sum, c) => sum + N(c.amount), 0)
-
-    // Match summary's isSalaryCash: checks payMethod first, then paidFromOffice.
-    // This mirrors the reports page so openingCash matches summary's runningCash.
-    const isSalaryCash = s => {
-      const m = String(s.payMethod || '').toLowerCase()
-      if (m === 'bank' || m === 'bank_transfer' || m === 'cheque') return false
-      return String(s?.paidFromOffice || 'front').toLowerCase() !== 'back'
-    }
-
-    // Pre-range cash-paid salaries only — bank-paid salaries don't affect openingCash
-    const preSalariesCash = (salaries || [])
-      .filter(s => {
-        const prefer =
-          s.paymentDate ||
-          s.date ||
-          s.payDate ||
-          s.createdAt ||
-          s.monthEnd ||
-          s.month
-        const ms =
-          (typeof prefer === 'string' ? Date.parse(prefer) : tsToMs(prefer)) ||
-          Date.now()
-        const d = format(new Date(ms), 'yyyy-MM-dd')
-        return d < fromStr
-      })
-      .filter(isSalaryCash)
-      .reduce(
-        (sum, s) =>
-          sum + N(s.totalSalary ?? s.amount ?? s.total ?? s.total_amount ?? 0),
-        0
-      )
-
-    // Match summary's isAdvanceCash: advances paid from back office (bank) don't reduce cash.
-    const isAdvanceCash = a =>
-      String(a?.paidFromOffice || 'front').toLowerCase() !== 'back'
-
-    const preAdvances = advances
-      .filter(a => a?.date && a.date < fromStr && isAdvanceCash(a))
-      .reduce((sum, a) => sum + N(a.amount), 0)
-
-    // Pre-range staff loan disbursements that came out of the register
-    const preStaffLoansCash = staffLoans
-      .filter(l =>
-        l.date && l.date < fromStr &&
-        l.source !== 'migration' &&
-        String(l.paidFromOffice || 'front').toLowerCase() !== 'back'
-      )
-      .reduce((sum, l) => sum + N(l.amount), 0)
-
-    const preDeposits = deposits
-      .filter(d => d?.date && d.date < fromStr)
-      .reduce((sum, d) => sum + N(d.amount), 0)
-
-    const preWithdrawals = (withdrawals || [])
-      .filter(w => {
-        const prefer = w.date || w.withdrawDate || w.createdAt
-        const ms =
-          (typeof prefer === 'string' ? Date.parse(prefer) : tsToMs(prefer)) ||
-          Date.now()
-        const d = format(new Date(ms), 'yyyy-MM-dd')
-        return d < fromStr
-      })
-      .reduce((sum, w) => sum + N(w.amount), 0)
-
-    const preActsCashDelta = normalizedLoans
-      .filter(x => x.dateStr < fromStr)
-      .reduce((s, x) => s + (x.cashDelta || 0), 0)
-    // Initial Cash
-    const initialCash = N(
-      branchSettings?.initialCash ??
-        branchSettings?.financeSales?.openingBalance ??
-        0
-    )
-
-    let openingCash =
-      initialCash +
-      preSalesCash -
-      preCostsCash -
-      preSalariesCash -
-      preAdvances -
-      preStaffLoansCash +
-      preActsCashDelta -
-      preDeposits +
-      preWithdrawals
-
-    // ---------- IN-PERIOD ----------
-    // banked tenders (settings/per-row aware)
-    const bankedSum = fSales.reduce(
-      (sum, s) => sum + saleBankedAmount(s, bankedSet),
-      0
-    )
-
-    const periodDeposits = fDep.reduce((s, x) => s + N(x.amount), 0)
-    const periodWithdrawals = fWdr.reduce((s, x) => s + getWithdrawAmount(x), 0)
-
-    // Costs split (front/back)
-    let totalCostsFront = 0
-    let totalCostsBack = 0
-    let backCard = 0,
-      backQR = 0,
-      backOnline = 0,
-      backBank = 0
+    const t = ledger.totals
+    // Back-office costs by how they were paid.
+    let backCard = 0, backQR = 0, backOnline = 0, backBank = 0
     fCosts.forEach(c => {
-      const amt = N(c.amount)
-      const from = derivePaidFrom(c)
-      const method = derivePaidMethod(c)
-      if (from === 'front') {
-        totalCostsFront += amt
-      } else {
-        totalCostsBack += amt
-        if (method === 'card') backCard += amt
-        else if (method === 'qr') backQR += amt
-        else if (method === 'online') backOnline += amt
-        else if (method === 'bank_transfer') backBank += amt
-      }
+      if (isCashCost(c)) return
+      const amt = num(c.amount)
+      const method = c.paidMethod || ''
+      if (method === 'card') backCard += amt
+      else if (method === 'qr') backQR += amt
+      else if (method === 'online') backOnline += amt
+      else if (method === 'bank_transfer') backBank += amt
     })
-
-    // Advances: only cash-paid ones reduce handInCash (mirrors summary's isAdvanceCash).
-    // Bank-paid advances are not tracked on the bank side either — summary treats
-    // them as out-of-scope for cash-flow purposes, so we match that behaviour.
-    const totalAdv = fAdv.filter(isAdvanceCash).reduce((s, x) => s + N(x.amount), 0)
-
-    // Staff loan disbursements from the register (cash out on the loan date)
-    const totalStaffLoanCash = fStaffLoans.reduce((s, x) => s + N(x.amount), 0)
-
-    // Salaries split using the same isSalaryCash helper as summary/reports:
-    //   cash → reduces handInCash (staff paid in hand)
-    //   bank → reduces bankExpected (bank transfer)
-    let totalSalCash = 0
-    let totalSalBank = 0
-    fSal.forEach(x => {
-      const amt = getSalaryAmount(x)
-      if (isSalaryCash(x)) totalSalCash += amt
-      else totalSalBank += amt
-    })
-    const totalSal = totalSalCash + totalSalBank  // combined for KPI display
-
-    // Cash sales in period
-    const periodCashSales = fSales.reduce((s, x) => s + N(x.cash), 0)
-
-    // Loan channel deltas (in period)
-    const periodCashLoanDelta = normalizedLoans
-      .filter(x => inRangeStr(x.dateStr))
-      .reduce((s, x) => s + (x.cashDelta || 0), 0)
-
-    const periodBankLoanDelta = normalizedLoans
-      .filter(x => inRangeStr(x.dateStr))
-      .reduce((s, x) => s + (x.bankDelta || 0), 0)
-
-    // ---------- CASH IN HAND ----------
-    // Only cash-paid items reduce hand cash:
-    //   - front-office costs
-    //   - cash-paid salaries (payMethod: 'cash' or no payMethod)
-    //   - advances given
-    //   - staff loan disbursements from register (paidFromOffice: 'front')
-    //   - deposits to bank
-    //   - branch loans given in cash (via normalizedLoans cashDelta)
-    const handInCash =
-      openingCash +
-      periodCashSales -
-      totalCostsFront -
-      totalSalCash -
-      totalAdv -
-      totalStaffLoanCash -
-      periodDeposits +
-      periodCashLoanDelta +
-      periodWithdrawals
-
-    // ---------- EFFECTIVE BANK (expected) ----------
-    // banked tenders + deposits ± non-cash repayments − withdrawals − back-office costs − bank salaries
-    const bankExpected =
-      bankedSum +
-      periodDeposits +
-      periodBankLoanDelta -
-      periodWithdrawals -
-      totalCostsBack -
-      totalSalBank  // bank-transferred salaries reduce bank balance
-
-    // Keep earlier high-levels too
-    const totalCash = fSales.reduce((s, x) => s + N(x.cash), 0)
-    const totalCard = fSales.reduce((s, x) => s + N(x.card), 0)
-    const totalQR = fSales.reduce((s, x) => s + N(x.qr), 0)
-    const totalOnline = fSales.reduce((s, x) => s + N(x.online), 0)
-    const totalSales = fSales.reduce((s, x) => s + saleTotalDynamic(x), 0)
-
-    // Delivery totals (settings-driven)
-    const deliverySet = new Set(deliveryKeys)
-    const deliveryBanked = fSales.reduce((sum, s) => {
-      let row = 0
-      if (Array.isArray(s?.tenderMeta) && s.tenderMeta.length) {
-        s.tenderMeta.forEach(t => {
-          if (!deliverySet.has(t.key)) return
-          if (!t.banked) return
-          row += N(s[t.key])
-        })
-      } else {
-        Object.keys(s || {}).forEach(k => {
-          if (META_KEYS.has(k)) return
-          if (!deliverySet.has(k)) return
-          if (!bankedSet.has(k)) return
-          row += N(s[k])
-        })
-      }
-      return sum + row
-    }, 0)
-
-    const deliveryNonBanked = fSales.reduce((sum, s) => {
-      let row = 0
-      if (Array.isArray(s?.tenderMeta) && s.tenderMeta.length) {
-        s.tenderMeta.forEach(t => {
-          if (!deliverySet.has(t.key)) return
-          if (t.banked) return
-          row += N(s[t.key])
-        })
-      } else {
-        Object.keys(s || {}).forEach(k => {
-          if (META_KEYS.has(k)) return
-          if (!deliverySet.has(k)) return
-          if (bankedSet.has(k)) return
-          row += N(s[k])
-        })
-      }
-      return sum + row
-    }, 0)
-
-    const deliveryTotal = deliveryBanked + deliveryNonBanked
-
     return {
-      // new KPI-aligned outputs
-      handInCash,
-      bankExpected,
-
-      // backward-compatible aliases
-      estCashOnHand: handInCash,
-      effectiveBankedAfterWithdrawals: bankExpected,
-
-      // existing totals
-      totalCash,
-      totalCard,
-      totalQR,
-      totalOnline,
-      bankedSales: bankedSum,
-      totalWdr: periodWithdrawals,
-      totalDep: periodDeposits,
-      totalCosts: totalCostsFront + totalCostsBack,
-      totalCostsFront,
-      totalCostsBack,
+      // Cash in hand at the end of the period (opening + everything since).
+      handInCash: ledger.closing.cash,
+      // Bank movement within the period.
+      bankExpected: t.bankChange,
+      totalCash: t.cashSales,
+      totalCard: fSales.reduce((s, x) => s + num(x.card), 0),
+      totalQR: fSales.reduce((s, x) => s + num(x.qr), 0),
+      totalOnline: fSales.reduce((s, x) => s + num(x.online), 0),
+      bankedSales: t.bankedSales,
+      totalWdr: t.withdrawal,
+      totalDep: t.deposit,
+      totalCosts: t.costCash + t.costBank,
+      totalCostsFront: t.costCash,
+      totalCostsBack: t.costBank,
       backCard,
       backQR,
       backOnline,
       backBank,
-      totalAdv,
-      totalStaffLoanCash,
-      totalSal,
-      totalSales,
-      deliveryBanked,
-      deliveryNonBanked,
-      deliveryTotal
+      totalAdv: t.advance,
+      totalStaffLoanCash: t.staffLoanGiven,
+      totalSal: t.salaryCash + t.salaryBank,
+      totalSales: t.totalSales,
+      deliveryBanked: t.deliveryBanked,
+      deliveryNonBanked: t.deliveryUnbanked,
+      deliveryTotal: t.deliveryTotal
     }
-  }, [
-    sales,
-    costs,
-    salaries,
-    staffLoans,
-    advances,
-    deposits,
-    withdrawals,
-    fSales,
-    fCosts,
-    fSal,
-    fAdv,
-    fStaffLoans,
-    fDep,
-    fWdr,
-    bankedSet,
-    deliveryKeys,
-    filter,
-    normalizedLoans
-  ])
+  }, [ledger, fCosts, fSales])
 
   /* --------------- trend (daily total) --------------- */
   const salesTrend = useMemo(() => {
@@ -703,11 +255,11 @@ export default function useBranchData (filter) {
     fSales.forEach(s => {
       const k = byDateKey(s.date)
       const prev = map.get(k) || { date: k, total: 0 }
-      prev.total += saleTotalDynamic(s)
+      prev.total += saleTotal(s)
       map.set(k, prev)
     })
     return sortByDateKey([...map.values()])
-  }, [fSales])
+  }, [fSales, saleTotal])
 
   /* --------------- comparison sales trend (previous period) --------------- */
   // preset = 'month'  → same calendar days, one month back  (Apr 1-20 → Mar 1-20)
@@ -743,12 +295,12 @@ export default function useBranchData (filter) {
     const curMap = new Map()
     fSales.forEach(s => {
       const k = byDateKey(s.date)
-      curMap.set(k, (curMap.get(k) || 0) + saleTotalDynamic(s))
+      curMap.set(k, (curMap.get(k) || 0) + saleTotal(s))
     })
     const prevMap = new Map()
     prevSales.forEach(s => {
       const k = byDateKey(s.date)
-      prevMap.set(k, (prevMap.get(k) || 0) + saleTotalDynamic(s))
+      prevMap.set(k, (prevMap.get(k) || 0) + saleTotal(s))
     })
 
     // Align both periods by day position (index 0 = Day 1 of each period)
@@ -778,7 +330,7 @@ export default function useBranchData (filter) {
         prevDate:    prevDate,
       }
     })
-  }, [sales, fSales, filter])
+  }, [sales, fSales, filter, saleTotal])
 
   /* --------------- dynamic sales breakdown --------------- */
   const { tenderKeys, tenderLabelsByKey } = useMemo(
@@ -848,7 +400,7 @@ export default function useBranchData (filter) {
         costs_front: 0,
         costs_back: 0
       }
-      prev.sales += saleTotalDynamic(s)
+      prev.sales += saleTotal(s)
       map.set(k, prev)
     })
     fCosts.forEach(c => {
@@ -859,7 +411,7 @@ export default function useBranchData (filter) {
         costs_front: 0,
         costs_back: 0
       }
-      const from = derivePaidFrom(c)
+      const from = isCashCost(c) ? 'front' : 'back'
       const amt = num(c.amount)
       if (from === 'front') prev.costs_front += amt
       else prev.costs_back += amt
@@ -871,7 +423,7 @@ export default function useBranchData (filter) {
         costs_total: row.costs_front + row.costs_back
       }))
     )
-  }, [fSales, fCosts])
+  }, [fSales, fCosts, saleTotal])
 
   /* --------------- banked vs withdrawals (daily) --------------- */
   const bankedVsWdr = useMemo(() => {
@@ -879,7 +431,7 @@ export default function useBranchData (filter) {
     fSales.forEach(s => {
       const k = byDateKey(s.date)
       const prev = map.get(k) || { date: k, bankedSales: 0, withdrawals: 0 }
-      prev.bankedSales += saleBankedAmount(s, bankedSet)
+      prev.bankedSales += bankedOfSale(s)
       map.set(k, prev)
     })
     fWdr.forEach(w => {
@@ -889,7 +441,7 @@ export default function useBranchData (filter) {
       map.set(k, prev)
     })
     return sortByDateKey([...map.values()])
-  }, [fSales, fWdr, bankedSet])
+  }, [fSales, fWdr, bankedOfSale])
 
   /* --------------- banked vs back-office cost (daily) --------------- */
   const bankedVsBackCost = useMemo(() => {
@@ -898,18 +450,18 @@ export default function useBranchData (filter) {
     fSales.forEach(s => {
       const k = byDateKey(s.date)
       const prev = map.get(k) || { date: k, bankedSales: 0, backCosts: 0 }
-      prev.bankedSales += saleBankedAmount(s, bankedSet)
+      prev.bankedSales += bankedOfSale(s)
       map.set(k, prev)
     })
     // add back-office costs per day
     fCosts.forEach(c => {
       const k = byDateKey(c.date || c.createdAt)
       const prev = map.get(k) || { date: k, bankedSales: 0, backCosts: 0 }
-      if (derivePaidFrom(c) === 'back') prev.backCosts += num(c.amount)
+      if (!isCashCost(c)) prev.backCosts += num(c.amount)
       map.set(k, prev)
     })
     return sortByDateKey([...map.values()])
-  }, [fSales, fCosts, bankedSet])
+  }, [fSales, fCosts, bankedOfSale])
 
   /* --------------- cash vs cost (daily) --------------- */
   const cashVsCost = useMemo(() => {
@@ -923,7 +475,7 @@ export default function useBranchData (filter) {
     fCosts.forEach(c => {
       const k = byDateKey(c.date || c.createdAt)
       const prev = map.get(k) || { date: k, cashSales: 0, cashCosts: 0 }
-      if (derivePaidFrom(c) === 'front') prev.cashCosts += num(c.amount)
+      if (isCashCost(c)) prev.cashCosts += num(c.amount)
       map.set(k, prev)
     })
     return sortByDateKey([...map.values()])
@@ -972,7 +524,7 @@ export default function useBranchData (filter) {
   const recent = useMemo(() => {
     const rows = []
     fSales.slice(-20).forEach(x => {
-      rows.push({ type: 'Sale', date: x.date, amount: saleTotalDynamic(x) })
+      rows.push({ type: 'Sale', date: x.date, amount: saleTotal(x) })
     })
     fCosts.slice(-20).forEach(x =>
       rows.push({
@@ -1021,7 +573,7 @@ export default function useBranchData (filter) {
       .filter(r => !Number.isNaN(r.ts))
       .sort((a, b) => b.ts - a.ts)
       .slice(0, 15)
-  }, [fSales, fCosts, fDep, fWdr, fSal, fAdv, fLoans])
+  }, [fSales, fCosts, fDep, fWdr, fSal, fAdv, fLoans, saleTotal])
 
   const loading =
     salesLoading ||
@@ -1103,7 +655,6 @@ export default function useBranchData (filter) {
     branchName,
 
     // Branch switching — for owner/gm/superAdmin viewing individual branches
-    branchId,
     isCompany,
     setActiveBranch,
   }

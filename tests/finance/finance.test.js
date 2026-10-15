@@ -36,7 +36,27 @@ function matchGolden(file, actual) {
   if (!fs.existsSync(file)) {
     throw new Error(`No golden file at ${file}. Create it with \`npm run test:golden:update\`.`);
   }
-  expect(actual).toEqual(JSON.parse(fs.readFileSync(file, "utf8")));
+  const golden = JSON.parse(fs.readFileSync(file, "utf8"));
+  const changes = diffPaths(golden, actual);
+  if (changes.length) {
+    // Readable list of every figure that moved, plus the full actual output.
+    const actualFile = file.replace(/\.json$/, ".actual.json");
+    fs.writeFileSync(actualFile, JSON.stringify(actual, null, 2) + "\n");
+    throw new Error(
+      `${changes.length} recorded figure(s) changed (full output: ${path.basename(actualFile)}):\n` +
+        changes.slice(0, 60).join("\n") +
+        (changes.length > 60 ? `\n… and ${changes.length - 60} more` : "")
+    );
+  }
+}
+
+/** "branches › X › 2026-01 › summary › kpis › handInCash: 10 → 12" for each difference. */
+function diffPaths(a, b, at = []) {
+  if (Object.is(a, b)) return [];
+  const isObj = (v) => v && typeof v === "object";
+  if (!isObj(a) || !isObj(b)) return [`${at.join(" › ")}: ${JSON.stringify(a)} → ${JSON.stringify(b)}`];
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  return [...keys].flatMap((k) => diffPaths(a[k], b[k], [...at, k]));
 }
 import { presetFilter } from "@/utils/dashboard/dateFilters";
 import { buildDemoCompany, KL as DEMO_KL, PJ as DEMO_PJ } from "@/scripts/local/demo/demoCompany.mjs";
