@@ -20,7 +20,7 @@ import { aggregateLoanMovements } from '../finance/loanAgg'
 import { buildLedger } from '@/lib/finance/ledger'
 import {
   saleDay, costDay, advanceDay, depositDay, withdrawalDay, salaryDay, staffLoanDay,
-  isCashCost, isPaidFromTill, isMigratedStaffLoan
+  isCashCost, isMigratedStaffLoan, paidOutOf
 } from '@/lib/finance/rules'
 
 /* ------------------------ chart label helpers ------------------------ */
@@ -165,13 +165,14 @@ export default function useBranchData (filter) {
   /* --------------- the period's records (charts and lists) --------------- */
   const fSales = useMemo(() => sales.filter(s => inPeriod(saleDay(s))), [sales, fromKey, toKey])
   const fCosts = useMemo(() => costs.filter(x => inPeriod(costDay(x))), [costs, fromKey, toKey])
-  const fAdv = useMemo(() => advances.filter(x => inPeriod(advanceDay(x))), [advances, fromKey, toKey])
+  // Advances and staff loans count once paid out, on the day they were paid.
+  const fAdv = useMemo(() => advances.filter(x => inPeriod(paidOutOf(x, advanceDay)?.day)), [advances, fromKey, toKey])
   const fDep = useMemo(() => deposits.filter(x => inPeriod(depositDay(x))), [deposits, fromKey, toKey])
   const fWdr = useMemo(() => withdrawals.filter(w => inPeriod(withdrawalDay(w))), [withdrawals, fromKey, toKey])
   const fSal = useMemo(() => salaries.filter(s => inPeriod(salaryDay(s))), [salaries, fromKey, toKey])
   // Staff loans paid out of the till in this period.
   const fStaffLoans = useMemo(
-    () => staffLoans.filter(x => inPeriod(staffLoanDay(x)) && !isMigratedStaffLoan(x) && isPaidFromTill(x)),
+    () => staffLoans.filter(x => !isMigratedStaffLoan(x) && paidOutOf(x, staffLoanDay)?.fromTill && inPeriod(paidOutOf(x, staffLoanDay).day)),
     [staffLoans, fromKey, toKey]
   )
   const fLoans = useMemo(

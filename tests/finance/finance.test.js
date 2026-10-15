@@ -211,8 +211,64 @@ describe("cash rules (hand-made example)", () => {
     expect((await companyDashboard(busy, monthFilter("2026-09"))).estCashOnHand).toBe(880 + 150);
   });
 
-  // Roadmap 1.4 — money should move only when a request is approved AND paid.
-  it.todo("a pending or rejected advance does not reduce hand in cash");
+  // Roadmap 1.4 — an advance or staff loan moves money only when it has been
+  // approved AND paid out, on the day it was paid, from where it was paid.
+  describe("requested → approved → paid", () => {
+    const withA = (extra) => ({
+      ...example,
+      branches: example.branches.map((b) =>
+        b.id === "A" ? { ...b, cols: { ...b.cols, advances: [...b.cols.advances, ...(extra.advances || [])], loans: extra.loans || [] } } : b
+      ),
+    });
+    const cashIn = (data, month = "2026-09") => summaryForMonth(data, "A", month);
+
+    it("a request that is pending, rejected, or approved but not paid moves no money", () => {
+      const data = withA({
+        advances: [
+          { id: "p", date: "2026-09-16", amount: 500, status: "pending", paidOut: null },
+          { id: "r", date: "2026-09-16", amount: 500, status: "rejected" }, // older record, no paidOut field
+          { id: "u", date: "2026-09-16", amount: 500, status: "approved", paidOut: null },
+        ],
+        loans: [{ id: "sl", date: "2026-09-16", amount: 900, status: "approved", paidOut: null }],
+      });
+      expect(cashIn(data).handInCash).toBe(880);
+      expect(branchDashboard(data, "A", monthFilter("2026-09")).handInCash).toBe(880);
+    });
+
+    it("money moves on the day it is paid, not the day it was requested", () => {
+      const data = withA({
+        advances: [{ id: "x", date: "2026-08-20", amount: 300, status: "approved", paidOut: { date: "2026-09-17", from: "front" } }],
+      });
+      expect(cashIn(data, "2026-08").handInCash).toBe(1070); // August untouched
+      expect(cashIn(data).handInCash).toBe(880 - 300);
+    });
+
+    it("paid from the bank reduces the bank, not the till", () => {
+      const data = withA({
+        advances: [{ id: "b", date: "2026-09-17", amount: 200, status: "approved", paidOut: { date: "2026-09-17", from: "back" } }],
+        loans: [{ id: "sl", date: "2026-09-17", amount: 400, status: "approved", paidOut: { date: "2026-09-17", from: "back" } }],
+      });
+      const s = cashIn(data);
+      expect(s.handInCash).toBe(880);
+      expect(s.bankBalance).toBe(300 - 200 - 400);
+    });
+
+    it("a paid staff loan reduces cash like an advance", () => {
+      const data = withA({ loans: [{ id: "sl", date: "2026-09-18", amount: 250, status: "approved", paidOut: { date: "2026-09-18", from: "front" } }] });
+      expect(cashIn(data).handInCash).toBe(880 - 250);
+    });
+
+    it("a leave request is never money, even with an amount", () => {
+      const data = withA({ advances: [{ id: "l", date: "2026-09-16", amount: 2, advanceType: "medical", status: "approved" }] });
+      expect(cashIn(data).handInCash).toBe(880);
+    });
+
+    it("older records with no paid-out field keep counting on their own date when approved", () => {
+      // The example's RM 40 advance is such a record — it is in the 880 above.
+      const data = withA({ advances: [{ id: "old", date: "2026-09-16", amount: 60, status: "closed" }] });
+      expect(cashIn(data).handInCash).toBe(880 - 60);
+    });
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
