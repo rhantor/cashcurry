@@ -37,12 +37,14 @@ const branchCollection = (name) => (args) => {
   return result(cached(`${args.branchId}/${name}`, () => branch(args.branchId)?.cols[name] ?? []));
 };
 
-// Mirrors loanApiSlice.getLoanActivities: adds _fromBranchId/_toBranchId and
-// filters by direction/status/type. (It also applies limit(100); the backup
-// has fewer loans than that, so it is left out here.)
+// Mirrors loanApiSlice.getLoanActivities: newest first, at most `pageLimit`
+// records (0 = all), then adds _fromBranchId/_toBranchId and filters by
+// direction/status/type.
+const createdMs = (e) => (e.createdAt?.seconds ? e.createdAt.seconds * 1000 : Date.parse(e.createdAt) || 0);
 function loanActivities(args) {
-  const { branchId, direction = "all", status = "all", type = "all" } = args;
-  return (current.dataset.companyCols.loans || [])
+  const { branchId, direction = "all", status = "all", type = "all", pageLimit = 100 } = args;
+  const newestFirst = [...(current.dataset.companyCols.loans || [])].sort((a, b) => createdMs(b) - createdMs(a));
+  return (pageLimit ? newestFirst.slice(0, pageLimit) : newestFirst)
     .map((e) => ({
       ...e,
       _fromBranchId: e.requestFromBranchId ?? e.fromBranchId ?? null,

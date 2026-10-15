@@ -15,63 +15,13 @@ import { useGetBranchesBasicQuery, useGetSingleBranchQuery } from '@/lib/redux/a
 import { useGetSalaryEntriesQuery } from '@/lib/redux/api/salaryApiSlice'
 import { useGetWithdrawEntriesQuery } from '@/lib/redux/api/cashWithdrawApiSlice'
 import { useGetCompanyDetailsQuery } from '@/lib/redux/api/authApiSlice'
+import { buildLedger } from '@/lib/finance/ledger'
+import {
+  num, isPaidFromTill, saleDay, costDay, advanceDay, staffLoanDay, depositDay,
+  salaryDay, withdrawalDay, branchLoanMovements,
+} from '@/lib/finance/rules'
 
 // --- 1. Static Helper Functions ---
-
-const N = v => (v ? Number(v) : 0)
-
-const tsToMs = v => {
-  if (!v) return 0
-  if (typeof v === 'number') return v
-  if (v?.seconds) return v.seconds * 1000
-  const ms = Date.parse(v)
-  return Number.isNaN(ms) ? 0 : ms
-}
-
-const pickActivityDate = e => {
-  const prefer =
-    e.payDate || e.paymentDate || e.repayDate || e.loanDate || e.date
-  const msPref = Date.parse(prefer || '')
-  if (!Number.isNaN(msPref)) return format(new Date(msPref), 'yyyy-MM-dd')
-  const ms =
-    tsToMs(e.createdAt) || tsToMs(e.updatedAt) || Date.parse(e.date || '')
-  return format(new Date(ms || Date.now()), 'yyyy-MM-dd')
-}
-
-const isCashCost = c => {
-  const office = String(c?.paidFromOffice || '').toLowerCase()
-  const method = String(c?.paidMethod || c?.method || '').toLowerCase()
-  return office === 'front' || method === 'cash'
-}
-const isBankCost = c => !isCashCost(c)
-
-const isCashMethod = m => {
-  const x = String(m || '')
-    .trim()
-    .toLowerCase()
-  if (!x) return true
-  return /(cash|hand\s*cash|cash-in-hand|voucher|petty)/i.test(x)
-}
-
-const pickSalaryDate = s => {
-  const prefer =
-    s.paymentDate || s.date || s.payDate || s.createdAt || s.monthEnd || s.month
-  const ms =
-    (typeof prefer === 'string' ? Date.parse(prefer) : tsToMs(prefer)) ||
-    Date.now()
-  return format(new Date(ms), 'yyyy-MM-dd')
-}
-const getSalaryAmount = s =>
-  N(s.totalSalary ?? s.amount ?? s.total ?? s.total_amount ?? 0)
-
-const pickWithdrawDate = w => {
-  const prefer = w.date || w.withdrawDate || w.createdAt
-  const ms =
-    (typeof prefer === 'string' ? Date.parse(prefer) : tsToMs(prefer)) ||
-    Date.now()
-  return format(new Date(ms), 'yyyy-MM-dd')
-}
-const getWithdrawAmount = w => N(w.amount)
 
 const extractSalesNotes = (sale, keys) => {
   const out = {}
@@ -118,30 +68,12 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
   const { data: costs = [], isLoading: loadingCosts } = useGetCostEntriesQuery(
     baseArgs ? baseArgs : skipToken
   )
-  const { data: advanceEntries = [], isLoading: loadingAdvances } = useGetAdvanceEntriesQuery(
+  const { data: advances = [], isLoading: loadingAdvances } = useGetAdvanceEntriesQuery(
     baseArgs ? baseArgs : skipToken
   )
   const { data: staffLoans = [], isLoading: loadingStaffLoans } = useGetStaffLoansQuery(
     baseArgs ? baseArgs : skipToken
   )
-  // Merge staff loans into advances for cash-flow calculation.
-  // Staff loans use the issue date (loan.date) as the cash-out date,
-  // same shape as advances: { date, amount, paidFromOffice }
-  const advances = [
-    ...advanceEntries,
-    // Migration loans (source === 'migration') had no cash given out by this office —
-    // the money was paid before the app was adopted, so exclude them from cash flow.
-    ...staffLoans
-      .filter(l => l.source !== 'migration')
-      .map(l => ({
-        id:             l.id,
-        date:           l.date,
-        amount:         l.amount,
-        staffName:      l.staffName || '',
-        paidFromOffice: l.paidFromOffice || 'front',
-        _source:        'staffLoan',
-      })),
-  ]
   const { data: deposits = [], isLoading: loadingDeposits } = useGetDepositEntryQuery(
     baseArgs ? baseArgs : skipToken
   )
@@ -153,7 +85,7 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
   )
   const { data: loanActs = [], isLoading: loadingLoanActs } = useGetLoanActivitiesQuery(
     baseArgs
-      ? { ...baseArgs, direction: 'all', status: 'approved', type: 'all' }
+      ? { ...baseArgs, direction: 'all', status: 'approved', type: 'all', pageLimit: 0 } // every loan: cash needs the full history
       : skipToken
   )
   const { data: branches = [] } = useGetBranchesBasicQuery(companyId || skipToken)
@@ -184,87 +116,6 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
     settings?.basic?.name ||
     getBranchName(branchId)
 
-  // Tender Config
-  const tenderDefs = useMemo(() => {
-    const list = settings?.financeSales?.tenders || []
-    return list
-      .filter(t => t.enabled !== false)
-      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
-  }, [settings])
-
-  const tenderKeys = useMemo(() => tenderDefs.map(t => t.key), [tenderDefs])
-
-  const tenderByKey = useMemo(() => {
-    const m = new Map()
-    tenderDefs.forEach(t => m.set(t.key, t))
-    return m
-  }, [tenderDefs])
-
-  const isBankedTender = key => !!tenderByKey.get(key)?.banked
-  const includeInTotal = key => tenderByKey.get(key)?.includeInTotal !== false
-
-  const deliveryKeys = useMemo(() => {
-    const explicit = tenderDefs.filter(t => t.delivery).map(t => t.key)
-    if (explicit.length > 0) return explicit
-    return ['grab', 'foodpanda'].filter(k => tenderByKey.has(k))
-  }, [tenderDefs, tenderByKey])
-
-  // Normalized Loans
-  const normalized = useMemo(
-    () =>
-      (loanActs || [])
-        .map(e => {
-          const typ = String(e.type || '').toLowerCase()
-          const from =
-            e._fromBranchId ?? e.fromBranchId ?? e.requestFromBranchId
-          const to = e._toBranchId ?? e.toBranchId ?? e.requestedToBranchId
-          const rawMethod = String(
-            e.paymentMethod || e.method || ''
-          ).toLowerCase()
-          const dateStr = pickActivityDate(e)
-
-          let role = 'other'
-          if (to === branchId) role = 'lender'
-          else if (from === branchId) role = 'borrower'
-
-          let cashDelta = 0
-          let bankDelta = 0
-          const amt = N(e.amount)
-
-          if (typ === 'loan') {
-            if (role === 'lender') cashDelta -= amt
-            else if (role === 'borrower') cashDelta += amt
-          } else if (typ === 'repayment') {
-            const cash = isCashMethod(rawMethod)
-            if (role === 'lender') {
-              if (cash) cashDelta += amt
-              else bankDelta += amt
-            } else if (role === 'borrower') {
-              if (cash) cashDelta -= amt
-              else bankDelta -= amt
-            }
-          }
-
-          return {
-            id: e.id,
-            type: typ,
-            amount: amt,
-            paymentMethod: typ === 'loan' ? 'cash (forced)' : rawMethod || '-',
-            fromBranchId: from,
-            toBranchId: to,
-            requestFrom: e.requestFrom || null,
-            requestedTo: e.requestedTo || null,
-            reason: e.reason || null,
-            dateStr,
-            role,
-            cashDelta,
-            bankDelta
-          }
-        })
-        .filter(x => x.role !== 'other' && x.dateStr),
-    [loanActs, branchId]
-  )
-
   // Date Range Logic
   const dateRange = useMemo(() => {
     const today = new Date()
@@ -279,16 +130,17 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
 
     switch (filterState.filterType) {
       case 'all': {
-        const collectDates = []
-        sales.forEach(s => s?.date && collectDates.push(s.date))
-        costs.forEach(c => c?.date && collectDates.push(c.date))
-        advances.forEach(a => a?.date && collectDates.push(a.date))
-        deposits.forEach(d => d?.date && collectDates.push(d.date))
-        ;(salaries || []).forEach(s => collectDates.push(pickSalaryDate(s)))
-        ;(withdrawals || []).forEach(w =>
-          collectDates.push(pickWithdrawDate(w))
-        )
-        normalized.forEach(x => x?.dateStr && collectDates.push(x.dateStr))
+        // From the first to the last day anything was recorded.
+        const collectDates = [
+          ...sales.map(saleDay),
+          ...costs.map(costDay),
+          ...advances.map(advanceDay),
+          ...staffLoans.map(staffLoanDay),
+          ...deposits.map(depositDay),
+          ...salaries.map(salaryDay),
+          ...withdrawals.map(withdrawalDay),
+          ...branchLoanMovements(loanActs, branchId).map(m => m.day),
+        ].filter(Boolean)
         if (collectDates.length) {
           collectDates.sort()
           from = parseISO(collectDates[0])
@@ -334,288 +186,81 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
     sales,
     costs,
     advances,
+    staffLoans,
     deposits,
     salaries,
     withdrawals,
-    normalized
+    loanActs,
+    branchId
   ])
 
-  // --- CALCULATION LOOP ---
+  // --- Money: one cash book from the shared finance engine ---
+  const ledger = useMemo(
+    () =>
+      buildLedger({
+        branchId,
+        settings,
+        records: { sales, costs, advances, staffLoans, deposits, salaries, withdrawals, loanActivities: loanActs },
+        from: format(dateRange.from, 'yyyy-MM-dd'),
+        to: format(dateRange.to, 'yyyy-MM-dd'),
+      }),
+    [branchId, settings, sales, costs, advances, staffLoans, deposits, salaries, withdrawals, loanActs, dateRange]
+  )
+
+  const tenderDefs = ledger.tenders.defs
+
+  // --- Report rows: the ledger's days, laid out for the table and exports ---
   const computed = useMemo(() => {
-    const fromStr = format(dateRange.from, 'yyyy-MM-dd')
-    const toStr = format(dateRange.to, 'yyyy-MM-dd')
-    const inRange = d => d >= fromStr && d <= toStr
-
-    // Initial Balances
-    const initialCash = N(
-      settings?.initialCash ?? settings?.financeSales?.openingBalance ?? 0
-    )
-    const initialBankBalance = N(settings?.financeSales?.openingBankBalance ?? 0)
-
-    const preSalesCash = sales
-      .filter(s => s.date < fromStr)
-      .reduce((sum, s) => sum + N(s.cash), 0)
-    const preCostsCash = costs
-      .filter(c => c.date < fromStr && isCashCost(c))
-      .reduce((sum, c) => sum + N(c.amount), 0)
-    // isSalaryCash: checks payMethod (new payroll entries) then paidFromOffice (legacy manual entries)
-    const isSalaryCash = s => {
-      const m = String(s.payMethod || '').toLowerCase()
-      if (m === 'bank' || m === 'bank_transfer' || m === 'cheque') return false
-      return String(s?.paidFromOffice || 'front').toLowerCase() !== 'back'
-    }
-    const preSalariesCash = (salaries || [])
-      .filter(s => pickSalaryDate(s) < fromStr && isSalaryCash(s))
-      .reduce((sum, s) => sum + getSalaryAmount(s), 0)
-    const preSalariesBank = (salaries || [])
-      .filter(s => pickSalaryDate(s) < fromStr && !isSalaryCash(s))
-      .reduce((sum, s) => sum + getSalaryAmount(s), 0)
-    const isAdvanceCashPre = a => String(a?.paidFromOffice || 'front').toLowerCase() !== 'back'
-    const preAdvances = advances
-      .filter(a => a.date < fromStr && isAdvanceCashPre(a))
-      .reduce((sum, a) => sum + N(a.amount), 0)
-    const preDeposits = deposits
-      .filter(d => d.date < fromStr)
-      .reduce((s, d0) => s + N(d0.amount), 0)
-    const preActsCashDelta = normalized
-      .filter(x => x.dateStr < fromStr)
-      .reduce((s, x) => s + (x.cashDelta || 0), 0)
-    const preWithdrawals = (withdrawals || [])
-      .filter(w => pickWithdrawDate(w) < fromStr)
-      .reduce((s, w) => s + getWithdrawAmount(w), 0)
-
-    let runningCash =
-      initialCash +
-      preSalesCash -
-      preCostsCash -
-      preSalariesCash -
-      preAdvances +
-      preActsCashDelta -
-      preDeposits +
-      preWithdrawals
-
-    // Pre-period Bank Balance
-    const preBankedTenders = tenderKeys.reduce((sum, k) => {
-      if (!isBankedTender(k)) return sum
-      return sum + sales.filter(s => s.date < fromStr).reduce((s2, sale) => s2 + N(sale[k]), 0)
-    }, 0)
-    const preBankCosts = costs
-      .filter(c => c.date < fromStr && isBankCost(c))
-      .reduce((s, c) => s + N(c.amount), 0)
-    const preBankDeposits = deposits
-      .filter(d => d.date < fromStr)
-      .reduce((s, d) => s + N(d.amount), 0)
-    const preBankActsDelta = normalized
-      .filter(x => x.dateStr < fromStr)
-      .reduce((s, x) => s + (x.bankDelta || 0), 0)
-    const preBankWithdrawals = (withdrawals || [])
-      .filter(w => pickWithdrawDate(w) < fromStr)
-      .reduce((s, w) => s + getWithdrawAmount(w), 0)
-
-    let runningBank =
-      initialBankBalance +
-      preBankedTenders +
-      preBankDeposits +
-      preBankActsDelta -
-      preBankWithdrawals -
-      preBankCosts -
-      preSalariesBank  // was computed but never applied — pre-period bank salaries reduce opening bank
-
-    const days =
-      Math.floor(
-        (dateRange.to.getTime() - dateRange.from.getTime()) /
-          (1000 * 60 * 60 * 24)
-      ) + 1
-    const allDates = Array.from({ length: days }, (_, i) => {
-      const d = new Date(dateRange.from)
-      d.setDate(d.getDate() + i)
-      return format(d, 'yyyy-MM-dd')
-    })
-
-    let periodDeposits = 0,
-      periodWithdrawals = 0,
-      totalCostFront = 0,
-      totalCostBack = 0,
-      periodBankLoanDelta = 0
-    let periodRepayCashIn = 0,
-      periodRepayCashOut = 0,
-      periodRepayBankIn = 0,
-      periodRepayBankOut = 0,
-      periodTotalSales = 0
-
-    // Explicit Accumulators for KPI
-    let periodAdvances = 0
-    let periodLoanGiven = 0
-    let periodCashSales = 0 // <--- FIX: Track cash sales explicitly
-
-    const periodTotals = Object.fromEntries(tenderKeys.map(k => [k, 0]))
+    const { tenders, days, totals, broughtForward, closing } = ledger
+    const tenderKeys = tenders.keys
     const rows = []
 
     rows.push({
       type: 'balance',
       label: 'Balance from Last Summary',
-      runningCash,
-      runningBank,
-      date: fromStr
+      runningCash: broughtForward.cash,
+      runningBank: broughtForward.bank,
+      date: ledger.from
     })
 
-    allDates.forEach(d => {
-      const dailySales = sales.filter(s => s.date === d)
-      const dailyCosts = costs.filter(c => c.date === d)
-      const dailyAdvances = advances.filter(a => a.date === d)
-      const dailyDeposits = deposits.filter(dep => dep.date === d)
-      const dailySalaries = (salaries || []).filter(
-        s => pickSalaryDate(s) === d
-      )
-      const dailyWithdrawals = (withdrawals || []).filter(
-        w => pickWithdrawDate(w) === d
-      )
-      const dailyActs = normalized.filter(x => x.dateStr === d)
-      const dailyLoans = dailyActs.filter(x => x.type === 'loan')
-      const dailyRepays = dailyActs.filter(x => x.type === 'repayment')
+    for (const day of days) {
+      const d = day.date
+      const { runningCash, runningBank } = day
+      const rec = day.records
 
-      const tendersForDay = Object.fromEntries(
-        tenderKeys.map(k => [k, dailySales.reduce((s, x) => s + N(x[k]), 0)])
-      )
-      const cashVal = N(tendersForDay.cash) // Explicit cash value
-
-      // Split salary advances from staff loans; only front-office (cash) ones affect runningCash
-      const isAdvanceCash = a => String(a?.paidFromOffice || 'front').toLowerCase() !== 'back'
-      const dailySalaryAdvances = dailyAdvances.filter(a => a._source !== 'staffLoan')
-      const dailyStaffLoans     = dailyAdvances.filter(a => a._source === 'staffLoan')
-      const advance        = dailySalaryAdvances.filter(isAdvanceCash).reduce((s, x) => s + N(x.amount), 0)
-      const staffLoanGiven = dailyStaffLoans.filter(isAdvanceCash).reduce((s, x) => s + N(x.amount), 0)
-
-      const deposit = dailyDeposits.reduce((s, x) => s + N(x.amount), 0)
-      const costCash = dailyCosts
-        .filter(c => isCashCost(c))
-        .reduce((s, x) => s + N(x.amount), 0)
-      const costBank = dailyCosts
-        .filter(c => isBankCost(c))
-        .reduce((s, x) => s + N(x.amount), 0)
-      const salaryCash = dailySalaries
-        .filter(isSalaryCash)
-        .reduce((s, x) => s + getSalaryAmount(x), 0)
-      const salaryBank = dailySalaries
-        .filter(s => !isSalaryCash(s))
-        .reduce((s, x) => s + getSalaryAmount(x), 0)
-      const withdrawalAmt = dailyWithdrawals.reduce(
-        (s, x) => s + getWithdrawAmount(x),
-        0
-      )
-
-      const loanGiven = dailyLoans
-        .filter(l => l.role === 'lender')
-        .reduce((s, x) => s + N(x.amount), 0)
-      const loanReceived = dailyLoans
-        .filter(l => l.role === 'borrower')
-        .reduce((s, x) => s + N(x.amount), 0)
-
-      const repayCashIn = dailyRepays
-        .filter(r => r.role === 'lender' && isCashMethod(r.paymentMethod))
-        .reduce((s, r) => s + N(r.amount), 0)
-      const repayCashOut = dailyRepays
-        .filter(r => r.role === 'borrower' && isCashMethod(r.paymentMethod))
-        .reduce((s, r) => s + N(r.amount), 0)
-      const repayBankIn = dailyRepays
-        .filter(r => r.role === 'lender' && !isCashMethod(r.paymentMethod))
-        .reduce((s, r) => s + N(r.amount), 0)
-      const repayBankOut = dailyRepays
-        .filter(r => r.role === 'borrower' && !isCashMethod(r.paymentMethod))
-        .reduce((s, r) => s + N(r.amount), 0)
-
-      const totalSales = tenderKeys.reduce(
-        (sum, k) => sum + (includeInTotal(k) ? N(tendersForDay[k]) : 0),
-        0
-      )
-      const dailyActsCashDelta = dailyActs.reduce(
-        (s, x) => s + (x.cashDelta || 0),
-        0
-      )
-      const dailyActsBankDelta = dailyActs.reduce(
-        (s, x) => s + (x.bankDelta || 0),
-        0
-      )
-      const dailyBankedTenders = tenderKeys.reduce(
-        (sum, k) => sum + (isBankedTender(k) ? N(tendersForDay[k]) : 0),
-        0
-      )
-
-      const notesByTender = dailySales.reduce(
+      const notesByTender = rec.sales.reduce(
         (acc, s) => mergeNotes(acc, extractSalesNotes(s, tenderKeys)),
         {}
       )
       const salesNotesText = tenderKeys
         .filter(k => notesByTender[k]?.length)
-        .map(
-          k =>
-            `${tenderByKey.get(k)?.label || k}: ${notesByTender[k].join(' | ')}`
-        )
+        .map(k => `${tenders.byKey.get(k)?.label || k}: ${notesByTender[k].join(' | ')}`)
         .join(' • ')
-
-      runningCash =
-        runningCash +
-        cashVal -
-        costCash -
-        salaryCash -
-        advance -
-        staffLoanGiven -
-        deposit +
-        dailyActsCashDelta +
-        withdrawalAmt
-
-      runningBank =
-        runningBank +
-        dailyBankedTenders +
-        deposit +
-        dailyActsBankDelta -
-        withdrawalAmt -
-        costBank -
-        salaryBank  // bank-transferred salaries reduce bank balance
-
-      if (inRange(d)) {
-        periodDeposits += deposit
-        periodWithdrawals += withdrawalAmt
-        totalCostFront += costCash
-        totalCostBack += costBank  // bank salaries handled separately in runningBank, not counted as a cost
-        tenderKeys.forEach(k => (periodTotals[k] += N(tendersForDay[k])))
-        periodBankLoanDelta += dailyActsBankDelta
-        periodRepayCashIn += repayCashIn
-        periodRepayCashOut += repayCashOut
-        periodRepayBankIn += repayBankIn
-        periodRepayBankOut += repayBankOut
-        periodTotalSales += totalSales
-
-        // Accumulate for KPIs
-        periodAdvances += advance
-        periodLoanGiven += loanGiven
-        periodCashSales += cashVal // <--- FIX: Accumulate here
-      }
 
       rows.push({
         type: 'daily',
         date: d,
-        tenders: tendersForDay,
+        tenders: day.tenders,
         // Raw entries for consumers that break costs down by category; the
         // costCash/costBank split below stays the source of truth for cash flow.
-        costEntries: dailyCosts,
-        advance,
-        staffLoanGiven,
-        cost: costCash + costBank,
-        costCash,
-        costBank,
-        salary: salaryCash + salaryBank,
-        salaryCash,
-        salaryBank,
-        loanGiven,
-        loanReceived,
-        repayCashIn,
-        repayCashOut,
-        repayBankIn,
-        repayBankOut,
-        deposit,
-        withdrawal: withdrawalAmt,
-        totalSales,
+        costEntries: rec.costs,
+        advance: day.advance,
+        staffLoanGiven: day.staffLoanGiven,
+        cost: day.costCash + day.costBank,
+        costCash: day.costCash,
+        costBank: day.costBank,
+        salary: day.salaryCash + day.salaryBank,
+        salaryCash: day.salaryCash,
+        salaryBank: day.salaryBank,
+        loanGiven: day.loanGiven,
+        loanReceived: day.loanReceived,
+        repayCashIn: day.repayCashIn,
+        repayCashOut: day.repayCashOut,
+        repayBankIn: day.repayBankIn,
+        repayBankOut: day.repayBankOut,
+        deposit: day.deposit,
+        withdrawal: day.withdrawal,
+        totalSales: day.totalSales,
         runningCash,
         runningBank,
         salesNotesByTender: notesByTender,
@@ -632,7 +277,7 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
           runningCash
         })
 
-      dailyLoans.forEach(l =>
+      rec.loans.filter(l => l.type === 'loan').forEach(l =>
         rows.push({
           type: 'loan',
           date: d,
@@ -640,7 +285,7 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
             l.role === 'lender'
               ? `Loan Provided to ${l.requestFrom || getBranchName(l.fromBranchId)}`
               : `Loan Received from ${l.requestedTo || getBranchName(l.toBranchId)}`,
-          amount: N(l.amount),
+          amount: l.amount,
           role: l.role,
           method: l.paymentMethod,
           reason: l.reason || null,
@@ -648,7 +293,7 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
         })
       )
 
-      dailyRepays.forEach(r =>
+      rec.loans.filter(l => l.type === 'repayment').forEach(r =>
         rows.push({
           type: 'repayment',
           date: d,
@@ -656,109 +301,73 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
             r.role === 'lender'
               ? `Repayment Received (${r.paymentMethod})`
               : `Repayment Paid (${r.paymentMethod})`,
-          amount: N(r.amount),
+          amount: r.amount,
           role: r.role,
           method: r.paymentMethod || '-',
           runningCash
         })
       )
 
-      dailyDeposits.forEach(dep =>
-        rows.push({
-          type: 'deposit',
-          date: d,
-          label: 'Cash Deposit',
-          amount: N(dep.amount),
-          runningCash
-        })
+      rec.deposits.forEach(dep =>
+        rows.push({ type: 'deposit', date: d, label: 'Cash Deposit', amount: num(dep.amount), runningCash })
       )
-      dailyWithdrawals.forEach(wd =>
-        rows.push({
-          type: 'withdraw',
-          date: d,
-          label: 'Cash Withdrawal',
-          amount: N(wd.amount),
-          runningCash
-        })
+      rec.withdrawals.forEach(wd =>
+        rows.push({ type: 'withdraw', date: d, label: 'Cash Withdrawal', amount: num(wd.amount), runningCash })
       )
-      dailySalaryAdvances.filter(isAdvanceCash).forEach(a =>
+      rec.advances.filter(isPaidFromTill).forEach(a =>
         rows.push({
           type: 'staffAdvance',
           date: d,
           label: `Staff Advance${a.staffName ? ` — ${a.staffName}` : ''}`,
-          amount: N(a.amount),
+          amount: num(a.amount),
           runningCash
         })
       )
-      dailyStaffLoans.filter(isAdvanceCash).forEach(l =>
+      rec.staffLoans.filter(isPaidFromTill).forEach(l =>
         rows.push({
           type: 'staffLoan',
           date: d,
           label: `Staff Loan${l.staffName ? ` — ${l.staffName}` : ''}`,
-          amount: N(l.amount),
+          amount: num(l.amount),
           runningCash
         })
       )
-    })
+    }
 
-    const handInCash = runningCash
-    const bankBalance = runningBank
-    const totalBankedSales = tenderKeys.reduce(
-      (s, k) => s + (isBankedTender(k) ? N(periodTotals[k]) : 0),
-      0
-    )
-    // foodDeliveryTotal: for display in KPI card (all delivery, regardless of banked)
-    const foodDeliveryTotal = deliveryKeys.reduce((s, k) => s + N(periodTotals[k] ?? 0), 0)
-    // foodDeliveryUnbanked: only pending receivables not yet in bank (for netTotal)
-    const foodDeliveryUnbanked = deliveryKeys.reduce(
-      (s, k) => s + (isBankedTender(k) ? 0 : N(periodTotals[k] ?? 0)),
-      0
-    )
-    const netTotal = handInCash + bankBalance + foodDeliveryUnbanked
+    const handInCash = closing.cash
+    const bankBalance = closing.bank
 
     return {
       rows,
       kpis: {
-        totalSales: periodTotalSales,
+        totalSales: totals.totalSales,
         handInCash,
         bankBalance,
-        netTotal,
-        foodDelivery: foodDeliveryTotal,
-        totalCostFront,
-        totalCostBack,
-        totalCashSales: periodCashSales,
-        totalAdvances: periodAdvances,
-        totalLoanGiven: periodLoanGiven,
-        totalBankedSales,
-        periodDeposits,
-        periodWithdrawals,
+        // Grab/Foodpanda not yet paid out still belong to the business.
+        netTotal: handInCash + bankBalance + totals.deliveryUnbanked,
+        foodDelivery: totals.deliveryTotal,
+        totalCostFront: totals.costCash,
+        totalCostBack: totals.costBank,
+        totalCashSales: totals.cashSales,
+        totalAdvances: totals.advance,
+        totalLoanGiven: totals.loanGiven,
+        totalBankedSales: totals.bankedSales,
+        periodDeposits: totals.deposit,
+        periodWithdrawals: totals.withdrawal,
       },
-      periodTotals,
-      periodTotalSales,
-      periodDeposits,
-      periodWithdrawals,
+      periodTotals: totals.tenders,
+      periodTotalSales: totals.totalSales,
+      periodDeposits: totals.deposit,
+      periodWithdrawals: totals.withdrawal,
       periodRepaySums: {
-        cashIn: periodRepayCashIn,
-        cashOut: periodRepayCashOut,
-        bankIn: periodRepayBankIn,
-        bankOut: periodRepayBankOut
+        cashIn: totals.repayCashIn,
+        cashOut: totals.repayCashOut,
+        bankIn: totals.repayBankIn,
+        bankOut: totals.repayBankOut
       },
       tenderDefs
     }
-  }, [
-    sales,
-    costs,
-    advances,
-    deposits,
-    salaries,
-    withdrawals,
-    normalized,
-    dateRange,
-    tenderKeys,
-    deliveryKeys,
-    settings,
-    branches
-  ])
+  }, [ledger, tenderDefs, branches]) // `branches` feeds getBranchName in loan labels
 
   const filterBadgeText = makeFilterText(
     filterState.filterType,

@@ -5,8 +5,13 @@ import { db } from "@/lib/firebase";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import { format } from "date-fns";
 import { dayKey } from "./utils";
+import { buildLedger } from "@/lib/finance/ledger";
+import {
+  saleDay, costDay, advanceDay, depositDay, withdrawalDay, salaryDay, staffLoanDay,
+  isCashCost, isPaidFromTill, isMigratedStaffLoan,
+} from "@/lib/finance/rules";
 
-// ====== helpers (copy-kept in this file; if you prefer, extract to a shared helpers file) ======
+// ====== chart helpers (money rules live in lib/finance) ======
 const toDate = (ts) => {
   if (!ts) return null;
   if (typeof ts === "string") return new Date(ts);
@@ -64,69 +69,6 @@ const normalizeTenderDef = (key, cand = {}) => {
     includeInTotal: cand.includeInTotal !== false,
   };
 };
-const includedTenderKeys = (s) => {
-  if (Array.isArray(s?.tenderMeta) && s.tenderMeta.length) {
-    return s.tenderMeta
-      .filter((t) => t?.includeInTotal !== false)
-      .map((t) => t.key);
-  }
-  return Object.keys(s || {}).filter((k) => {
-    if (META_KEYS.has(k)) return false;
-    if (k === "promotion") return false;
-    const n = parseFloat(s[k]);
-    return Number.isFinite(n);
-  });
-};
-const saleTotalDynamic = (s) => {
-  const saved = parseFloat(s?.total);
-  if (Number.isFinite(saved)) return saved;
-  const cents = includedTenderKeys(s).reduce(
-    (sum, k) => sum + Math.round((parseFloat(s?.[k]) || 0) * 100),
-    0
-  );
-  return cents / 100;
-};
-const DEFAULT_BANKED_KEYS = new Set([
-  "card",
-  "qr",
-  "online",
-  "grab",
-  "foodpanda",
-]);
-const saleBankedAmount = (s) => {
-  if (Array.isArray(s?.tenderMeta) && s.tenderMeta.length) {
-    const keys = s.tenderMeta.filter((t) => t?.banked).map((t) => t.key);
-    return keys.reduce((sum, k) => sum + (parseFloat(s?.[k]) || 0), 0);
-  }
-  return Object.keys(s || {}).reduce((sum, k) => {
-    if (META_KEYS.has(k)) return sum;
-    if (DEFAULT_BANKED_KEYS.has(k)) return sum + (parseFloat(s[k]) || 0);
-    return sum;
-  }, 0);
-};
-const derivePaidFrom = (c) => {
-  if (c?.paidFromOffice === "front" || c?.paidFromOffice === "back")
-    return c.paidFromOffice;
-  if (c?.paidMethod && c.paidMethod !== "cash") return "back";
-  return "front";
-};
-const derivePaidMethod = (c) =>
-  c?.paidMethod ? c.paidMethod : derivePaidFrom(c) === "front" ? "cash" : "";
-
-/**
- * Returns true when a salary entry was paid in cash (front-office).
- * Mirrors the same helper in useBranchData / useSummaryReportLogic.
- * Priority: payMethod field (set by payroll run) → paidFromOffice legacy field.
- */
-const isSalaryCash = (s) => {
-  const m = String(s?.payMethod || "").toLowerCase();
-  if (m === "bank" || m === "bank_transfer" || m === "cheque") return false;
-  return String(s?.paidFromOffice || "front").toLowerCase() !== "back";
-};
-
-const isAdvanceCash = (a) =>
-  String(a?.paidFromOffice || "front").toLowerCase() !== "back";
-
 const tenderDefsFromSales = (fSales) => {
   const defs = new Map();
   for (const s of fSales) {
@@ -176,6 +118,8 @@ export default function useCompanyData(filter) {
   const [allStaffLoans, setAllStaffLoans] = useState([]);
   // Sum of each branch's configured opening cash float (from branch settings)
   const [totalOpeningCash, setTotalOpeningCash] = useState(0);
+  // Each branch's settings: payment types and opening balances for its ledger
+  const [settingsByBranch, setSettingsByBranch] = useState({});
 
   useEffect(() => {
     const raw = localStorage.getItem("user");
@@ -258,6 +202,9 @@ export default function useCompanyData(filter) {
       setLoanActivities(loanAll);
       setAllStaffLoans(staffLoansAll);
       setTotalOpeningCash(openingCashSum);
+      setSettingsByBranch(
+        Object.fromEntries(branchIds.map((bid, i) => [bid, settingsSnaps[i].exists() ? settingsSnaps[i].data() : null]))
+      );
       setLoading(false);
     }
     loadAll();
@@ -266,215 +213,121 @@ export default function useCompanyData(filter) {
     };
   }, [companyId]);
 
-  // Compare calendar days, not instants, like the branch hook and the
-  // summary report — a filter carrying the time of day must not drop part of
-  // its first or last day.
+  // Whole calendar days, like the branch dashboard and the summary report.
   const fromKey = format(filter.from, "yyyy-MM-dd");
   const toKey = format(filter.to, "yyyy-MM-dd");
-  const inRange = (d) => {
-    const k = dayKey(d);
-    return !!k && k >= fromKey && k <= toKey;
-  };
+  const inPeriod = (day) => !!day && day >= fromKey && day <= toKey;
 
-  // Cumulative filter: everything up to end of the selected period.
-  // Used for "balance" KPIs (cash on hand, bank expected) so they include
-  // pre-period history and match the branch reports page exactly.
-  const cutoff = toKey;
-  const upto = (d) => {
-    const k = dayKey(d);
-    return !!k && k <= cutoff;
-  };
-
-  // filter by date window
-  const fSales = useMemo(
-    () => sales.filter((s) => inRange(s.date)),
-    [sales, filter]
-  );
-  const fCosts = useMemo(
-    () => costs.filter((x) => inRange(x.date || x.createdAt)),
-    [costs, filter]
-  );
-  const fAdv = useMemo(
-    () => advances.filter((x) => inRange(x.date || x.createdAt)),
-    [advances, filter]
-  );
-  const fDep = useMemo(
-    () => deposits.filter((x) => inRange(x.date || x.createdAt)),
-    [deposits, filter]
-  );
-  const fWdr = useMemo(
-    () => withdrawals.filter((x) => inRange(x.date || x.createdAt)),
-    [withdrawals, filter]
-  );
-  const fSal = useMemo(
-    () => salaries.filter((x) => inRange(x.date || x.createdAt)),
-    [salaries, filter]
-  );
+  // ── the period's records, all branches (charts and lists) ──
+  const fSales = useMemo(() => sales.filter((s) => inPeriod(saleDay(s))), [sales, fromKey, toKey]);
+  const fCosts = useMemo(() => costs.filter((x) => inPeriod(costDay(x))), [costs, fromKey, toKey]);
+  const fAdv = useMemo(() => advances.filter((x) => inPeriod(advanceDay(x))), [advances, fromKey, toKey]);
+  const fDep = useMemo(() => deposits.filter((x) => inPeriod(depositDay(x))), [deposits, fromKey, toKey]);
+  const fWdr = useMemo(() => withdrawals.filter((x) => inPeriod(withdrawalDay(x))), [withdrawals, fromKey, toKey]);
+  const fSal = useMemo(() => salaries.filter((x) => inPeriod(salaryDay(x))), [salaries, fromKey, toKey]);
   const fLoan = useMemo(
-    () => loanActivities.filter((x) => inRange(x.date || x.createdAt)),
-    [loanActivities, filter]
+    () => loanActivities.filter((x) => inPeriod(dayKey(x.date || x.createdAt))),
+    [loanActivities, fromKey, toKey]
   );
-
-  // Staff loans: only cash-disbursed (front office), non-migration, approved/closed, in period
+  // Staff loans paid out of a till in this period.
   const fStaffLoans = useMemo(
-    () =>
-      allStaffLoans.filter((x) => {
-        if (!inRange(x.date || x.createdAt)) return false;
-        const src    = String(x?.source || "").toLowerCase();
-        const paid   = String(x?.paidFromOffice || "front").toLowerCase();
-        const status = String(x?.status || "").toLowerCase();
-        return src !== "migration" && paid !== "back" && (status === "approved" || status === "closed");
-      }),
-    [allStaffLoans, filter]
+    () => allStaffLoans.filter((x) => inPeriod(staffLoanDay(x)) && !isMigratedStaffLoan(x) && isPaidFromTill(x)),
+    [allStaffLoans, fromKey, toKey]
   );
 
-  // totals (company-wide)
+  // ── money: one ledger per branch from the shared finance engine ──
+  // The company figures are the sum of the branch ledgers, so they always
+  // equal the branch reports added up. Loans between branches cancel out.
+  const ledgers = useMemo(() => {
+    const ofBranch = (list, bid) => list.filter((x) => x.branchId === bid);
+    // Same loans the branch reports use (approved only).
+    const approvedLoans = loanActivities.filter((l) => l.status === "approved");
+    return Object.keys(settingsByBranch).map((bid) =>
+      buildLedger({
+        branchId: bid,
+        settings: settingsByBranch[bid],
+        records: {
+          sales: ofBranch(sales, bid),
+          costs: ofBranch(costs, bid),
+          advances: ofBranch(advances, bid),
+          staffLoans: ofBranch(allStaffLoans, bid),
+          deposits: ofBranch(deposits, bid),
+          salaries: ofBranch(salaries, bid),
+          withdrawals: ofBranch(withdrawals, bid),
+          loanActivities: approvedLoans,
+        },
+        from: fromKey,
+        to: toKey,
+      })
+    );
+  }, [settingsByBranch, sales, costs, advances, allStaffLoans, deposits, salaries, withdrawals, loanActivities, fromKey, toKey]);
+
+  // What one sale adds to total sales and to the bank, by its branch's rules.
+  const { saleTotal, bankedOfSale } = useMemo(() => {
+    const configs = Object.fromEntries(ledgers.map((l) => [l.branchId, l.tenders]));
+    const sum = (s, pick) => {
+      const t = configs[s.branchId];
+      return t ? t.keys.reduce((a, k) => a + (pick(t, k) ? num(s[k]) : 0), 0) : 0;
+    };
+    return {
+      saleTotal: (s) => sum(s, (t, k) => t.countsInTotal(k)),
+      bankedOfSale: (s) => sum(s, (t, k) => t.isBanked(k)),
+    };
+  }, [ledgers]);
+
   const totals = useMemo(() => {
-    const totalCash = fSales.reduce((s, x) => s + num(x.cash), 0);
-    const totalCard = fSales.reduce((s, x) => s + num(x.card), 0);
-    const totalQR = fSales.reduce((s, x) => s + num(x.qr), 0);
-    const totalOnline = fSales.reduce((s, x) => s + num(x.online), 0);
-
-    const bankedSales = fSales.reduce((sum, s) => sum + saleBankedAmount(s), 0);
-    const totalWdr = fWdr.reduce((s, x) => s + num(x.amount), 0);
-    const totalDep = fDep.reduce((s, x) => s + num(x.amount), 0);
-
-    let totalCostsFront = 0,
-      totalCostsBack = 0;
-    let backCard = 0,
-      backQR = 0,
-      backOnline = 0,
-      backBank = 0;
-
+    const sumOf = (k) => ledgers.reduce((s, l) => s + l.totals[k], 0);
+    let backCard = 0, backQR = 0, backOnline = 0, backBank = 0;
     fCosts.forEach((c) => {
+      if (isCashCost(c)) return;
       const amt = num(c.amount);
-      const from = derivePaidFrom(c);
-      const method = derivePaidMethod(c);
-      if (from === "front") totalCostsFront += amt;
-      else {
-        totalCostsBack += amt;
-        if (method === "card") backCard += amt;
-        else if (method === "qr") backQR += amt;
-        else if (method === "online") backOnline += amt;
-        else if (method === "bank_transfer") backBank += amt;
-      }
+      const method = c.paidMethod || "";
+      if (method === "card") backCard += amt;
+      else if (method === "qr") backQR += amt;
+      else if (method === "online") backOnline += amt;
+      else if (method === "bank_transfer") backBank += amt;
     });
-
-    const totalCosts = totalCostsFront + totalCostsBack;
-    const totalAdv = fAdv.reduce((s, x) => s + num(x.amount), 0);
-    const totalAdvCash = fAdv.filter(isAdvanceCash).reduce((s, x) => s + num(x.amount), 0);
-    const totalSal = fSal.reduce((s, x) => s + num(x.amount), 0);
-
-    // Split salaries into cash-paid vs bank-paid so each goes to the right pool.
-    // totalSal is kept as the grand total for the KPI display card.
-    const totalSalCash = fSal.filter(isSalaryCash).reduce((s, x) => s + num(x.amount), 0);
-    const totalSalBank = totalSal - totalSalCash;
-
-    // Staff loans paid in cash (from register) — reduces cash on hand.
-    const totalStaffLoanCash = fStaffLoans.reduce((s, x) => s + num(x.amount), 0);
-
-    // Bank side: banked receipts + deposits minus withdrawals, back-office costs and bank salaries.
-    const effectiveBankedAfterWithdrawals =
-      bankedSales + totalDep - totalWdr - totalCostsBack - totalSalBank;
-
-    // Cash side: sum of branch opening floats + cash in − cash out during the period.
-    const estCashOnHand =
-      totalOpeningCash +
-      totalCash + totalWdr - totalDep -
-      totalCostsFront - totalSalCash - totalAdvCash - totalStaffLoanCash;
-
-    const totalSales = fSales.reduce((s, x) => s + saleTotalDynamic(x), 0);
-
+    const totalCash = sumOf("cashSales");
+    const totalSalCash = sumOf("salaryCash");
+    const totalSalBank = sumOf("salaryBank");
     return {
       totalCash,
-      totalCard,
-      totalQR,
-      totalOnline,
-      bankedSales,
-      totalWdr,
-      totalDep,
-      totalCosts,
-      totalCostsFront,
-      totalCostsBack,
+      totalCard: fSales.reduce((s, x) => s + num(x.card), 0),
+      totalQR: fSales.reduce((s, x) => s + num(x.qr), 0),
+      totalOnline: fSales.reduce((s, x) => s + num(x.online), 0),
+      bankedSales: sumOf("bankedSales"),
+      totalWdr: sumOf("withdrawal"),
+      totalDep: sumOf("deposit"),
+      totalCosts: sumOf("costCash") + sumOf("costBank"),
+      totalCostsFront: sumOf("costCash"),
+      totalCostsBack: sumOf("costBank"),
       backCard,
       backQR,
       backOnline,
       backBank,
-      totalAdv,
-      totalSal,
+      totalAdv: sumOf("advance") + sumOf("advanceBank"),
+      totalSal: totalSalCash + totalSalBank,
       totalSalCash,
       totalSalBank,
-      totalStaffLoanCash,
-      // period-range values (kept for chart / period KPI use)
-      periodEstCashOnHand: estCashOnHand,
-      periodEffectiveBanked: effectiveBankedAfterWithdrawals,
-      totalSales,
+      totalStaffLoanCash: sumOf("staffLoanGiven"),
+      // Opening floats + this period's cash flow (not a balance — see estCashOnHand).
+      periodEstCashOnHand:
+        totalOpeningCash + totalCash + sumOf("withdrawal") - sumOf("deposit") - sumOf("costCash") -
+        totalSalCash - sumOf("advance") - sumOf("staffLoanGiven"),
+      periodEffectiveBanked:
+        sumOf("bankedSales") + sumOf("deposit") - sumOf("withdrawal") - sumOf("costBank") - totalSalBank,
+      totalSales: sumOf("totalSales"),
     };
-  }, [fSales, fWdr, fDep, fCosts, fAdv, fSal, fStaffLoans, totalOpeningCash]);
+  }, [ledgers, fCosts, fSales, totalOpeningCash]);
 
-  // ─────────────────────────────────────────────────────────────────────
-  // Cumulative balances (all history up to filter.to) — mirrors the
-  // branch reports page so company-wide totals match sum of branch reports.
-  // ─────────────────────────────────────────────────────────────────────
-  const cumulative = useMemo(() => {
-    const sumCash = sales
-      .filter((s) => upto(s.date))
-      .reduce((s, x) => s + num(x.cash), 0);
-
-    const sumBanked = sales
-      .filter((s) => upto(s.date))
-      .reduce((sum, s) => sum + saleBankedAmount(s), 0);
-
-    const sumWdr = withdrawals
-      .filter((x) => upto(x.date || x.createdAt))
-      .reduce((s, x) => s + num(x.amount), 0);
-
-    const sumDep = deposits
-      .filter((x) => upto(x.date || x.createdAt))
-      .reduce((s, x) => s + num(x.amount), 0);
-
-    let sumCostsFront = 0;
-    let sumCostsBack  = 0;
-    costs
-      .filter((c) => upto(c.date || c.createdAt))
-      .forEach((c) => {
-        const amt = num(c.amount);
-        if (derivePaidFrom(c) === "front") sumCostsFront += amt;
-        else sumCostsBack += amt;
-      });
-
-    const allSal = salaries.filter((x) => upto(x.date || x.createdAt));
-    const sumSalCash = allSal.filter(isSalaryCash).reduce((s, x) => s + num(x.amount), 0);
-    const sumSalBank = allSal.filter((s) => !isSalaryCash(s)).reduce((s, x) => s + num(x.amount), 0);
-
-    const allAdv = advances.filter((x) => upto(x.date || x.createdAt));
-    const sumAdvCash = allAdv.filter(isAdvanceCash).reduce((s, x) => s + num(x.amount), 0);
-
-    const sumStaffLoanCash = allStaffLoans
-      .filter((x) => {
-        if (!upto(x.date || x.createdAt)) return false;
-        const src    = String(x?.source || "").toLowerCase();
-        const paid   = String(x?.paidFromOffice || "front").toLowerCase();
-        const status = String(x?.status || "").toLowerCase();
-        return src !== "migration" && paid !== "back" && (status === "approved" || status === "closed");
-      })
-      .reduce((s, x) => s + num(x.amount), 0);
-
-    // Cash on hand: branch opening floats + all cash movements up to end of period.
-    const estCashOnHand =
-      totalOpeningCash +
-      sumCash + sumWdr - sumDep -
-      sumCostsFront - sumSalCash - sumAdvCash - sumStaffLoanCash;
-
-    // Bank expected: banked receipts + deposits − withdrawals − back costs − bank salaries, all cumulative.
-    const effectiveBankedAfterWithdrawals =
-      sumBanked + sumDep - sumWdr - sumCostsBack - sumSalBank;
-
-    return { estCashOnHand, effectiveBankedAfterWithdrawals };
-  }, [
-    sales, costs, deposits, withdrawals, salaries, advances, allStaffLoans,
-    totalOpeningCash, cutoff,
-  ]);
+  // Balances at the end of the period: every branch's closing cash and bank.
+  const cumulative = useMemo(
+    () => ({
+      estCashOnHand: ledgers.reduce((s, l) => s + l.closing.cash, 0),
+      effectiveBankedAfterWithdrawals: ledgers.reduce((s, l) => s + l.closing.bank, 0),
+    }),
+    [ledgers]
+  );
 
   // charts (company-wide) — same shape as your branch hook
   const salesTrend = useMemo(() => {
@@ -482,11 +335,11 @@ export default function useCompanyData(filter) {
     fSales.forEach((s) => {
       const k = byDateKey(s.date);
       const prev = map.get(k) || { date: k, total: 0 };
-      prev.total += saleTotalDynamic(s);
+      prev.total += saleTotal(s);
       map.set(k, prev);
     });
     return sortByDateKey([...map.values()]);
-  }, [fSales]);
+  }, [fSales, saleTotal]);
 
   const { tenderKeys, tenderLabelsByKey } = useMemo(
     () => tenderDefsFromSales(fSales),
@@ -523,7 +376,7 @@ export default function useCompanyData(filter) {
         costs_front: 0,
         costs_back: 0,
       };
-      prev.sales += saleTotalDynamic(s);
+      prev.sales += saleTotal(s);
       map.set(k, prev);
     });
     fCosts.forEach((c) => {
@@ -534,7 +387,7 @@ export default function useCompanyData(filter) {
         costs_front: 0,
         costs_back: 0,
       };
-      const from = derivePaidFrom(c);
+      const from = isCashCost(c) ? "front" : "back";
       const amt = num(c.amount);
       if (from === "front") prev.costs_front += amt;
       else prev.costs_back += amt;
@@ -546,14 +399,14 @@ export default function useCompanyData(filter) {
         costs_total: row.costs_front + row.costs_back,
       }))
     );
-  }, [fSales, fCosts]);
+  }, [fSales, fCosts, saleTotal]);
 
   const bankedVsWdr = useMemo(() => {
     const map = new Map();
     fSales.forEach((s) => {
       const k = byDateKey(s.date);
       const prev = map.get(k) || { date: k, bankedSales: 0, withdrawals: 0 };
-      prev.bankedSales += saleBankedAmount(s);
+      prev.bankedSales += bankedOfSale(s);
       map.set(k, prev);
     });
     fWdr.forEach((w) => {
@@ -563,7 +416,7 @@ export default function useCompanyData(filter) {
       map.set(k, prev);
     });
     return sortByDateKey([...map.values()]);
-  }, [fSales, fWdr]);
+  }, [fSales, fWdr, bankedOfSale]);
 
   const cashVsCost = useMemo(() => {
     const map = new Map();
@@ -576,7 +429,7 @@ export default function useCompanyData(filter) {
     fCosts.forEach((c) => {
       const k = byDateKey(c.date || c.createdAt);
       const prev = map.get(k) || { date: k, cashSales: 0, cashCosts: 0 };
-      if (derivePaidFrom(c) === "front") prev.cashCosts += num(c.amount);
+      if (isCashCost(c)) prev.cashCosts += num(c.amount);
       map.set(k, prev);
     });
     return sortByDateKey([...map.values()]);
@@ -616,7 +469,7 @@ export default function useCompanyData(filter) {
     fSales
       .slice(-50)
       .forEach((x) =>
-        rows.push({ type: "Sale", date: x.date, amount: saleTotalDynamic(x) })
+        rows.push({ type: "Sale", date: x.date, amount: saleTotal(x) })
       );
     fCosts.slice(-50).forEach((x) =>
       rows.push({
@@ -672,7 +525,7 @@ export default function useCompanyData(filter) {
       .filter((r) => !Number.isNaN(r.ts))
       .sort((a, b) => b.ts - a.ts)
       .slice(0, 15);
-  }, [fSales, fCosts, fDep, fWdr, fSal, fAdv, fLoan]);
+  }, [fSales, fCosts, fDep, fWdr, fSal, fAdv, fStaffLoans, fLoan, saleTotal]);
   // --- build a quick map for branch names (after you fetched branches) ---
   /* if you already have branches loaded in this hook, keep them;
    otherwise, you can pass a branches prop or fetch similarly to sales */
@@ -715,14 +568,14 @@ export default function useCompanyData(filter) {
     // sales
     fSales.forEach((s) => {
       const r = ensure(s.branchId);
-      r.sales += saleTotalDynamic(s);
+      r.sales += saleTotal(s);
     });
 
     // costs split
     fCosts.forEach((c) => {
       const r = ensure(c.branchId);
       const amt = num(c.amount);
-      const from = derivePaidFrom(c);
+      const from = isCashCost(c) ? "front" : "back";
       if (from === "front") {
         r.frontCosts += amt;
       } else {
@@ -761,7 +614,7 @@ export default function useCompanyData(filter) {
     // sort best → worst by net
     rows.sort((a, b) => b.net - a.net);
     return rows;
-  }, [fSales, fCosts, fSal, fAdv, fDep, fWdr, branchesList]);
+  }, [fSales, fCosts, fSal, fAdv, fStaffLoans, fDep, fWdr, branchesList, saleTotal]);
 
   // --- PER-BRANCH LOAN BALANCE (net owed vs owed-to) ---
   // Positive = others owe this branch (net lender)
