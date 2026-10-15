@@ -1,5 +1,6 @@
 'use client'
 import React, { useEffect, useState, useMemo } from 'react'
+import { useDefaultDate } from '@/app/hooks/useRegion'
 import { db, storage } from '@/lib/firebase'
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
@@ -35,7 +36,7 @@ const BACK_OFFICE_METHODS = [
 
 export default function CostEntryPage () {
   const currency = useCurrency()
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [date, setDate] = useDefaultDate() // today on the branch's clock
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState('')
   const [customCategory, setCustomCategory] = useState('') // shown if "Other"

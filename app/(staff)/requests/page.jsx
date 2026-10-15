@@ -1,4 +1,5 @@
 "use client";
+import { businessToday } from "@/lib/region";
 import React, { useState, useEffect } from "react";
 import { useAddAdvanceEntryMutation, useGetAdvanceEntriesQuery } from "@/lib/redux/api/AdvanceApiSlice";
 import { useAddNotificationMutation } from "@/lib/redux/api/notificationApiSlice";
@@ -61,7 +62,7 @@ export default function RequestsPage() {
           reason: form.reason,
           advanceType: form.advanceType,
           status: "pending",
-          date: new Date().toISOString().split("T")[0],
+          date: businessToday(), // on the branch's clock
           repaymentInstallments: 1,
           createdBy: { uid: user.uid, name: user.firstName || "Staff" },
         }

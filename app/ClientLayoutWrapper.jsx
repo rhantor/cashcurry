@@ -9,6 +9,7 @@ import { auth } from "@/lib/firebase";
 import ProviderWrapper from "@/lib/redux/store/Provider";
 import Sidebar from "./components/menu/Sidebar";
 import AutoAskAfterLogin from "@/app/components/notifications/AutoAskAfterLogin";
+import RegionSync from "@/app/components/region/RegionSync";
 import { registerFcm } from "@/lib/notifications/registerFcm"; // real push
 
 export default function ClientLayoutWrapper({ children }) {
@@ -99,6 +100,9 @@ export default function ClientLayoutWrapper({ children }) {
 
   return (
     <ProviderWrapper>
+      {/* Active branch's time zone, day cut-off and currency, for every screen */}
+      {isLoggedIn && !isAuthPage && <RegionSync />}
+
       {/* Ask permission + show personalized welcome once per session after login */}
       {isLoggedIn && !isAuthPage && (
         <React.Suspense fallback={null}>

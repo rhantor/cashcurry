@@ -43,7 +43,7 @@ Nothing here changes what users see. It lets us change things without fear.
 |---|------|--------|
 | 1.1 | Fix "Last 7 / Last 30 Days" dropping the first day from dashboard cash on hand; date label and pickers showed the day before (UTC) | ✅ |
 | 1.2 | **One finance engine** (`lib/finance/`) used by the summary report and both dashboards — replaces the three copies | ✅ |
-| 1.3 | **Time zone, currency and business day per company/branch** (Malaysia = Asia/Kuala_Lumpur, RM; Bangladesh = Asia/Dhaka, ৳). Optional day cut-off for restaurants that close after midnight. Replaces every UTC "today" | ⬜ |
+| 1.3 | **Time zone, currency and business day per company/branch** (Malaysia = Asia/Kuala_Lumpur, RM; Bangladesh = Asia/Dhaka, ৳). Optional day cut-off for restaurants that close after midnight. Replaces every UTC "today" | ✅ |
 | 1.4 | **Money request lifecycle**: requested → approved / rejected → **paid** (who paid, when, from front cash or bank). Only *paid* moves cash; payroll deducts only paid. Manager entering directly = approve + pay in one step (today's workflow keeps working). Existing records count as paid on their date, so today's numbers stay the same | ⬜ |
 | 1.5 | ~~Promotion in Total Sales~~ — **decided: keep as is.** Promotion is free food served after an order and the owners want it counted; each branch's "include in total" setting stays in control | ✅ |
 
@@ -53,7 +53,11 @@ Nothing here changes what users see. It lets us change things without fear.
   Also fixed: the cash books read only the newest 100 loan records; the company dashboard
   dated salaries by entry time. One figure changed on purpose — see "Open decisions"
   (banked sales follow the branch settings).
-- **1.3 How you check:** settings page has time zone / currency / day cut-off; a sale entered at 1am lands on the right business day.
+- **1.3 How you check:** Branch Settings → General → "Region & business day" shows the branch's
+  clock, the date new entries default to, and how money is written; with "Day ends at 05:00",
+  a sale form opened at 1:30am defaults to the previous day. Settings live in existing fields
+  (`attendance.dayCutoffTime` is the same cut-off the POS uses); a branch with no cut-off
+  stays on midnight. The company dashboard warns when branches use different currencies.
 - **1.4 How you check:** a rejected advance does not change hand-in-cash; an approved one changes it only after "Mark paid".
 
 ## Phase 2 — Speed and security foundation
@@ -122,6 +126,10 @@ rehearsed on the local copy first.
       42 of them collapsed in the Sep 2026 backup). Export the id separately.
 - [ ] Back up production with the fixed script, and test-restore it locally
 - [ ] Data fix: mark existing advances / staff loans as paid on their date (1.4)
+- [ ] Branch settings: set each branch's time zone (Asia/Kuala_Lumpur) and confirm its
+      "day ends at" — Lazeez BB and Lazeez Bistro have 05:00; the two Eggcellence branches have
+      none (midnight). Note: until now every form defaulted to the UTC date, which in Malaysia
+      behaved like an 08:00 cut-off.
 - [ ] Deploy new database rules and Cloud Functions
 - [ ] Merge `dev` into `main` and push (Vercel deploys the web app)
 - [ ] Re-run the golden check against production numbers
@@ -130,6 +138,8 @@ rehearsed on the local copy first.
 
 | Decision | Needed before |
 |---|---|
+| Do the Eggcellence branches trade past midnight? (sets their "day ends at") | release |
+| A company with branches in two countries: one company per country, or company dashboard per currency? (today it warns) | 5.x |
 | Banked sales: follow the branch settings (now, as the summary report always did) or the flag saved on each sale? Only Eggcellence BB Jan 2026 differs (RM 70) | any time — one line in `lib/finance` |
 | Staff app technology and login method | 4.0 |
 | Separate staging Firebase project (recommended before Phase 4) | 4.x deploys |

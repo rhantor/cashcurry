@@ -98,7 +98,10 @@ export default function useBranchSettingsForm() {
     const attendance = settings.attendance || {
       payPeriodStart: 1,
       startDayOfWeek: "Monday",
-      dayCutoffTime: "05:00",
+      // No cut-off was ever set, which everything reads as midnight. Don't
+      // invent one here: saving any other setting would silently move the
+      // branch's business day (sales, costs, attendance, POS).
+      dayCutoffTime: "",
       duplicatePunchInterval: 5,
       maxWorkHoursPerDay: 16,
       hoursFormat: "decimal",

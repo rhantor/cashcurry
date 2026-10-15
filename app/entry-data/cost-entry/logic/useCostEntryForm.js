@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import imageCompression from 'browser-image-compression'
+import { useDefaultDate } from '@/app/hooks/useRegion'
 
 export function useCostEntryForm () {
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0])
+  const [date, setDate] = useDefaultDate() // today on the branch's clock
   const [amount, setAmount] = useState('')
   const [category, setCategory] = useState('')
   const [customCategory, setCustomCategory] = useState('')

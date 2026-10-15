@@ -10,4 +10,5 @@ export const BASIC_SETTINGS_FIELDS = [
   "openHours",
   "companyName",
   "companyRegistration",
+  "timeZone", // branch clock for business days (Region & business day)
 ];

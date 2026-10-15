@@ -1,4 +1,5 @@
 // /utils/payVendorBills.js
+import { businessToday } from "@/lib/region";
 import { db } from "@/lib/firebase";
 import {
   collection,
@@ -51,7 +52,7 @@ export async function payVendorBills({
   }
 
   const now = serverTimestamp();
-  const paymentDateStr = paymentDate || new Date().toISOString().slice(0, 10);
+  const paymentDateStr = paymentDate || businessToday();
   const batch = writeBatch(db);
 
   // --- 1) Create a vendor payment "header" (optional; useful for audit) ---

@@ -1,5 +1,6 @@
 /* eslint-disable react/prop-types */
 "use client";
+import { businessToday } from "@/lib/region";
 import React, { useMemo, useEffect, useState } from "react";
 import { formatMoney } from "@/utils/formatMoney";
 import useCurrency from "@/app/hooks/useCurrency";
@@ -18,7 +19,7 @@ export default function PayBillsModal({
   const [method, setMethod] = useState("cash");
   const [note, setNote] = useState("");
   const [file, setFile] = useState(null);
-  const [paymentDate, setPaymentDate] = useState(() => new Date().toISOString().slice(0, 10));
+  const [paymentDate, setPaymentDate] = useState(() => businessToday());
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
@@ -30,7 +31,7 @@ export default function PayBillsModal({
       setMethod("cash");
       setNote("");
       setFile(null);
-      setPaymentDate(new Date().toISOString().slice(0, 10));
+      setPaymentDate(businessToday());
     }
   }, [open, bills]);
 
@@ -276,7 +277,7 @@ export default function PayBillsModal({
                   className="mt-1.5 w-full border border-gray-200 rounded-xl p-2.5 text-sm font-medium text-gray-700 bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-400 transition-all"
                   value={paymentDate}
                   onChange={(e) => setPaymentDate(e.target.value)}
-                  max={new Date().toISOString().slice(0, 10)}
+                  max={businessToday()}
                   required
                 />
               </div>

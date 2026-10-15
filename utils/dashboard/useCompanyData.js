@@ -6,6 +6,7 @@ import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import { format } from "date-fns";
 import { dayKey } from "./utils";
 import { buildLedger } from "@/lib/finance/ledger";
+import { currencyInfo } from "@/lib/region";
 import {
   saleDay, costDay, advanceDay, depositDay, withdrawalDay, salaryDay, staffLoanDay,
   isCashCost, isPaidFromTill, isMigratedStaffLoan,
@@ -319,6 +320,11 @@ export default function useCompanyData(filter) {
       totalSales: sumOf("totalSales"),
     };
   }, [ledgers, fCosts, fSales, totalOpeningCash]);
+
+  const currencies = useMemo(
+    () => [...new Set(Object.values(settingsByBranch).map((s) => currencyInfo(s?.financeSales?.currency).code))],
+    [settingsByBranch]
+  );
 
   // Balances at the end of the period: every branch's closing cash and bank.
   const cumulative = useMemo(
@@ -723,5 +729,7 @@ export default function useCompanyData(filter) {
     branchPerf, // array of {name, branchId, sales, costs, frontCosts, backCosts, salaries, advances, net, opMarginPct}
     branchLoanBalances, // array of {name, branchId, net}
     branchesList,
+    // Currency codes the branches use; more than one means company totals mix them.
+    currencies,
   };
 }

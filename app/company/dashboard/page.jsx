@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import useCompanyData from "@/utils/dashboard/useCompanyData";
 import Filters from "@/app/components/dashboard/Filters";
 import { presetFilter } from "@/utils/dashboard/dateFilters";
+import { businessToday } from "@/lib/region";
 import KPICard from "@/app/components/dashboard/KPICard";
 import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/utils/formatMoney";
@@ -14,10 +15,9 @@ import BranchPerformanceBar from "@/app/components/dashboard/charts/BranchPerfor
 import BranchLeaderboard from "@/app/components/dashboard/BranchLeaderboard";
 
 export default function OwnerDashboardPage() {
-  const [filter, setFilter] = useState(() => presetFilter("month"));
+  const [filter, setFilter] = useState(() => presetFilter("month", new Date(), businessToday()));
 
-  const currency = useCurrency();
-  const fmt = (v) => formatMoney(v, currency);
+  const activeBranchCurrency = useCurrency();
 
   const {
     loading,
@@ -48,7 +48,14 @@ export default function OwnerDashboardPage() {
     branchPerf,
     fSales,
     branchesList,
+    currencies,
   } = useCompanyData(filter);
+
+  // Company totals are written in the branches' currency; when branches use
+  // different currencies the totals add them together, so say so (below).
+  const mixedCurrencies = currencies.length > 1;
+  const currency = currencies.length === 1 ? currencies[0] : activeBranchCurrency;
+  const fmt = (v) => formatMoney(v, currency);
 
   const expensePie = [
     { 
@@ -95,6 +102,13 @@ export default function OwnerDashboardPage() {
           </div>
           <Filters filter={filter} setFilter={setFilter} />
         </div>
+
+        {mixedCurrencies && (
+          <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            <b>Branches use different currencies ({currencies.join(", ")}).</b> Company totals on this page add
+            them together and are not meaningful. Use each branch&apos;s own dashboard and reports.
+          </div>
+        )}
 
         {/* Section 1: The Bottom Line */}
         <div>

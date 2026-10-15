@@ -1,6 +1,7 @@
 /* eslint-disable react/prop-types */
 "use client";
 
+import { dayKey } from "@/lib/finance/rules";
 import React, { useEffect, useMemo, useState } from "react";
 import imageCompression from "browser-image-compression";
 import { format } from "date-fns";
@@ -104,8 +105,7 @@ export default function SalesEditModal({
   // Local state (date, form, notes) must include *all* tender keys
   const initialDate = useMemo(() => {
     try {
-      const d = new Date(item.date);
-      return !isNaN(d) ? d.toISOString().slice(0, 10) : item.date;
+      return dayKey(item.date) || item.date;
     } catch {
       return item.date;
     }

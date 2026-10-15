@@ -1,4 +1,5 @@
 "use client";
+import { businessToday } from "@/lib/region";
 import React, { useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { skipToken } from "@reduxjs/toolkit/query";
@@ -75,7 +76,7 @@ const sumLines = (rows = [], qtyKey, priceKey) =>
   rows.reduce((acc, row) => acc + lineTotal(row, qtyKey, priceKey), 0);
 
 const money = (n) => Number(n || 0).toFixed(2);
-const todayISO = () => new Date().toISOString().split("T")[0];
+const todayISO = () => businessToday(); // on the branch's clock
 
 export default function PurchaseOrdersPage() {
   const { ready, companyId, branchId, user } = useResolvedCompanyBranch();

@@ -89,10 +89,10 @@ export default function buildPurchaseReportPdf({
 
   /* -------------------------------- summary -------------------------------- */
   const tiles = [
-    ["Total spend", formatMoney(totals.spend, currency)],
+    ["Total spend", formatMoney(totals.spend, currency, { plain: true })],
     ["Products bought", String(totals.itemCount ?? items.length)],
     ["Deliveries received", String(totals.orderCount ?? 0)],
-    ["Average per delivery", formatMoney(totals.avgOrderValue, currency)],
+    ["Average per delivery", formatMoney(totals.avgOrderValue, currency, { plain: true })],
   ];
 
   const tileW = (RIGHT - MARGIN - 3 * 3) / 4;
@@ -120,8 +120,8 @@ export default function buildPurchaseReportPdf({
     r.name,
     r.category,
     `${r.qty} ${r.unit}`,
-    formatMoney(r.spend, currency),
-    formatMoney(r.avgPrice, currency),
+    formatMoney(r.spend, currency, { plain: true }),
+    formatMoney(r.avgPrice, currency, { plain: true }),
     r.minPrice === r.maxPrice ? "—" : `${Number(r.minPrice).toFixed(2)} – ${Number(r.maxPrice).toFixed(2)}`,
     String(r.orders),
     localDate(r.lastDate),
@@ -133,7 +133,7 @@ export default function buildPurchaseReportPdf({
     head: [["#", "Item", "Category", "Quantity", "Spend", "Avg price", "Price range", "Times", "Last bought", "Supplier"]],
     body,
     foot: [[
-      "", "Total", "", String(totals.qty ?? ""), formatMoney(totals.spend, currency), "", "", "", "", "",
+      "", "Total", "", String(totals.qty ?? ""), formatMoney(totals.spend, currency, { plain: true }), "", "", "", "", "",
     ]],
     theme: "striped",
     margin: { left: MARGIN, right: MARGIN, bottom: 16 },

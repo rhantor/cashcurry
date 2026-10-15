@@ -1,4 +1,5 @@
 "use client";
+import { businessToday } from "@/lib/region";
 import React, { useState, useMemo } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -45,7 +46,7 @@ export default function VendorUnpaidBills({ companyId, branchId, vendorId }) {
   );
 
   const bills = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = businessToday();
     return [...unpaidRaw, ...partialRaw]
       .map(b => ({
         ...b,

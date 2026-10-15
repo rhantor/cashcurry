@@ -95,7 +95,7 @@ export default function AttendanceSettingsSection({ role, companyId, branchId, v
 
               <SectionCard title="Punch Rules" subtitle="Logic for validating and processing punches.">
                 <div className="space-y-4 mt-4">
-                  <FieldRow label="Day Cutoff Time" hint="Shifts after this roll to next day (e.g. 05:00)">
+                  <FieldRow label="Day Cutoff Time" hint="When the business day ends (e.g. 05:00) — also used for sales, costs and the POS">
                     <TextField
                       type="time"
                       value={v.dayCutoffTime}

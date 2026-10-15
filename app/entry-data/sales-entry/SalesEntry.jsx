@@ -10,6 +10,7 @@ import {
 } from "@/lib/redux/api/salesApiSlice";
 import { collection, getDocs, query, where } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
+import { useDefaultDate } from "@/app/hooks/useRegion";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
 import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
@@ -25,8 +26,8 @@ import SalesForm from "./SalesForm";
 import SalesTable from "./SalesTable";
 
 export default function SalesEntry() {
-  const today = new Date().toISOString().split("T")[0];
-  const [date, setDate] = useState(today);
+  // Defaults to today on the branch's clock, after its day cut-off.
+  const [date, setDate, today] = useDefaultDate();
   const [companyId, setCompanyId] = useState(null);
   const [branchId, setBranchId] = useState(null);
   const [userRole, setUserRole] = useState(null);

@@ -1,6 +1,7 @@
 /* eslint-disable react/prop-types */
 'use client'
 import React, { useEffect, useRef, useState } from 'react'
+import { useBusinessToday } from '@/app/hooks/useRegion'
 import { NumericFormat } from 'react-number-format'
 import {
   useAddAdvanceEntryMutation,
@@ -168,10 +169,16 @@ const getDeductionMonth = fromDateStr => {
 // ─── ADVANCE FORM ─────────────────────────────────────────────────────────────
 
 const AdvanceForm = ({ staffList, staffLoading, companyId, branchId, isAdminOrManager }) => {
-  const today = new Date().toISOString().split('T')[0]
+  const today = useBusinessToday() // on the branch's clock, after its day cut-off
 
   const [staffId, setStaffId] = useState('')
   const [form, setForm] = useState({ amount: '', advanceType: 'salary', reason: '', date: today, deductionMonth: getDeductionMonth(today).value, paidFromOffice: 'front', approvalNotes: '' })
+  // Keep the default date on today (e.g. once the branch's settings load) until the user changes it.
+  const shownToday = useRef(today)
+  useEffect(() => {
+    setForm(f => (f.date === shownToday.current ? { ...f, date: today, deductionMonth: getDeductionMonth(today).value } : f))
+    shownToday.current = today
+  }, [today])
   const [successMsg, setSuccessMsg] = useState('')
 
   const [addAdvanceEntry, { isLoading, isError, error }] = useAddAdvanceEntryMutation()
@@ -340,12 +347,18 @@ const AdvanceForm = ({ staffList, staffLoading, companyId, branchId, isAdminOrMa
 // ─── LOAN FORM ────────────────────────────────────────────────────────────────
 
 const LoanForm = ({ staffList, staffLoading, companyId, branchId, isAdminOrManager }) => {
-  const today = new Date().toISOString().split('T')[0]
+  const today = useBusinessToday() // on the branch's clock, after its day cut-off
 
   const BLANK_FORM = { amount: '', durationMonths: '6', alreadyPaidMonths: '0', reason: '', date: today, repaymentStartDate: '', paidFromOffice: 'front', approvalNotes: '' }
 
   const [staffId, setStaffId] = useState('')
   const [form, setForm] = useState(BLANK_FORM)
+  // Keep the default date on today (e.g. once the branch's settings load) until the user changes it.
+  const shownToday = useRef(today)
+  useEffect(() => {
+    setForm(f => (f.date === shownToday.current ? { ...f, date: today } : f))
+    shownToday.current = today
+  }, [today])
   const [isMigration, setIsMigration] = useState(false)
   const [successMsg, setSuccessMsg] = useState('')
 

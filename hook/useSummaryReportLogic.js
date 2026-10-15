@@ -16,6 +16,7 @@ import { useGetSalaryEntriesQuery } from '@/lib/redux/api/salaryApiSlice'
 import { useGetWithdrawEntriesQuery } from '@/lib/redux/api/cashWithdrawApiSlice'
 import { useGetCompanyDetailsQuery } from '@/lib/redux/api/authApiSlice'
 import { buildLedger } from '@/lib/finance/ledger'
+import { useBusinessToday } from '@/app/hooks/useRegion'
 import {
   num, isPaidFromTill, saleDay, costDay, advanceDay, staffLoanDay, depositDay,
   salaryDay, withdrawalDay, branchLoanMovements,
@@ -116,9 +117,12 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
     settings?.basic?.name ||
     getBranchName(branchId)
 
+  // "Today" is the branch's business date (its clock, after the day cut-off).
+  const businessToday = useBusinessToday()
+
   // Date Range Logic
   const dateRange = useMemo(() => {
-    const today = new Date()
+    const today = parseISO(businessToday)
     let from = subDays(today, 6)
     let to = today
 
@@ -191,7 +195,8 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
     salaries,
     withdrawals,
     loanActs,
-    branchId
+    branchId,
+    businessToday
   ])
 
   // --- Money: one cash book from the shared finance engine ---
