@@ -75,11 +75,6 @@ export const EMPTY_FORM = {
   hasPaidBreak: false,
   requireFullShiftForBreak: false,
   fullShiftHours: 7.5,
-  // Face ID for kiosk attendance (optional; only shown when the branch has
-  // face recognition enabled). Descriptor = 128-number vector, not a photo.
-  faceDescriptors: [], // number[][]
-  faceEnrolledAt: null,
-  faceThumb: null // tiny base64 thumbnail for the attendance log
 }
 
 /**
