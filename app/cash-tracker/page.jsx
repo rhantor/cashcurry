@@ -13,6 +13,7 @@ import {
   useAddCompanyDeductionMutation, 
   useDeleteCompanyDeductionMutation 
 } from "@/lib/redux/api/companyDeductionsApiSlice";
+import { getSessionUser } from "@/lib/session";
 
 // --- Subcomponent to load branch cash ---
 const BranchCashLoader = ({ branch, onUpdate }) => {
@@ -36,9 +37,9 @@ export default function DailyCashTracker() {
   const [isAuthChecking, setIsAuthChecking] = useState(true);
 
   useEffect(() => {
-    const raw = localStorage.getItem("user");
+    const raw = getSessionUser();
     if (raw) {
-      const u = JSON.parse(raw);
+      const u = raw;
       setUser(u);
     }
     setIsAuthChecking(false);

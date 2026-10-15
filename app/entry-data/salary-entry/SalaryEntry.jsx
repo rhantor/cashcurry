@@ -10,6 +10,7 @@ import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import useCurrency from "@/app/hooks/useCurrency";
 import { useDefaultDate } from "@/app/hooks/useRegion";
 import { format } from "date-fns";
+import { getSessionUser } from "@/lib/session";
 
 /** ---- tiny helpers ---- */
 // Local calendar dates. (These used toISOString, which is UTC: in Malaysia the
@@ -60,9 +61,9 @@ export default function SalaryEntryPage() {
   const [addSalaryEntry, { isLoading: isSaving }] = useAddSalaryEntryMutation();
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
+    const storedUser = getSessionUser();
     if (storedUser) {
-      const parsed = JSON.parse(storedUser);
+      const parsed = storedUser;
       setCompanyId(parsed.companyId);
       setBranchId(parsed.branchId);
     }
@@ -166,8 +167,8 @@ export default function SalaryEntryPage() {
       }
 
       // 3. Prepare Data
-      const storedUser = localStorage.getItem("user");
-      const createdBy = storedUser ? JSON.parse(storedUser) : {};
+      const storedUser = getSessionUser();
+      const createdBy = storedUser ? storedUser : {};
       const { monthStart, monthEnd } = monthStartEnd(month);
       const paymentMonth = paymentDate ? paymentDate.slice(0, 7) : null;
 

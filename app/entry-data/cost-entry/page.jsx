@@ -6,6 +6,7 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
 import { useCostEntryForm } from './logic/useCostEntryForm'
 import { uploadCostFile } from './logic/storageUpload'
 import CostEntryForm from './components/CostEntryForm'
+import { getSessionUser } from '@/lib/session'
 
 
 
@@ -77,8 +78,8 @@ export default function CostEntryPage () {
         kind: 'receipt'
       })
 
-      const storedUser = localStorage.getItem('user')
-      const createdBy = storedUser ? JSON.parse(storedUser) : {}
+      const storedUser = getSessionUser()
+      const createdBy = storedUser ? storedUser : {}
 
       const data = {
         date, // YYYY-MM-DD

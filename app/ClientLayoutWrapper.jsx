@@ -3,9 +3,7 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import Cookies from "js-cookie";
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import { auth } from "@/lib/firebase";
+import useSession from "@/app/hooks/useSession";
 import ProviderWrapper from "@/lib/redux/store/Provider";
 import Sidebar from "./components/menu/Sidebar";
 import AutoAskAfterLogin from "@/app/components/notifications/AutoAskAfterLogin";
@@ -17,40 +15,14 @@ export default function ClientLayoutWrapper({ children }) {
   const pathname = usePathname();
 
   // ---- state
-  const [user, setUser] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // The signed-in user, from the shared session (lib/session): confirmed with
+  // Firebase Auth and refreshed from the user's record on every load.
+  const { status, user, signOut } = useSession();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // ---- hooks (ALWAYS declare hooks before any early returns)
-
-  // 1) Firebase auth listener + localStorage sync
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (firebaseUser) {
-        const userData = localStorage.getItem("user");
-        const parsedUser = userData ? JSON.parse(userData) : null;
-        setUser(parsedUser);
-      } else {
-        setUser(null);
-        localStorage.removeItem("user");
-        Cookies.remove("isLoggedIn");
-        Cookies.remove("role");
-        Cookies.remove("companyId");
-      }
-      setIsLoading(false);
-    });
-
-    const handleStorageChange = () => {
-      const userData = localStorage.getItem("user");
-      setUser(userData ? JSON.parse(userData) : null);
-    };
-    window.addEventListener("storage", handleStorageChange);
-
-    return () => {
-      unsubscribe();
-      window.removeEventListener("storage", handleStorageChange);
-    };
-  }, []);
+  // Wait for Firebase to confirm the sign-in: a screen that queried before
+  // that would be refused by the database rules.
+  const isLoading = status === "loading";
 
   // 2) Close mobile sidebar on route change
   useEffect(() => {
@@ -63,15 +35,19 @@ export default function ClientLayoutWrapper({ children }) {
   const staffPages = ["/staff-portal", "/requests", "/chat", "/kiosk", "/profile"];
   const isAuthPage = authPages.some((path) => pathname.startsWith(path));
   const isStaffPage = staffPages.some((path) => pathname.startsWith(path));
-  const isLoggedIn =
-    !!user && !!user.role && Cookies.get("isLoggedIn") !== undefined;
+  const isLoggedIn = status === "signedIn" && !!user?.role;
+
+  // 3a) Signed out (here or in another tab) on a page that needs a login → login.
+  useEffect(() => {
+    if (status === "signedOut" && !isAuthPage) router.replace("/login");
+  }, [status, isAuthPage, router]);
 
   useEffect(() => {
     // safe to early-return *inside* the effect
     if (!isLoggedIn || isAuthPage) return;
 
-    const companyId = Cookies.get("companyId") || user?.companyId;
-    const uid = user?.uid || auth.currentUser?.uid;
+    const companyId = user?.companyId;
+    const uid = user?.uid;
     if (!companyId || !uid) return;
 
     (async () => {
@@ -89,9 +65,7 @@ export default function ClientLayoutWrapper({ children }) {
   // ---- logout
   const logout = async () => {
     try {
-      await signOut(auth);
-      localStorage.removeItem("user");
-      sessionStorage.removeItem("posWelcomedThisSession");
+      await signOut(); // clears the cached profile and routing cookies too
       router.replace("/login");
     } catch (error) {
       console.error("Logout failed:", error);

@@ -1,25 +1,19 @@
 "use client";
+import { signOut } from "@/lib/session";
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, MessageCircle, FileText, Pickaxe, LogOut, User } from "lucide-react";
-import Cookies from "js-cookie";
-import { auth } from "@/lib/firebase";
 
 export default function StaffLayout({ children }) {
   const pathname = usePathname();
 
   const handleLogout = async () => {
     try {
-      await auth.signOut();
+      await signOut(); // session: Firebase sign-out, cached profile and cookies
     } catch (e) {
       console.error(e);
     }
-    localStorage.removeItem("user");
-    Cookies.remove("isLoggedIn", { path: "/" });
-    Cookies.remove("role", { path: "/" });
-    Cookies.remove("companyId", { path: "/" });
-    Cookies.remove("branchId", { path: "/" });
     window.location.href = "/login";
   };
 

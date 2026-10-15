@@ -14,7 +14,8 @@ import {
 } from "@/utils/export/exportSalary";
 import { FaCalendarAlt, FaMoneyBillWave, FaEdit, FaFilePdf } from "react-icons/fa";
 import useCurrency from "@/app/hooks/useCurrency";
-import { getCurrentUser, hasRole, ALLOWED_EDIT_ROLES } from "@/lib/authz/roles";
+import { hasRole, ALLOWED_EDIT_ROLES } from "@/lib/authz/roles";
+import { getSessionUser } from "@/lib/session";
 
 export default function SalaryReport() {
   const [dateMode, setDateMode] = useState("salary");
@@ -22,7 +23,7 @@ export default function SalaryReport() {
   const currency = useCurrency();
 
   const { ready, args: baseArgs, setFetchArgs, branchData, companyId, branchId } = useReportData();
-  const canEdit = hasRole(getCurrentUser(), ALLOWED_EDIT_ROLES);
+  const canEdit = hasRole(getSessionUser(), ALLOWED_EDIT_ROLES);
 
   const args = { ...baseArgs, dateField: dateMode === "salary" ? "month" : "paymentDate" };
 

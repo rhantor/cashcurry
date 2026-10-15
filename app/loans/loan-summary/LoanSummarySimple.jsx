@@ -792,6 +792,8 @@ function SettledBlock({
   fmtDateTime,
   sumAmounts,
 }) {
+  // Was used below but never defined: the settled-loans section crashed.
+  const currency = useCurrency();
   return (
     <div className="mt-6">
       <div className="text-sm font-semibold mb-2">{title}</div>

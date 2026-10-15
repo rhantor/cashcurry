@@ -18,6 +18,7 @@ import * as XLSX from "xlsx";
 import Cookies from "js-cookie";
 import { computeAttendance, formatHours as fmtHours, toLocalDateStr } from "@/lib/attendance/computeHours";
 import { shiftsEnabled } from "@/lib/attendance/shifts";
+import { getSessionUser } from "@/lib/session";
 
 export default function AttendanceLogPage() {
   const [user, setUser] = useState(null);
@@ -28,8 +29,8 @@ export default function AttendanceLogPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    const stored = localStorage.getItem("user");
-    if (stored) setUser(JSON.parse(stored));
+    const stored = getSessionUser();
+    if (stored) setUser(stored);
   }, []);
 
   const companyId = user?.companyId;

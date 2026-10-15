@@ -4,13 +4,14 @@ import { skipToken } from "@reduxjs/toolkit/query/react";
 import { useGetAuditLogsQuery } from "@/lib/redux/api/auditApiSlice";
 import { useGetBranchesQuery } from "@/lib/redux/api/branchApiSlice";
 import Pagination from "@/app/components/common/Pagination";
+import { getSessionUser } from "@/lib/session";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function getUserFromStorage() {
   try {
-    const raw = localStorage.getItem("user");
-    return raw ? JSON.parse(raw) : null;
+    const raw = getSessionUser();
+    return raw ? raw : null;
   } catch {
     return null;
   }

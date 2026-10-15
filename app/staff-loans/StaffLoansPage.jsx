@@ -3,12 +3,13 @@ import React, { useMemo, useState } from 'react'
 import { useGetStaffLoansQuery, useEditStaffLoanTermsMutation } from '@/lib/redux/api/staffLoanApiSlice'
 import LoanTermsModal from '@/app/components/common/LoanTermsModal'
 import useCurrency from '@/app/hooks/useCurrency'
+import { getSessionUser } from '@/lib/session'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function getUser () {
   if (typeof window === 'undefined') return {}
-  try { return JSON.parse(localStorage.getItem('user') || '{}') } catch { return {} }
+  try { return (getSessionUser() || {}) } catch { return {} }
 }
 
 function progressPct (loan) {

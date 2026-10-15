@@ -2,7 +2,7 @@
 'use client'
 import React, { useState } from 'react'
 import { useUpdateAdvanceEntryMutation, useDeleteAdvanceEntryMutation } from '@/lib/redux/api/AdvanceApiSlice'
-import { getCurrentUser } from '@/lib/authz/roles'
+import { getSessionUser } from '@/lib/session'
 
 const ADVANCE_TYPES = [
   { value: 'salary', label: 'Salary Advance' },
@@ -43,7 +43,7 @@ export default function AdvanceEditModal ({
         companyId,
         branchId,
         id: item.id,
-        user: getCurrentUser(),
+        user: getSessionUser(),
         data: {
           amount: Number(form.amount) || 0,
           advanceType: form.advanceType,
@@ -217,7 +217,7 @@ export default function AdvanceEditModal ({
                 onClick={async () => {
                   if (window.confirm('Are you sure you want to delete this advance entry? This action cannot be undone.')) {
                     try {
-                      await deleteAdvance({ companyId, branchId, id: item.id, user: getCurrentUser() }).unwrap()
+                      await deleteAdvance({ companyId, branchId, id: item.id, user: getSessionUser() }).unwrap()
                       onSuccess?.()
                       onClose()
                     } catch (err) {

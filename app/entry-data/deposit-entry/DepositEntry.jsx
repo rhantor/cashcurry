@@ -18,6 +18,7 @@ import {
 } from "@/utils/export/exportDepositData";
 import Link from "next/link";
 import useCurrency from "@/app/hooks/useCurrency";
+import { getSessionUser } from "@/lib/session";
 
 export default function DepositEntryPage() {
   const currency = useCurrency();
@@ -36,9 +37,9 @@ export default function DepositEntryPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
+    const storedUser = getSessionUser();
     if (storedUser) {
-      const parsed = JSON.parse(storedUser);
+      const parsed = storedUser;
       setCompanyId(parsed.companyId);
       setBranchId(parsed.branchId);
     }
@@ -110,8 +111,8 @@ export default function DepositEntryPage() {
 
     try {
       const fileURL = await uploadFile();
-      const storedUser = localStorage.getItem("user");
-      const createdBy = storedUser ? JSON.parse(storedUser) : {};
+      const storedUser = getSessionUser();
+      const createdBy = storedUser ? storedUser : {};
       const data = {
         date,
         amount,

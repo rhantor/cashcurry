@@ -28,6 +28,7 @@ import { IoSettingsSharp } from "react-icons/io5";
 import { useGetBranchesQuery, useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
 import { useGetCompanyDetailsQuery, useUpdateUserDefaultBranchMutation } from "@/lib/redux/api/authApiSlice";
 import { skipToken } from "@reduxjs/toolkit/query";
+import { getSessionUser, updateSessionUser, setActiveBranch as setSessionBranch } from "@/lib/session";
 
 const iconMap = {
   MdAppRegistration: <MdAppRegistration size={20} />,
@@ -56,7 +57,7 @@ export default function Sidebar({ onLogout, onNavigate }) {
   let currentUser = {};
   if (typeof window !== "undefined") {
     try {
-      currentUser = JSON.parse(localStorage.getItem("user") || "null") || {};
+      currentUser = getSessionUser() || {};
     } catch {
       currentUser = {};
     }
@@ -81,8 +82,7 @@ export default function Sidebar({ onLogout, onNavigate }) {
       if (!uid) return;
       await updateDefaultBranch({ uid, companyId, defaultBranchId: activeBranch }).unwrap();
       
-      const updatedUser = { ...currentUser, defaultBranchId: activeBranch };
-      localStorage.setItem("user", JSON.stringify(updatedUser));
+      updateSessionUser({ defaultBranchId: activeBranch });
       alert("Default branch saved successfully!");
     } catch (e) {
       console.error("Failed to set default branch", e);
@@ -127,7 +127,7 @@ export default function Sidebar({ onLogout, onNavigate }) {
         if (currentUser.defaultBranchId && formatted.some(b => b.id === currentUser.defaultBranchId)) {
           defaultId = currentUser.defaultBranchId;
         }
-        Cookies.set(cookieKey, defaultId, { path: "/" });
+        setSessionBranch(defaultId); // remembers it (cookie) for every screen
         setActiveBranch(defaultId);
       }
     }
@@ -136,8 +136,8 @@ export default function Sidebar({ onLogout, onNavigate }) {
   const handleBranchChange = (e) => {
     const id = e.target.value;
     setActiveBranch(id);
-    Cookies.set(cookieKey, id, { path: "/" });
-    // If you want instant updates without reload, broadcast an event instead.
+    setSessionBranch(id); // shared session + cookie
+    // Some screens still read the branch once when they open, so reload.
     window.location.reload();
   };
 
@@ -163,8 +163,6 @@ export default function Sidebar({ onLogout, onNavigate }) {
         }
       });
 
-      localStorage.removeItem("user");
-      window.dispatchEvent(new Event("storage"));
     } catch (error) {
       console.error("Logout error:", error);
     }

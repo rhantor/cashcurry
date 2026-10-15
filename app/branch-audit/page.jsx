@@ -5,13 +5,14 @@ import { useGetBranchAuditLogsQuery } from "@/lib/redux/api/auditApiSlice";
 import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
 import Pagination from "@/app/components/common/Pagination";
 import { hasRole } from "@/lib/authz/roles";
+import { getSessionUser } from "@/lib/session";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function getUserFromStorage() {
   try {
-    const raw = localStorage.getItem("user");
-    return raw ? JSON.parse(raw) : null;
+    const raw = getSessionUser();
+    return raw ? raw : null;
   } catch {
     return null;
   }

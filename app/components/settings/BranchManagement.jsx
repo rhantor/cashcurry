@@ -12,11 +12,11 @@ import {
 import AssignBranchAdminForm from "./BranchAdminForm";
 import BranchForm from "./BranchForm";
 import BranchList from "./BranchList";
-import { getUserFromLocalStorage } from "@/lib/getUserFromLocalStorage";
+import { getSessionUser } from "@/lib/session";
 import AssignBranchUserForm from "./BranchUserForm";
 
 export default function BranchManagement() {
-  const user = getUserFromLocalStorage();
+  const user = getSessionUser();
 
   const { data: branches = [] } = useGetBranchesQuery(user?.companyId, {
     skip: !user?.companyId,

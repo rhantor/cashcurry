@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useGetChatMessagesQuery, useSendMessageMutation } from "@/lib/redux/api/chatApiSlice";
 import { Send, Hash, MessageCircle } from "lucide-react";
 import Cookies from "js-cookie";
+import { getSessionUser } from "@/lib/session";
 
 export default function BranchChatPage() {
   const [user, setUser] = useState(null);
@@ -10,8 +11,8 @@ export default function BranchChatPage() {
   const scrollRef = useRef(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem("user");
-    if (stored) setUser(JSON.parse(stored));
+    const stored = getSessionUser();
+    if (stored) setUser(stored);
   }, []);
 
   // Branch admins/managers use cookie-based branch selection

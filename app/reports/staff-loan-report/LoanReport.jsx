@@ -75,7 +75,7 @@ function groupApprovedByStaff (rows = []) {
    Main Component
 --------------------------- */
 export default function LoanReport () {
-  const { ready, args, setFetchArgs, branchData } = useReportData()
+  const { ready, args, setFetchArgs, branchData, companyId, branchId } = useReportData()
 
   const { data: staffLoansData, isLoading, error: loanError } = useGetStaffLoansQuery(args)
 

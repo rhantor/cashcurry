@@ -23,6 +23,7 @@ import {
   Layers, 
   Info
 } from "lucide-react";
+import { getSessionUser } from "@/lib/session";
 
 // Draw an image scaled to fit inside a box without distorting it, then return
 // the height it actually used. addImage() stretches to whatever width/height it
@@ -182,9 +183,9 @@ export default function AppointmentLetterGenerator() {
   useEffect(() => {
     if (typeof window !== "undefined") {
       try {
-        const raw = localStorage.getItem("user");
+        const raw = getSessionUser();
         if (raw) {
-          const u = JSON.parse(raw);
+          const u = raw;
           setCompanyId(u.companyId);
           
           // Get active branch from cookies or fallback to user's default branchId

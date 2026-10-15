@@ -1,4 +1,5 @@
 "use client";
+import { signOut } from "@/lib/session";
 import React, { useState, useEffect, useMemo } from "react";
 import {
   useGetBranchAttendanceByPeriodQuery,
@@ -13,7 +14,6 @@ import { shiftsEnabled } from "@/lib/attendance/shifts";
 import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/utils/formatMoney";
 import { skipToken } from "@reduxjs/toolkit/query";
-import { auth } from "@/lib/firebase";
 import { 
   User,
   MapPin,
@@ -26,7 +26,7 @@ import {
   Receipt,
   Coffee
 } from "lucide-react";
-import Cookies from "js-cookie";
+import { getSessionUser } from "@/lib/session";
 
 export default function StaffProfilePage() {
   const [user, setUser] = useState(null);
@@ -34,8 +34,8 @@ export default function StaffProfilePage() {
   const currency = useCurrency();
 
   useEffect(() => {
-    const stored = localStorage.getItem("user");
-    if (stored) setUser(JSON.parse(stored));
+    const stored = getSessionUser();
+    if (stored) setUser(stored);
   }, []);
 
   // Fetch staff list to find the logged-in staff's full record
@@ -173,10 +173,7 @@ export default function StaffProfilePage() {
 
   const handleLogout = async () => {
     try {
-      await auth.signOut();
-      localStorage.removeItem("user");
-      Cookies.remove("isLoggedIn", { path: "/" });
-      Cookies.remove("role", { path: "/" });
+      await signOut(); // session: Firebase sign-out, cached profile and cookies
       window.location.href = "/login";
     } catch (e) {
       console.error(e);

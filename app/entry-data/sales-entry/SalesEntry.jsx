@@ -18,7 +18,7 @@ import imageCompression from "browser-image-compression";
 
 import ConfirmDeleteModal from "@/app/components/common/ConfirmDeleteModal";
 import useCrudActions from "@/app/components/common/useCrudActions";
-import { getCurrentUser } from "@/lib/authz/roles";
+import { getSessionUser } from "@/lib/session";
 import ItemsReportModal from "@/app/reports/sales-report/SalesReportModal";
 
 // --- IMPORT NEW SUB-COMPONENTS ---
@@ -55,9 +55,9 @@ export default function SalesEntry() {
   const MAX_DIMENSION = 2200;
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
+    const storedUser = getSessionUser();
     if (storedUser) {
-      const parsed = JSON.parse(storedUser);
+      const parsed = storedUser;
       setCompanyId(parsed.companyId);
       setBranchId(parsed.branchId);
       setUserRole(parsed.role);
@@ -231,7 +231,7 @@ export default function SalesEntry() {
         };
 
         if (confirmMode === "create") {
-            const createdBy = getCurrentUser() || {};
+            const createdBy = getSessionUser() || {};
             await addSalesEntry({ 
                 companyId, 
                 branchId, 
