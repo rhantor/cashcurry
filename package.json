@@ -6,6 +6,7 @@
     "dev": "next dev",
     "dev:local": "node scripts/local/dev.mjs",
     "local:seed": "node scripts/local/seed-run.mjs",
+    "local:seed:backup": "node scripts/local/seed-run.mjs --backup",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",

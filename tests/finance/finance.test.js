@@ -23,6 +23,7 @@ import { hasBackup, loadBackup, monthsCovered, backupDir } from "./dataset";
 import { format } from "date-fns";
 import { summary, summaryForMonth, branchDashboard, companyDashboard, monthFilter } from "./run";
 import { presetFilter } from "@/utils/dashboard/dateFilters";
+import { buildDemoCompany, KL as DEMO_KL, PJ as DEMO_PJ } from "@/scripts/local/demo/demoCompany.mjs";
 
 // ── data layer → fakeBackend ────────────────────────────────────────────────
 // (vi.mock calls are hoisted to the top of the file, so the factory is too.)
@@ -161,6 +162,38 @@ describe("cash rules (hand-made example)", () => {
 
   // Roadmap 1.4 — money should move only when a request is approved AND paid.
   it.todo("a pending or rejected advance does not reduce hand in cash");
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Demo company (npm run local:seed): the app must show exactly what the
+// walkthrough in .local/DEMO_GUIDE.md promises, day by day.
+// ─────────────────────────────────────────────────────────────────────────────
+describe("demo company matches its walkthrough", () => {
+  const demo = buildDemoCompany(new Date(2026, 9, 15, 10)); // Day 7 = 15 Oct 2026
+  const { dataset, days, expected } = demo;
+
+  for (const branchId of [DEMO_KL, DEMO_PJ]) {
+    it(`${branchId}: summary cash in hand at the end of every day`, () => {
+      for (let d = 1; d <= 7; d++) {
+        const s = summary(dataset, branchId, { filterType: "range", dateRange: { from: days[1], to: days[d] } });
+        expect({ day: d, cash: s.handInCash, bank: s.bankBalance })
+          .toEqual({ day: d, cash: expected[branchId].byDay[d].cash, bank: expected[branchId].byDay[d].bank });
+      }
+    });
+
+    it(`${branchId}: dashboard and summary for the whole week`, () => {
+      const range = { filterType: "range", dateRange: { from: days[1], to: days[7] } };
+      const s = summary(dataset, branchId, range);
+      const dash = branchDashboard(dataset, branchId, presetFilter("week", new Date(2026, 9, 15, 10)));
+      expect(s).toMatchObject({ handInCash: expected[branchId].handInCash, totalSales: expected[branchId].totalSales });
+      expect(dash).toMatchObject({ handInCash: expected[branchId].handInCash, bankExpected: expected[branchId].bank, totalSales: expected[branchId].totalSales });
+    });
+  }
+
+  it("company dashboard", async () => {
+    const c = await companyDashboard(dataset, presetFilter("week", new Date(2026, 9, 15, 10)));
+    expect(c).toMatchObject({ estCashOnHand: expected.company.handInCash, effectiveBankedAfterWithdrawals: expected.company.bank });
+  });
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

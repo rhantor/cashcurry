@@ -1,10 +1,50 @@
-/* eslint-disable no-undef */
+/* eslint-disable react/prop-types */
 "use client";
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
 import { useLoginMutation } from "@/lib/redux/api/authApiSlice";
+import { USE_EMULATOR } from "@/lib/firebase";
+
+// Local development only. `npm run dev:local` passes the seeded accounts and
+// their shared local password; production builds never set these variables,
+// and the box is hidden unless the app is on the emulators.
+const LOCAL_PASSWORD = process.env.NEXT_PUBLIC_LOCAL_PASSWORD || "";
+const LOCAL_ACCOUNTS = (() => {
+  try {
+    return JSON.parse(process.env.NEXT_PUBLIC_LOCAL_ACCOUNTS || "[]");
+  } catch {
+    return [];
+  }
+})();
+
+function LocalAccounts({ onPick, disabled }) {
+  if (!USE_EMULATOR || !LOCAL_PASSWORD || !LOCAL_ACCOUNTS.length) return null;
+  return (
+    <div className="mt-6 rounded-xl border border-amber-300 bg-amber-50 p-4">
+      <p className="text-sm font-semibold text-amber-800">Local demo accounts</p>
+      <p className="mb-3 text-xs text-amber-700">Click one to log in. Only shown on local data.</p>
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {LOCAL_ACCOUNTS.map((a) => (
+          <button
+            key={a.login}
+            type="button"
+            disabled={disabled}
+            onClick={() => onPick(a.login)}
+            className="rounded-lg border border-amber-200 bg-white px-3 py-2 text-left text-sm hover:border-amber-400 hover:bg-amber-100 disabled:opacity-60"
+          >
+            <span className="block font-medium text-gray-800">{a.login}</span>
+            <span className="block text-xs text-gray-500">
+              {a.role}
+              {a.branch && !a.branch.startsWith("—") ? ` · ${a.branch}` : " · company"}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 export default function LoginPage() {
   const [usernameOrEmail, setUsernameOrEmail] = useState("");
@@ -14,8 +54,12 @@ export default function LoginPage() {
   const [login, { isLoading }] = useLoginMutation();
   const router = useRouter();
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
+    signIn(usernameOrEmail, password);
+  };
+
+  const signIn = async (usernameOrEmail, password) => {
     setMsg("");
 
     try {
@@ -132,6 +176,8 @@ export default function LoginPage() {
               Sign up here
             </a>
           </p>
+
+          <LocalAccounts disabled={isLoading} onPick={(u) => signIn(u, LOCAL_PASSWORD)} />
         </div>
       </div>
     </div>
