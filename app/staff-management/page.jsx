@@ -13,7 +13,6 @@ import { useGetSingleBranchQuery } from '@/lib/redux/api/branchApiSlice'
 import { useGetBranchSettingsQuery } from '@/lib/redux/api/branchSettingsApiSlice'
 import { skipToken } from '@reduxjs/toolkit/query'
 import { shiftsEnabled } from '@/lib/attendance/shifts'
-import { findDuplicateEnrollmentGroups } from '@/lib/face/faceApi'
 import { AlertTriangle } from 'lucide-react'
 
 import StaffToolbar from './components/StaffToolbar'
@@ -22,7 +21,6 @@ import StaffModal from './components/StaffModal'
 import DeleteConfirm from './components/DeleteConfirm'
 import Toast from './components/Toast'
 import StaffDetailModal from './components/StaffDetailModal'
-import FaceConflictBanner from './components/FaceConflictBanner'
 
 export default function StaffManagementPage () {
   const { ready, companyId, branchId } = useResolvedCompanyBranch()
@@ -38,7 +36,6 @@ export default function StaffManagementPage () {
     companyId && branchId ? { companyId, branchId } : skipToken
   )
   const payrollConfig = branchSettings?.payroll || null
-  const faceEnabled = !!branchSettings?.attendance?.faceEnabled
   // The modal hides the shift time fields entirely when the branch hasn't
   // turned shift rules on.
   const shiftsOn = shiftsEnabled(branchSettings?.attendance)
@@ -64,36 +61,6 @@ export default function StaffManagementPage () {
     setTimeout(() => setToast(null), 3000)
   }
 
-  // Every face on file. Descriptors are stored as { data: [...] } maps because
-  // Firestore forbids array-of-array.
-  const allFaces = useMemo(
-    () =>
-      staffList
-        .filter(s => s.faceDescriptors?.length)
-        .map(s => ({
-          id: s.id,
-          name: `${s.firstName || ''} ${s.lastName || ''}`.trim() || 'another staff member',
-          descriptors: s.faceDescriptors
-            .map(d => d?.data)
-            .filter(d => Array.isArray(d) && d.length === 128)
-        })),
-    [staffList]
-  )
-
-  // Enrollment compares against everyone EXCEPT the person being edited, so one
-  // face can't end up on two records (which would let someone punch in under
-  // two names) while re-enrolling yourself still works.
-  const enrolledFaces = useMemo(
-    () => allFaces.filter(f => f.id !== editTarget?.id),
-    [allFaces, editTarget?.id]
-  )
-
-  // Records that already collide — enrolled before the guard existed, or written
-  // straight to the database.
-  const faceConflicts = useMemo(
-    () => (faceEnabled ? findDuplicateEnrollmentGroups(allFaces) : []),
-    [faceEnabled, allFaces]
-  )
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase()
@@ -212,16 +179,6 @@ export default function StaffManagementPage () {
           }}
         />
 
-        <FaceConflictBanner
-          groups={faceConflicts}
-          onFix={id => {
-            const s = staffList.find(x => x.id === id)
-            if (!s) return
-            setEditTarget(s)
-            setModalMode('edit')
-          }}
-        />
-
         <StaffTable
           rows={filtered}
           loading={isLoading || generating}
@@ -240,9 +197,7 @@ export default function StaffManagementPage () {
           mode={modalMode}
           initialData={modalMode === 'edit' ? editTarget : null}
           payrollConfig={payrollConfig}
-          faceEnabled={faceEnabled}
           shiftsEnabled={shiftsOn}
-          enrolledFaces={enrolledFaces}
           onSave={handleSave}
           onClose={() => {
             setModalMode(null)

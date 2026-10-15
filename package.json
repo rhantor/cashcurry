@@ -15,12 +15,12 @@
     "test:golden:update": "node scripts/test-golden-update.mjs",
     "test:rules": "node scripts/test-rules.mjs",
     "summaries:rebuild": "node scripts/summaries-rebuild.mjs",
-    "staff:link": "node scripts/link-staff-logins.mjs"
+    "staff:link": "node scripts/link-staff-logins.mjs",
+    "face:remove-data": "node scripts/remove-face-data.mjs"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.8.2",
     "@vercel/analytics": "^1.6.1",
-    "@vladmandic/face-api": "^1.7.15",
     "browser-image-compression": "^2.0.2",
     "date-fns": "^4.1.0",
     "firebase": "^12.1.0",
