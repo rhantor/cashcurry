@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import useBranchData from "@/utils/dashboard/useBranchData";
 import { useGetBranchesBasicQuery } from "@/lib/redux/api/branchApiSlice";
 import Filters from "../components/dashboard/Filters";
+import { presetFilter } from "@/utils/dashboard/dateFilters";
 import KPICard from "../components/dashboard/KPICard";
 import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/utils/formatMoney";
@@ -42,12 +43,7 @@ function ChartCard({ title, subtitle, children }) {
 }
 
 export default function DashboardPage() {
-  const now = new Date();
-  const [filter, setFilter] = useState({
-    from: new Date(now.getFullYear(), now.getMonth(), 1),
-    to: now,
-    preset: "month",
-  });
+  const [filter, setFilter] = useState(() => presetFilter("month"));
 
   const currency = useCurrency();
   const fmt = (v) => formatMoney(v, currency);

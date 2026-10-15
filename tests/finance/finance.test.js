@@ -20,7 +20,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { hasBackup, loadBackup, monthsCovered, backupDir } from "./dataset";
+import { format } from "date-fns";
 import { summary, summaryForMonth, branchDashboard, companyDashboard, monthFilter } from "./run";
+import { presetFilter } from "@/utils/dashboard/dateFilters";
 
 // ── data layer → fakeBackend ────────────────────────────────────────────────
 // (vi.mock calls are hoisted to the top of the file, so the factory is too.)
@@ -234,14 +236,24 @@ describe.skipIf(!backupPresent)(`golden figures (${backupDir()})`, () => {
     }
   });
 
-  // KNOWN BUG — roadmap 1.1. "Last 7 Days" starts the range at the current
-  // time of day, so the first day's cash drops out of the dashboard. Remove
-  // `.fails` when 1.1 is fixed.
-  it.skipIf(!anchors?.last7DaysBug).fails("branch dashboard 'Last 7 Days' equals the summary for the same dates", () => {
-    const { branchId, now: nowIso, from, to } = anchors.last7DaysBug;
-    const now = new Date(nowIso); // local time, as Filters.jsx builds the preset
-    const dash = branchDashboard(data, branchId, { from: new Date(+now - 6 * 864e5), to: now, preset: "week" });
-    const sum = summary(data, branchId, { filterType: "range", dateRange: { from, to } });
-    expect(dash.handInCash).toBe(sum.handInCash);
+  // Roadmap 1.1: "Last 7 / 30 Days" used to start at the current time of day,
+  // which dropped the first day's cash from the dashboard (RM 3,295.95 for
+  // the anchored branch on this date).
+  describe.skipIf(!anchors?.last7DaysBug)("rolling presets match the summary for the same dates", () => {
+    const presets = { week: 7, days30: 30 };
+    for (const [preset, days] of Object.entries(presets)) {
+      // Both the old filter shape (time of day kept) and the new one (presetFilter).
+      it(`${preset}, filter as built by the dashboard`, () => {
+        const { branchId, now: nowIso } = anchors.last7DaysBug;
+        const now = new Date(nowIso);
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (days - 1));
+        const range = { from: format(firstDay, "yyyy-MM-dd"), to: format(now, "yyyy-MM-dd") };
+        const sum = summary(data, branchId, { filterType: "range", dateRange: range });
+        const timeOfDay = branchDashboard(data, branchId, { from: new Date(+now - (days - 1) * 864e5), to: now, preset });
+        const fromPreset = branchDashboard(data, branchId, presetFilter(preset, now));
+        expect(timeOfDay.handInCash).toBe(sum.handInCash);
+        expect(fromPreset.handInCash).toBe(sum.handInCash);
+      });
+    }
   });
 });

@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import useCompanyData from "@/utils/dashboard/useCompanyData";
 import Filters from "@/app/components/dashboard/Filters";
+import { presetFilter } from "@/utils/dashboard/dateFilters";
 import KPICard from "@/app/components/dashboard/KPICard";
 import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/utils/formatMoney";
@@ -13,11 +14,7 @@ import BranchPerformanceBar from "@/app/components/dashboard/charts/BranchPerfor
 import BranchLeaderboard from "@/app/components/dashboard/BranchLeaderboard";
 
 export default function OwnerDashboardPage() {
-  const now = new Date();
-  const [filter, setFilter] = useState({
-    from: new Date(now.getFullYear(), now.getMonth(), 1),
-    to: now,
-  });
+  const [filter, setFilter] = useState(() => presetFilter("month"));
 
   const currency = useCurrency();
   const fmt = (v) => formatMoney(v, currency);

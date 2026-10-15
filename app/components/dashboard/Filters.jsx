@@ -1,38 +1,26 @@
 /* eslint-disable react/prop-types */
 "use client";
 import React from "react";
-import { byDateKey } from "@/utils/dashboard/utils";
+import {
+  presetFilter,
+  filterFromInput,
+  filterToInput,
+  dayKeyOfFilter,
+} from "@/utils/dashboard/dateFilters";
 
 const Filters = ({ filter, setFilter }) => {
   const now = new Date();
-
-  const k             = (d) => (d ? byDateKey(d) : "");
-  const todayKey      = k(now);
-  const thisMonthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const last7Start    = new Date(+now - 6 * 864e5);
-  const last30Start   = new Date(+now - 29 * 864e5);
-
-  const fromKey = k(filter.from);
-  const toKey   = k(filter.to);
-
-  const isThisMonth = fromKey === k(thisMonthStart) && toKey === todayKey;
-  const isLast7     = fromKey === k(last7Start)     && toKey === todayKey;
-  const isLast30    = fromKey === k(last30Start)    && toKey === todayKey;
-
-  const apply = (preset) => {
-    const nowLocal = new Date();
-    if (preset === "week") {
-      setFilter({ from: new Date(+nowLocal - 6 * 864e5), to: nowLocal, preset: "week" });
-    } else if (preset === "days30") {
-      setFilter({ from: new Date(+nowLocal - 29 * 864e5), to: nowLocal, preset: "days30" });
-    } else {
-      setFilter({
-        from: new Date(nowLocal.getFullYear(), nowLocal.getMonth(), 1),
-        to:   nowLocal,
-        preset: "month",
-      });
-    }
+  const current = dayKeyOfFilter(filter);
+  const isActive = (preset) => {
+    const p = dayKeyOfFilter(presetFilter(preset, now));
+    return current.from === p.from && current.to === p.to;
   };
+
+  const isThisMonth = isActive("month");
+  const isLast7     = isActive("week");
+  const isLast30    = isActive("days30");
+
+  const apply = (preset) => setFilter(presetFilter(preset, new Date()));
 
   const btnCls = (active) =>
     `px-3 py-2 rounded-xl shadow text-sm transition ${
@@ -57,22 +45,24 @@ const Filters = ({ filter, setFilter }) => {
       <input
         type="date"
         className="px-3 py-2 rounded-xl bg-white/80 shadow text-sm"
-        value={fromKey}
+        value={current.from}
         onChange={(e) =>
-          setFilter((p) => ({ ...p, from: new Date(e.target.value), preset: "custom" }))
+          e.target.value &&
+          setFilter((p) => ({ ...p, from: filterFromInput(e.target.value), preset: "custom" }))
         }
       />
       <input
         type="date"
         className="px-3 py-2 rounded-xl bg-white/80 shadow text-sm"
-        value={toKey}
+        value={current.to}
         onChange={(e) =>
-          setFilter((p) => ({ ...p, to: new Date(e.target.value + "T23:59:59"), preset: "custom" }))
+          e.target.value &&
+          setFilter((p) => ({ ...p, to: filterToInput(e.target.value), preset: "custom" }))
         }
       />
 
       <span className="ml-1 text-xs px-2 py-1 rounded-full bg-black/5">
-        {fromKey || "—"} → {toKey || "—"}
+        {current.from || "—"} → {current.to || "—"}
       </span>
     </div>
   );

@@ -41,7 +41,7 @@ Nothing here changes what users see. It lets us change things without fear.
 
 | # | Task | Status |
 |---|------|--------|
-| 1.1 | Fix "Last 7 / Last 30 Days" dropping the first day from dashboard cash on hand | ⬜ |
+| 1.1 | Fix "Last 7 / Last 30 Days" dropping the first day from dashboard cash on hand; date label and pickers showed the day before (UTC) | ✅ |
 | 1.2 | **One finance engine** (`lib/finance/`) used by the summary report and both dashboards — replaces the three copies | ⬜ |
 | 1.3 | **Time zone, currency and business day per company/branch** (Malaysia = Asia/Kuala_Lumpur, RM; Bangladesh = Asia/Dhaka, ৳). Optional day cut-off for restaurants that close after midnight. Replaces every UTC "today" | ⬜ |
 | 1.4 | **Money request lifecycle**: requested → approved / rejected → **paid** (who paid, when, from front cash or bank). Only *paid* moves cash; payroll deducts only paid. Manager entering directly = approve + pay in one step (today's workflow keeps working). Existing records count as paid on their date, so today's numbers stay the same | ⬜ |

@@ -1,7 +1,7 @@
 'use client'
 import { useMemo } from 'react'
 import { format, subDays, subMonths, eachDayOfInterval, differenceInDays } from 'date-fns'
-import { toDate, byDateKey, num, sortByDateKey } from './utils'
+import { toDate, byDateKey, dayKey, num, sortByDateKey } from './utils'
 
 // RTK slices
 import { useGetSalesEntriesQuery } from '@/lib/redux/api/salesApiSlice'
@@ -248,9 +248,15 @@ export default function useBranchData (filter) {
   const { data: loanActivities = [], isLoading: loanLoading } =
     useGetLoanActivitiesQuery(loanArgs)
 
+  // Compare calendar days, not instants: the opening balance below counts
+  // everything dated before `from` by day, so the period must start on the
+  // same day boundary or the first day falls in neither (it did, when a
+  // preset carried the time of day).
+  const fromKey = format(filter.from, 'yyyy-MM-dd')
+  const toKey = format(filter.to, 'yyyy-MM-dd')
   const inRange = d => {
-    const t = +toDate(d)
-    return t >= +filter.from && t <= +filter.to
+    const k = dayKey(d)
+    return !!k && k >= fromKey && k <= toKey
   }
 
   /* --------------- filtered windows --------------- */
