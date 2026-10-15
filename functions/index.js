@@ -2,6 +2,9 @@
 // functions/index.js
 
 const admin = require("firebase-admin");
+// Imported directly: the Functions emulator wraps admin.firestore and drops its
+// static members, so admin.firestore.FieldValue is undefined there.
+const { FieldValue } = require("firebase-admin/firestore");
 const {
   onDocumentCreated,
   onDocumentWritten,
@@ -46,7 +49,7 @@ async function notifyRoles({
 
   // 2) optional in-app inbox at /companies/{companyId}/users/{uid}/inbox
   if (writeInbox) {
-    const createdAt = admin.firestore.FieldValue.serverTimestamp();
+    const createdAt = FieldValue.serverTimestamp();
     const batch = db.batch();
     for (const uid of uids) {
       const ref = db.doc(
@@ -305,7 +308,7 @@ async function writeAuditLog({
     actorName,
     before: action === "created" ? null : before,
     after: action === "deleted" ? null : after,
-    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    timestamp: FieldValue.serverTimestamp(),
   });
 }
 
@@ -435,7 +438,7 @@ async function recomputeAndWriteSummary({
       branchId,
       [totalField]: rounded,
       [countField]: snap.size,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     },
     { merge: true }
   );
@@ -617,7 +620,7 @@ exports.onShiftClosed = onDocumentWritten(
           tenderBreakdown,
           orderCount: Number(after.orderCount || 0),
           description: `POS shift ${event.params.shiftId}`,
-          createdAt: admin.firestore.FieldValue.serverTimestamp(),
+          createdAt: FieldValue.serverTimestamp(),
           source: "POS_SHIFT",
           shiftId: event.params.shiftId,
         });
