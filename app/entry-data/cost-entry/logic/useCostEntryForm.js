@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import imageCompression from 'browser-image-compression'
 import { useDefaultDate } from '@/app/hooks/useRegion'
+import { getSessionUser } from '@/lib/session'
 
 export function useCostEntryForm () {
   const [date, setDate] = useDefaultDate() // today on the branch's clock
@@ -25,9 +26,9 @@ export function useCostEntryForm () {
   const [paidMethod, setPaidMethod] = useState('cash')
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user')
+    const storedUser = getSessionUser()
     if (storedUser) {
-      const parsed = JSON.parse(storedUser)
+      const parsed = storedUser
       setCompanyId(parsed.companyId)
       setBranchId(parsed.branchId)
     }

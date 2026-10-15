@@ -4,15 +4,16 @@ import {React, useState, useEffect } from "react";
 import { useGetNotificationsQuery } from "@/lib/redux/api/notificationApiSlice";
 import { FaBell } from "react-icons/fa";
 import { messaging, onMessage } from "@/lib/firebase"; // ✅ import FCM
+import { getSessionUser } from "@/lib/session";
 
 export default function NotificationBell() {
   const [open, setOpen] = useState(false);
   const [companyId, setCompanyId] = useState(null);
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
+    const storedUser = getSessionUser();
     if (storedUser) {
-      const parsed = JSON.parse(storedUser);
+      const parsed = storedUser;
       setCompanyId(parsed.companyId);
     }
   }, []);

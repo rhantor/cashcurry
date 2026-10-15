@@ -6,6 +6,7 @@ import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
 import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage'
 import useCurrency from '@/app/hooks/useCurrency'
 import UploadInvoice from '@/app/components/purchases/UploadInvoice'
+import { getSessionUser } from '@/lib/session'
 
 const CATEGORIES = [
   'Utilities',
@@ -55,9 +56,9 @@ export default function CostEntryPage () {
   const [paidMethod, setPaidMethod] = useState('cash') // one of the allowed methods
 
   useEffect(() => {
-    const storedUser = localStorage.getItem('user')
+    const storedUser = getSessionUser()
     if (storedUser) {
-      const parsed = JSON.parse(storedUser)
+      const parsed = storedUser
       setCompanyId(parsed.companyId)
       setBranchId(parsed.branchId)
     }
@@ -188,8 +189,8 @@ export default function CostEntryPage () {
         fileURL = await uploadFile()
       }
 
-      const storedUser = localStorage.getItem('user')
-      const createdBy = storedUser ? JSON.parse(storedUser) : {}
+      const storedUser = getSessionUser()
+      const createdBy = storedUser ? storedUser : {}
 
       const data = {
         date, // YYYY-MM-DD

@@ -15,6 +15,7 @@ import { useGetCompanyDetailsQuery } from '@/lib/redux/api/authApiSlice'
 import { useGetSingleBranchQuery } from '@/lib/redux/api/branchApiSlice'
 import { useGetStaffListQuery } from '@/lib/redux/api/staffApiSlice'
 import PayrollPrintView from '../components/PayrollPrintView'
+import { getSessionUser } from '@/lib/session'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -206,7 +207,7 @@ export default function PayrollHistory () {
   const [printTarget, setPrintTarget] = useState(null)
 
   useEffect(() => {
-    const u = JSON.parse(localStorage.getItem('user') || '{}')
+    const u = (getSessionUser() || {})
     setCompanyId(u.companyId || null)
     setBranchId(u.branchId  || null)
     setRole(u.role || null)

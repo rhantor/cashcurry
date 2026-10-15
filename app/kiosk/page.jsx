@@ -2,18 +2,19 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Cookies from "js-cookie";
+import { getSessionUser } from "@/lib/session";
 
 export default function KioskRedirect() {
   const router = useRouter();
 
   useEffect(() => {
-    const raw = localStorage.getItem("user");
+    const raw = getSessionUser();
     if (!raw) {
       router.replace("/login");
       return;
     }
 
-    const user = JSON.parse(raw);
+    const user = raw;
     const companyId = user.companyId;
     const cookieKey = companyId ? `activeBranch_${companyId}` : "activeBranch";
     const branchId = user.role === "owner" || user.role === "gm" || user.role === "superAdmin"

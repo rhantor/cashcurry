@@ -1,14 +1,15 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import Feeds from "@/app/feeds/Feeds";
+import { getSessionUser } from "@/lib/session";
 
 export default function StaffPortalPage() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem("user");
+    const stored = getSessionUser();
     if (stored) {
-       setUser(JSON.parse(stored));
+       setUser(stored);
     }
   }, []);
 

@@ -8,6 +8,7 @@ import {
   useUpdateBranchSettingsMutation,
 } from "@/lib/redux/api/branchSettingsApiSlice";
 import { BRANCH_LOCKED_FIELDS, BASIC_SETTINGS_FIELDS } from "./fieldMaps";
+import { getSessionUser } from "@/lib/session";
 
 function normalizeTenders(input = []) {
   return input.map((t, i) => {
@@ -33,9 +34,9 @@ export default function useBranchSettingsForm() {
   const [role, setRole] = useState(null);
 
   useEffect(() => {
-    const raw = localStorage.getItem("user");
+    const raw = getSessionUser();
     if (!raw) return;
-    const u = JSON.parse(raw);
+    const u = raw;
     setCompanyId(u.companyId);
     setBranchId(u.branchId);
     setRole(u.role);

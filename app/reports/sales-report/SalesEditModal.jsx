@@ -9,7 +9,8 @@ import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 import { useUpdateSalesEntryMutation } from "@/lib/redux/api/salesApiSlice";
 import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
-import { getCurrentUser, hasRole, ALLOWED_EDIT_ROLES } from "@/lib/authz/roles";
+import { hasRole, ALLOWED_EDIT_ROLES } from "@/lib/authz/roles";
+import { getSessionUser } from "@/lib/session";
 
 // Fallback tenders if no settings found
 const DEFAULT_TENDERS = [
@@ -34,7 +35,7 @@ export default function SalesEditModal({
   branchId,
   onClose,
 }) {
-  const currentUser = getCurrentUser();
+  const currentUser = getSessionUser();
   const canEdit = hasRole(currentUser, ALLOWED_EDIT_ROLES);
 
   // Pull branch tender settings here so we can show *all* configured tenders

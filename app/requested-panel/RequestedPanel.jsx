@@ -26,6 +26,7 @@ import { serverTimestamp } from "firebase/firestore";
 import AdvanceRequests from "./AdvanceRequests";
 import LoanRequests from "./LoanRequests";
 import OtRequests from "./OtRequests";
+import { getSessionUser } from "@/lib/session";
 
 export default function RequestedPanel() {
   const [companyId, setCompanyId] = useState(null);
@@ -42,10 +43,10 @@ export default function RequestedPanel() {
   const [otErrorMsg, setOtErrorMsg] = useState("");
 
   useEffect(() => {
-    const storedUser = localStorage.getItem("user");
+    const storedUser = getSessionUser();
     if (!storedUser) return;
     try {
-      const parsed = JSON.parse(storedUser);
+      const parsed = storedUser;
       setCompanyId(parsed.companyId);
       setBranchId(parsed.branchId);
       setUser(parsed);

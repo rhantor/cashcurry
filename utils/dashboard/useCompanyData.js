@@ -11,6 +11,7 @@ import {
   saleDay, costDay, advanceDay, depositDay, withdrawalDay, salaryDay, staffLoanDay,
   isCashCost, isMigratedStaffLoan, paidOutOf,
 } from "@/lib/finance/rules";
+import { getSessionUser } from "@/lib/session";
 
 // ====== chart helpers (money rules live in lib/finance) ======
 const toDate = (ts) => {
@@ -123,9 +124,9 @@ export default function useCompanyData(filter) {
   const [settingsByBranch, setSettingsByBranch] = useState({});
 
   useEffect(() => {
-    const raw = localStorage.getItem("user");
+    const raw = getSessionUser();
     if (!raw) return;
-    const u = JSON.parse(raw);
+    const u = raw;
     setCompanyId(u.companyId);
   }, []);
 

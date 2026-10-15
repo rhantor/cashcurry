@@ -30,6 +30,7 @@ import { computeAttendance } from '@/lib/attendance/computeHours'
 import { startOfMonth, endOfMonth, addDays, subDays, format } from 'date-fns'
 import { skipToken } from '@reduxjs/toolkit/query'
 import PayrollPrintView from './components/PayrollPrintView'
+import { getSessionUser } from '@/lib/session'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -380,7 +381,7 @@ export default function PayrollBuilder () {
   const [printTarget, setPrintTarget] = useState(null) // { mode: 'single'|'all', slip? }
 
   useEffect(() => {
-    const u = JSON.parse(localStorage.getItem('user') || '{}')
+    const u = (getSessionUser() || {})
     setCompanyId(u.companyId || null)
     setBranchId(u.branchId  || null)
     setCurrentUser(u)

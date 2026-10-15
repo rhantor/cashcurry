@@ -15,6 +15,7 @@ import SalesVsCosts from "../components/dashboard/charts/SalesVsCosts";
 import CashVsCost from "../components/dashboard/charts/CashVsCost";
 import BankedVsBackCost from "../components/dashboard/charts/BankedVsBackCost";
 import LoansTimeline from "../components/dashboard/charts/LoansTimeline";
+import { getSessionUser } from "@/lib/session";
 
 /* ── Reusable section divider ── */
 function SectionHeader({ title }) {
@@ -78,7 +79,7 @@ export default function DashboardPage() {
 
   // Fetch branch list only for company roles (owner / gm / superAdmin)
   const companyId = isCompany
-    ? (() => { try { return JSON.parse(localStorage.getItem("user") || "{}").companyId } catch { return null } })()
+    ? (() => { try { return (getSessionUser() || {}).companyId } catch { return null } })()
     : null;
   const { data: branches = [] } = useGetBranchesBasicQuery(companyId, { skip: !companyId });
 

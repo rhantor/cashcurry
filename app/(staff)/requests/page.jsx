@@ -6,15 +6,16 @@ import { useAddNotificationMutation } from "@/lib/redux/api/notificationApiSlice
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { FileText, Clock, CheckCircle, XCircle } from "lucide-react";
+import { getSessionUser } from "@/lib/session";
 
 export default function RequestsPage() {
   const [user, setUser] = useState(null);
   const [staffDocId, setStaffDocId] = useState(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem("user");
+    const stored = getSessionUser();
     if (stored) {
-       const u = JSON.parse(stored);
+       const u = stored;
        setUser(u);
        if (u.uid && u.companyId && u.branchId) {
          const q = query(

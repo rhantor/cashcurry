@@ -14,6 +14,7 @@ import { verifyBiometric } from "@/lib/biometricUtils";
 import FaceKioskScanner from "./FaceKioskScanner";
 import { getAttendanceDate, todayLocalStr } from "@/lib/attendance/computeHours";
 import { otRequestId, resolveStaffShift, shiftRules, shiftWindow } from "@/lib/attendance/shifts";
+import { getSessionUser } from "@/lib/session";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 function todayStr() {
@@ -292,8 +293,8 @@ export default function KioskPage() {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    const stored = localStorage.getItem("user");
-    if (stored) setUser(JSON.parse(stored));
+    const stored = getSessionUser();
+    if (stored) setUser(stored);
   }, []);
 
   // Keep the tablet screen awake while the kiosk is open (re-acquire when the

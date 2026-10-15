@@ -1,7 +1,7 @@
 /* eslint-disable react/prop-types */
 import React, { useState, useEffect } from "react";
 import { useUpdateSalaryEntryMutation, useDeleteSalaryEntryMutation } from "@/lib/redux/api/salaryApiSlice";
-import { getCurrentUser } from "@/lib/authz/roles";
+import { getSessionUser } from "@/lib/session";
 import { FaTimes, FaSpinner, FaSave, FaUpload, FaFilePdf, FaTrash, FaEye } from "react-icons/fa";
 import { storage } from "@/lib/firebase";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
@@ -122,7 +122,7 @@ export default function EditSalaryModal({ item, onClose, companyId, branchId }) 
         companyId, 
         branchId, 
         entryId: item.id, 
-        user: getCurrentUser(),
+        user: getSessionUser(),
         data 
       }).unwrap();
       
@@ -137,7 +137,7 @@ export default function EditSalaryModal({ item, onClose, companyId, branchId }) 
   const handleDelete = async () => {
     if (window.confirm("Are you sure you want to delete this salary entry? This action cannot be undone.")) {
       try {
-        await deleteSalaryEntry({ companyId, branchId, salaryId: item.id, user: getCurrentUser() }).unwrap();
+        await deleteSalaryEntry({ companyId, branchId, salaryId: item.id, user: getSessionUser() }).unwrap();
         onClose();
       } catch (error) {
         console.error("Failed to delete salary:", error);

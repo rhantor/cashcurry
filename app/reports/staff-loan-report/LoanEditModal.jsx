@@ -1,7 +1,7 @@
 /* eslint-disable react/prop-types */
 'use client'
 import { useUpdateStaffLoanMutation, useDeleteStaffLoanMutation } from '@/lib/redux/api/staffLoanApiSlice'
-import { getCurrentUser } from '@/lib/authz/roles'
+import { getSessionUser } from '@/lib/session'
 import React, { useState, useMemo } from 'react'
 import useCurrency from '@/app/hooks/useCurrency'
 
@@ -109,7 +109,7 @@ export default function LoanEditModal ({
         companyId,
         branchId,
         id: item.id,
-        user: getCurrentUser(),
+        user: getSessionUser(),
         data: {
           amount: newAmount,
           durationMonths: newDuration,
@@ -136,7 +136,7 @@ export default function LoanEditModal ({
   const handleDelete = async () => {
     if (window.confirm('Are you sure you want to delete this loan entry? This action cannot be undone.')) {
       try {
-        await deleteLoan({ companyId, branchId, id: item.id, user: getCurrentUser() }).unwrap()
+        await deleteLoan({ companyId, branchId, id: item.id, user: getSessionUser() }).unwrap()
         onSuccess?.()
         onClose()
       } catch (err) {

@@ -2,7 +2,6 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
-import { getUserFromLocalStorage } from "@/lib/getUserFromLocalStorage";
 import { useAddBranchUserMutation } from "@/lib/redux/api/branchApiSlice";
 import AddBranchUserModal from "./modals/AddBranchUserModal";
 
@@ -35,6 +34,7 @@ import AddCompanyUserModal from "./modals/AddCompanyUserModal"; // <-- NEW
 // Helpers
 import { canManageAllBranches } from "@/utils/roles";
 import { sanitizeUpdates, normalizeRole } from "@/utils/sanitize";
+import { getSessionUser } from "@/lib/session";
 
 export default function UserManagement() {
   // state for add modals
@@ -42,11 +42,7 @@ export default function UserManagement() {
   const [addingCompanyUserOpen, setAddingCompanyUserOpen] = useState(false); // <-- NEW
   const [companyAddErr, setCompanyAddErr] = useState(""); // <-- NEW
 
-  const currentUser =
-    getUserFromLocalStorage?.() ||
-    (typeof window !== "undefined"
-      ? JSON.parse(localStorage.getItem("user"))
-      : null);
+  const currentUser = getSessionUser();
 
   const companyId = currentUser?.companyId;
   const userRole = currentUser?.role;

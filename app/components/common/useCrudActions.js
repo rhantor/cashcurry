@@ -1,7 +1,8 @@
 // app/components/common/useCrudActions.js
 "use client";
 import { useCallback, useState } from "react";
-import { getCurrentUser, hasRole, ALLOWED_EDIT_ROLES, ALLOWED_DELETE_ROLES } from "@/lib/authz/roles";
+import { hasRole, ALLOWED_EDIT_ROLES, ALLOWED_DELETE_ROLES } from "@/lib/authz/roles";
+import { getSessionUser } from "@/lib/session";
 
 /**
  * Generic CRUD action helpers using your RTK hooks.
@@ -12,7 +13,7 @@ export default function useCrudActions({
   useDeleteMutationHook,
 }) {
   const [confirmingDelete, setConfirmingDelete] = useState(null); // the item being deleted
-  const currentUser = getCurrentUser();
+  const currentUser = getSessionUser();
   const canEdit = hasRole(currentUser, ALLOWED_EDIT_ROLES);
   const canDelete = hasRole(currentUser, ALLOWED_DELETE_ROLES);
 

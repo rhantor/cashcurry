@@ -11,6 +11,7 @@ import { useGetStaffListQuery } from '@/lib/redux/api/staffApiSlice'
 import {
   useAddStaffLoanMutation,
 } from '@/lib/redux/api/staffLoanApiSlice'
+import { getSessionUser } from '@/lib/session'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -194,7 +195,7 @@ const AdvanceForm = ({ staffList, staffLoading, companyId, branchId, isAdminOrMa
   const handleSubmit = async e => {
     e.preventDefault()
     if (!canSubmit) return
-    const createdBy = JSON.parse(localStorage.getItem('user') || '{}')
+    const createdBy = (getSessionUser() || {})
     const selectedStaff = staffList.find(s => s.id === staffId)
     const approved = isAdminOrManager
 
@@ -400,7 +401,7 @@ const LoanForm = ({ staffList, staffLoading, companyId, branchId, isAdminOrManag
   const handleSubmit = async e => {
     e.preventDefault()
     if (!canSubmit) return
-    const createdBy = JSON.parse(localStorage.getItem('user') || '{}')
+    const createdBy = (getSessionUser() || {})
     const selectedStaff = staffList.find(s => s.id === staffId)
     const approved = isAdminOrManager
 
@@ -643,7 +644,7 @@ const AdvanceLoanEntry = () => {
   const [currentUser, setCurrentUser] = useState(null)
 
   useEffect(() => {
-    const parsed = JSON.parse(localStorage.getItem('user') || '{}')
+    const parsed = (getSessionUser() || {})
     setCompanyId(parsed.companyId || null)
     setBranchId(parsed.branchId   || null)
     setCurrentUserRole(parsed.role || null)

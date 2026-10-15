@@ -8,6 +8,7 @@ import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { FaUpload, FaFileAlt, FaFilePdf, FaTrash, FaSpinner, FaCheckCircle, FaExclamationCircle } from "react-icons/fa";
 import useCurrency from "@/app/hooks/useCurrency";
 import { useDefaultDate } from "@/app/hooks/useRegion";
+import { getSessionUser } from "@/lib/session";
 
 const CATEGORIES = [
   "Supplier Payment",
@@ -47,9 +48,9 @@ export default function CashWithdrawPage() {
   const [addWithdrawEntry, { isLoading: isSaving }] = useAddWithdrawEntryMutation();
 
   useEffect(() => {
-    const stored = localStorage.getItem("user");
+    const stored = getSessionUser();
     if (stored) {
-      const u = JSON.parse(stored);
+      const u = stored;
       setCompanyId(u.companyId);
       setBranchId(u.branchId);
     }
@@ -141,8 +142,8 @@ export default function CashWithdrawPage() {
       const uploadedUrls = await uploadReceipts();
 
       // 2. Prepare Data
-      const storedUser = localStorage.getItem("user");
-      const createdBy = storedUser ? JSON.parse(storedUser) : {};
+      const storedUser = getSessionUser();
+      const createdBy = storedUser ? storedUser : {};
 
       const data = {
         date,

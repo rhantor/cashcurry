@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useParams } from "next/navigation";
-import { getUserFromLocalStorage } from "@/lib/getUserFromLocalStorage";
+import { getSessionUser } from "@/lib/session";
 import {
   useGetBranchesQuery,
   useUpdateBranchMutation,
@@ -21,7 +21,7 @@ import UserModal from "./UserModal";
 import AddBranchUserModal from "@/app/components/settings/users/modals/AddBranchUserModal";
 
 const BranchDetailsPage = () => {
-  const user = getUserFromLocalStorage();
+  const user = getSessionUser();
   const { branchId } = useParams();
   const {
     data: branches,
