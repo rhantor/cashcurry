@@ -35,6 +35,14 @@ export default function RootLayout({ children }) {
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <ClientLayoutWrapper>{children}</ClientLayoutWrapper>
+        {process.env.NEXT_PUBLIC_USE_EMULATOR === "true" && (
+          <div
+            className="fixed bottom-3 right-3 z-[100] pointer-events-none rounded-full bg-amber-500 px-3 py-1 text-xs font-bold tracking-wide text-white shadow-lg"
+            title="Connected to the local Firebase emulators, not production"
+          >
+            LOCAL DATA
+          </div>
+        )}
         <Analytics />
       </body>
     </html>
