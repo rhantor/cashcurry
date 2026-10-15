@@ -12,9 +12,9 @@ import { useBusinessToday } from "@/app/hooks/useRegion";
 import { formatMoney } from "@/lib/region";
 import { isLeaveRequest } from "@/lib/finance/rules";
 
-// Roles allowed to hand over money. Cashiers join once the database rules
-// are tightened (roadmap 2.1) — today they cannot write staff loans.
-export const PAYER_ROLES = ["branchAdmin", "manager", "accountant", "supervisor", "owner", "gm", "superAdmin"];
+// Roles allowed to hand over money — the same list the database rules
+// enforce (firestore.rules: isPayer).
+export const PAYER_ROLES = ["branchAdmin", "manager", "accountant", "supervisor", "cashier", "owner", "gm", "superAdmin"];
 
 const showDate = (d) => (/^\d{4}-\d{2}-\d{2}$/.test(d || "") ? format(parseISO(d), "d MMM yyyy") : d || "-");
 
@@ -161,7 +161,7 @@ export default function PayOutQueue({ companyId, branchId, user, title = "Waitin
           );
         })}
       </ul>
-      {!canPay && <p className="text-xs text-amber-800">Only a manager, accountant, supervisor or branch admin can mark these paid.</p>}
+      {!canPay && <p className="text-xs text-amber-800">Only a cashier, supervisor, accountant, manager or branch admin can mark these paid.</p>}
     </div>
   );
 }

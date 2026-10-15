@@ -26,12 +26,22 @@ service firebase.storage {
       return u.role in ['owner', 'gm', 'superAdmin', 'superadmin'];
     }
 
-    // Can the user access files belonging to this company's branch?
+    // Can the user open this branch's files (receipts, salary sheets, bills…)?
+    // Company roles, or the branch's own users — not staff (these are finance
+    // documents; firestore.rules canRead draws the same line).
     function canAccessBranch(companyId, branchId) {
       let u = userData();
       return isAuth() && u.companyId == companyId && (
         isCompanyRole(u) ||
-        u.branchId == branchId
+        (u.get('branchId', null) == branchId && u.role != 'staff')
+      );
+    }
+
+    // Anyone who works at the branch, staff included (staff photos).
+    function isBranchMember(companyId, branchId) {
+      let u = userData();
+      return isAuth() && u.companyId == companyId && (
+        isCompanyRole(u) || u.get('branchId', null) == branchId
       );
     }
 
@@ -41,7 +51,7 @@ service firebase.storage {
       let u = userData();
       return isAuth() && u.companyId == companyId && (
         isCompanyRole(u) ||
-        (u.branchId == branchId &&
+        (u.get('branchId', null) == branchId &&
           (isBranchAdmin(u) || u.role in ['manager', 'accountant', 'supervisor']))
       );
     }
@@ -51,7 +61,7 @@ service firebase.storage {
       let u = userData();
       return isAuth() && u.companyId == companyId && (
         u.role == 'owner' ||
-        (u.branchId == branchId && isBranchAdmin(u))
+        (u.get('branchId', null) == branchId && isBranchAdmin(u))
       );
     }
 
@@ -148,7 +158,7 @@ service firebase.storage {
     // Staff Photos: staffPhotos/{companyId}/{branchId}/{filename}
     // ─────────────────────────────────────────────────────────────────────────
     match /staffPhotos/{companyId}/{branchId}/{filename} {
-      allow read: if canAccessBranch(companyId, branchId);
+      allow read: if isBranchMember(companyId, branchId);
       allow create, update: if canUpload(companyId, branchId) &&
         request.resource.size <= 5 * 1024 * 1024 &&
         request.resource.contentType.matches('image/.*');
@@ -160,7 +170,7 @@ service firebase.storage {
     // Note: segment is "{branchId}_to_{otherId}" — company-level check only
     // ─────────────────────────────────────────────────────────────────────────
     match /loanRepayments/{companyId}/{segment}/{filename} {
-      allow read: if belongsToCompany(companyId);
+      allow read: if belongsToCompany(companyId) && userData().role != 'staff';
       allow create, update: if canWriteCompanyLevel(companyId) &&
         request.resource.size <= 10 * 1024 * 1024;
       allow delete: if isAuth() && userData().companyId == companyId &&

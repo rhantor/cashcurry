@@ -87,5 +87,24 @@ function localLoginEnv() {
   }
 }
 
+// Auto-save every 5 minutes. Data is otherwise saved only on a clean Ctrl+C;
+// if the emulators crash or the window is closed, everything since the last
+// save would be lost.
+const AUTOSAVE_MS = 5 * 60 * 1000;
+let saving = false;
+setInterval(() => {
+  if (saving || stopping) return;
+  saving = true;
+  const child = spawn(
+    "firebase",
+    ["emulators:export", `"${EMULATOR_DATA_DIR}"`, "--force", "--project", LOCAL_PROJECT_ID],
+    { cwd: ROOT, stdio: "ignore", shell: true }
+  );
+  child.on("exit", (code) => {
+    saving = false;
+    if (code === 0) console.log(`  [local data saved ${new Date().toLocaleTimeString()}]`);
+  });
+}, AUTOSAVE_MS).unref();
+
 console.log("\n  Local data ready — emulator dashboard: http://127.0.0.1:4000\n");
 run("npx", ["next", "dev"], { ...NEXT_LOCAL_ENV, ...localLoginEnv() });
