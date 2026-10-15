@@ -53,3 +53,6 @@ certificates
 firebase-debug.log
 firestore-debug.log
 ui-debug.log
+
+# finance golden figures are real client data — keep out of the (public) repo
+tests/finance/__golden__/
