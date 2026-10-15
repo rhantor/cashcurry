@@ -9,6 +9,7 @@ const {
   onDocumentCreated,
   onDocumentWritten,
 } = require("firebase-functions/v2/firestore");
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { setGlobalOptions } = require("firebase-functions/v2");
 
 if (!admin.apps.length) admin.initializeApp();
@@ -357,186 +358,77 @@ exports.auditVendorBills = makeAuditTrigger(
 );
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 📊 MONTHLY SUMMARY ROLLUPS
+// 📊 MONTHLY SUMMARIES
 //
-// On every write (create / update / delete) to a financial collection, we do a
-// FULL RECOMPUTE of that month's total from Firestore. No deltas, no increments.
-// Slower per write but 100% accurate — critical for hand-in-cash calculations.
+// companies/{companyId}/branches/{branchId}/summaries/{YYYY-MM}: each month's
+// cash and bank movement and totals, computed by the app's own finance engine
+// (functions/summaries.js). Dashboards add these up instead of downloading
+// every record ever entered, and check their counts before trusting them.
 //
-// Writes to: companies/{companyId}/branches/{branchId}/summaries/{YYYY-MM}
-// Stored fields (merge: true so collections don't overwrite each other):
-//   totalSales, totalCosts, totalDeposits, totalWithdrawals,
-//   totalAdvances, totalSalaries  + their *Count counterparts
-//
-// NOTE: handInCash / bankExpected / bankedSales are NOT stored here.
-//       Those depend on tender settings and opening balance — they stay
-//       client-side in useBranchData where they've been validated.
+// Any write recomputes the whole month(s) it touches; retry on failure, and a
+// nightly pass recomputes this month and last month for every branch.
 // ─────────────────────────────────────────────────────────────────────────────
+const summaries = require("./summaries");
 
-/** "2026-04" → "2026-05" (handles Dec → Jan correctly) */
-function nextMonthStr(month) {
-  const [y, m] = month.split("-").map(Number);
-  return m === 12
-    ? `${y + 1}-01`
-    : `${y}-${String(m + 1).padStart(2, "0")}`;
-}
-
-/**
- * Extract YYYY-MM from a Firestore document's data.
- * Prefers the `date` string field (YYYY-MM-DD) used by all entry forms.
- * Falls back to `createdAt` timestamp if `date` is absent.
- */
-function getDocMonth(data) {
-  if (!data) return null;
-  const d = data.date;
-  if (typeof d === "string" && /^\d{4}-\d{2}/.test(d)) return d.slice(0, 7);
-  const ts = data.createdAt;
-  if (ts?.toDate) return ts.toDate().toISOString().slice(0, 7);
-  return null;
-}
-
-/**
- * Re-query the entire month's data for one collection and write the
- * accurate total into the branch summary doc (merge: true).
- */
-async function recomputeAndWriteSummary({
-  companyId,
-  branchId,
-  collectionName,
-  month,
-  totalField,
-  countField,
-  amountFn,
-}) {
-  const start     = `${month}-01`;
-  const end       = nextMonthStr(month); // exclusive upper bound
-
-  const snap = await db
-    .collection(`companies/${companyId}/branches/${branchId}/${collectionName}`)
-    .where("date", ">=", start)
-    .where("date", "<", end)
-    .get();
-
-  let total = 0;
-  snap.docs.forEach((d) => {
-    const v = amountFn(d.data());
-    if (Number.isFinite(v) && v > 0) total += v;
-  });
-
-  // Round to 2 decimal places to avoid floating-point drift
-  const rounded = Math.round(total * 100) / 100;
-
-  const summaryRef = db.doc(
-    `companies/${companyId}/branches/${branchId}/summaries/${month}`
-  );
-
-  // merge: true → other collection totals in the same doc are preserved
-  await summaryRef.set(
-    {
-      period: month,
-      companyId,
-      branchId,
-      [totalField]: rounded,
-      [countField]: snap.size,
-      updatedAt: FieldValue.serverTimestamp(),
-    },
-    { merge: true }
-  );
-
-  console.log(
-    `[rollup] ${collectionName} ${companyId}/${branchId}/${month}` +
-    ` → ${totalField}=${rounded} (${snap.size} docs)`
-  );
-}
-
-/** Amount extractors — must match exactly what useBranchData uses client-side */
-const ROLLUP_CONFIG = {
-  sales: {
-    totalField: "totalSales",
-    countField: "salesCount",
-    // Prefer saved `total`; fall back to `amount` (matches saleTotalDynamic simple case)
-    amountFn: (d) => Number(d.total ?? d.amount ?? 0),
-  },
-  costs: {
-    totalField: "totalCosts",
-    countField: "costsCount",
-    amountFn: (d) => Number(d.amount ?? d.total ?? d.costAmount ?? 0),
-  },
-  deposits: {
-    totalField: "totalDeposits",
-    countField: "depositsCount",
-    amountFn: (d) => Number(d.amount ?? 0),
-  },
-  cashWithdrawals: {
-    totalField: "totalWithdrawals",
-    countField: "withdrawalsCount",
-    amountFn: (d) => Number(d.amount ?? 0),
-  },
-  advances: {
-    totalField: "totalAdvances",
-    countField: "advancesCount",
-    amountFn: (d) => Number(d.amount ?? 0),
-  },
-  salaries: {
-    totalField: "totalSalaries",
-    countField: "salariesCount",
-    // Match useBranchData: totalSalary ?? amount ?? total ?? total_amount
-    amountFn: (d) =>
-      Number(d.totalSalary ?? d.amount ?? d.total ?? d.total_amount ?? 0),
-  },
-};
-
-/**
- * Factory: returns an onDocumentWritten trigger for one collection.
- * Handles create, update (including date changes), and delete.
- */
-function makeRollupTrigger(collectionName, config) {
-  const path = `companies/{companyId}/branches/{branchId}/${collectionName}/{docId}`;
-
-  return onDocumentWritten(path, async (event) => {
-    const { companyId, branchId } = event.params;
-    const before = event.data?.before?.exists ? event.data.before.data() : null;
-    const after  = event.data?.after?.exists  ? event.data.after.data()  : null;
-
-    // Collect every month that may have changed (handles date edits on updates)
-    const months = new Set();
-    const bm = getDocMonth(before);
-    const am = getDocMonth(after);
-    if (bm) months.add(bm);
-    if (am) months.add(am);
-
-    if (!months.size) {
-      console.warn(
-        `[rollup] ${collectionName} ${companyId}/${branchId}: no valid date found, skipping`
-      );
-      return;
+function makeSummaryTrigger(collection) {
+  return onDocumentWritten(
+    { document: `companies/{companyId}/branches/{branchId}/${collection}/{docId}`, retry: true },
+    async (event) => {
+      const { companyId, branchId } = event.params;
+      const months = summaries.monthsTouched(collection, event.data?.before?.data(), event.data?.after?.data());
+      for (const month of months) await summaries.recomputeSummary(db, companyId, branchId, month);
     }
+  );
+}
 
-    for (const month of months) {
-      try {
-        await recomputeAndWriteSummary({
-          companyId,
-          branchId,
-          collectionName,
-          month,
-          ...config,
-        });
-      } catch (err) {
-        console.error(
-          `[rollup] failed for ${collectionName} ${companyId}/${branchId}/${month}:`,
-          err
-        );
+exports.summarySales = makeSummaryTrigger("sales");
+exports.summaryCosts = makeSummaryTrigger("costs");
+exports.summaryAdvances = makeSummaryTrigger("advances");
+exports.summaryStaffLoans = makeSummaryTrigger("loans");
+exports.summaryDeposits = makeSummaryTrigger("deposits");
+exports.summaryWithdrawals = makeSummaryTrigger("cashWithdrawals");
+exports.summarySalaries = makeSummaryTrigger("salaries");
+
+// Loans between branches move both branches' cash.
+exports.summaryBranchLoans = onDocumentWritten(
+  { document: "companies/{companyId}/loans/{loanId}", retry: true },
+  async (event) => {
+    const { companyId } = event.params;
+    const touched = summaries.loanTouches(event.data?.before?.data(), event.data?.after?.data());
+    for (const { branchId, month } of touched) await summaries.recomputeSummary(db, companyId, branchId, month);
+  }
+);
+
+// Payment-method settings decide cash vs bank: recompute the branch's history.
+exports.summaryBranchSettings = onDocumentWritten(
+  { document: "companies/{companyId}/branches/{branchId}/settings/settings", retry: true, timeoutSeconds: 540 },
+  async (event) => {
+    const { companyId, branchId } = event.params;
+    await summaries.rebuildBranch(db, companyId, branchId);
+  }
+);
+
+exports.summaryNightly = onSchedule(
+  { schedule: "every day 04:00", timeZone: "Asia/Kuala_Lumpur", timeoutSeconds: 540 },
+  async () => {
+    // Last month and this month in any branch's time zone (UTC−12…+14).
+    const day = 24 * 3600 * 1000;
+    const months = [...new Set([-32, -1, 0, 1].map((d) => new Date(Date.now() + d * day).toISOString().slice(0, 7)))].sort();
+    const companies = await db.collection("companies").listDocuments();
+    for (const company of companies) {
+      const branches = await company.collection("branches").listDocuments();
+      for (const branch of branches) {
+        for (const month of months) {
+          try {
+            await summaries.recomputeSummary(db, company.id, branch.id, month);
+          } catch (err) {
+            console.error("[summaryNightly]", company.id, branch.id, month, err);
+          }
+        }
       }
     }
-  });
-}
-
-exports.rollupSales         = makeRollupTrigger("sales",           ROLLUP_CONFIG.sales);
-exports.rollupCosts         = makeRollupTrigger("costs",           ROLLUP_CONFIG.costs);
-exports.rollupDeposits      = makeRollupTrigger("deposits",        ROLLUP_CONFIG.deposits);
-exports.rollupWithdrawals   = makeRollupTrigger("cashWithdrawals", ROLLUP_CONFIG.cashWithdrawals);
-exports.rollupAdvances      = makeRollupTrigger("advances",        ROLLUP_CONFIG.advances);
-exports.rollupSalaries      = makeRollupTrigger("salaries",        ROLLUP_CONFIG.salaries);
+  }
+);
 
 // 🔔 cash deposit trigger (bank deposit)
 exports.onDepositCreated = onDocumentCreated(

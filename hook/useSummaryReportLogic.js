@@ -1,4 +1,3 @@
-/* eslint-disable no-case-declarations */
 import { useMemo } from 'react'
 import { endOfWeek, format, parseISO, startOfWeek, subDays } from 'date-fns'
 import { makeFilterText } from '@/utils/export/exportSummary'
@@ -17,9 +16,10 @@ import { useGetWithdrawEntriesQuery } from '@/lib/redux/api/cashWithdrawApiSlice
 import { useGetCompanyDetailsQuery } from '@/lib/redux/api/authApiSlice'
 import { buildLedger } from '@/lib/finance/ledger'
 import { useBusinessToday } from '@/app/hooks/useRegion'
+import useLedgerSource from '@/app/hooks/useLedgerSource'
 import {
   num, saleDay, costDay, advanceDay, staffLoanDay, depositDay,
-  salaryDay, withdrawalDay, branchLoanMovements,
+  salaryDay, withdrawalDay, branchLoanMovements, branchTimeZone,
 } from '@/lib/finance/rules'
 
 // --- 1. Static Helper Functions ---
@@ -48,6 +48,38 @@ const mergeNotes = (acc, next) => {
   return out
 }
 
+/**
+ * The period a filter asks for, or null for "all" (first to last record,
+ * known only once every record is loaded).
+ */
+const requestedRange = (filterState, businessToday) => {
+  const today = parseISO(businessToday)
+  const lastWeek = { from: subDays(today, 6), to: today }
+  switch (filterState.filterType) {
+    case 'all':
+      return null
+    case 'weekly':
+      return { from: startOfWeek(today, { weekStartsOn: 1 }), to: endOfWeek(today, { weekStartsOn: 1 }) }
+    case 'monthly':
+    case 'thisMonth':
+      return { from: new Date(today.getFullYear(), today.getMonth(), 1), to: today }
+    case 'lastMonth':
+      return { from: new Date(today.getFullYear(), today.getMonth() - 1, 1), to: new Date(today.getFullYear(), today.getMonth(), 0) }
+    case 'month': {
+      const [y, m] = (filterState.selectedMonth || '').split('-').map(Number)
+      return y && m ? { from: new Date(y, m - 1, 1), to: new Date(y, m, 0) } : lastWeek
+    }
+    case 'range':
+      return {
+        from: filterState.dateRange.from ? parseISO(filterState.dateRange.from) : lastWeek.from,
+        to: filterState.dateRange.to ? parseISO(filterState.dateRange.to) : lastWeek.to,
+      }
+    case 'last7days':
+    default:
+      return lastWeek
+  }
+}
+
 // --- 2. The Hook ---
 
 export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId = null) => {
@@ -59,29 +91,12 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
   const baseArgs =
     ready && companyId && branchId ? { companyId, branchId } : null
 
+  // "Today" is the branch's business date (its clock, after the day cut-off).
+  const businessToday = useBusinessToday()
+  const requested = useMemo(() => requestedRange(filterState, businessToday), [filterState, businessToday])
+
   // Queries
-  const { data: settings } = useGetBranchSettingsQuery(
-    baseArgs ? baseArgs : skipToken
-  )
-  const { data: sales = [], isLoading: loadingSales } = useGetSalesEntriesQuery(
-    baseArgs ? baseArgs : skipToken
-  )
-  const { data: costs = [], isLoading: loadingCosts } = useGetCostEntriesQuery(
-    baseArgs ? baseArgs : skipToken
-  )
-  const { data: advances = [], isLoading: loadingAdvances } = useGetAdvanceEntriesQuery(
-    baseArgs ? baseArgs : skipToken
-  )
-  const { data: staffLoans = [], isLoading: loadingStaffLoans } = useGetStaffLoansQuery(
-    baseArgs ? baseArgs : skipToken
-  )
-  const { data: deposits = [], isLoading: loadingDeposits } = useGetDepositEntryQuery(
-    baseArgs ? baseArgs : skipToken
-  )
-  const { data: salaries = [], isLoading: loadingSalaries } = useGetSalaryEntriesQuery(
-    baseArgs ? baseArgs : skipToken
-  )
-  const { data: withdrawals = [], isLoading: loadingWithdrawals } = useGetWithdrawEntriesQuery(
+  const { data: settings, isLoading: loadingSettings } = useGetBranchSettingsQuery(
     baseArgs ? baseArgs : skipToken
   )
   const { data: loanActs = [], isLoading: loadingLoanActs } = useGetLoanActivitiesQuery(
@@ -89,6 +104,26 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
       ? { ...baseArgs, direction: 'all', status: 'approved', type: 'all', pageLimit: 0 } // every loan: cash needs the full history
       : skipToken
   )
+  // Records from the 1st of the period's month when the monthly summaries
+  // cover everything earlier; otherwise (or for "all") the full history.
+  const source = useLedgerSource({
+    companyId,
+    branchId,
+    fromKey: requested ? format(requested.from, 'yyyy-MM-dd') : null,
+    settings,
+    settingsReady: !!baseArgs && !loadingSettings,
+    loanActivities: loanActs,
+    loansReady: !!baseArgs && !loadingLoanActs,
+  })
+  const recordArgs = !baseArgs || !source.ready ? skipToken : source.since ? { ...baseArgs, since: source.since } : baseArgs
+
+  const { data: sales = [], isLoading: loadingSales } = useGetSalesEntriesQuery(recordArgs)
+  const { data: costs = [], isLoading: loadingCosts } = useGetCostEntriesQuery(recordArgs)
+  const { data: advances = [], isLoading: loadingAdvances } = useGetAdvanceEntriesQuery(recordArgs)
+  const { data: staffLoans = [], isLoading: loadingStaffLoans } = useGetStaffLoansQuery(recordArgs)
+  const { data: deposits = [], isLoading: loadingDeposits } = useGetDepositEntryQuery(recordArgs)
+  const { data: salaries = [], isLoading: loadingSalaries } = useGetSalaryEntriesQuery(recordArgs)
+  const { data: withdrawals = [], isLoading: loadingWithdrawals } = useGetWithdrawEntriesQuery(recordArgs)
   const { data: branches = [] } = useGetBranchesBasicQuery(companyId || skipToken)
   const { data: currentBranch } = useGetSingleBranchQuery(
     baseArgs ? baseArgs : skipToken
@@ -99,6 +134,7 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
   // Otherwise a fully-zeroed table flashes before the real numbers arrive.
   const isLoading =
     !ready ||
+    !source.ready ||
     loadingSales ||
     loadingCosts ||
     loadingAdvances ||
@@ -117,76 +153,31 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
     settings?.basic?.name ||
     getBranchName(branchId)
 
-  // "Today" is the branch's business date (its clock, after the day cut-off).
-  const businessToday = useBusinessToday()
-
   // Date Range Logic
   const dateRange = useMemo(() => {
+    if (requested) return requested
+    // "All": from the first to the last day anything was recorded.
     const today = parseISO(businessToday)
     let from = subDays(today, 6)
     let to = today
-
-    const parseYyyyMm = ym => {
-      const [y, m] = (ym || '').split('-').map(Number)
-      if (!y || !m) return null
-      return { from: new Date(y, m - 1, 1), to: new Date(y, m, 0) }
-    }
-
-    switch (filterState.filterType) {
-      case 'all': {
-        // From the first to the last day anything was recorded.
-        const collectDates = [
-          ...sales.map(saleDay),
-          ...costs.map(costDay),
-          ...advances.map(advanceDay),
-          ...staffLoans.map(staffLoanDay),
-          ...deposits.map(depositDay),
-          ...salaries.map(salaryDay),
-          ...withdrawals.map(withdrawalDay),
-          ...branchLoanMovements(loanActs, branchId).map(m => m.day),
-        ].filter(Boolean)
-        if (collectDates.length) {
-          collectDates.sort()
-          from = parseISO(collectDates[0])
-          to = parseISO(collectDates[collectDates.length - 1])
-        }
-        break
-      }
-      case 'weekly':
-        from = startOfWeek(today, { weekStartsOn: 1 })
-        to = endOfWeek(today, { weekStartsOn: 1 })
-        break
-      case 'monthly':
-      case 'thisMonth':
-        from = new Date(today.getFullYear(), today.getMonth(), 1)
-        to = today
-        break
-      case 'lastMonth':
-        from = new Date(today.getFullYear(), today.getMonth() - 1, 1)
-        to = new Date(today.getFullYear(), today.getMonth(), 0)
-        break
-      case 'month':
-        const picked = parseYyyyMm(filterState.selectedMonth)
-        if (picked) {
-          from = picked.from
-          to = picked.to
-        }
-        break
-      case 'range':
-        from = filterState.dateRange.from
-          ? parseISO(filterState.dateRange.from)
-          : from
-        to = filterState.dateRange.to ? parseISO(filterState.dateRange.to) : to
-        break
-      case 'last7days':
-      default:
-        from = subDays(today, 6)
-        to = today
-        break
+    const collectDates = [
+      ...sales.map(saleDay),
+      ...costs.map(costDay),
+      ...advances.map(advanceDay),
+      ...staffLoans.map(staffLoanDay),
+      ...deposits.map(depositDay),
+      ...salaries.map(salaryDay),
+      ...withdrawals.map(withdrawalDay),
+      ...branchLoanMovements(loanActs, branchId, branchTimeZone(settings)).map(m => m.day),
+    ].filter(Boolean)
+    if (collectDates.length) {
+      collectDates.sort()
+      from = parseISO(collectDates[0])
+      to = parseISO(collectDates[collectDates.length - 1])
     }
     return { from, to }
   }, [
-    filterState,
+    requested,
     sales,
     costs,
     advances,
@@ -196,6 +187,7 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
     withdrawals,
     loanActs,
     branchId,
+    settings,
     businessToday
   ])
 
@@ -208,8 +200,9 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
         records: { sales, costs, advances, staffLoans, deposits, salaries, withdrawals, loanActivities: loanActs },
         from: format(dateRange.from, 'yyyy-MM-dd'),
         to: format(dateRange.to, 'yyyy-MM-dd'),
+        carriedIn: source.carriedIn,
       }),
-    [branchId, settings, sales, costs, advances, staffLoans, deposits, salaries, withdrawals, loanActs, dateRange]
+    [branchId, settings, sales, costs, advances, staffLoans, deposits, salaries, withdrawals, loanActs, dateRange, source.carriedIn]
   )
 
   const tenderDefs = ledger.tenders.defs

@@ -89,8 +89,8 @@ const money = (n) => n.toFixed(2);
 export function buildDemoCompany(today = new Date()) {
   const day1 = startOfDay(addDays(today, -6));
   const dateOf = (d) => format(addDays(day1, d - 1), "yyyy-MM-dd");
-  // A timestamp on that local day (2pm), as the app would record it.
-  const at = (d, hour = 14) => new Date(addDays(day1, d - 1).getTime() + hour * 3600e3).toISOString();
+  // Times of day on the demo branches' clock (Malaysia), whatever this machine's zone.
+  const at = (d, hour = 14) => new Date(Date.parse(`${dateOf(d)}T00:00:00+08:00`) + hour * 3600e3).toISOString();
   const days = Object.fromEntries([1, 2, 3, 4, 5, 6, 7].map((d) => [d, dateOf(d)]));
   const createdAt = at(0, 9);
 

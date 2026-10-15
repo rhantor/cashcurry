@@ -13,7 +13,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:golden:update": "node scripts/test-golden-update.mjs",
-    "test:rules": "node scripts/test-rules.mjs"
+    "test:rules": "node scripts/test-rules.mjs",
+    "summaries:rebuild": "node scripts/summaries-rebuild.mjs"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.8.2",
@@ -52,6 +53,7 @@
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",
     "@types/react": "19.1.12",
+    "esbuild": "^0.28.2",
     "eslint": "^9.33.0",
     "eslint-config-next": "15.4.6",
     "eslint-plugin-react": "^7.37.5",

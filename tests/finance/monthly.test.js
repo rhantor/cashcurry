@@ -4,7 +4,7 @@
 import { describe, it, expect } from "vitest";
 import { buildLedger } from "@/lib/finance/ledger";
 import { DATE_FIELD, dayKey } from "@/lib/finance/rules";
-import { summarizeMonth, carriedInto, summariesCover, monthOf, monthBounds, ENGINE_VERSION } from "@/lib/finance/monthly";
+import { summarizeMonth, carriedInto, summariesCover, loanCountsByMonth, monthOf, monthBounds, ENGINE_VERSION } from "@/lib/finance/monthly";
 import { buildDemoCompany } from "@/scripts/local/demo/demoCompany.mjs";
 import { hasBackup, loadBackup, monthsCovered } from "./dataset";
 
@@ -78,8 +78,10 @@ describe("the safety check", () => {
   const records = branchRecords(demo.dataset, b);
   const months = ["2026-09", "2026-10"];
   const summaries = months.map((month) => summarizeMonth({ branchId: b.id, settings: b.settings, records, month }));
-  const countsBefore = (month) =>
-    Object.fromEntries(Object.keys(DATE_FIELD).map((col) => [col, records[col].filter((r) => (monthOf(r[DATE_FIELD[col]]) || "9999") < month).length]));
+  const countsBefore = (month) => ({
+    ...Object.fromEntries(Object.keys(DATE_FIELD).map((col) => [col, records[col].filter((r) => (monthOf(r[DATE_FIELD[col]]) || "9999") < month).length])),
+    loanActivities: Object.entries(loanCountsByMonth(records.loanActivities, b.id, b.settings)).filter(([m]) => m < month).reduce((n, [, c]) => n + c, 0),
+  });
 
   it("trusts complete, current summaries", () => {
     expect(summariesCover("2026-11", { summaries, countsBefore: countsBefore("2026-11") })).toBe(true);
@@ -97,5 +99,10 @@ describe("the safety check", () => {
   it("refuses when the server counts a record the summaries did not see", () => {
     const counts = countsBefore("2026-11");
     expect(summariesCover("2026-11", { summaries, countsBefore: { ...counts, costs: counts.costs + 1 } })).toBe(false);
+  });
+
+  it("refuses when a loan between branches is missing from the summaries", () => {
+    const counts = countsBefore("2026-11");
+    expect(summariesCover("2026-11", { summaries, countsBefore: { ...counts, loanActivities: counts.loanActivities + 1 } })).toBe(false);
   });
 });

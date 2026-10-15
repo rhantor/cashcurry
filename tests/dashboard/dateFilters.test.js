@@ -51,7 +51,8 @@ describe("dayKey", () => {
   it("keeps a business date string exactly", () => {
     expect(dayKey("2026-09-12")).toBe("2026-09-12");
   });
-  it("puts a timestamp on the local calendar day", () => {
+  // The device's day by design; checked from Malaysia.
+  it.skipIf(process.env.TZ !== "Asia/Kuala_Lumpur")("puts a timestamp on the local calendar day", () => {
     expect(dayKey("2026-09-11T17:30:00.000Z")).toBe("2026-09-12"); // 1:30am in KL
     expect(dayKey({ seconds: Date.UTC(2026, 8, 11, 17, 30) / 1000 })).toBe("2026-09-12");
     expect(dayKey(at(2026, 9, 12, 23, 59))).toBe("2026-09-12");

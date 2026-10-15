@@ -109,6 +109,15 @@ export async function companyCharts(dataset, filter) {
   return centsDeep(out);
 }
 
+/** Which source the branch dashboard used ("fast" | "full"). */
+export function branchDataSource(dataset, branchId, filter) {
+  useDataset(dataset, branchId);
+  const { result, unmount } = renderHook(() => useBranchData(filter));
+  const out = result.current.dataSource;
+  unmount();
+  return out;
+}
+
 /** Branch dashboard KPIs for a dashboard filter ({ from, to, preset }). */
 export function branchDashboard(dataset, branchId, filter) {
   useDataset(dataset, branchId);

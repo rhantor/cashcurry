@@ -24,6 +24,9 @@ if (!useBackup) {
   console.log("Demo company built — walkthrough in .local/DEMO_GUIDE.md");
 }
 
+// The seed builds monthly summaries with the functions' engine bundle.
+spawnSync("node", ["scripts/build-functions-engine.mjs"], { cwd: ROOT, stdio: "inherit" });
+
 console.log(`Seeding local emulators from ${source}`);
 fs.rmSync(EMULATOR_DATA_DIR, { recursive: true, force: true });
 
