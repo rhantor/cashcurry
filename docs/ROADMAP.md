@@ -91,7 +91,7 @@ Needed before staff phones get direct access to the database (Phase 4).
 
 | # | Task | Status |
 |---|------|--------|
-| 3.1 | **Design system**: colours, type, spacing (light + dark), components — button, input, select, date picker, dialog, bottom sheet, toast, table, badge, empty state, skeleton. One icon set. A `/ui` preview page to review them | ⬜ |
+| 3.1 | **Design system** — `app/components/ui`: colour tokens for light and dark (mint brand kept; screens use bg-surface, text-fg, bg-brand…), motion presets (quick springs; reduced-motion respected), Button (press, loading, success check), Card, Badge, Skeleton (shimmer), Loader, CountUp numbers, Field/Input/Select/Textarea (error shake), Switch, Tabs (sliding highlight), Dialog, bottom Sheet (drag to close), Toasts (stack, pause, swipe, promise), EmptyState, Stagger, page progress bar, Popover, Menu, Tooltip, Avatar, DatePicker/DateRangePicker (business-day aware), DataTable (sort, paging, cards on phones). One icon set (lucide); react-icons removed. Review at `/ui` | ✅ |
 | 3.2 | **App shell**: new sidebar + top bar, branch switcher, search/command bar (Ctrl+K), mobile bottom navigation, instant page frame while data loads | ⬜ |
 | 3.3 | Replace all 113 `alert()` and 21 `confirm()` with toasts and proper dialogs | ⬜ |
 | 3.4 | Redesign screens, one pull request each: dashboards → sales & cost entry → summary/reports → approvals → staff → payroll → purchases → settings | ⬜ |
