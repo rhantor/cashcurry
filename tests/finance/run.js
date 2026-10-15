@@ -1,0 +1,73 @@
+// Render the app's real finance hooks against the fake backend and return the
+// figures each screen shows. The calling test file must mock the data layer
+// (see finance.test.js).
+import { renderHook, waitFor } from "@testing-library/react";
+import { useSummaryReportLogic } from "@/hook/useSummaryReportLogic";
+import useBranchData from "@/utils/dashboard/useBranchData";
+import useCompanyData from "@/utils/dashboard/useCompanyData";
+import { useDataset } from "./fakeBackend";
+
+/** Round to cents; turns -0 into 0 so goldens don't flip on sign of zero. */
+export const cents = (v) => {
+  const r = Math.round((Number(v) || 0) * 100) / 100;
+  return Object.is(r, -0) ? 0 : r;
+};
+const pick = (obj, keys) => Object.fromEntries(keys.map((k) => [k, cents(obj[k])]));
+
+/** "2026-09" → the period the dashboards' "This Month" filter covers. */
+export function monthFilter(month) {
+  const [y, m] = month.split("-").map(Number);
+  const last = new Date(y, m, 0).getDate();
+  return { from: new Date(y, m - 1, 1), to: new Date(y, m - 1, last, 23, 59, 59), preset: "month" };
+}
+
+export const SUMMARY_KEYS = [
+  "handInCash", "bankBalance", "netTotal", "totalSales", "totalCashSales", "totalBankedSales",
+  "foodDelivery", "totalCostFront", "totalCostBack", "totalAdvances", "totalLoanGiven",
+  "periodDeposits", "periodWithdrawals",
+];
+
+export const BRANCH_DASHBOARD_KEYS = [
+  "handInCash", "bankExpected", "totalSales", "totalCash", "bankedSales", "totalCosts",
+  "totalCostsFront", "totalCostsBack", "totalSal", "totalAdv", "totalStaffLoanCash",
+  "totalDep", "totalWdr", "deliveryTotal",
+];
+
+export const COMPANY_DASHBOARD_KEYS = [
+  "estCashOnHand", "effectiveBankedAfterWithdrawals", "totalSales", "totalCash", "bankedSales",
+  "totalCosts", "totalSal", "totalAdv", "totalDep", "totalWdr",
+];
+
+/** Summary report (reports page), "By Month" or "Date Range" filter. */
+export function summary(dataset, branchId, filterState) {
+  useDataset(dataset, branchId);
+  const { result, unmount } = renderHook(() => useSummaryReportLogic(filterState, "all"));
+  const kpis = result.current.computed.kpis;
+  unmount();
+  return pick(kpis, SUMMARY_KEYS);
+}
+
+export const summaryForMonth = (dataset, branchId, month) =>
+  summary(dataset, branchId, { filterType: "month", selectedMonth: month, dateRange: {} });
+
+/** Branch dashboard KPIs for a dashboard filter ({ from, to, preset }). */
+export function branchDashboard(dataset, branchId, filter) {
+  useDataset(dataset, branchId);
+  const { result, unmount } = renderHook(() => useBranchData(filter));
+  const out = pick(result.current, BRANCH_DASHBOARD_KEYS);
+  unmount();
+  return out;
+}
+
+/** Company dashboard KPIs for a dashboard filter. Loads asynchronously. */
+export async function companyDashboard(dataset, filter) {
+  useDataset(dataset, null);
+  localStorage.setItem("user", JSON.stringify({ companyId: dataset.companyId, role: "owner" }));
+  const { result, unmount } = renderHook(() => useCompanyData(filter));
+  await waitFor(() => {
+    if (result.current.loading) throw new Error("still loading");
+  });
+  const out = pick(result.current, COMPANY_DASHBOARD_KEYS);
+  unmount();
+  return out;
+}

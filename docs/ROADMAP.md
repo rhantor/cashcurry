@@ -32,7 +32,7 @@ Nothing here changes what users see. It lets us change things without fear.
 |---|------|--------|
 | 0.1 | Tidy git: commit the two pending access fixes (supervisor kiosk / attendance menu), start the local `dev` branch | ✅ |
 | 0.2 | Local Firebase emulator, seeded from the Saffron Empire backup, so development never touches live data — see [LOCAL_DEV.md](LOCAL_DEV.md) | ✅ |
-| 0.3 | Test setup (Vitest) + **golden finance tests**: hand-in-cash per branch per month, company total, must equal today's verified numbers | ⬜ |
+| 0.3 | Test setup (Vitest) + **golden finance tests**: hand-in-cash per branch per month, company total, must equal today's verified numbers — see [TESTING.md](TESTING.md) | ✅ |
 
 - **0.2 How you check:** `npm run dev:local` opens the app with real-looking data; changes you make there do not appear in production.
 - **0.3 How you check:** `npm test` prints the 36 branch-months and company totals, all passing.
@@ -49,6 +49,11 @@ Nothing here changes what users see. It lets us change things without fear.
 
 - **1.1 How you check:** branch dashboard, Lazeez BB, "Last 7 Days" shows the same cash as the summary report for the same dates.
 - **1.2 How you check:** golden tests unchanged; dashboards and summary show identical numbers; dashboards load faster.
+  Also fixes, found while building the tests: (a) the loan query behind hand-in-cash
+  reads only the 100 newest loan records — older loans would silently drop out once
+  the company passes 100; (b) the company dashboard dates salaries by entry time
+  (`createdAt`) while the summary uses the payment date, so they can differ at a
+  month boundary.
 - **1.3 How you check:** settings page has time zone / currency / day cut-off; a sale entered at 1am lands on the right business day.
 - **1.4 How you check:** a rejected advance does not change hand-in-cash; an approved one changes it only after "Mark paid".
 
