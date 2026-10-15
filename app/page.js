@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { sidebarItems } from "@/utils/dummyData";
+import { sidebarItems } from "@/app/components/shell/navigation";
 import useSession from "@/app/hooks/useSession";
 import { menuIcon } from "@/app/components/ui/icons";
 

@@ -1,14 +1,18 @@
-// utils/dummyData.js (only the small fix below)
+// The app's navigation: what each role sees in the sidebar, the phone's
+// bottom bar and the Ctrl+K search. `section` groups items in the sidebar;
+// `icon` names map to lucide icons in app/components/ui/icons.js.
 export const sidebarItems = {
   branchUser: [
     {
       label: 'Dashboard',
+      section: 'Overview',
       icon: 'MdOutlineSpaceDashboard',
       path: '/dashboard',
       allowedRoles: ['accountant', 'manager', 'branchAdmin']
-    }, // <-- fixed leading slash
+    },
     {
       label: 'Purchases',
+      section: 'Money',
       icon: 'MdShoppingCart',
       allowedRoles: ['manager', 'accountant', 'branchAdmin', 'supervisor'],
       children: [
@@ -24,6 +28,7 @@ export const sidebarItems = {
     },
     {
       label: 'Entries',
+      section: 'Daily work',
       icon: 'GrTransaction',
       allowedRoles: [
         'cashier',
@@ -73,6 +78,7 @@ export const sidebarItems = {
     },
     {
       label: 'Reports',
+      section: 'Money',
       icon: 'MdOutlineBarChart',
       allowedRoles: ['manager', 'accountant', 'branchAdmin'],
       children: [
@@ -88,26 +94,21 @@ export const sidebarItems = {
     },
     {
       label: 'Requested Panel',
+      section: 'Daily work',
       icon: 'MdOutlineRequestPage',
       path: '/requested-panel',
       allowedRoles: ['manager', 'branchAdmin']
     },
     {
       label: 'My Requested',
+      section: 'Daily work',
       icon: 'MdOutlineFactCheck',
       path: '/supervisor-panel',
       allowedRoles: ['supervisor']
     },
-    /*
-    {
-      label: 'Feeds',
-      icon: 'MdOutlineDynamicFeed',
-      path: '/feeds',
-      allowedRoles: ['manager', 'branchAdmin', 'accountant', 'supervisor']
-    },
-    */
     {
       label: 'Loans',
+      section: 'Money',
       icon: 'MdAttachMoney',
       allowedRoles: ['manager', 'branchAdmin', 'accountant'],
       children: [
@@ -135,30 +136,35 @@ export const sidebarItems = {
     },
     {
       label: 'Settings',
+      section: 'Admin',
       icon: 'IoSettingsSharp',
       path: '/settings',
       allowedRoles: ['gm', 'owner']
     },
     {
       label: 'Audit Log',
+      section: 'Admin',
       icon: 'MdOutlineManageSearch',
       path: '/branch-audit',
       allowedRoles: ['branchAdmin', 'manager']
     },
     {
       label: 'Branch Settings',
+      section: 'Admin',
       icon: 'IoSettingsSharp',
       path: '/branch-settings',
       allowedRoles: ['branchAdmin', 'manager']
     },
     {
       label: 'Staff Management',
+      section: 'Team',
       icon: 'MdPeopleOutline',
       path: '/staff-management',
       allowedRoles: ['branchAdmin', 'manager']
     },
     {
       label: 'Payroll',
+      section: 'Money',
       icon: 'MdOutlinePayments',
       allowedRoles: ['branchAdmin', 'manager'],
       children: [
@@ -169,6 +175,7 @@ export const sidebarItems = {
 
     {
       label: 'Attendance',
+      section: 'Daily work',
       icon: 'MdOutlineCalendarMonth',
       // Keep these in sync with the /attendance-log and /kiosk policies in
       // middleware.js — a child with no allowedRoles is shown to everyone, which
@@ -182,6 +189,7 @@ export const sidebarItems = {
 
     {
       label: 'Tools',
+      section: 'More',
       icon: 'MdAppRegistration',
       allowedRoles: [
         'cashier',
@@ -197,6 +205,7 @@ export const sidebarItems = {
     },
     {
       label: 'Support',
+      section: 'More',
       icon: 'MdOutlineSupportAgent',
       path: '/support',
       allowedRoles: [
@@ -212,22 +221,26 @@ export const sidebarItems = {
   company: [
     {
       label: 'Branch Dashboard',
+      section: 'Overview',
       icon: 'MdOutlineSpaceDashboard',
       path: '/dashboard' // <-- fixed leading slash
     },
     {
       label: 'Company Dashboard',
+      section: 'Overview',
       icon: 'MdOutlineSpaceDashboard',
       path: '/company/dashboard'
     },
     {
       label: 'Daily Cash Tracker',
+      section: 'Overview',
       icon: 'MdOutlineAccountBalanceWallet',
       path: '/cash-tracker',
       allowedRoles: ['gm', 'superAdmin', 'owner', 'branchAdmin', 'manager', 'accountant']
     },
     {
       label: 'Purchases',
+      section: 'Money',
       icon: 'MdShoppingCart',
       allowedRoles: ['gm', 'superAdmin', 'owner'],
       children: [
@@ -243,36 +256,42 @@ export const sidebarItems = {
     },
     {
       label: 'Sales Report',
+      section: 'Reports',
       icon: 'MdOutlineBarChart',
       path: '/reports/sales-report',
       allowedRoles: ['gm', 'superAdmin', 'owner']
     },
     {
       label: 'Cost Report',
+      section: 'Reports',
       icon: 'MdOutlineAttachMoney',
       path: '/reports/cost-report',
       allowedRoles: ['gm', 'superAdmin', 'owner']
     },
     {
       label: 'Cash Deposit Report',
+      section: 'Reports',
       icon: 'MdOutlineAccountBalanceWallet',
       path: '/reports/deposit-report',
       allowedRoles: ['gm', 'superAdmin', 'owner']
     },
     {
       label: 'Withdrawal Report',
+      section: 'Reports',
       icon: 'MdOutlineMoneyOffCsred',
       path: '/reports/withdrawal-report',
       allowedRoles: ['gm', 'superAdmin', 'owner']
     },
     {
       label: 'Advance Report',
+      section: 'Reports',
       icon: 'MdOutlineCalendarMonth',
       path: '/reports/advance-report',
       allowedRoles: ['gm', 'superAdmin', 'owner']
     },
     {
       label: 'Loans',
+      section: 'Money',
       icon: 'MdAttachMoney',
       allowedRoles: ['gm', 'superAdmin', 'owner'],
       children: [
@@ -295,24 +314,28 @@ export const sidebarItems = {
     },
     {
       label: 'Reports (Summary)',
+      section: 'Reports',
       icon: 'MdOutlineInsights',
       path: '/reports',
       allowedRoles: ['gm', 'superAdmin', 'owner']
     },
     {
       label: 'Yearly Summary',
+      section: 'Reports',
       icon: 'MdOutlineCalendarToday',
       path: '/reports/yearly-summary',
       allowedRoles: ['gm', 'superAdmin', 'owner']
     },
     {
       label: 'Audit Log',
+      section: 'Admin',
       icon: 'MdOutlineManageSearch',
       path: '/audit-log',
       allowedRoles: ['owner', 'gm', 'superAdmin']
     },
     {
       label: 'Settings',
+      section: 'Admin',
       icon: 'IoSettingsSharp',
       path: '/settings',
       allowedRoles: ['gm', 'superAdmin', 'owner'],
@@ -323,6 +346,7 @@ export const sidebarItems = {
     },
     {
       label: 'Attendance',
+      section: 'Team',
       icon: 'MdOutlineCalendarMonth',
       allowedRoles: ['gm', 'superAdmin', 'owner'],
       children: [
@@ -332,6 +356,7 @@ export const sidebarItems = {
     },
     {
       label: 'Tools',
+      section: 'More',
       icon: 'MdAppRegistration',
       allowedRoles: ['gm', 'superAdmin', 'owner'],
       children: [
@@ -341,8 +366,80 @@ export const sidebarItems = {
     },
     {
       label: 'Support',
+      section: 'More',
       icon: 'MdOutlineSupportAgent',
       path: '/support'
     }
   ]
+}
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+const COMPANY_ROLES = ["owner", "gm", "superAdmin"];
+export const isCompanyRole = (role) => COMPANY_ROLES.includes(role);
+const SECTION_ORDER = ["Overview", "Daily work", "Reports", "Money", "Team", "Admin", "More"];
+const allowed = (item, role) => !role || !item.allowedRoles || item.allowedRoles.includes(role);
+
+/** The sidebar for a role: [{ section, items }], children filtered too. */
+export function navFor(role) {
+  const items = (isCompanyRole(role) ? sidebarItems.company : sidebarItems.branchUser)
+    .filter((it) => allowed(it, role))
+    .map((it) => (it.children ? { ...it, children: it.children.filter((c) => allowed(c, role)) } : it))
+    .filter((it) => !it.children || it.children.length);
+  const sections = [];
+  for (const it of items) {
+    let s = sections.find((x) => x.section === it.section);
+    if (!s) sections.push((s = { section: it.section, items: [] }));
+    s.items.push(it);
+  }
+  return sections.sort((a, b) => SECTION_ORDER.indexOf(a.section) - SECTION_ORDER.indexOf(b.section));
+}
+
+/** Every page a role can open, flat (for search), each once. */
+export function pagesFor(role) {
+  const out = [];
+  for (const { section, items } of navFor(role)) {
+    for (const it of items) {
+      if (it.path) out.push({ label: it.label, path: it.path, icon: it.icon, section });
+      for (const c of it.children || []) out.push({ label: c.label, path: c.path, icon: it.icon, section, parent: it.label });
+    }
+  }
+  return out.filter((p, i) => out.findIndex((q) => q.path === p.path) === i);
+}
+
+/**
+ * The menu page the address belongs to: the longest menu path it starts with
+ * (so /reports/sales-report is "Sales Report", not "Summary" at /reports).
+ */
+export function currentPage(pathname, role) {
+  if (pathname === "/") return { label: "Home", path: "/" };
+  let best = null;
+  for (const p of pagesFor(role)) {
+    if ((pathname === p.path || pathname.startsWith(`${p.path}/`)) && (!best || p.path.length > best.path.length)) best = p;
+  }
+  return best;
+}
+
+// The phone's bottom bar: Home plus the first three of these the role can open.
+const BOTTOM = [
+  ["/company/dashboard", "Company"],
+  ["/dashboard", "Dashboard"],
+  ["/entry-data/sales-entry", "Sales"],
+  ["/requested-panel", "Requests"],
+  ["/supervisor-panel", "My requests"],
+  ["/cash-tracker", "Cash"],
+  ["/reports", "Summary"],
+  ["/entry-data/advance-entry", "Advance"],
+  ["/attendance-log", "Attendance"],
+  ["/staff-loans", "Loans"],
+];
+
+export function bottomNavFor(role) {
+  const pages = pagesFor(role);
+  const picks = BOTTOM.map(([path, short]) => {
+    const p = pages.find((x) => x.path === path);
+    return p && { ...p, label: short };
+  })
+    .filter(Boolean)
+    .slice(0, 3);
+  return [{ label: "Home", path: "/", icon: "home" }, ...picks];
 }
