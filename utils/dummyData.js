@@ -170,10 +170,13 @@ export const sidebarItems = {
     {
       label: 'Attendance',
       icon: 'MdOutlineCalendarMonth',
-      allowedRoles: ['branchAdmin', 'manager', 'supervisor', 'accountant'],
+      // Keep these in sync with the /attendance-log and /kiosk policies in
+      // middleware.js — a child with no allowedRoles is shown to everyone, which
+      // would send unlisted roles straight to /unauthorized.
+      allowedRoles: ['branchAdmin', 'manager', 'supervisor'],
       children: [
-        { label: 'Attendance Log', path: '/attendance-log' },
-        { label: 'Open Kiosk', path: '/kiosk' }
+        { label: 'Attendance Log', path: '/attendance-log', allowedRoles: ['branchAdmin', 'manager', 'supervisor'] },
+        { label: 'Open Kiosk', path: '/kiosk', allowedRoles: ['branchAdmin', 'manager', 'supervisor'] }
       ]
     },
 

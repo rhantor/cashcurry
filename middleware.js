@@ -92,7 +92,7 @@ const BRANCH_POLICIES = [
   },
   {
     test: (p) => starts(p, "/kiosk"),
-    roles: [ROLES.branchAdmin, ROLES.manager, ROLES.owner, ROLES.gm],
+    roles: [ROLES.branchAdmin, ROLES.manager, ROLES.supervisor, ROLES.owner, ROLES.gm],
   },
   {
     test: (p) => starts(p, "/branch-chat"),
