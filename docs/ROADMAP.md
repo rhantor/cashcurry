@@ -72,14 +72,16 @@ Needed before staff phones get direct access to the database (Phase 4).
 |---|------|--------|
 | 2.1 | **Real access control** — the database and storage rules are the security boundary (screens and middleware only hide buttons). One shared rules file for v2 + POS; closed: anyone could make themselves owner of any company, staff could read all finances and colleagues' personal data, anyone could approve/pay their own advance, anyone could claim usernames, open create-staff and image-proxy endpoints. 46 rules tests (`npm run test:rules`). Login-token claims deferred: not needed for security now that rules are tight | ✅ |
 | 2.2 | One shared "current user / company / branch" source (`lib/session`, `useSession`), replacing 44 separate browser-storage reads in 37 files and three helpers. Profile comes from the database (a changed role/branch applies on next load); one active branch for every screen; signing out anywhere returns to login | ✅ |
-| 2.3 | Dashboards read the monthly totals the server already keeps + only the current month's records (no more downloading all history). **First make the totals trustworthy:** the rollup functions don't follow the engine's rules (they count pending/unpaid advances, ignore staff loans, sum stored totals) and they can drift — Lazeez BB Sep 2026 costs: stored RM 13,873.25 vs records RM 11,305.05. Compute them with the same rules and add a check/repair that recomputes a month | ⬜ |
+| 2.3 | **Fast dashboards.** The server keeps each branch's monthly totals with the app's own finance engine (bundled into the Cloud Functions), recomputing the whole month on every change, with retry and a nightly pass. The old rollups (which broke the money rules and drifted) are gone. The branch and company dashboards and the summary report check those totals against server-side record counts and, when they cover everything earlier, load only the period's months; anything missing or stale → the full download, as before. Proven equal to the full download for every branch, month and filter on the real data; **1,744 → 230 document reads (−87%)** for the Sep 2026 dashboards. Loans between branches are now dated on the branch's clock (Malaysia by default), not the device's, so the server and every screen agree | ✅ |
 | 2.4 | Reports load by date range with paging | ⬜ |
 | 2.5 | Remove dead/unsafe code (old `onShiftClosed` function, unused helpers) | ⬜ |
 
 - **2.1 How you check:** `npm run test:rules` — 46 statements about who may read/write what, run against the
   emulator (e.g. "a stranger cannot make themselves owner of an existing company", "a cashier marks an approved
   advance paid — once"). Cashiers can now "Mark paid". Staff logins get a random one-time password.
-- **2.3 How you check:** company dashboard opens in about a second; Firebase read count drops sharply (we'll compare before/after).
+- **2.3 How you check:** `npm run dev:local`, open a dashboard — same figures as before. Add a cost dated last month in
+  the app: a few seconds later `summaries/{month}` in the emulator UI (localhost:4000) shows it. `npm test` proves
+  fast == full for every branch, month and filter; `CC_TEST_TZ=UTC npm test` runs it as the server would.
 
 ## Phase 3 — New UI
 
@@ -141,7 +143,10 @@ rehearsed on the local copy first.
       deploying either one would lock the other app out. Deploy ONLY v2's firestore.rules and storage.rules
       (they include the POS sections); retire the POS repo's copy. First download the live rules and diff
       them against v2's, to catch anything deployed from elsewhere.
-- [ ] Deploy Cloud Functions
+- [ ] Deploy Cloud Functions (`firebase deploy --only functions` builds the finance engine first). This
+      removes the old rollup functions — confirm the deletion when the CLI asks
+- [ ] Right after: `npm run summaries:rebuild -- --project <id> --confirm` (needs
+      `gcloud auth application-default login`). Until it runs, dashboards just use the full download
 - [ ] Merge `dev` into `main` and push (Vercel deploys the web app)
 - [ ] Re-run the golden check against production numbers
 

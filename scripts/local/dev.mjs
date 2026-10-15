@@ -52,6 +52,9 @@ const portOpen = (port) =>
     s.once("error", () => resolve(false));
   });
 
+// The Functions emulator loads the finance engine bundle; build it fresh.
+spawnSync("node", ["scripts/build-functions-engine.mjs"], { cwd: ROOT, stdio: "inherit" });
+
 run("firebase", [
   "emulators:start",
   "--project", LOCAL_PROJECT_ID,

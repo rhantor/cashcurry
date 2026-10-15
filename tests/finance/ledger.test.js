@@ -1,7 +1,7 @@
 // The finance engine on its own (no React, no fakes).
 import { describe, it, expect } from "vitest";
 import { buildLedger } from "@/lib/finance/ledger";
-import { dayKey, branchLoanMovements, tenderConfig } from "@/lib/finance/rules";
+import { dayKey, branchLoanMovements, branchTimeZone, loanActivityDay, tenderConfig } from "@/lib/finance/rules";
 import { buildDemoCompany, KL, PJ } from "@/scripts/local/demo/demoCompany.mjs";
 
 const demo = buildDemoCompany(new Date(2026, 9, 15, 10)); // Day 7 = 15 Oct 2026
@@ -54,11 +54,19 @@ describe("buildLedger on the demo company", () => {
 });
 
 describe("rules", () => {
-  it("dayKey keeps business dates and puts timestamps on the local day", () => {
+  // dayKey is the device's day by design; this checks it from Malaysia.
+  it.skipIf(process.env.TZ !== "Asia/Kuala_Lumpur")("dayKey keeps business dates and puts timestamps on the local day", () => {
     expect(dayKey("2026-09-12")).toBe("2026-09-12");
     expect(dayKey("2026-09-11T17:30:00.000Z")).toBe("2026-09-12"); // 1:30am in KL
     expect(dayKey({ seconds: Date.UTC(2026, 8, 11, 17, 30) / 1000 })).toBe("2026-09-12");
     expect(dayKey(null)).toBeNull();
+  });
+
+  it("a loan with only a creation time lands on the branch's day, whatever the device's clock", () => {
+    const loan = { type: "loan", amount: 50, fromBranchId: "B", toBranchId: "A", createdAt: { seconds: Date.UTC(2026, 0, 31, 17, 30) / 1000 } };
+    expect(loanActivityDay(loan)).toBe("2026-02-01"); // 1:30am in KL — Malaysia until a zone is set
+    expect(loanActivityDay(loan, branchTimeZone({ basic: { timeZone: "Asia/Dhaka" } }))).toBe("2026-01-31"); // 11:30pm in Dhaka
+    expect(branchLoanMovements([loan], "A")[0].day).toBe("2026-02-01");
   });
 
   it("a repayment paid by transfer moves bank, not cash", () => {

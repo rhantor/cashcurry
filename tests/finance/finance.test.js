@@ -24,6 +24,7 @@ import { format } from "date-fns";
 import {
   summary, summaryForMonth, branchDashboard, companyDashboard, monthFilter,
   summaryDetail, branchCharts, companyCharts,
+  branchDataSource,
 } from "./run";
 
 /** Compare with a recorded golden file, or record it under `test:golden:update`. */
@@ -60,6 +61,7 @@ function diffPaths(a, b, at = []) {
 }
 import { presetFilter } from "@/utils/dashboard/dateFilters";
 import { buildDemoCompany, KL as DEMO_KL, PJ as DEMO_PJ } from "@/scripts/local/demo/demoCompany.mjs";
+import { setLedgerMode, fetched } from "./fakeBackend";
 
 // ── data layer → fakeBackend ────────────────────────────────────────────────
 // (vi.mock calls are hoisted to the top of the file, so the factory is too.)
@@ -75,6 +77,8 @@ vi.mock("@/lib/redux/api/branchSettingsApiSlice", rtk);
 vi.mock("@/lib/redux/api/branchApiSlice", rtk);
 vi.mock("@/lib/redux/api/loanApiSlice", rtk);
 vi.mock("@/lib/redux/api/authApiSlice", rtk);
+vi.mock("@/lib/redux/api/summaryApiSlice", rtk);
+vi.mock("@/lib/redux/api/since", async () => (await import("./fakeBackend")).since);
 vi.mock("firebase/firestore", async () => (await import("./fakeBackend")).firestore);
 vi.mock("@/lib/firebase", () => ({ db: {} }));
 // The signed-in user, as the session would report it: an owner of the dataset's company.
@@ -418,4 +422,80 @@ describe.skipIf(!backupPresent)(`golden figures (${backupDir()})`, () => {
       });
     }
   });
+});
+
+// Roadmap 2.3: the dashboards load earlier months as monthly summaries and
+// only the period's months as records. Same figures and charts as the full
+// download, for every branch, month and preset — with fewer records read.
+describe("fast dashboards (monthly summaries) equal the full download", () => {
+  const demo = buildDemoCompany(new Date(2026, 9, 15, 10));
+  const sets = [["demo", demo.dataset, ["2026-10"]]];
+  if (backupPresent) {
+    const data = loadBackup();
+    sets.push(["backup", data, monthsCovered(data)]);
+  }
+  const filtersFor = (month) => {
+    const end = monthFilter(month).to;
+    const day = new Date(end.getFullYear(), end.getMonth(), 20, 12);
+    return [
+      monthFilter(month),
+      presetFilter("week", day),
+      presetFilter("days30", day),
+      { from: new Date(day.getFullYear(), day.getMonth() - 2, 10), to: day, preset: "custom" },
+    ];
+  };
+  const both = async (fn) => {
+    setLedgerMode("full");
+    fetched.reset();
+    const full = await fn();
+    const fullReads = fetched.records;
+    setLedgerMode("fast");
+    fetched.reset();
+    const fast = await fn();
+    return { full, fast, fullReads, fastReads: fetched.records };
+  };
+
+  for (const [label, data, months] of sets) {
+    it(`${label}: branch dashboards`, async () => {
+      let fullReads = 0;
+      let fastReads = 0;
+      for (const b of data.branches) {
+        for (const m of months) {
+          for (const f of filtersFor(m)) {
+            const r = await both(() => ({
+              kpis: branchDashboard(data, b.id, f),
+              charts: branchCharts(data, b.id, f),
+            }));
+            expect({ branch: b.id, from: f.from, ...r.fast }).toEqual({ branch: b.id, from: f.from, ...r.full });
+            fullReads += r.fullReads;
+            fastReads += r.fastReads;
+          }
+          expect(branchDataSource(data, b.id, monthFilter(m))).toBe("fast");
+        }
+      }
+      if (label === "backup") expect(fastReads).toBeLessThan(fullReads);
+    });
+
+    it(`${label}: summary report (rows, totals and exports)`, async () => {
+      for (const b of data.branches) {
+        for (const m of months) {
+          const range = { from: `${m}-10`, to: `${m}-20` };
+          for (const fs of [{ filterType: "month", selectedMonth: m, dateRange: {} }, { filterType: "range", dateRange: range }]) {
+            const r = await both(() => summaryDetail(data, b.id, fs));
+            expect({ branch: b.id, ...fs, ...r.fast }).toEqual({ branch: b.id, ...fs, ...r.full });
+          }
+        }
+      }
+    });
+
+    it(`${label}: company dashboard`, async () => {
+      for (const m of months) {
+        const r = await both(async () => ({
+          kpis: await companyDashboard(data, monthFilter(m)),
+          charts: await companyCharts(data, monthFilter(m)),
+        }));
+        expect({ month: m, ...r.fast }).toEqual({ month: m, ...r.full });
+      }
+    });
+  }
 });

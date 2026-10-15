@@ -50,7 +50,15 @@ Firebase swapped for in-memory data (`fakeBackend.js`).
 | Anchors | A few figures verified by hand still come out the same | Yes |
 | Dashboard = summary | Branch dashboard "This Month" cash equals the summary report for every branch × month | Yes |
 | Company = Σ branches | Company cash and bank equal the sum of branch summaries | Yes |
+| Monthly totals (`monthly.test.js`) | A ledger started from the monthly summaries equals the full download, and the safety check refuses missing, stale or older-rules summaries | Both |
+| Fast dashboards | Dashboards, charts and the summary report give identical output from summaries + recent records as from the full download, every branch × month × filter — and read fewer records | Both |
 | Known bugs (`it.fails`) | Documents a bug that is not fixed yet; flips to a normal test when it is | Yes |
+
+The fake backend serves monthly summaries by default (the fast path), so the
+golden figures — recorded from the full download — also prove the fast path.
+
+Tests run in Malaysia time. `CC_TEST_TZ=UTC npm test` runs them as the Cloud
+Functions server would (two tests about the device's own day are skipped).
 
 The backup is read from `../backup_saffron_empire`, or `CC_BACKUP_DIR`. Without
 it, the backup tests are skipped and only the hand-made example runs.

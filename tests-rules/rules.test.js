@@ -66,6 +66,7 @@ beforeEach(async () => {
     for (const b of ["kl", "pj"]) {
       await d.doc(B(b)).set({ name: b });
       await d.doc(`${B(b)}/sales/s1`).set({ date: "2026-10-10", cash: "100", total: 100 });
+      await d.doc(`${B(b)}/summaries/2026-09`).set({ period: "2026-09", engineVersion: 1, cashChange: 100, bankChange: 0 });
       await d.doc(`${B(b)}/staff/st1`).set({ firstName: "Ali", basicSalary: "1800", passportNumber: "A123", bankAccountNumber: "999" });
     }
     await d.doc(`${B()}/settings/settings`).set({
@@ -175,6 +176,15 @@ describe("who can see what", () => {
   it("nobody reads another branch's finances", async () => {
     await assertFails(as("klManager").doc(`${B("pj")}/sales/s1`).get());
     await assertFails(as("pjAdmin").doc(`${B()}/sales/s1`).get());
+  });
+
+  it("monthly summaries: readable like the branch's finances, written only by the server", async () => {
+    await assertSucceeds(as("klCashier").doc(`${B()}/summaries/2026-09`).get());
+    await assertSucceeds(as("owner").doc(`${B("pj")}/summaries/2026-09`).get());
+    await assertFails(as("klStaff").doc(`${B()}/summaries/2026-09`).get());
+    await assertFails(as("klManager").doc(`${B("pj")}/summaries/2026-09`).get());
+    await assertFails(as("owner").doc(`${B()}/summaries/2026-09`).set({ period: "2026-09", cashChange: 999999 }));
+    await assertFails(as("klAdmin").doc(`${B()}/summaries/2026-09`).delete());
   });
 
   it("a branch user with no branch assigned reads no branch", async () => {

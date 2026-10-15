@@ -4,12 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import { format } from "date-fns";
-import { dayKey } from "./utils";
 import { buildLedger } from "@/lib/finance/ledger";
+import { fastStart, monthOf } from "@/lib/finance/monthly";
+import { fetchLedgerStart } from "@/lib/redux/api/summaryApiSlice";
+import { getDocsSince } from "@/lib/redux/api/since";
 import { currencyInfo } from "@/lib/region";
 import {
   saleDay, costDay, advanceDay, depositDay, withdrawalDay, salaryDay, staffLoanDay,
-  isCashCost, isMigratedStaffLoan, paidOutOf,
+  isCashCost, isMigratedStaffLoan, paidOutOf, loanActivityDay, COLLECTION, DATE_FIELD,
 } from "@/lib/finance/rules";
 import { getSessionUser } from "@/lib/session";
 
@@ -122,6 +124,8 @@ export default function useCompanyData(filter) {
   const [totalOpeningCash, setTotalOpeningCash] = useState(0);
   // Each branch's settings: payment types and opening balances for its ledger
   const [settingsByBranch, setSettingsByBranch] = useState({});
+  // Balance carried into each branch's first loaded day (null = full history)
+  const [carriedByBranch, setCarriedByBranch] = useState({});
 
   useEffect(() => {
     const raw = getSessionUser();
@@ -129,6 +133,14 @@ export default function useCompanyData(filter) {
     const u = raw;
     setCompanyId(u.companyId);
   }, []);
+
+  // Whole calendar days, like the branch dashboard and the summary report.
+  const fromKey = format(filter.from, "yyyy-MM-dd");
+  const toKey = format(filter.to, "yyyy-MM-dd");
+  const inPeriod = (day) => !!day && day >= fromKey && day <= toKey;
+  // Records are loaded from the 1st of this month where the monthly summaries
+  // cover everything earlier (per branch, checked every load); else in full.
+  const month = monthOf(fromKey);
 
   useEffect(() => {
     let alive = true;
@@ -140,59 +152,58 @@ export default function useCompanyData(filter) {
       const bSnap = await getDocs(bCol);
       const branchIds = bSnap.docs.map((d) => d.id);
 
-      // pull in parallel
-      const fetchColl = async (collName) => {
+      // Settings (payment types, opening balances) and the company-level loans
+      // between branches come first: they decide where each ledger starts.
+      const [settingsSnaps, loansSnap, starts] = await Promise.all([
+        Promise.all(
+          branchIds.map((bid) => getDoc(doc(db, "companies", companyId, "branches", bid, "settings", "settings")))
+        ),
+        getDocs(collection(db, `companies/${companyId}/loans`)),
+        Promise.all(branchIds.map((bid) => fetchLedgerStart({ companyId, branchId: bid, month }))),
+      ]);
+      const settingsOf = Object.fromEntries(
+        branchIds.map((bid, i) => [bid, settingsSnaps[i].exists() ? settingsSnaps[i].data() : null])
+      );
+      const loanAll = loansSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const approvedLoans = loanAll.filter((l) => l.status === "approved");
+      const carried = Object.fromEntries(
+        branchIds.map((bid, i) => [
+          bid,
+          fastStart({ month, branchId: bid, settings: settingsOf[bid], start: starts[i], loanActivities: approvedLoans }),
+        ])
+      );
+
+      // Each branch's records: from its start day, or all of them.
+      const fetchColl = async (kind) => {
         const chunks = await Promise.all(
           branchIds.map(async (bid) => {
-            const snap = await getDocs(
-              collection(
-                db,
-                `companies/${companyId}/branches/${bid}/${collName}`
-              )
-            );
-            return snap.docs.map((d) => ({
-              id: d.id,
-              branchId: bid,
-              ...d.data(),
-            }));
+            const ref = collection(db, `companies/${companyId}/branches/${bid}/${COLLECTION[kind]}`);
+            const since = carried[bid]?.day;
+            const rows = since
+              ? await getDocsSince(ref, DATE_FIELD[kind], since, { paidOut: kind === "advances" || kind === "staffLoans" })
+              : (await getDocs(ref)).docs.map((d) => ({ id: d.id, ...d.data() }));
+            return rows.map((r) => ({ ...r, branchId: bid }));
           })
         );
         return chunks.flat();
       };
 
-      // Fetch branch-level subcollections + branch settings + staff loans in parallel.
-      // Note: cash withdrawals are stored under "cashWithdrawals" (not "withdrawals").
-      // Inter-branch loans are at company level — fetched separately below.
-      const [salesAll, costsAll, advAll, depAll, wdrAll, salAll, staffLoansAll, settingsSnaps] =
-        await Promise.all([
-          fetchColl("sales"),
-          fetchColl("costs"),
-          fetchColl("advances"),
-          fetchColl("deposits"),
-          fetchColl("cashWithdrawals"),   // ← correct collection name
-          fetchColl("salaries"),
-          fetchColl("loans"),             // ← branch-level staff loans
-          // Fetch settings doc for every branch to get opening cash balance
-          Promise.all(
-            branchIds.map((bid) =>
-              getDoc(doc(db, "companies", companyId, "branches", bid, "settings", "settings"))
-            )
-          ),
-        ]);
+      const [salesAll, costsAll, advAll, depAll, wdrAll, salAll, staffLoansAll] = await Promise.all([
+        fetchColl("sales"),
+        fetchColl("costs"),
+        fetchColl("advances"),
+        fetchColl("deposits"),
+        fetchColl("withdrawals"),
+        fetchColl("salaries"),
+        fetchColl("staffLoans"),
+      ]);
 
       // Sum opening cash float across all branches
-      const openingCashSum = settingsSnaps.reduce((sum, snap) => {
-        if (!snap.exists()) return sum;
-        const s = snap.data();
+      const openingCashSum = Object.values(settingsOf).reduce((sum, s) => {
+        if (!s) return sum;
         const v = parseFloat(s?.initialCash) || parseFloat(s?.financeSales?.openingBalance) || 0;
         return sum + v;
       }, 0);
-
-      // Fetch company-level inter-branch loans
-      const loansSnap = await getDocs(
-        collection(db, `companies/${companyId}/loans`)
-      );
-      const loanAll = loansSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
       if (!alive) return;
       setSales(salesAll);
@@ -204,21 +215,15 @@ export default function useCompanyData(filter) {
       setLoanActivities(loanAll);
       setAllStaffLoans(staffLoansAll);
       setTotalOpeningCash(openingCashSum);
-      setSettingsByBranch(
-        Object.fromEntries(branchIds.map((bid, i) => [bid, settingsSnaps[i].exists() ? settingsSnaps[i].data() : null]))
-      );
+      setSettingsByBranch(settingsOf);
+      setCarriedByBranch(carried);
       setLoading(false);
     }
     loadAll();
     return () => {
       alive = false;
     };
-  }, [companyId]);
-
-  // Whole calendar days, like the branch dashboard and the summary report.
-  const fromKey = format(filter.from, "yyyy-MM-dd");
-  const toKey = format(filter.to, "yyyy-MM-dd");
-  const inPeriod = (day) => !!day && day >= fromKey && day <= toKey;
+  }, [companyId, month]);
 
   // ── the period's records, all branches (charts and lists) ──
   const fSales = useMemo(() => sales.filter((s) => inPeriod(saleDay(s))), [sales, fromKey, toKey]);
@@ -229,7 +234,7 @@ export default function useCompanyData(filter) {
   const fWdr = useMemo(() => withdrawals.filter((x) => inPeriod(withdrawalDay(x))), [withdrawals, fromKey, toKey]);
   const fSal = useMemo(() => salaries.filter((x) => inPeriod(salaryDay(x))), [salaries, fromKey, toKey]);
   const fLoan = useMemo(
-    () => loanActivities.filter((x) => inPeriod(dayKey(x.date || x.createdAt))),
+    () => loanActivities.filter((x) => inPeriod(loanActivityDay(x))),
     [loanActivities, fromKey, toKey]
   );
   // Staff loans paid out of a till in this period.
@@ -261,9 +266,10 @@ export default function useCompanyData(filter) {
         },
         from: fromKey,
         to: toKey,
+        carriedIn: carriedByBranch[bid] || null,
       })
     );
-  }, [settingsByBranch, sales, costs, advances, allStaffLoans, deposits, salaries, withdrawals, loanActivities, fromKey, toKey]);
+  }, [settingsByBranch, carriedByBranch, sales, costs, advances, allStaffLoans, deposits, salaries, withdrawals, loanActivities, fromKey, toKey]);
 
   // What one sale adds to total sales and to the bank, by its branch's rules.
   const { saleTotal, bankedOfSale } = useMemo(() => {
@@ -457,7 +463,7 @@ export default function useCompanyData(filter) {
       map.set(k, row);
     };
     fLoan.forEach((e) => {
-      const k = byDateKey(e.date || e.createdAt);
+      const k = loanActivityDay(e);
       const amt = num(e.amount);
       // For company view: aggregate all branches together
       if (e.type === "loan") {

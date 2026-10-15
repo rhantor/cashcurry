@@ -4,7 +4,8 @@ import { defineConfig } from "vitest/config";
 
 // Finance figures depend on the local calendar day. The live branches are in
 // Malaysia, so tests run in that zone whatever the developer's machine uses.
-process.env.TZ = "Asia/Kuala_Lumpur";
+// CC_TEST_TZ=UTC runs them as the Cloud Functions server would.
+process.env.TZ = process.env.CC_TEST_TZ || "Asia/Kuala_Lumpur";
 
 const root = path.dirname(fileURLToPath(import.meta.url));
 

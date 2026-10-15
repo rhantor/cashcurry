@@ -1,5 +1,8 @@
 {
-  "functions": { "source": "functions" },
+  "functions": {
+    "source": "functions",
+    "predeploy": ["node scripts/build-functions-engine.mjs"]
+  },
   "firestore": {
     "rules": "firestore.rules",
     "indexes": "firestore.indexes.json"

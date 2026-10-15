@@ -18,6 +18,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { createRequire } from "node:module";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, Timestamp } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
@@ -142,6 +143,13 @@ for (const folder of fs.readdirSync(branchesDir)) {
 await writer.close();
 console.log(`Firestore: ${docCount} documents written`);
 console.log(Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([k, n]) => `  ${k}: ${n}`).join("\n"));
+
+// ── monthly summaries ────────────────────────────────────────────────────────
+// What the Cloud Functions keep up to date, built here in one go (the seed
+// runs without the Functions emulator). Same code as the functions use.
+const summaries = createRequire(import.meta.url)("../../functions/summaries.js");
+const built = await summaries.rebuildCompany(db, company.id);
+console.log(`Summaries: ${Object.values(built).reduce((n, m) => n + m.length, 0)} branch-months`);
 
 // ── login accounts ───────────────────────────────────────────────────────────
 // Real passwords cannot be exported, so every account gets one shared local

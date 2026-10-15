@@ -59,3 +59,6 @@ tests/finance/__golden__/
 
 # a failing golden check writes its full output here
 tests/finance/__golden__/*.actual.json
+
+# generated from lib/finance by scripts/build-functions-engine.mjs
+functions/engine.cjs

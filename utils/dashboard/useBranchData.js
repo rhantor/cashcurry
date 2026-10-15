@@ -1,7 +1,7 @@
 'use client'
 import { useMemo } from 'react'
 import { format, subDays, subMonths, eachDayOfInterval, differenceInDays } from 'date-fns'
-import { toDate, byDateKey, dayKey, num, sortByDateKey } from './utils'
+import { toDate, byDateKey, num, sortByDateKey } from './utils'
 
 // RTK slices
 import { useGetSalesEntriesQuery } from '@/lib/redux/api/salesApiSlice'
@@ -15,12 +15,13 @@ import { useGetStaffLoansQuery } from '@/lib/redux/api/staffLoanApiSlice'
 import { useGetSingleBranchQuery } from '@/lib/redux/api/branchApiSlice'
 import { useGetBranchSettingsQuery } from '@/lib/redux/api/branchSettingsApiSlice'
 import useResolvedCompanyBranch from '../useResolvedCompanyBranch'
+import useLedgerSource from '@/app/hooks/useLedgerSource'
 import { skipToken } from '@reduxjs/toolkit/query'
 import { aggregateLoanMovements } from '../finance/loanAgg'
 import { buildLedger } from '@/lib/finance/ledger'
 import {
   saleDay, costDay, advanceDay, depositDay, withdrawalDay, salaryDay, staffLoanDay,
-  isCashCost, isMigratedStaffLoan, paidOutOf
+  isCashCost, isMigratedStaffLoan, paidOutOf, loanActivityDay, branchTimeZone
 } from '@/lib/finance/rules'
 
 /* ------------------------ chart label helpers ------------------------ */
@@ -111,6 +112,19 @@ const tenderDefsFromSales = fSales => {
   }
 }
 
+/**
+ * The period the comparison chart sets against `filter`:
+ * 'month' → same calendar days one month back; otherwise the same number of
+ * days just before.
+ */
+function previousPeriod (filter) {
+  const { from, to } = filter
+  if (!from || !to || isNaN(+from) || isNaN(+to)) return null
+  if ((filter.preset ?? 'custom') === 'month') return { prevFrom: subMonths(from, 1), prevTo: subMonths(to, 1) }
+  const dayCount = Math.max(1, differenceInDays(to, from) + 1)
+  return { prevFrom: subDays(from, dayCount), prevTo: subDays(from, 1) }
+}
+
 /* ------------------------ hook ------------------------ */
 export default function useBranchData (filter) {
   const { companyId, branchId, isCompany, setActiveBranch } = useResolvedCompanyBranch()
@@ -122,25 +136,7 @@ export default function useBranchData (filter) {
   const branchName = branchData?.name || 'Branch'
 
   // 🔹 settings for tenders (banked/delivery)
-  const { data: branchSettings = {} } = useGetBranchSettingsQuery(baseArgs)
-
-  const { data: sales = [], isLoading: salesLoading } =
-    useGetSalesEntriesQuery(baseArgs)
-  const { data: costs = [], isLoading: costsLoading } =
-    useGetCostEntriesQuery(baseArgs)
-  const { data: advances = [], isLoading: advLoading } =
-    useGetAdvanceEntriesQuery(baseArgs)
-  const { data: deposits = [], isLoading: depLoading } =
-    useGetDepositEntryQuery(baseArgs)
-  const { data: withdrawals = [], isLoading: wdLoading } =
-    useGetWithdrawEntriesQuery(baseArgs)
-  const { data: salaries = [], isLoading: salLoading } =
-    useGetSalaryEntriesQuery(baseArgs)
-
-  // Staff loans: needed to deduct disbursements from handInCash.
-  // Only non-migration + front-office (cash given from register) + actually approved/closed.
-  const { data: staffLoans = [], isLoading: staffLoanLoading } =
-    useGetStaffLoansQuery(baseArgs)
+  const { data: branchSettings = {}, isLoading: settingsLoading } = useGetBranchSettingsQuery(baseArgs)
 
   const loanArgs =
     companyId && branchId
@@ -162,6 +158,35 @@ export default function useBranchData (filter) {
   const toKey = format(filter.to, 'yyyy-MM-dd')
   const inPeriod = day => !!day && day >= fromKey && day <= toKey
 
+  // Records from the 1st of the period's month when the monthly summaries
+  // cover everything earlier; otherwise the full history (see useLedgerSource).
+  const source = useLedgerSource({
+    companyId, branchId, fromKey,
+    settings: branchSettings, settingsReady: baseArgs !== skipToken && !settingsLoading,
+    loanActivities, loansReady: loanArgs !== skipToken && !loanLoading
+  })
+  const recordArgs = !source.ready ? skipToken : source.since ? { ...baseArgs, since: source.since } : baseArgs
+  // Sales also reach back to the comparison chart's previous period.
+  const prev = previousPeriod(filter)
+  const salesSince = source.since && prev ? [source.since, format(prev.prevFrom, 'yyyy-MM-dd')].sort()[0] : source.since
+  const salesArgs = !source.ready ? skipToken : salesSince ? { ...baseArgs, since: salesSince } : baseArgs
+
+  const { data: sales = [], isLoading: salesLoading } =
+    useGetSalesEntriesQuery(salesArgs)
+  const { data: costs = [], isLoading: costsLoading } =
+    useGetCostEntriesQuery(recordArgs)
+  const { data: advances = [], isLoading: advLoading } =
+    useGetAdvanceEntriesQuery(recordArgs)
+  const { data: deposits = [], isLoading: depLoading } =
+    useGetDepositEntryQuery(recordArgs)
+  const { data: withdrawals = [], isLoading: wdLoading } =
+    useGetWithdrawEntriesQuery(recordArgs)
+  const { data: salaries = [], isLoading: salLoading } =
+    useGetSalaryEntriesQuery(recordArgs)
+  // Staff loans paid out of the till reduce cash in hand.
+  const { data: staffLoans = [], isLoading: staffLoanLoading } =
+    useGetStaffLoansQuery(recordArgs)
+
   /* --------------- the period's records (charts and lists) --------------- */
   const fSales = useMemo(() => sales.filter(s => inPeriod(saleDay(s))), [sales, fromKey, toKey])
   const fCosts = useMemo(() => costs.filter(x => inPeriod(costDay(x))), [costs, fromKey, toKey])
@@ -175,9 +200,11 @@ export default function useBranchData (filter) {
     () => staffLoans.filter(x => !isMigratedStaffLoan(x) && paidOutOf(x, staffLoanDay)?.fromTill && inPeriod(paidOutOf(x, staffLoanDay).day)),
     [staffLoans, fromKey, toKey]
   )
+  // Loans between branches, dated like the money engine dates them.
+  const loanTz = branchTimeZone(branchSettings)
   const fLoans = useMemo(
-    () => loanActivities.filter(x => inPeriod(dayKey(x.date || x.createdAt))),
-    [loanActivities, fromKey, toKey]
+    () => loanActivities.filter(x => inPeriod(loanActivityDay(x, loanTz))),
+    [loanActivities, fromKey, toKey, loanTz]
   )
 
   /* --------------- money: the shared finance engine --------------- */
@@ -189,9 +216,10 @@ export default function useBranchData (filter) {
         settings: branchSettings,
         records: { sales, costs, advances, staffLoans, deposits, salaries, withdrawals, loanActivities },
         from: fromKey,
-        to: toKey
+        to: toKey,
+        carriedIn: source.carriedIn
       }),
-    [branchId, branchSettings, sales, costs, advances, staffLoans, deposits, salaries, withdrawals, loanActivities, fromKey, toKey]
+    [branchId, branchSettings, sales, costs, advances, staffLoans, deposits, salaries, withdrawals, loanActivities, fromKey, toKey, source.carriedIn]
   )
 
   // What one sale adds to total sales and to the bank, by the ledger's rules.
@@ -272,25 +300,14 @@ export default function useBranchData (filter) {
     const from   = filter.from
     const to     = filter.to
     const preset = filter.preset ?? 'custom'
-    if (!from || !to || isNaN(+from) || isNaN(+to)) return []
-
-    // ── Compute previous period boundaries ──────────────────────────────────
-    let prevFrom, prevTo
-    if (preset === 'month') {
-      // Same calendar days, one month back
-      prevFrom = subMonths(from, 1)   // e.g. Mar 1
-      prevTo   = subMonths(to,   1)   // e.g. Mar 20
-    } else {
-      // For week / days30 / custom: shift back by exact same duration
-      const dayCount = Math.max(1, differenceInDays(to, from) + 1)
-      prevTo   = subDays(from, 1)
-      prevFrom = subDays(from, dayCount)
-    }
+    const periods = previousPeriod(filter)
+    if (!periods) return []
+    const { prevFrom, prevTo } = periods
 
     const prevFromStr = format(prevFrom, 'yyyy-MM-dd')
     const prevToStr   = format(prevTo,   'yyyy-MM-dd')
 
-    // Reuse the already-fetched full sales array — no extra network request
+    // Sales are fetched back to the previous period (salesSince) — no extra request
     const prevSales = sales.filter(s => s.date >= prevFromStr && s.date <= prevToStr)
 
     // Build day-keyed totals for both periods
@@ -498,7 +515,7 @@ export default function useBranchData (filter) {
       map.set(k, row)
     }
     fLoans.forEach(e => {
-      const k = byDateKey(e.date || e.createdAt)
+      const k = loanActivityDay(e, loanTz)
       const amt = num(e.amount)
       const fromId =
         e.fromBranchId ||
@@ -578,6 +595,7 @@ export default function useBranchData (filter) {
   }, [fSales, fCosts, fDep, fWdr, fSal, fAdv, fLoans, saleTotal])
 
   const loading =
+    !source.ready ||
     salesLoading ||
     costsLoading ||
     advLoading ||
@@ -594,6 +612,8 @@ export default function useBranchData (filter) {
     companyId,
     branchId,
     loading,
+    // "fast" = monthly summaries + this period's months; "full" = every record
+    dataSource: source.mode,
     fSales,
     fCosts,
     fAdv,
