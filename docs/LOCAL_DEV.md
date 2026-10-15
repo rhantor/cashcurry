@@ -14,14 +14,20 @@ the local copy. No badge = production data.
 - Node 20+
 - Firebase CLI: `npm install -g firebase-tools`
 - Java 11+ (the Firestore emulator needs it)
-- A backup folder. Default: `../backup_saffron_empire` next to this repo.
-  Use another one with `CC_BACKUP_DIR=path/to/backup`.
+- Only for `local:seed:backup`: a backup folder. Default:
+  `../backup_saffron_empire` next to this repo; use another one with
+  `CC_BACKUP_DIR=path/to/backup`.
+
+The demo company is built by `scripts/local/demo/demoCompany.mjs`. Its
+walkthrough figures are computed from the same list of entries, and
+`npm test` checks that the app shows exactly those figures.
 
 ## Commands
 
 | Command | What it does |
 |---|---|
-| `npm run local:seed` | Builds the local copy from the backup. **Wipes** any previous local data. Run once, or whenever you want a fresh start. |
+| `npm run local:seed` | Builds the local copy with the **demo company** (made up, no client data): two branches, 7 days ending today, round numbers. Writes a day-by-day walkthrough of what every screen should show to `.local/DEMO_GUIDE.md`. **Wipes** any previous local data. |
+| `npm run local:seed:backup` | Same, but from a real company backup instead (see Requirements). |
 | `npm run dev:local` | Starts the emulators + the app at http://localhost:3000. Changes you make are kept between runs. Stop with **Ctrl+C** (waits a few seconds to save). |
 
 Emulator dashboard (browse the data, users, function logs): http://127.0.0.1:4000
