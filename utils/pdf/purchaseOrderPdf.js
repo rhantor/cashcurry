@@ -256,15 +256,15 @@ export default function buildPurchaseOrderPdf({
           name,
           `${Number(i.requestedQty || 0)} ${text(i.unit)}`,
           `${qty} ${text(i.unit)}`,
-          formatMoney(price, currency),
-          formatMoney(qty * price, currency),
+          formatMoney(price, currency, { plain: true }),
+          formatMoney(qty * price, currency, { plain: true }),
         ]
       : [
           index + 1,
           name,
           `${qty} ${text(i.unit)}`,
-          formatMoney(price, currency),
-          formatMoney(qty * price, currency),
+          formatMoney(price, currency, { plain: true }),
+          formatMoney(qty * price, currency, { plain: true }),
         ];
   });
 
@@ -309,7 +309,7 @@ export default function buildPurchaseOrderPdf({
 
   doc.setFontSize(13);
   doc.setTextColor(...INK);
-  doc.text(formatMoney(total, currency), RIGHT - 4, y + 2.5, { align: "right" });
+  doc.text(formatMoney(total, currency, { plain: true }), RIGHT - 4, y + 2.5, { align: "right" });
 
   /* ------------------------- terms, notes, signatures ---------------------- */
   let leftBlockY = y;

@@ -1,5 +1,6 @@
 // Plain JS helpers shared across components
 import { format } from "date-fns";
+import { formatMoney } from "@/lib/region/currency";
 
 export const toDate = (x) =>
   x?.seconds ? new Date(x.seconds * 1000) : new Date(x);
@@ -33,11 +34,7 @@ export const num = (v) => Number(v || 0);
 //   const fmt     = mkFmt(currency);     // "USD 1,234.56"
 //   const compact = mkCompact(currency); // "1.2k"  (no prefix — for Y-axis ticks)
 
-export const mkFmt = (currency = "RM") => (v) =>
-  `${currency} ${Number(v || 0).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
+export const mkFmt = (currency = "RM") => (v) => formatMoney(v, currency);
 
 // Compact form for Y-axis tick labels (no currency prefix needed there)
 export const mkCompact = () => (v) => {
