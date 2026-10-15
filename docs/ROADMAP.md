@@ -45,7 +45,7 @@ Nothing here changes what users see. It lets us change things without fear.
 | 1.2 | **One finance engine** (`lib/finance/`) used by the summary report and both dashboards — replaces the three copies | ⬜ |
 | 1.3 | **Time zone, currency and business day per company/branch** (Malaysia = Asia/Kuala_Lumpur, RM; Bangladesh = Asia/Dhaka, ৳). Optional day cut-off for restaurants that close after midnight. Replaces every UTC "today" | ⬜ |
 | 1.4 | **Money request lifecycle**: requested → approved / rejected → **paid** (who paid, when, from front cash or bank). Only *paid* moves cash; payroll deducts only paid. Manager entering directly = approve + pay in one step (today's workflow keeps working). Existing records count as paid on their date, so today's numbers stay the same | ⬜ |
-| 1.5 | **Promotion = free food, never revenue.** Exclude it from Total Sales everywhere, whatever a branch's settings say; keep showing it as its own figure. *Intentional number change:* Lazeez BB Total Sales drops by RM 5,706.15 (28 days, to 18 Sep). Cash and bank do not change. Old records' stored totals corrected by a one-off data fix at release | ⬜ |
+| 1.5 | ~~Promotion in Total Sales~~ — **decided: keep as is.** Promotion is free food served after an order and the owners want it counted; each branch's "include in total" setting stays in control | ✅ |
 
 - **1.1 How you check:** branch dashboard, Lazeez BB, "Last 7 Days" shows the same cash as the summary report for the same dates.
 - **1.2 How you check:** golden tests unchanged; dashboards and summary show identical numbers; dashboards load faster.
@@ -114,7 +114,6 @@ Things that must happen on production at release time, in order. Each one is
 rehearsed on the local copy first.
 
 - [ ] Back up production (same export as `backup_saffron_empire`)
-- [ ] Data fix: remove promotion from stored sale totals (1.5)
 - [ ] Data fix: mark existing advances / staff loans as paid on their date (1.4)
 - [ ] Deploy new database rules and Cloud Functions
 - [ ] Merge `dev` into `main` and push (Vercel deploys the web app)
