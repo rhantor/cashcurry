@@ -309,11 +309,16 @@ describe.skipIf(!backupPresent)(`golden figures (${backupDir()})`, () => {
     }
   });
 
-  it("company cash on hand equals the sum of every branch's summary", async () => {
+  it("company cash and bank equal the sum of every branch's summary", async () => {
+    const r2 = (v) => Math.round(v * 100) / 100;
     for (const m of months) {
-      const total = data.branches.reduce((sum, b) => sum + summaryForMonth(data, b.id, m).handInCash, 0);
+      const branchSummaries = data.branches.map((b) => summaryForMonth(data, b.id, m));
       const company = await companyDashboard(data, monthFilter(m));
-      expect({ month: m, cash: company.estCashOnHand }).toEqual({ month: m, cash: Math.round(total * 100) / 100 });
+      expect({ month: m, cash: company.estCashOnHand, bank: company.effectiveBankedAfterWithdrawals }).toEqual({
+        month: m,
+        cash: r2(branchSummaries.reduce((s, x) => s + x.handInCash, 0)),
+        bank: r2(branchSummaries.reduce((s, x) => s + x.bankBalance, 0)),
+      });
     }
   });
 
