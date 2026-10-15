@@ -37,10 +37,11 @@ const USERS = [
   ["supervisor", "kl_supervisor", "KL Supervisor", KL],
   ["cashier", "kl_cashier", "KL Cashier", KL],
   ["branchAdmin", "pj_admin", "PJ Branch Admin", PJ],
+  ["staff", "ali", "Ali Hassan", KL], // the staff app: Ali's own requests and pay
 ];
 
 const STAFF = [
-  { id: "staff-ali", branchId: KL, firstName: "Ali", lastName: "Hassan", department: "kitchen", basicSalary: "1800" },
+  { id: "staff-ali", branchId: KL, firstName: "Ali", lastName: "Hassan", department: "kitchen", basicSalary: "1800", login: "ali" },
   { id: "staff-siti", branchId: KL, firstName: "Siti", lastName: "Aminah", department: "front", basicSalary: "1200" },
   { id: "staff-kumar", branchId: KL, firstName: "Kumar", lastName: "Raj", department: "front", basicSalary: "1500" },
   { id: "staff-rahim", branchId: PJ, firstName: "Rahim", lastName: "Yusof", department: "kitchen", basicSalary: "1600" },
@@ -227,6 +228,8 @@ export function buildDemoCompany(today = new Date()) {
       employmentType: "full-time", basicSalary: s.basicSalary, allowance: "0", fixedSalaryNoAttendance: true,
       startDate: "2026-01-01", nationality: "malaysian", country: "Malaysia", phone: "",
       companyId: COMPANY_ID, branchId: s.branchId, createdAt,
+      // A staff login is linked both ways, as create-staff does it.
+      ...(s.login ? { uid: uid(s.login), loginEmail: emailOf(s.login) } : {}),
     });
   }
 
@@ -285,6 +288,7 @@ export function buildDemoCompany(today = new Date()) {
   const users = USERS.map(([role, username, name, branchId]) => ({
     id: uid(username), companyId: COMPANY_ID, role, userName: username, name, fullName: name,
     email: emailOf(username), ...(branchId ? { branchId } : {}), createdAt,
+    ...(role === "staff" ? { staffId: STAFF.find((s) => s.login === username).id } : {}),
   }));
 
   const dataset = {

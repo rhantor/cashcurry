@@ -73,8 +73,10 @@ export default function SalarySheetPage () {
   // Fetch Data
   const { data: branchData } = useGetSingleBranchQuery(args)
   const { data: staffList = [] } = useGetStaffListQuery(args)
-  const { data: advances = [] } = useGetAdvanceEntriesQuery(args)
-  const { data: loans = [] } = useGetStaffLoansQuery(args)
+  // Only approved ones can have an instalment to deduct (repaid ones are closed).
+  const approvedArgs = args === skipToken ? skipToken : { ...args, status: 'approved' }
+  const { data: advances = [] } = useGetAdvanceEntriesQuery(approvedArgs)
+  const { data: loans = [] } = useGetStaffLoansQuery(approvedArgs)
   const { data: savedSheets = [] } = useGetSalarySheetsQuery(historyArgs)
 
   const [saveSalarySheet] = useSaveSalarySheetMutation()

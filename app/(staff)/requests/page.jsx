@@ -6,38 +6,34 @@ import { useAddNotificationMutation } from "@/lib/redux/api/notificationApiSlice
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { FileText, Clock, CheckCircle, XCircle } from "lucide-react";
-import { getSessionUser } from "@/lib/session";
+import useSession from "@/app/hooks/useSession";
 
 export default function RequestsPage() {
-  const [user, setUser] = useState(null);
-  const [staffDocId, setStaffDocId] = useState(null);
+  // Live session: the profile refresh after login fills in staffId.
+  const { user } = useSession();
+  const [lookedUpStaffId, setLookedUpStaffId] = useState(null);
 
+  // Logins created before staffId was recorded on the user: find the staff
+  // record by its uid instead (npm run staff:link fixes them for good).
   useEffect(() => {
-    const stored = getSessionUser();
-    if (stored) {
-       const u = stored;
-       setUser(u);
-       if (u.uid && u.companyId && u.branchId) {
-         const q = query(
-           collection(db, "companies", u.companyId, "branches", u.branchId, "staff"),
-           where("uid", "==", u.uid)
-         );
-         getDocs(q).then(snap => {
-           if (!snap.empty) {
-             setStaffDocId(snap.docs[0].id);
-           }
-         });
-       }
-    }
-  }, []);
+    if (!user?.uid || !user?.companyId || !user?.branchId || user.staffId) return;
+    const q = query(
+      collection(db, "companies", user.companyId, "branches", user.branchId, "staff"),
+      where("uid", "==", user.uid)
+    );
+    getDocs(q).then(snap => {
+      if (!snap.empty) setLookedUpStaffId(snap.docs[0].id);
+    });
+  }, [user?.uid, user?.companyId, user?.branchId, user?.staffId]);
+  const staffDocId = user?.staffId || lookedUpStaffId;
 
-  // Fetch all advances for branch, then filter client-side since Redux doesn't support complex client queries out of the box here without a new endpoint
-  const skipQuery = !user?.companyId || !user?.branchId;
-  const { data: allAdvances = [], isLoading } = useGetAdvanceEntriesQuery(
-    !skipQuery ? { companyId: user.companyId, branchId: user.branchId } : { skip: true }
+  // Only this person's: the ones they asked for and the ones entered for
+  // their staff record (staff may not read anyone else's).
+  const skipQuery = !user?.uid || !user?.companyId || !user?.branchId;
+  const { data: myRequests = [], isLoading } = useGetAdvanceEntriesQuery(
+    { companyId: user?.companyId, branchId: user?.branchId, mine: { uid: user?.uid, staffId: user?.staffId } },
+    { skip: skipQuery }
   );
-
-  const myRequests = allAdvances.filter(a => a.staffId === staffDocId || a.createdBy?.uid === user?.uid);
 
   const [addAdvance, { isLoading: submitting }] = useAddAdvanceEntryMutation();
   const [addNotification] = useAddNotificationMutation();

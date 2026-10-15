@@ -142,6 +142,20 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys();
     }
 
+    // A row about the signed-in staff member: its staffId is the staff record
+    // their login is linked to (users/{uid}.staffId — only an admin sets it).
+    // Queries must filter on exactly that staffId, or Firestore refuses them.
+    function isOwnStaffRecord() {
+      let mine = userData().get('staffId', '');
+      return mine != '' && resource.data.get('staffId', '') == mine;
+    }
+
+    // A staff member's own advance or loan: one they asked for, or one
+    // entered for them.
+    function isOwnRequest() {
+      return resource.data.get('createdBy', {}).get('uid', '') == request.auth.uid || isOwnStaffRecord();
+    }
+
     // A request as anyone may raise it: pending, nothing paid.
     function isNewRequest() {
       return request.resource.data.get('status', '') == 'pending' &&
@@ -271,11 +285,12 @@ service cloud.firestore {
 
       allow delete: if false;
 
-      // Users can update their own profile, but CANNOT change their role or companyId
+      // Users can update their own profile, but CANNOT change their role,
+      // company, branch, or which staff record they are (staffId)
       allow update: if isAuth() &&
         request.auth.uid == uid &&
         !request.resource.data.diff(resource.data).affectedKeys()
-          .hasAny(['role', 'companyId', 'branchId', 'platformAdmin']);
+          .hasAny(['role', 'companyId', 'branchId', 'platformAdmin', 'staffId']);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -481,9 +496,9 @@ service cloud.firestore {
           // admin approves or rejects, or records one handed over on the spot.
           // A payer (cashier and up) marks an approved one paid — once, changing
           // nothing else. Accountants/supervisors keep the books. Staff read
-          // only what they asked for.
+          // only their own (isOwnRequest).
           allow read: if canRead(companyId, branchId) ||
-            (isBranchMember(companyId, branchId) && resource.data.get('createdBy', {}).get('uid', '') == request.auth.uid);
+            (isBranchMember(companyId, branchId) && isOwnRequest());
           allow create: if isApprover(companyId, branchId) ||
             (isBranchMember(companyId, branchId) && isNewRequest());
           allow update: if isApprover(companyId, branchId) ||
@@ -498,9 +513,9 @@ service cloud.firestore {
           // admin approves or rejects, or records one handed over on the spot.
           // A payer (cashier and up) marks an approved one paid — once, changing
           // nothing else. Accountants/supervisors keep the books. Staff read
-          // only what they asked for.
+          // only their own (isOwnRequest).
           allow read: if canRead(companyId, branchId) ||
-            (isBranchMember(companyId, branchId) && resource.data.get('createdBy', {}).get('uid', '') == request.auth.uid);
+            (isBranchMember(companyId, branchId) && isOwnRequest());
           allow create: if isApprover(companyId, branchId) ||
             (isBranchMember(companyId, branchId) && isNewRequest());
           allow update: if isApprover(companyId, branchId) ||
@@ -516,7 +531,9 @@ service cloud.firestore {
 
         // ── Attendance (Shared Kiosk) ────────────────────────────────────────
         match /attendance/{docId} {
-          allow read: if canRead(companyId, branchId);
+          // Staff see their own punches (the staff app's hours and pay).
+          allow read: if canRead(companyId, branchId) ||
+            (isBranchMember(companyId, branchId) && isOwnStaffRecord());
           allow write: if canWrite(companyId, branchId);
         }
 
@@ -524,7 +541,8 @@ service cloud.firestore {
         // Raised by the kiosk on an early punch-in, approved in the Requested
         // Panel. Same access shape as attendance.
         match /otRequests/{docId} {
-          allow read: if canRead(companyId, branchId);
+          allow read: if canRead(companyId, branchId) ||
+            (isBranchMember(companyId, branchId) && isOwnStaffRecord());
           allow write: if canWrite(companyId, branchId);
         }
 

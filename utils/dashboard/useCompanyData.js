@@ -7,7 +7,7 @@ import { format } from "date-fns";
 import { buildLedger } from "@/lib/finance/ledger";
 import { fastStart, monthOf } from "@/lib/finance/monthly";
 import { fetchLedgerStart } from "@/lib/redux/api/summaryApiSlice";
-import { getDocsSince } from "@/lib/redux/api/since";
+import { getDocsSince } from "@/lib/redux/api/recordQueries";
 import { currencyInfo } from "@/lib/region";
 import {
   saleDay, costDay, advanceDay, depositDay, withdrawalDay, salaryDay, staffLoanDay,

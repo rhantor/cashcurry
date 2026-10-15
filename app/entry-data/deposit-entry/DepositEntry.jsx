@@ -53,7 +53,7 @@ export default function DepositEntryPage() {
     isLoading,
     isError,
   } = useGetDepositEntryQuery(
-    { companyId, branchId },
+    { companyId, branchId, latest: 5 },
     { skip: !companyId || !branchId }
   );
 
@@ -62,7 +62,8 @@ export default function DepositEntryPage() {
     branchId,
   });
 
-  const lastFiveDeposits = deposits?.slice(-5).reverse();
+  // Newest first (the query returns only the latest five).
+  const lastFiveDeposits = deposits;
 
   // ✅ Upload File
   const uploadFile = async () => {

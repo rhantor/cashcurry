@@ -24,7 +24,8 @@ const waiting = (x) => x.status === "approved" && x.paidOut === null && !isLeave
 export default function PayOutQueue({ companyId, branchId, user, title = "Waiting to be paid" }) {
   const currency = useCurrency();
   const today = useBusinessToday();
-  const args = { companyId, branchId };
+  // Only approved and not yet handed over — not the whole history.
+  const args = { companyId, branchId, status: "approved", unpaid: true };
   const skip = { skip: !companyId || !branchId };
   const { data: advances = [] } = useGetAdvanceEntriesQuery(args, skip);
   const { data: loans = [] } = useGetStaffLoansQuery(args, skip);

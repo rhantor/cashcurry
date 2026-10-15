@@ -67,13 +67,14 @@ export default function RequestedPanel() {
     isLoading: advLoading,
     isError: advError,
   } = useGetAdvanceEntriesQuery(
-    { companyId, branchId },
+    // Only what waits for a decision — not the whole history every 5 seconds.
+    { companyId, branchId, status: "pending" },
     { skip: !companyId || !branchId, pollingInterval: 5000 }
   );
 
   // Staff loans requested by a cashier/supervisor wait here for approval too.
   const { data: staffLoans } = useGetStaffLoansQuery(
-    { companyId, branchId },
+    { companyId, branchId, status: "pending" },
     { skip: !companyId || !branchId, pollingInterval: 5000 }
   );
 
@@ -82,7 +83,7 @@ export default function RequestedPanel() {
     isLoading: loanLoading,
     isError: loanError,
   } = useGetLoanEntriesQuery(
-    { companyId, branchId },
+    { companyId, branchId, status: "pending" },
     { skip: !companyId || !branchId, pollingInterval: 5000 }
   );
 
@@ -99,7 +100,7 @@ export default function RequestedPanel() {
     isError: otError,
     error: otErrorDetail,
   } = useGetOtRequestsQuery(
-    { companyId, branchId },
+    { companyId, branchId, status: "pending" },
     { skip: !companyId || !branchId || !otTabEnabled, pollingInterval: 5000 }
   );
 

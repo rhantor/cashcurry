@@ -73,12 +73,15 @@ Needed before staff phones get direct access to the database (Phase 4).
 | 2.1 | **Real access control** — the database and storage rules are the security boundary (screens and middleware only hide buttons). One shared rules file for v2 + POS; closed: anyone could make themselves owner of any company, staff could read all finances and colleagues' personal data, anyone could approve/pay their own advance, anyone could claim usernames, open create-staff and image-proxy endpoints. 46 rules tests (`npm run test:rules`). Login-token claims deferred: not needed for security now that rules are tight | ✅ |
 | 2.2 | One shared "current user / company / branch" source (`lib/session`, `useSession`), replacing 44 separate browser-storage reads in 37 files and three helpers. Profile comes from the database (a changed role/branch applies on next load); one active branch for every screen; signing out anywhere returns to login | ✅ |
 | 2.3 | **Fast dashboards.** The server keeps each branch's monthly totals with the app's own finance engine (bundled into the Cloud Functions), recomputing the whole month on every change, with retry and a nightly pass. The old rollups (which broke the money rules and drifted) are gone. The branch and company dashboards and the summary report check those totals against server-side record counts and, when they cover everything earlier, load only the period's months; anything missing or stale → the full download, as before. Proven equal to the full download for every branch, month and filter on the real data; **1,744 → 230 document reads (−87%)** for the Sep 2026 dashboards. Loans between branches are now dated on the branch's clock (Malaysia by default), not the device's, so the server and every screen agree | ✅ |
-| 2.4 | Reports load by date range with paging | ⬜ |
+| 2.4 | **Screens ask for what they show.** The list reports already loaded by date range; the rest of the app did not. The requests panel re-downloaded every advance, staff loan, branch loan and OT request every 5 seconds — now only pending ones (Lazeez BB: ~1,920 → 48 reads a minute while open). Pay-out queue: only approved-unpaid. Payroll/salary sheet: only approved. Supervisor panel: only their own. Deposit entry: the latest five (it was showing the five *oldest*). **Staff pages fixed:** since 2.1 staff may read only their own records, but their pages asked for the whole branch, so they would have shown nothing. Each staff login now records which staff record it is (`users.staffId`, set by create-staff, locked like role); staff read their own advances, loans, punches and OT requests — asked by them or entered for them. Demo company has a staff login (`ali`) | ✅ |
 | 2.5 | Remove dead/unsafe code (old `onShiftClosed` function, unused helpers) | ⬜ |
 
 - **2.1 How you check:** `npm run test:rules` — 46 statements about who may read/write what, run against the
   emulator (e.g. "a stranger cannot make themselves owner of an existing company", "a cashier marks an approved
   advance paid — once"). Cashiers can now "Mark paid". Staff logins get a random one-time password.
+- **2.4 How you check:** log in as `ali` (staff): Requests shows the RM 100 advance the KL admin entered for him. As
+  `kl_manager`: Requested panel shows only Kumar's pending RM 150; as `kl_cashier`: "Waiting to be paid" shows Siti's RM 600.
+  `npm run test:rules` includes "staff see their own … and no one else's".
 - **2.3 How you check:** `npm run dev:local`, open a dashboard — same figures as before. Add a cost dated last month in
   the app: a few seconds later `summaries/{month}` in the emulator UI (localhost:4000) shows it. `npm test` proves
   fast == full for every branch, month and filter; `CC_TEST_TZ=UTC npm test` runs it as the server would.
@@ -143,6 +146,9 @@ rehearsed on the local copy first.
       deploying either one would lock the other app out. Deploy ONLY v2's firestore.rules and storage.rules
       (they include the POS sections); retire the POS repo's copy. First download the live rules and diff
       them against v2's, to catch anything deployed from elsewhere.
+- [ ] Deploy indexes (`firebase deploy --only firestore:indexes` — additive, safe; wait until they finish building)
+- [ ] Right after the rules: `npm run staff:link -- --project <id> --confirm` — records on each existing staff
+      login which staff record it is. Until then those staff see only requests they raised themselves
 - [ ] Deploy Cloud Functions (`firebase deploy --only functions` builds the finance engine first). This
       removes the old rollup functions — confirm the deletion when the CLI asks
 - [ ] Right after: `npm run summaries:rebuild -- --project <id> --confirm` (needs

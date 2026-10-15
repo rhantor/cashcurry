@@ -26,21 +26,17 @@ import {
   Receipt,
   Coffee
 } from "lucide-react";
-import { getSessionUser } from "@/lib/session";
+import useSession from "@/app/hooks/useSession";
 
 export default function StaffProfilePage() {
-  const [user, setUser] = useState(null);
+  // Live session: the profile refresh after login fills in staffId.
+  const { user } = useSession();
   const [staffData, setStaffData] = useState(null);
   const currency = useCurrency();
 
-  useEffect(() => {
-    const stored = getSessionUser();
-    if (stored) setUser(stored);
-  }, []);
-
-  // Fetch staff list to find the logged-in staff's full record
+  // The logged-in staff member's own record
   const { data: staffList = [] } = useGetStaffListQuery(
-    user?.companyId && user?.branchId ? { companyId: user.companyId, branchId: user.branchId } : { skip: true }
+    user?.uid && user?.companyId && user?.branchId ? { companyId: user.companyId, branchId: user.branchId, uid: user.uid } : skipToken
   );
 
   useEffect(() => {
@@ -84,10 +80,11 @@ export default function StaffProfilePage() {
   // the branch day-cutoff, then we keep only days inside the period.
   const todayStr = toLocalDateStr(new Date());
   const bufStartStr = period ? toLocalDateStr(new Date(period.start.getTime() - 86400000)) : null;
-  const canAttendance = !skip && !!period && !staffData?.fixedSalaryNoAttendance;
+  // Own punches only: needs the login linked to a staff record (users.staffId).
+  const canAttendance = !skip && !!period && !!user?.staffId && !staffData?.fixedSalaryNoAttendance;
   const { data: periodPunches = [] } = useGetBranchAttendanceByPeriodQuery(
     canAttendance
-      ? { companyId: user.companyId, branchId: user.branchId, startDate: bufStartStr, endDate: todayStr }
+      ? { companyId: user.companyId, branchId: user.branchId, staffId: user.staffId, startDate: bufStartStr, endDate: todayStr }
       : skipToken
   );
 
@@ -95,7 +92,7 @@ export default function StaffProfilePage() {
   const otEnabled = canAttendance && shiftsEnabled(attendanceSettings);
   const { data: otRequests = [] } = useGetOtRequestsQuery(
     otEnabled
-      ? { companyId: user.companyId, branchId: user.branchId, startDate: bufStartStr, endDate: todayStr }
+      ? { companyId: user.companyId, branchId: user.branchId, staffId: user.staffId, startDate: bufStartStr, endDate: todayStr }
       : skipToken
   );
 
@@ -107,12 +104,14 @@ export default function StaffProfilePage() {
     return map;
   }, [otRequests, staffData?.id]);
 
+  // This person's own loans and advances only (staff may not read others').
+  const mine = { uid: user?.uid, staffId: user?.staffId };
   const { data: allLoans = [] } = useGetStaffLoansQuery(
-    !skip ? { companyId: user.companyId, branchId: user.branchId } : { skip: true }
+    !skip ? { companyId: user.companyId, branchId: user.branchId, mine } : skipToken
   );
 
   const { data: allAdvances = [] } = useGetAdvanceEntriesQuery(
-    !skip ? { companyId: user.companyId, branchId: user.branchId } : { skip: true }
+    !skip ? { companyId: user.companyId, branchId: user.branchId, mine } : skipToken
   );
 
   // Calculations — uses the shared attendance engine (same as payroll/log).
