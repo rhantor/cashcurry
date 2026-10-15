@@ -4,8 +4,9 @@
 // saves any changes you made back to .local/emulator-data.
 import fs from "node:fs";
 import net from "node:net";
+import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
-import { ROOT, LOCAL_PROJECT_ID, EMULATOR_DATA_DIR, NEXT_LOCAL_ENV } from "./config.mjs";
+import { ROOT, LOCAL_DIR, LOCAL_PROJECT_ID, EMULATOR_DATA_DIR, NEXT_LOCAL_ENV } from "./config.mjs";
 
 if (!fs.existsSync(EMULATOR_DATA_DIR)) {
   console.error("No local data yet. Run `npm run local:seed` first.");
@@ -69,5 +70,22 @@ while (!(await portOpen(8080))) {
   await new Promise((r) => setTimeout(r, 500));
 }
 
+// One-click logins on the login page: the seeded accounts (from the table the
+// seed writes) and their shared local password.
+function localLoginEnv() {
+  try {
+    const password = fs.readFileSync(path.join(LOCAL_DIR, "dev-password.txt"), "utf8").trim();
+    const accounts = fs
+      .readFileSync(path.join(LOCAL_DIR, "DEV_ACCOUNTS.md"), "utf8")
+      .split("\n")
+      .map((line) => line.split("|").map((c) => c.trim()))
+      .filter((c) => c.length === 6 && c[1] && c[1] !== "Role" && !c[1].startsWith("-"))
+      .map(([, role, login, , branch]) => ({ role, login, branch }));
+    return { NEXT_PUBLIC_LOCAL_PASSWORD: password, NEXT_PUBLIC_LOCAL_ACCOUNTS: JSON.stringify(accounts) };
+  } catch {
+    return {};
+  }
+}
+
 console.log("\n  Local data ready — emulator dashboard: http://127.0.0.1:4000\n");
-run("npx", ["next", "dev"], NEXT_LOCAL_ENV);
+run("npx", ["next", "dev"], { ...NEXT_LOCAL_ENV, ...localLoginEnv() });
