@@ -21,7 +21,23 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { hasBackup, loadBackup, monthsCovered, backupDir } from "./dataset";
 import { format } from "date-fns";
-import { summary, summaryForMonth, branchDashboard, companyDashboard, monthFilter } from "./run";
+import {
+  summary, summaryForMonth, branchDashboard, companyDashboard, monthFilter,
+  summaryDetail, branchCharts, companyCharts,
+} from "./run";
+
+/** Compare with a recorded golden file, or record it under `test:golden:update`. */
+function matchGolden(file, actual) {
+  if (process.env.CC_UPDATE_GOLDEN === "1") {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, JSON.stringify(actual, null, 2) + "\n");
+    return;
+  }
+  if (!fs.existsSync(file)) {
+    throw new Error(`No golden file at ${file}. Create it with \`npm run test:golden:update\`.`);
+  }
+  expect(actual).toEqual(JSON.parse(fs.readFileSync(file, "utf8")));
+}
 import { presetFilter } from "@/utils/dashboard/dateFilters";
 import { buildDemoCompany, KL as DEMO_KL, PJ as DEMO_PJ } from "@/scripts/local/demo/demoCompany.mjs";
 
@@ -228,15 +244,27 @@ describe.skipIf(!backupPresent)(`golden figures (${backupDir()})`, () => {
     }
     for (const m of months) actual.company_dashboard[m] = await companyDashboard(data, monthFilter(m));
 
-    if (process.env.CC_UPDATE_GOLDEN === "1") {
-      fs.mkdirSync(path.dirname(goldenFile), { recursive: true });
-      fs.writeFileSync(goldenFile, JSON.stringify(actual, null, 2) + "\n");
-      return;
+    matchGolden(goldenFile, actual);
+  });
+
+  // Everything else those screens show: the summary report's day-by-day rows
+  // and period totals (also what its PDF/Excel exports print), and the chart
+  // series on both dashboards.
+  it("matches the recorded report rows and chart data", async () => {
+    const actual = { branches: {}, company_charts: {} };
+    for (const b of data.branches) {
+      const perMonth = {};
+      for (const m of months) {
+        perMonth[m] = {
+          summary: summaryDetail(data, b.id, { filterType: "month", selectedMonth: m, dateRange: {} }),
+          branch_charts: branchCharts(data, b.id, monthFilter(m)),
+        };
+      }
+      actual.branches[nameOf(b)] = perMonth;
     }
-    if (!fs.existsSync(goldenFile)) {
-      throw new Error(`No golden file at ${goldenFile}. Create it with \`npm run test:golden:update\`.`);
-    }
-    expect(actual).toEqual(JSON.parse(fs.readFileSync(goldenFile, "utf8")));
+    for (const m of months) actual.company_charts[m] = await companyCharts(data, monthFilter(m));
+
+    matchGolden(goldenFile.replace(/\.json$/, ".detail.json"), actual);
   });
 
   it.skipIf(!anchors)("anchors: hand-verified figures", async () => {
