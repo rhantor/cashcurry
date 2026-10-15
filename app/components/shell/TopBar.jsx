@@ -1,0 +1,81 @@
+"use client";
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { Building2, LogOut, Search } from "lucide-react";
+import { Avatar, Menu, cn } from "@/app/components/ui";
+import BranchSwitcher from "./BranchSwitcher";
+
+/**
+ * The bar above every page: where you are, search (Ctrl+K), the branch, and you.
+ * On phones it keeps to the essentials; the rest lives in the bottom bar.
+ */
+export default function TopBar({ page, user, isCompany, branches, activeBranchId, branchName, onSwitchBranch, onSearch, onSignOut }) {
+  const crumb = page?.parent || page?.section;
+  return (
+    <header className="sticky top-0 z-30 border-b border-line bg-surface/80 backdrop-blur-xl">
+      <div className="flex h-14 items-center gap-3 px-4 sm:px-6 lg:h-16">
+        {/* phone: the brand mark (the sidebar has it on computers) */}
+        <Link href="/" aria-label="Home" className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-brand text-sm font-black text-brand-fg lg:hidden">
+          C
+        </Link>
+
+        <div className="min-w-0 flex-1">
+          {/* The new title shows at once (fading in) — never waits for the old one to leave. */}
+          <motion.div
+            key={page?.path || "page"}
+            initial={{ opacity: 0, y: 4 }}
+            animate={{ opacity: 1, y: 0, transition: { duration: 0.18 } }}
+          >
+            {crumb && <p className="hidden truncate text-[11px] font-semibold uppercase tracking-wider text-subtle sm:block">{crumb}</p>}
+            <h1 className="truncate text-base font-bold tracking-tight text-fg lg:text-lg">{page?.label || "Cash Curry"}</h1>
+          </motion.div>
+        </div>
+
+        {/* search: a box on computers, an icon on phones */}
+        <button
+          type="button"
+          onClick={onSearch}
+          className="hidden h-10 w-56 items-center gap-2 rounded-xl border border-line bg-surface-2 px-3 text-sm text-subtle transition hover:border-brand/40 hover:text-muted md:flex"
+        >
+          <Search className="size-4" />
+          <span className="flex-1 text-left">Search…</span>
+          <kbd className="rounded-md border border-line bg-surface px-1.5 py-0.5 text-[10px] font-semibold text-muted">Ctrl K</kbd>
+        </button>
+        <button type="button" onClick={onSearch} aria-label="Search" className="rounded-xl p-2 text-muted transition hover:bg-surface-2 hover:text-fg md:hidden">
+          <Search className="size-5" />
+        </button>
+
+        {isCompany ? (
+          branches.length > 0 && (
+            <div className="hidden max-w-56 sm:block">
+              <BranchSwitcher user={user} branches={branches} activeId={activeBranchId} onSwitch={onSwitchBranch} />
+            </div>
+          )
+        ) : (
+          branchName && (
+            <span className="hidden items-center gap-1.5 rounded-xl bg-brand-soft px-3 py-2 text-xs font-semibold text-brand sm:inline-flex">
+              <Building2 className="size-3.5" />
+              {branchName}
+            </span>
+          )
+        )}
+
+        <Menu
+          align="end"
+          width={230}
+          trigger={(p) => (
+            <button {...p} type="button" aria-label="Account" className={cn("rounded-full transition hover:ring-4 hover:ring-brand-soft")}>
+              <Avatar name={user?.userName || user?.username || user?.email} size="md" />
+            </button>
+          )}
+          items={[
+            { label: user?.userName || user?.username || "Account", hint: user?.role, disabled: true },
+            "divider",
+            { label: "Search", icon: Search, hint: "Ctrl K", onSelect: onSearch },
+            { label: "Sign out", icon: LogOut, danger: true, onSelect: onSignOut },
+          ]}
+        />
+      </div>
+    </header>
+  );
+}

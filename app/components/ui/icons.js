@@ -1,16 +1,17 @@
 // One icon set for the whole app: lucide-react. Import icons from
 // "lucide-react" directly in new code.
 //
-// MENU_ICONS turns the icon names stored in the menu config (utils/dummyData.js,
+// MENU_ICONS turns the icon names stored in the menu config (app/components/shell/navigation.js,
 // written when the app used react-icons) into lucide icons, so the config
 // didn't have to change. Unknown names fall back to a neutral dot.
 import {
-  ArrowDownToLine, Banknote, CalendarDays, CalendarRange, ChartColumn, Circle, HandCoins, Headset, Inbox,
+  ArrowDownToLine, Banknote, CalendarDays, CalendarRange, ChartColumn, Circle, HandCoins, Headset, House, Inbox,
   LayoutDashboard, ListChecks, Newspaper, NotebookPen, Receipt, Repeat, ScrollText, Settings, ShoppingCart,
   TrendingUp, Users, Wallet, Wrench,
 } from "lucide-react";
 
 export const MENU_ICONS = {
+  home: House,
   MdOutlineSpaceDashboard: LayoutDashboard, // dashboards
   MdShoppingCart: ShoppingCart, // purchases
   GrTransaction: NotebookPen, // entries

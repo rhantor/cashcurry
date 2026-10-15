@@ -10,6 +10,8 @@ process.env.TZ = process.env.CC_TEST_TZ || "Asia/Kuala_Lumpur";
 const root = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
+  // JSX like Next.js compiles it (no `import React` needed in components).
+  esbuild: { jsx: "automatic" },
   resolve: {
     alias: { "@": root },
   },
