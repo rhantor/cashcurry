@@ -12,7 +12,8 @@
     "lint": "next lint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:golden:update": "node scripts/test-golden-update.mjs"
+    "test:golden:update": "node scripts/test-golden-update.mjs",
+    "test:rules": "node scripts/test-rules.mjs"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.8.2",
@@ -46,6 +47,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@eslint/js": "^9.33.0",
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@tailwindcss/postcss": "^4",
     "@testing-library/dom": "^10.4.2",
     "@testing-library/react": "^16.3.3",

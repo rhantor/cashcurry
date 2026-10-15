@@ -1,4 +1,11 @@
 rules_version = '2';
+
+// ONE rules file for the whole Firebase project: Cash Curry v2 AND the POS
+// share it. Deploy only this file (from cash_curry_v2); the POS repo's copy is
+// retired — deploying either app's own version would lock the other out.
+//
+// These rules are the security boundary. Screens and middleware only hide
+// buttons; anyone can call Firestore directly. Tests: npm run test:rules.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -36,21 +43,34 @@ service cloud.firestore {
         u.role in ['owner', 'superAdmin', 'superadmin'];
     }
 
-    // Can the user READ this branch?
-    // - owner / gm / superAdmin: can read ALL branches in their company
-    // - all other authenticated roles in same company: can read their assigned branch
-    //   FALLBACK: if branchId is not set on user doc, allow any company member to read
-    //   (handles existing users created before branchId was standardized)
+    // Owner, GM and super admin work across every branch of their company.
+    function isCompanyWide(u) {
+      return u.role in ['owner', 'gm', 'superAdmin', 'superadmin'];
+    }
+
+    // The user's assigned branch (null when none — such a user reads no branch).
+    function inBranch(u, branchId) {
+      return u.get('branchId', null) == branchId;
+    }
+
+    // Can the user READ this branch's finance and operations data?
+    // - owner / gm / superAdmin: every branch in their company
+    // - other roles: their assigned branch only — except staff, who see only
+    //   what is theirs (own staff record, own requests) and the branch's chat/feed
+    // (There used to be a fallback letting any user without a branchId read
+    // every branch; every real branch user has one.)
     function canRead(companyId, branchId) {
       let u = userData();
       return isAuth() && u.companyId == companyId && (
-        u.role == 'owner' ||
-        u.role == 'gm' ||
-        u.role == 'superAdmin' ||
-        u.branchId == branchId ||
-        !('branchId' in u) ||
-        u.branchId == null
+        isCompanyWide(u) ||
+        (inBranch(u, branchId) && u.role != 'staff')
       );
+    }
+
+    // Anyone who works at this branch, staff included (chat, wall, requests).
+    function isBranchMember(companyId, branchId) {
+      let u = userData();
+      return isAuth() && u.companyId == companyId && (isCompanyWide(u) || inBranch(u, branchId));
     }
 
     // Normalises legacy lowercase "branchadmin" to canonical "branchAdmin".
@@ -69,9 +89,93 @@ service cloud.firestore {
         u.role in ['owner', 'gm', 'superAdmin', 'superadmin'] ||
         (
           (isBranchAdmin(u) || u.role in ['manager', 'accountant', 'supervisor']) &&
+          inBranch(u, branchId)
+        )
+      );
+    }
+
+    // Who may operate a till: everyone from cashier up. Mirrors the existing
+    // orders rule so the POS subtree does not invent a second answer.
+    function canOperatePos(companyId, branchId) {
+      let u = userData();
+      return isAuth() && u.companyId == companyId && (
+        u.role == 'owner' ||
+        (
+          (isBranchAdmin(u) || u.role in ['manager', 'supervisor', 'cashier', 'accountant']) &&
           u.branchId == branchId
         )
       );
+    }
+
+    // Who may configure a branch's POS: manager and above. Menu prices, floor
+    // plans and till logins are not a cashier's to change.
+    function canConfigurePos(companyId, branchId) {
+      let u = userData();
+      return isAuth() && u.companyId == companyId && (
+        u.role == 'owner' ||
+        u.role == 'gm' ||
+        u.role == 'superAdmin' ||
+        ((isBranchAdmin(u) || u.role == 'manager') && u.branchId == branchId)
+      );
+    }
+
+    // ── Advances and staff loans: requested → approved → paid ──────────────
+    // Approve or reject; record one handed over on the spot; delete.
+    function isApprover(companyId, branchId) {
+      let u = userData();
+      return isAuth() && u.companyId == companyId && (
+        isCompanyWide(u) ||
+        ((isBranchAdmin(u) || u.role == 'manager') && inBranch(u, branchId))
+      );
+    }
+
+    // Hand over approved money (records paidOut).
+    function isPayer(companyId, branchId) {
+      let u = userData();
+      return isAuth() && u.companyId == companyId && (
+        isCompanyWide(u) ||
+        ((isBranchAdmin(u) || u.role in ['manager', 'accountant', 'supervisor', 'cashier']) && inBranch(u, branchId))
+      );
+    }
+
+    function changedKeys() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    // A request as anyone may raise it: pending, nothing paid.
+    function isNewRequest() {
+      return request.resource.data.get('status', '') == 'pending' &&
+        request.resource.data.get('paidOut', null) == null;
+    }
+
+    // Paying out: an approved, unpaid request gets paidOut — and nothing else
+    // changes (not the amount, not who it is for).
+    function isPayOut() {
+      return resource.data.get('status', '') == 'approved' &&
+        resource.data.get('paidOut', null) == null &&
+        request.resource.data.get('paidOut', null) != null &&
+        changedKeys().hasOnly(['paidOut', 'paidFromOffice', 'updatedAt']);
+    }
+
+    // Accountant / supervisor keeping the books (installments, totals, notes):
+    // never who approved it, whether it is paid, the amount, or the staff
+    // member — though a fully repaid one may go from approved to closed.
+    function isBookkeeping() {
+      return !changedKeys().hasAny(['approvedBy', 'paidOut', 'paidFromOffice', 'amount', 'staffId', 'createdBy']) &&
+        (!changedKeys().hasAny(['status']) ||
+          (resource.data.get('status', '') == 'approved' && request.resource.data.get('status', '') == 'closed'));
+    }
+
+    // Settings fields that decide money and dates: branch admins and above only.
+    function keepsMoneySettings() {
+      let before = resource.data;
+      let after = request.resource.data;
+      return after.get('financeSales', {}).get('openingBalance', null) == before.get('financeSales', {}).get('openingBalance', null) &&
+        after.get('financeSales', {}).get('openingBankBalance', null) == before.get('financeSales', {}).get('openingBankBalance', null) &&
+        after.get('financeSales', {}).get('currency', null) == before.get('financeSales', {}).get('currency', null) &&
+        after.get('initialCash', null) == before.get('initialCash', null) &&
+        after.get('basic', {}).get('timeZone', null) == before.get('basic', {}).get('timeZone', null) &&
+        after.get('attendance', {}).get('dayCutoffTime', null) == before.get('attendance', {}).get('dayCutoffTime', null);
     }
 
     // Can the user manage branch settings? (owner / superAdmin, or this branch's admin)
@@ -88,12 +192,14 @@ service cloud.firestore {
     // labels/order, reporting defaults, notes). They are routed there by
     // middleware.js too, so they need write access to the settings DOCUMENT —
     // but not to branch metadata, which stays with canManageSettings.
-    // Field-level enforcement is UI-only; see SECURITY notes.
+    // Money and date settings (opening balances, currency, time zone, day
+    // cut-off) are enforced here too: a manager's save may not change them.
     function canWriteBranchSettings(companyId, branchId) {
       let u = userData();
       return canManageSettings(companyId, branchId) ||
         (isAuth() && u.companyId == companyId &&
-         u.role == 'manager' && u.branchId == branchId);
+         u.role == 'manager' && inBranch(u, branchId) &&
+         (resource == null || keepsMoneySettings()));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -110,19 +216,31 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isPlatformAdmin();
       // Consume: flip used false→true. createdAt cannot change.
-      allow update: if resource.data.used == false &&
+      allow update: if isAuth() &&
+        resource.data.used == false &&
         request.resource.data.used == true &&
+        request.resource.data.get('usedBy', '') == request.auth.uid &&
         !request.resource.data.diff(resource.data).affectedKeys()
           .hasAny(['createdAt']);
       // Platform admins can clean up unused codes.
       allow delete: if isPlatformAdmin() && resource.data.used == false;
     }
 
+    match /entitlements/{companyId} {
+      allow read: if isPlatformAdmin() || belongsToCompany(companyId);
+      allow write: if isPlatformAdmin();
+    }
+
     // Username → email lookup: must be publicly readable so login by username works
     // before the user is authenticated with Firebase Auth
     match /usernames/{username} {
       allow read: if true;          // Public: required for username-based login
-      allow create: if isAuth();    // Owner/admin writes lookup when creating a user
+      // Your own login, or a company admin adding someone to their company.
+      // (Anyone could claim any username before — including another user's.)
+      allow create: if isAuth() && (
+        request.resource.data.get('uid', '') == request.auth.uid ||
+        isCompanyAdmin(request.resource.data.get('companyId', ''))
+      );
       allow update, delete: if false;
     }
 
@@ -134,14 +252,22 @@ service cloud.firestore {
       // Users can only read their own document
       allow read: if isAuth() && request.auth.uid == uid;
 
-      // Allow create when:
-      //   - owner/superAdmin is creating a user for their own company
-      //     (secondary auth keeps the creator signed in)
-      //   - new user creating their own profile (signup flow)
-      allow create: if isAuth() && (
-        request.auth.uid == uid ||
-        isCompanyAdmin(request.resource.data.companyId)
-      );
+      // Create when:
+      //   - a company admin adds someone to their own company (never a platform admin)
+      //   - a new owner signs up: their own record, as owner of a company that is
+      //     being created in the same transaction (see the companies rule)
+      // Before, any signed-in account could write itself into ANY company with
+      // ANY role — e.g. owner of an existing company.
+      allow create: if isAuth() &&
+        request.resource.data.get('platformAdmin', false) == false && (
+          isCompanyAdmin(request.resource.data.get('companyId', '')) ||
+          (
+            request.auth.uid == uid &&
+            request.resource.data.get('role', '') == 'owner' &&
+            !exists(/databases/$(database)/documents/companies/$(request.resource.data.get('companyId', ''))) &&
+            getAfter(/databases/$(database)/documents/companies/$(request.resource.data.get('companyId', ''))).data.get('ownerUid', '') == uid
+          )
+        );
 
       allow delete: if false;
 
@@ -149,7 +275,7 @@ service cloud.firestore {
       allow update: if isAuth() &&
         request.auth.uid == uid &&
         !request.resource.data.diff(resource.data).affectedKeys()
-          .hasAny(['role', 'companyId', 'branchId']);
+          .hasAny(['role', 'companyId', 'branchId', 'platformAdmin']);
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -160,13 +286,31 @@ service cloud.firestore {
       // Any member of this company can read the company document
       allow read: if belongsToCompany(companyId);
 
-      // Only the owner can create/update/delete the company document
-      allow write: if isOwner(companyId);
+      // Sign-up creates a company: a brand-new account (no user record yet),
+      // naming itself owner, using an unused invite consumed in the same
+      // transaction. (The old rule checked the user record, which a transaction
+      // cannot see yet — so sign-up was refused.)
+      allow create: if isAuth() &&
+        request.resource.data.get('ownerUid', '') == request.auth.uid &&
+        !exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('companyId', '') == companyId &&
+        getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'owner' &&
+        get(/databases/$(database)/documents/signupInvites/$(request.resource.data.get('inviteCode', '-'))).data.get('used', true) == false &&
+        getAfter(/databases/$(database)/documents/signupInvites/$(request.resource.data.get('inviteCode', '-'))).data.get('usedBy', '') == request.auth.uid;
+
+      // Only the owner can update/delete the company document
+      allow update, delete: if isOwner(companyId);
 
       // ── Company Users Sub-collection ───────────────────────────────────────
       match /users/{uid} {
         allow read: if belongsToCompany(companyId);
-        allow write: if isCompanyAdmin(companyId) || (isAuth() && request.auth.uid == uid);
+        // A company admin, or a member updating their own entry (or the
+        // owner's entry written during sign-up). Outsiders cannot add themselves.
+        allow write: if isCompanyAdmin(companyId) ||
+          (isAuth() && request.auth.uid == uid && (
+            belongsToCompany(companyId) ||
+            getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('companyId', '') == companyId
+          ));
 
         // Individual users can manage their own device tokens
         match /fcmTokens/{token} {
@@ -221,9 +365,9 @@ service cloud.firestore {
 
       // ── Company Manual Deductions ──────────────────────────────────────────
       match /manual_deductions/{docId} {
-        allow read: if isAuth() && userData().companyId == companyId && 
+        allow read: if isAuth() && userData().companyId == companyId &&
                        userData().role in ['owner', 'gm', 'superAdmin', 'superadmin'];
-        allow write: if isAuth() && userData().companyId == companyId && 
+        allow write: if isAuth() && userData().companyId == companyId &&
                         userData().role in ['superAdmin', 'superadmin'];
       }
 
@@ -238,7 +382,14 @@ service cloud.firestore {
             resource.data.branchId == userData().branchId
           )
         );
-        allow write: if false; // Cloud Functions use Admin SDK (bypasses rules)
+        // Cloud Functions write their entries with the Admin SDK. The app adds
+        // entries for actions it performs (approvals, pay-outs, edits) — always
+        // in the signed-in user's own name; nobody edits or deletes entries.
+        // (Before, every entry written from the app was silently refused.)
+        allow create: if isAuth() && userData().companyId == companyId &&
+          request.resource.data.get('userId', '') == request.auth.uid &&
+          (isCompanyWide(userData()) || inBranch(userData(), request.resource.data.get('branchId', '')));
+        allow update, delete: if false;
       }
 
       // ── Branches ───────────────────────────────────────────────────────────
@@ -305,12 +456,15 @@ service cloud.firestore {
         // ── Staff List ───────────────────────────────────────────────────────
         // Owner can manage staff in any branch; branchAdmin/manager only in their own.
         match /staff/{docId} {
-          allow read: if canRead(companyId, branchId);
+          // Branch management reads the list; a staff member reads only their own
+          // record (it holds passport, bank and salary details).
+          allow read: if canRead(companyId, branchId) ||
+            (isBranchMember(companyId, branchId) && resource.data.get('uid', '') == request.auth.uid);
           allow write: if isAuth() && userData().companyId == companyId && (
             userData().role == 'owner' ||
             (
               (isBranchAdmin(userData()) || userData().role == 'manager') &&
-              userData().branchId == branchId
+              inBranch(userData(), branchId)
             )
           );
         }
@@ -323,22 +477,41 @@ service cloud.firestore {
 
         // ── Staff Loans (Branch Level) ───────────────────────────────────────
         match /loans/{docId} {
-          allow read: if canRead(companyId, branchId);
-          allow write: if canWrite(companyId, branchId);
+          // Anyone at the branch may ASK (pending, unpaid). A manager or branch
+          // admin approves or rejects, or records one handed over on the spot.
+          // A payer (cashier and up) marks an approved one paid — once, changing
+          // nothing else. Accountants/supervisors keep the books. Staff read
+          // only what they asked for.
+          allow read: if canRead(companyId, branchId) ||
+            (isBranchMember(companyId, branchId) && resource.data.get('createdBy', {}).get('uid', '') == request.auth.uid);
+          allow create: if isApprover(companyId, branchId) ||
+            (isBranchMember(companyId, branchId) && isNewRequest());
+          allow update: if isApprover(companyId, branchId) ||
+            (isPayer(companyId, branchId) && isPayOut()) ||
+            (canWrite(companyId, branchId) && isBookkeeping());
+          allow delete: if isApprover(companyId, branchId);
         }
 
         // ── Staff Advances ───────────────────────────────────────────────────
         match /advances/{docId} {
-          allow read: if canRead(companyId, branchId);
-          allow write: if canWrite(companyId, branchId) || 
-                          (isAuth() && userData().companyId == companyId && userData().branchId == branchId);
+          // Anyone at the branch may ASK (pending, unpaid). A manager or branch
+          // admin approves or rejects, or records one handed over on the spot.
+          // A payer (cashier and up) marks an approved one paid — once, changing
+          // nothing else. Accountants/supervisors keep the books. Staff read
+          // only what they asked for.
+          allow read: if canRead(companyId, branchId) ||
+            (isBranchMember(companyId, branchId) && resource.data.get('createdBy', {}).get('uid', '') == request.auth.uid);
+          allow create: if isApprover(companyId, branchId) ||
+            (isBranchMember(companyId, branchId) && isNewRequest());
+          allow update: if isApprover(companyId, branchId) ||
+            (isPayer(companyId, branchId) && isPayOut()) ||
+            (canWrite(companyId, branchId) && isBookkeeping());
+          allow delete: if isApprover(companyId, branchId);
         }
 
         // ── Chat Messages ───────────────────────────────────────────────────
         match /chat_messages/{messageId} {
-          allow read: if canRead(companyId, branchId);
-          allow write: if canWrite(companyId, branchId) || 
-                          (isAuth() && userData().companyId == companyId && userData().branchId == branchId);
+          allow read, write: if isBranchMember(companyId, branchId);
         }
 
         // ── Attendance (Shared Kiosk) ────────────────────────────────────────
@@ -370,8 +543,8 @@ service cloud.firestore {
         // ── Purchase Requisitions ────────────────────────────────────────────
         match /requisitions/{docId} {
           allow read: if canRead(companyId, branchId);
-          allow write: if canWrite(companyId, branchId) || 
-                          (isAuth() && userData().companyId == companyId && userData().branchId == branchId);
+          allow write: if canWrite(companyId, branchId) ||
+                          isBranchMember(companyId, branchId);
         }
 
         // ── Document number counters (PO numbers, etc.) ───────────────────────
@@ -381,7 +554,7 @@ service cloud.firestore {
         match /counters/{seriesId} {
           allow read: if canRead(companyId, branchId);
           allow write: if canWrite(companyId, branchId) ||
-                          (isAuth() && userData().companyId == companyId && userData().branchId == branchId);
+                          isBranchMember(companyId, branchId);
         }
 
         // ── POS: Order Guides ────────────────────────────────────────────────
@@ -396,13 +569,107 @@ service cloud.firestore {
           allow read:  if canRead(companyId, branchId);
           allow write: if isAuth() && userData().companyId == companyId &&
                           (isBranchAdmin(userData()) || userData().role == 'manager') &&
-                          userData().branchId == branchId;
+                          inBranch(userData(), branchId);
 
           match /slips/{slipId} {
             allow read:  if canRead(companyId, branchId);
             allow write: if isAuth() && userData().companyId == companyId &&
                             (isBranchAdmin(userData()) || userData().role == 'manager') &&
-                            userData().branchId == branchId;
+                            inBranch(userData(), branchId);
+          }
+        }
+
+        // ── POS subtree ──────────────────────────────────────────────────────
+        // Everything the till owns lives under one document, branches/{b}/pos/main.
+        // Keeping it here rather than beside the finance collections means the POS
+        // can never write a document v2 reads by the same name — `staff`,
+        // `deposits` and `cashWithdrawals` all exist in both apps meaning
+        // different things.
+        //
+        // The connection document is the on/off switch, so only someone who can
+        // manage branch settings may create or flip it. What lives beneath it
+        // splits two ways: things a cashier does during service, and things that
+        // configure the branch.
+        match /pos/{posDoc} {
+          allow read: if canRead(companyId, branchId);
+          allow create, update: if canManageSettings(companyId, branchId);
+          // Disconnecting is a flag, never a delete — orders and shifts under
+          // here are financial records.
+          allow delete: if false;
+
+          // Service-time records: any till operator may write them.
+          match /orders/{docId} {
+            allow read: if canRead(companyId, branchId);
+            allow create, update: if canOperatePos(companyId, branchId);
+            allow delete: if false;
+          }
+          match /shifts/{docId} {
+            allow read: if canRead(companyId, branchId);
+            allow create, update: if canOperatePos(companyId, branchId);
+            allow delete: if false;
+          }
+          match /deposits/{docId} {
+            allow read: if canRead(companyId, branchId);
+            allow create, update: if canOperatePos(companyId, branchId);
+            allow delete: if false;
+          }
+          match /cashWithdrawals/{docId} {
+            allow read: if canRead(companyId, branchId);
+            allow create, update: if canOperatePos(companyId, branchId);
+            allow delete: if false;
+          }
+          match /reservations/{docId} {
+            allow read: if canRead(companyId, branchId);
+            allow write: if canOperatePos(companyId, branchId);
+          }
+          match /terminals/{docId} {
+            allow read: if canRead(companyId, branchId);
+            allow write: if canOperatePos(companyId, branchId);
+          }
+          match /stockCounts/{docId} {
+            allow read: if canRead(companyId, branchId);
+            allow write: if canOperatePos(companyId, branchId);
+          }
+          // A cashier seats and clears tables; only a manager reshapes the room.
+          match /tables/{docId} {
+            allow read: if canRead(companyId, branchId);
+            allow update: if canOperatePos(companyId, branchId);
+            allow create, delete: if canConfigurePos(companyId, branchId);
+          }
+
+          // Configuration: manager and above.
+          match /menu/{docId} {
+            allow read: if canRead(companyId, branchId);
+            allow write: if canConfigurePos(companyId, branchId);
+          }
+          match /categories/{docId} {
+            allow read: if canRead(companyId, branchId);
+            allow write: if canConfigurePos(companyId, branchId);
+          }
+          match /modifierGroups/{docId} {
+            allow read: if canRead(companyId, branchId);
+            allow write: if canConfigurePos(companyId, branchId);
+          }
+          match /combos/{docId} {
+            allow read: if canRead(companyId, branchId);
+            allow write: if canConfigurePos(companyId, branchId);
+          }
+          match /promotions/{docId} {
+            allow read: if canRead(companyId, branchId);
+            allow write: if canConfigurePos(companyId, branchId);
+          }
+          match /floors/{docId} {
+            allow read: if canRead(companyId, branchId);
+            allow write: if canConfigurePos(companyId, branchId);
+          }
+
+          // Till logins. Readable by the terminal because the PIN screen has to
+          // look one up — which is exactly why these records hold nothing but a
+          // username, a PIN and a POS role. v2's `staff` collection, with its
+          // passport numbers and salaries, stays out of the till's reach.
+          match /tillUsers/{docId} {
+            allow read: if canRead(companyId, branchId);
+            allow write: if canConfigurePos(companyId, branchId);
           }
         }
 
@@ -432,7 +699,7 @@ service cloud.firestore {
             userData().role == 'owner' ||
             (
               (isBranchAdmin(userData()) || userData().role in ['manager', 'supervisor', 'cashier', 'accountant']) &&
-              userData().branchId == branchId
+              inBranch(userData(), branchId)
             )
           );
           allow delete: if false;
@@ -446,7 +713,7 @@ service cloud.firestore {
             userData().role == 'owner' ||
             (
               (isBranchAdmin(userData()) || userData().role in ['manager', 'supervisor', 'cashier', 'accountant']) &&
-              userData().branchId == branchId
+              inBranch(userData(), branchId)
             )
           );
         }
@@ -530,20 +797,16 @@ service cloud.firestore {
           allow update: if canManageSettings(companyId, branchId) || (
             isAuth() && userData().companyId == companyId &&
             userData().role in ['cashier', 'supervisor', 'manager', 'accountant'] &&
-            userData().branchId == branchId
+            inBranch(userData(), branchId)
           );
         }
 
         // ── Work Media: Wall Posts ───────────────────────────────────────────
         match /wall_posts/{postId} {
-          allow read: if canRead(companyId, branchId);
-          allow write: if canWrite(companyId, branchId) || 
-                          (isAuth() && userData().companyId == companyId && userData().branchId == branchId);
+          allow read, write: if isBranchMember(companyId, branchId);
 
           match /comments/{commentId} {
-            allow read: if canRead(companyId, branchId);
-            allow write: if canWrite(companyId, branchId) || 
-                            (isAuth() && userData().companyId == companyId && userData().branchId == branchId);
+            allow read, write: if isBranchMember(companyId, branchId);
           }
         }
       }

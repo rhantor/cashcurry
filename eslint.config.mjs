@@ -14,7 +14,7 @@ export default defineConfig([
   pluginReact.configs.flat.recommended,
   {
     // Run in Node, not the browser.
-    files: ["scripts/**", "lib/server/**", "functions/**", "tests/**", "vitest.config.mjs"],
+    files: ["scripts/**", "lib/server/**", "functions/**", "tests/**", "tests-rules/**", "vitest.config.mjs"],
     languageOptions: { globals: globals.node },
   },
   {
