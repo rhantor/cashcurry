@@ -1,11 +1,12 @@
 "use client";
 import React, { useState } from "react";
+import { Banknote, Coins, HandCoins, Landmark, Receipt, ShoppingBag, TrendingUp, Users, Wallet } from "lucide-react";
 import useBranchData from "@/utils/dashboard/useBranchData";
-import { useGetBranchesBasicQuery } from "@/lib/redux/api/branchApiSlice";
-import Filters from "../components/dashboard/Filters";
 import { presetFilter } from "@/utils/dashboard/dateFilters";
 import { businessToday } from "@/lib/region";
-import KPICard from "../components/dashboard/KPICard";
+import { Stagger } from "@/app/components/ui";
+import PeriodBar from "../components/dashboard/PeriodBar";
+import StatCard from "../components/dashboard/StatCard";
 import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/utils/formatMoney";
 import SalesTrend from "../components/dashboard/charts/SalesTrend";
@@ -15,7 +16,6 @@ import SalesVsCosts from "../components/dashboard/charts/SalesVsCosts";
 import CashVsCost from "../components/dashboard/charts/CashVsCost";
 import BankedVsBackCost from "../components/dashboard/charts/BankedVsBackCost";
 import LoansTimeline from "../components/dashboard/charts/LoansTimeline";
-import { getSessionUser } from "@/lib/session";
 
 /* ── Reusable section divider ── */
 function SectionHeader({ title }) {
@@ -70,117 +70,44 @@ export default function DashboardPage() {
     totalStaffLoanCash,
     totalSales,
     bankedTenderLabelList,
-    branchName,
-    // branch switching for owner / gm / superAdmin
-    branchId,
-    isCompany,
-    setActiveBranch,
   } = useBranchData(filter);
 
-  // Fetch branch list only for company roles (owner / gm / superAdmin)
-  const companyId = isCompany
-    ? (() => { try { return (getSessionUser() || {}).companyId } catch { return null } })()
-    : null;
-  const { data: branches = [] } = useGetBranchesBasicQuery(companyId, { skip: !companyId });
-
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen bg-bg">
+      <div className="mx-auto max-w-7xl space-y-5 px-4 py-5 sm:px-6 sm:py-6">
+        {/* ── Period (the branch is chosen in the top bar) ── */}
+        <PeriodBar filter={filter} setFilter={setFilter} busy={loading && !!totalSales} />
 
-      {/* ── Sticky header ── */}
-      <div className="bg-white border-b border-slate-100 px-6 py-4 sticky top-0 z-10 shadow-sm">
-        <div className="mx-auto max-w-7xl flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-base font-bold text-slate-800 leading-tight">
-              {branchName || "Branch"} Dashboard
-            </h1>
-            <p className="text-xs text-slate-400">Financial overview</p>
-          </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            {/* Branch selector — only for owner / gm / superAdmin */}
-            {isCompany && branches.length > 0 && (
-              <select
-                value={branchId || ""}
-                onChange={(e) => setActiveBranch(e.target.value)}
-                className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 bg-white text-slate-700 shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
-              >
-                <option value="" disabled>Select branch…</option>
-                {branches.map((b) => (
-                  <option key={b.id} value={b.id}>{b.name || b.id}</option>
-                ))}
-              </select>
-            )}
-            {loading && (
-              <span className="text-xs text-slate-400 flex items-center gap-1.5">
-                <svg className="animate-spin h-3 w-3 text-indigo-400" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                </svg>
-                Updating…
-              </span>
-            )}
-            <Filters filter={filter} setFilter={setFilter} />
-          </div>
-        </div>
-      </div>
+        {/* ── Headline figures ── */}
+        <Stagger className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+          <StatCard loading={loading && !totalSales} label="Total sales" value={totalSales} format={fmt} icon={TrendingUp} tone="brand" hint="All payment types" />
+          <StatCard loading={loading && !totalSales} label="Cash in hand" value={estCashOnHand} format={fmt} icon={Wallet} tone="brand" hint="Opening + cash in − cash out" />
+          <StatCard loading={loading && !totalSales} label="Bank (expected)" value={effectiveBankedAfterWithdrawals} format={fmt} icon={Landmark} tone="info" hint={bankedTenderLabelList || "Card · QR · online"} />
+          <StatCard loading={loading && !totalSales} label="Total costs" value={totalCosts} format={fmt} icon={Receipt} tone="neutral" hint="Front + back office" />
+        </Stagger>
 
-      <div className="mx-auto max-w-7xl px-4 sm:px-6 py-6 space-y-5">
-
-        {/* ── Primary KPIs ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          <KPICard
-            title="Total Sales"
-            value={fmt(totalSales)}
-            color="green"
-          />
-          <KPICard
-            title="Cash On Hand (Est.)"
-            value={fmt(estCashOnHand)}
-            color="blue"
-            sub="Opening + cash in − cash out"
-          />
-          <KPICard
-            title="Banked (Expected)"
-            value={fmt(effectiveBankedAfterWithdrawals)}
-            color="indigo"
-            sub={bankedTenderLabelList || "card · qr · online"}
-          />
-          <KPICard
-            title="Total Costs"
-            value={fmt(totalCosts)}
-            color="rose"
-          />
-        </div>
-
-        {/* ── Secondary KPIs ── */}
-        <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-          <KPICard
-            title="Front-Office Costs"
-            value={fmt(totalCostsFront)}
-            color="amber"
-            sub="Cash paid"
-          />
-          <KPICard
-            title="Back-Office Costs"
-            value={fmt(totalCostsBack)}
-            color="orange"
-            sub="Bank paid"
-          />
-          <KPICard
-            title="Staff Salaries"
-            value={fmt(totalSal)}
-            color="slate"
-          />
-          <KPICard
-            title="Staff Advances"
-            value={fmt(totalAdv)}
-            color="slate"
-          />
-          <KPICard
-            title="Staff Loans"
-            value={fmt(totalStaffLoanCash)}
-            color="slate"
-          />
-        </div>
+        {/* ── The rest: a swipeable row on phones, a grid on computers ── */}
+        <Stagger gap={0.035} delay={0.12} className="-mx-4 flex snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-1 sm:mx-0 sm:grid sm:grid-cols-3 sm:overflow-visible sm:px-0 xl:grid-cols-5">
+          {[
+            ["Front office", totalCostsFront, Coins, "Costs paid in cash"],
+            ["Back office", totalCostsBack, ShoppingBag, "Costs paid by bank"],
+            ["Salaries", totalSal, Users, "Paid this period"],
+            ["Advances", totalAdv, HandCoins, "Handed over"],
+            ["Staff loans", totalStaffLoanCash, Banknote, "From the till"],
+          ].map(([label, value, icon, hint]) => (
+            <StatCard
+              key={label}
+              size="sm"
+              loading={loading && !totalSales}
+              label={label}
+              value={value}
+              format={fmt}
+              icon={icon}
+              hint={hint}
+              className="w-44 shrink-0 snap-start sm:w-auto"
+            />
+          ))}
+        </Stagger>
 
         {/* ── Performance ── */}
         <SectionHeader title="Performance" />
