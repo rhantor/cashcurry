@@ -49,12 +49,13 @@ export function Field({ label, hint, error, children, className, id: idProp }) {
   );
 }
 
-export const Input = forwardRef(function Input({ invalid, className, ...rest }, ref) {
+/** A text field. `size="lg"` (48px) lines up with the big amount and date fields. */
+export const Input = forwardRef(function Input({ invalid, size = "md", className, ...rest }, ref) {
   return (
     <input
       ref={ref}
       aria-invalid={invalid || undefined}
-      className={cn(control, "h-10", invalid ? "border-danger" : "border-line", className)}
+      className={cn(control, size === "lg" ? "h-12" : "h-10", invalid ? "border-danger" : "border-line", className)}
       {...rest}
     />
   );

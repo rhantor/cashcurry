@@ -49,12 +49,12 @@ export const sidebarItems = {
           allowedRoles: ['manager', 'accountant', 'branchAdmin']
         },
         {
-          label: 'Cash Deposit',
+          label: 'Cash to Bank',
           path: '/entry-data/deposit-entry',
           allowedRoles: ['manager', 'accountant', 'branchAdmin']
         },
         {
-          label: 'Cash Withdrawal',
+          label: 'Bank to Cash',
           path: '/entry-data/cash-withdraw',
           allowedRoles: ['manager', 'accountant', 'branchAdmin']
         },
@@ -85,8 +85,8 @@ export const sidebarItems = {
         { label: 'Sales Report', path: '/reports/sales-report' },
         { label: 'Cost Report', path: '/reports/cost-report' },
         { label: 'Advance Report', path: '/reports/advance-report' },
-        { label: 'Deposit Report', path: '/reports/deposit-report' },
-        { label: 'Withdrawal Report', path: '/reports/withdrawal-report' },
+        { label: 'Cash to Bank Report', path: '/reports/deposit-report' },
+        { label: 'Bank to Cash Report', path: '/reports/withdrawal-report' },
         { label: 'Salaries Report', path: '/reports/salary-report' },
         { label: 'Summary', path: '/reports' },
         { label: 'Yearly Summary', path: '/reports/yearly-summary' }
@@ -269,14 +269,14 @@ export const sidebarItems = {
       allowedRoles: ['gm', 'superAdmin', 'owner']
     },
     {
-      label: 'Cash Deposit Report',
+      label: 'Cash to Bank Report',
       section: 'Reports',
       icon: 'MdOutlineAccountBalanceWallet',
       path: '/reports/deposit-report',
       allowedRoles: ['gm', 'superAdmin', 'owner']
     },
     {
-      label: 'Withdrawal Report',
+      label: 'Bank to Cash Report',
       section: 'Reports',
       icon: 'MdOutlineMoneyOffCsred',
       path: '/reports/withdrawal-report',
@@ -377,7 +377,8 @@ export const sidebarItems = {
 const COMPANY_ROLES = ["owner", "gm", "superAdmin"];
 export const isCompanyRole = (role) => COMPANY_ROLES.includes(role);
 const SECTION_ORDER = ["Overview", "Daily work", "Reports", "Money", "Team", "Admin", "More"];
-const allowed = (item, role) => !role || !item.allowedRoles || item.allowedRoles.includes(role);
+// No role (signed out, or not known yet) → no menu at all, never every item.
+const allowed = (item, role) => !!role && (!item.allowedRoles || item.allowedRoles.includes(role));
 
 /** The sidebar for a role: [{ section, items }], children filtered too. */
 export function navFor(role) {

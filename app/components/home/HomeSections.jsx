@@ -20,8 +20,8 @@ const TONE = {
 const ACTIONS = [
   ["/entry-data/sales-entry", "Add sales", ShoppingBag, "in"],
   ["/entry-data/cost-entry", "Add cost", Receipt, "out"],
-  ["/entry-data/deposit-entry", "Deposit", ArrowUpFromLine, "bank"],
-  ["/entry-data/cash-withdraw", "Withdraw", ArrowDownToLine, "bank"],
+  ["/entry-data/deposit-entry", "Cash to bank", ArrowUpFromLine, "bank"],
+  ["/entry-data/cash-withdraw", "Bank to cash", ArrowDownToLine, "bank"],
   ["/entry-data/advance-entry", "Advance", HandCoins, "out"],
   ["/entry-data/salary-entry", "Salary", Users, "out"],
   ["/requested-panel", "Requests", Inbox, "plain"],

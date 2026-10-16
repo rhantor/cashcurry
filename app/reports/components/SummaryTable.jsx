@@ -78,8 +78,8 @@ const DesktopHeader = ({ ctx }) => {
         <TH className="hidden md:table-cell bg-amber-50 text-amber-800">Repay In (Bank)</TH>
         <TH className="hidden md:table-cell bg-amber-50 text-amber-800">Repay Out (Bank)</TH>
       </>}
-      <TH className="bg-blue-50 text-blue-800">Deposit</TH>
-      <TH className="bg-blue-50 text-blue-800">Withdrawal</TH>
+      <TH className="bg-blue-50 text-blue-800">Cash to Bank</TH>
+      <TH className="bg-blue-50 text-blue-800">Bank to Cash</TH>
       <TH className="bg-slate-100 text-slate-800 font-bold">Total Sales</TH>
       {!hiddenCols.cashInHand && <TH className="bg-emerald-100 text-emerald-900 font-bold">Cash in Hand</TH>}
       {showBankBalance && <TH className="bg-blue-100 text-blue-900 font-bold">Bank Balance</TH>}
@@ -276,8 +276,8 @@ const MobileCard = ({ row, ctx }) => {
 
       <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
         {row.totalSales > 0 && <MobileLine ctx={ctx} label="Total Sales" value={row.totalSales} rm={false} />}
-        <MobileLine ctx={ctx} label="Deposit" value={row.deposit} tone="in" />
-        <MobileLine ctx={ctx} label="Withdrawal" value={row.withdrawal} tone="out" />
+        <MobileLine ctx={ctx} label="Cash to bank" value={row.deposit} tone="in" />
+        <MobileLine ctx={ctx} label="Bank to cash" value={row.withdrawal} tone="out" />
         <MobileLine ctx={ctx} label="Advance" value={row.advance ?? (row.type === 'staffAdvance' ? row.amount : null)} tone="out" />
         {costCols.map(c => <MobileLine key={c} ctx={ctx} label={`Cost (${c})`} value={c==='cash'?row.costCash:row.costBank} tone="out" />)}
         <MobileLine ctx={ctx} label="Salary" value={row.salaryCash} tone="out" />

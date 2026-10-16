@@ -140,7 +140,7 @@ export default function OwnerDashboardPage() {
             <StatCard loading={firstLoad} label="Cash in hand" value={estCashOnHand} format={fmt} icon={Wallet} tone="brand" hint="In every till, end of period" onClick={show("Cash in hand", "cash")} />
             <StatCard loading={firstLoad} label="Bank" value={effectiveBankedAfterWithdrawals} format={fmt} icon={Landmark} tone="info" hint="Expected balance" onClick={show("Bank", "bank")} />
             <StatCard loading={firstLoad} label="Owed by staff" value={totalReceivables} format={fmt} icon={HandCoins} hint="Advances + staff loans" onClick={show("Owed by staff", "owed")} />
-            <StatCard loading={firstLoad} label="Withdrawals" value={totalWdr} format={fmt} icon={ArrowDownToLine} hint="Taken out of the bank" onClick={show("Withdrawals", "withdrawals")} />
+            <StatCard loading={firstLoad} label="Bank to cash" value={totalWdr} format={fmt} icon={ArrowDownToLine} hint="Taken out of the bank" onClick={show("Bank to cash", "withdrawals")} />
           </Stagger>
         </Section>
 

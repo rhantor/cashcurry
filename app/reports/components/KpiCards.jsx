@@ -160,7 +160,7 @@ export default function KpiCards({ mode, kpis }) {
           subtitle="Period · card / QR / online"
         />
         <StatCard
-          label="Cash Deposited"
+          label="Cash to Bank"
           value={d.periodDeposits}
           icon={PiggyBank}
           color="emerald"
@@ -168,7 +168,7 @@ export default function KpiCards({ mode, kpis }) {
           subtitle="Period · cash → bank"
         />
         <StatCard
-          label="Cash Withdrawn"
+          label="Bank to Cash"
           value={d.periodWithdrawals}
           icon={ArrowUpRight}
           color="amber"
