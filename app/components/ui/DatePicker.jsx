@@ -9,6 +9,8 @@ import {
 import { useBusinessToday } from "@/app/hooks/useRegion";
 import { cn } from "./cn";
 import Popover from "./Popover";
+import { Sheet } from "./Dialog";
+import { useIsPhone } from "./useMedia";
 
 // Dates are "yyyy-MM-dd" strings everywhere, like the rest of the app.
 const key = (d) => format(d, "yyyy-MM-dd");
@@ -36,10 +38,40 @@ function TriggerButton({ refEl, open, toggle, text, placeholder, invalid, classN
 }
 
 /**
+ * Where a picker opens: a popover under its field on computers, a bottom
+ * sheet on phones (a floating calendar doesn't fit beside a thumb).
+ * children({ close, phone }) draws the inside.
+ */
+function PickerShell({ title, trigger, onOpen, align, children }) {
+  const phone = useIsPhone();
+  const [open, setOpen] = useState(false);
+  const change = (o) => {
+    setOpen(o);
+    if (o) onOpen?.();
+  };
+  const close = () => change(false);
+  if (phone) {
+    return (
+      <>
+        {trigger({ open, toggle: () => change(!open) })}
+        <Sheet open={open} onClose={close} title={title} layer="z-[300]">
+          {children({ close, phone: true })}
+        </Sheet>
+      </>
+    );
+  }
+  return (
+    <Popover align={align} open={open} onOpenChange={change} trigger={trigger}>
+      {() => children({ close, phone: false })}
+    </Popover>
+  );
+}
+
+/**
  * One month grid. Moving between months slides the days in from that side.
  * `pick(day)` gets a "yyyy-MM-dd"; `range` = {from, to} highlights a span.
  */
-function Calendar({ month, setMonth, today, selected, range, hover, setHover, pick, max }) {
+function Calendar({ month, setMonth, today, selected, range, hover, setHover, pick, max, wide = false }) {
   const [dir, setDir] = useState(0);
   const days = useMemo(() => {
     const start = startOfWeek(startOfMonth(month), { weekStartsOn: 1 });
@@ -56,7 +88,7 @@ function Calendar({ month, setMonth, today, selected, range, hover, setHover, pi
   const hi = range?.to || (range?.from && hover && hover > range.from ? hover : null);
 
   return (
-    <div className="w-[17.5rem] select-none p-2">
+    <div className={cn("select-none", wide ? "w-full" : "w-[17.5rem] p-2")}>
       <div className="mb-2 flex items-center justify-between">
         <button type="button" onClick={() => go(-1)} className="rounded-lg p-1.5 text-muted transition hover:bg-surface-2 hover:text-fg" aria-label="Previous month">
           <ChevronLeft className="size-4" />
@@ -109,7 +141,9 @@ function Calendar({ month, setMonth, today, selected, range, hover, setHover, pi
                   onClick={() => pick(k)}
                   onMouseEnter={() => setHover?.(k)}
                   className={cn(
-                    "relative h-9 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-30",
+                    "relative text-sm transition-colors",
+                    wide ? "h-11" : "h-9",
+                    "disabled:cursor-not-allowed disabled:opacity-30",
                     inSpan && "bg-brand-soft",
                     k === lo && hi && "rounded-l-xl bg-brand-soft",
                     k === hi && lo && "rounded-r-xl bg-brand-soft"
@@ -117,7 +151,8 @@ function Calendar({ month, setMonth, today, selected, range, hover, setHover, pi
                 >
                   <span
                     className={cn(
-                      "mx-auto flex size-9 items-center justify-center rounded-xl font-medium transition",
+                      "mx-auto flex items-center justify-center rounded-xl font-medium transition",
+                      wide ? "size-10" : "size-9",
                       isSel ? "bg-brand font-semibold text-brand-fg shadow-sm" : out ? "text-subtle" : "text-fg hover:bg-surface-2",
                       !isSel && k === today && "ring-1 ring-brand text-brand"
                     )}
@@ -139,15 +174,17 @@ export function DatePicker({ value, onChange, placeholder = "Pick a date", max, 
   const today = useBusinessToday();
   const [month, setMonth] = useState(() => parseISO(value || today));
   return (
-    <Popover
-      onOpenChange={(o) => o && setMonth(parseISO(value || today))}
+    <PickerShell
+      title={placeholder}
+      onOpen={() => setMonth(parseISO(value || today))}
       trigger={({ open, toggle, ref }) => (
         <TriggerButton refEl={ref} open={open} toggle={toggle} text={nice(value)} placeholder={placeholder} invalid={invalid} className={className} />
       )}
     >
-      {({ close }) => (
+      {({ close, phone }) => (
         <div>
           <Calendar
+            wide={phone}
             month={month}
             setMonth={setMonth}
             today={today}
@@ -158,7 +195,7 @@ export function DatePicker({ value, onChange, placeholder = "Pick a date", max, 
               close();
             }}
           />
-          <div className="flex gap-1 border-t border-line p-2">
+          <div className={cn("flex gap-1 border-t border-line", phone ? "mt-2 pt-3" : "p-2")}>
             {[
               ["Today", today],
               ["Yesterday", key(subDays(parseISO(today), 1))],
@@ -178,7 +215,7 @@ export function DatePicker({ value, onChange, placeholder = "Pick a date", max, 
           </div>
         </div>
       )}
-    </Popover>
+    </PickerShell>
   );
 }
 
@@ -208,21 +245,20 @@ export function DateRangePicker({ value, onChange, placeholder = "Pick dates", m
       : "";
 
   return (
-    <Popover
+    <PickerShell
+      title={placeholder}
       align="start"
-      onOpenChange={(o) => {
-        if (o) {
-          setDraft(null);
-          setMonth(parseISO(value?.from || today));
-        }
+      onOpen={() => {
+        setDraft(null);
+        setMonth(parseISO(value?.from || today));
       }}
       trigger={({ open, toggle, ref }) => (
         <TriggerButton refEl={ref} open={open} toggle={toggle} text={text} placeholder={placeholder} className={className} />
       )}
     >
-      {({ close }) => (
-        <div className="flex flex-col sm:flex-row">
-          <div className="flex gap-1 overflow-x-auto border-b border-line p-2 sm:w-36 sm:flex-col sm:border-b-0 sm:border-r">
+      {({ close, phone }) => (
+        <div className={phone ? "space-y-4" : "flex flex-row"}>
+          <div className={phone ? "flex flex-wrap gap-2" : "flex w-36 flex-col gap-1 border-r border-line p-2"}>
             {presets.map(([label, from, to]) => {
               const active = !draft && value?.from === from && value?.to === to;
               return (
@@ -234,8 +270,11 @@ export function DateRangePicker({ value, onChange, placeholder = "Pick dates", m
                     close();
                   }}
                   className={cn(
-                    "whitespace-nowrap rounded-lg px-2.5 py-1.5 text-left text-xs font-semibold transition",
-                    active ? "bg-brand-soft text-brand" : "text-muted hover:bg-surface-2 hover:text-fg"
+                    "whitespace-nowrap text-left text-xs font-semibold transition",
+                    phone ? "rounded-full border px-3 py-1.5" : "rounded-lg px-2.5 py-1.5",
+                    active
+                      ? "border-brand bg-brand-soft text-brand"
+                      : cn("text-muted hover:bg-surface-2 hover:text-fg", phone ? "border-line" : "border-transparent")
                   )}
                 >
                   {label}
@@ -245,6 +284,7 @@ export function DateRangePicker({ value, onChange, placeholder = "Pick dates", m
           </div>
           <div>
             <Calendar
+              wide={phone}
               month={month}
               setMonth={setMonth}
               today={today}
@@ -260,10 +300,10 @@ export function DateRangePicker({ value, onChange, placeholder = "Pick dates", m
                 close();
               }}
             />
-            <p className="px-3 pb-2 text-xs text-muted">{draft ? `From ${nice(draft)} — now pick the last day` : "Pick the first day"}</p>
+            <p className={cn("text-xs text-muted", phone ? "mt-3 text-center" : "px-3 pb-2")}>{draft ? `From ${nice(draft)} — now pick the last day` : "Pick the first day"}</p>
           </div>
         </div>
       )}
-    </Popover>
+    </PickerShell>
   );
 }
