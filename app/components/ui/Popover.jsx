@@ -51,19 +51,22 @@ export default function Popover({ trigger, children, align = "start", width, cla
     const onDown = (e) => {
       if (!panel.current?.contains(e.target) && !anchor.current?.contains(e.target)) setOpen(false);
     };
+    // Esc closes only this popover, not the sheet or dialog it sits in:
+    // caught on the way down and stopped there.
     const onKey = (e) => {
       if (e.key === "Escape") {
+        e.stopImmediatePropagation();
         setOpen(false);
         anchor.current?.focus?.();
       }
     };
     document.addEventListener("pointerdown", onDown);
-    document.addEventListener("keydown", onKey);
+    document.addEventListener("keydown", onKey, true);
     window.addEventListener("resize", place);
     window.addEventListener("scroll", place, true);
     return () => {
       document.removeEventListener("pointerdown", onDown);
-      document.removeEventListener("keydown", onKey);
+      document.removeEventListener("keydown", onKey, true);
       window.removeEventListener("resize", place);
       window.removeEventListener("scroll", place, true);
     };
