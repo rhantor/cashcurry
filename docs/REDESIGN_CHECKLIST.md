@@ -3,7 +3,7 @@
 Every screen in the app, so none is missed. A screen is done when it uses the
 UI kit (tokens, cards, fields, toasts, sheets), works on a phone and a
 computer, has its own loading look, and its old modals are redone too.
-✅ done · 🟡 started · ⬜ not yet. Update this file in the same commit as the screen.
+✅ done · 🟡 started · ⬜ not yet · ⏸ left for later. Update this file in the same commit as the screen.
 
 ## 3.4.1 Dashboards and home
 - ✅ `/` Home
@@ -17,7 +17,7 @@ computer, has its own loading look, and its old modals are redone too.
 - ✅ `/entry-data/cash-withdraw` Bank to cash (was "Cash withdrawal") (+ its record sheet)
 - ✅ `/entry-data/advance-entry` Advance & staff loan (+ "waiting to be paid", shared with the requested panel)
 - ✅ `/entry-data/salary-entry` Salary entry (salaries outside payroll; guards against counting a month twice, also on payroll's Mark as paid). Moving it under Payroll in the menu waits for 4.1 (Payroll is managers-only today)
-- ⬜ `/cash-tracker` Daily cash tracker
+- ⏸ `/cash-tracker` Daily cash tracker — skipped for now (owner, 17 Oct 2026); comes back with 4.10 pay-outs (daily cash check)
 
 ## 3.4.3 Reports
 - ⬜ `/reports` Summary report
