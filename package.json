@@ -16,7 +16,8 @@
     "test:rules": "node scripts/test-rules.mjs",
     "summaries:rebuild": "node scripts/summaries-rebuild.mjs",
     "staff:link": "node scripts/link-staff-logins.mjs",
-    "face:remove-data": "node scripts/remove-face-data.mjs"
+    "face:remove-data": "node scripts/remove-face-data.mjs",
+    "dev:phone": "node scripts/local/dev.mjs --lan"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.8.2",
