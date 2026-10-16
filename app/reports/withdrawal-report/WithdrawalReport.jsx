@@ -25,7 +25,7 @@ export default function WithdrawalReport() {
   return (
     <div className="p-4">
       <ReportPage
-        title=" Cash Withdrawal Report"
+        title="Bank to Cash Report"
         data={withdrawals}
         isLoading={isLoading}
         branchData={branchData}

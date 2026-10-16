@@ -20,7 +20,7 @@ export default function DepositReport() {
 
   return (
     <ReportPage
-      title="Deposit Report"
+      title="Cash to Bank Report"
       data={deposits}
       isLoading={isLoading}
       branchData={branchData}

@@ -276,7 +276,7 @@ export default function LoanTermsModal({
                     <span className="font-medium">{e.editedBy?.username || "Manager"}</span>
                     {" · "}
                     {e.editedAt ? new Date(e.editedAt).toLocaleDateString() : ""}
-                    {e.note && <span className="block text-gray-500 mt-0.5 italic">"{e.note}"</span>}
+                    {e.note && <span className="block text-gray-500 mt-0.5 italic">&ldquo;{e.note}&rdquo;</span>}
                   </div>
                 ))}
               </div>

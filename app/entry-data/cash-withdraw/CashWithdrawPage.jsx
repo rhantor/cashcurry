@@ -42,7 +42,7 @@ function Chip({ on, onClick, children }) {
 }
 
 /**
- * Cash withdrawal: money taken out of the bank into the till (an ATM
+ * Bank to cash (stored as a withdrawal): money taken out of the bank into the till (an ATM
  * withdrawal or a transfer). Not the owner taking money — that is drawings
  * (roadmap 4.9). Day, amount, what for, how, a reference and note, and at
  * least one slip or screenshot. Asks once before saving.
@@ -111,9 +111,9 @@ export default function CashWithdrawPage() {
     if (Object.keys(problems).length) return toast.error("Check the highlighted fields");
 
     const ok = await confirmDialog({
-      title: `Take ${money(amount)} out of the bank?`,
+      title: `Move ${money(amount)} from the bank to the till?`,
       message: `${day(date)} · ${category} · ${method}${reference ? ` · ${reference}` : ""}\nThe till goes up and the bank goes down by this amount.`,
-      confirmLabel: "Save withdrawal",
+      confirmLabel: "Save",
     });
     if (!ok) return;
 
@@ -137,7 +137,7 @@ export default function CashWithdrawPage() {
           createdAt: new Date().toISOString(),
         },
       }).unwrap();
-      toast.success("Withdrawal saved", { description: `${day(date)} · ${money(amount)} · ${category}` });
+      toast.success("Bank to cash saved", { description: `${day(date)} · ${money(amount)} · ${category}` });
       setSaved(true);
       setTimeout(() => setSaved(false), 1400);
       setAmount("");
@@ -149,7 +149,7 @@ export default function CashWithdrawPage() {
       setProgress(0);
     } catch (err) {
       console.error("Withdrawal save failed:", err);
-      toast.error("Couldn't save the withdrawal", { description: "Check your connection and try again." });
+      toast.error("Couldn't save it", { description: "Check your connection and try again." });
     } finally {
       setBusy(false);
     }
@@ -158,7 +158,7 @@ export default function CashWithdrawPage() {
   const uploading = progress > 0 && progress < 100;
   const saveButton = (
     <Button size="lg" className="w-full" onClick={save} loading={busy && !uploading} success={saved} disabled={uploading}>
-      {uploading ? `Uploading ${Math.round(progress)}%` : "Save withdrawal"}
+      {uploading ? `Uploading ${Math.round(progress)}%` : "Save"}
     </Button>
   );
 
@@ -184,7 +184,7 @@ export default function CashWithdrawPage() {
         bar={
           <div className="flex items-center gap-3">
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-subtle">Withdrawal</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-subtle">Bank to cash</p>
               <CountUp value={Number(amount) || 0} format={money} className="block truncate text-lg font-bold tracking-tight text-fg" />
             </div>
             <div className="w-40 shrink-0">{saveButton}</div>
@@ -192,7 +192,7 @@ export default function CashWithdrawPage() {
         }
         below={
           <RecentEntries
-            title="Withdrawals this month"
+            title="Bank to cash this month"
             viewAllHref="/reports/withdrawal-report"
             loading={isLoading && !!args}
             error={isError}
@@ -277,7 +277,7 @@ export default function CashWithdrawPage() {
       {viewing && (
         <RecordSheet
           onClose={() => setViewing(null)}
-          title={`Withdrawal · ${viewing.date ? format(parseISO(viewing.date), "EEEE, d MMMM yyyy") : ""}`}
+          title={`Bank to cash · ${viewing.date ? format(parseISO(viewing.date), "EEEE, d MMMM yyyy") : ""}`}
           branch={branchData?.name}
           amount={viewing.amount}
           amountLabel="Bank to till"

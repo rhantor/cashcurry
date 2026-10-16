@@ -13,8 +13,8 @@ computer, has its own loading look, and its old modals are redone too.
 ## 3.4.2 Entry screens
 - ✅ `/entry-data/sales-entry` Sales entry (+ the day's sales sheet, shared with the sales report)
 - ✅ `/entry-data/cost-entry` Cost entry (scanner inside is still the old look — 3.5)
-- ✅ `/entry-data/deposit-entry` Cash deposit (+ its record sheet)
-- ✅ `/entry-data/cash-withdraw` Cash withdrawal (+ its record sheet)
+- ✅ `/entry-data/deposit-entry` Cash to bank (was "Cash deposit") (+ its record sheet)
+- ✅ `/entry-data/cash-withdraw` Bank to cash (was "Cash withdrawal") (+ its record sheet)
 - ⬜ `/entry-data/advance-entry` Advance entry
 - ⬜ `/entry-data/salary-entry` Salary entry
 - ⬜ `/cash-tracker` Daily cash tracker
@@ -23,8 +23,8 @@ computer, has its own loading look, and its old modals are redone too.
 - ⬜ `/reports` Summary report
 - ⬜ `/reports/sales-report` Sales report (its day sheet ✅)
 - ⬜ `/reports/cost-report` Cost report (+ edit cost, attachments)
-- ⬜ `/reports/deposit-report` Deposit report
-- ⬜ `/reports/withdrawal-report` Withdrawal report
+- ⬜ `/reports/deposit-report` Cash to bank report
+- ⬜ `/reports/withdrawal-report` Bank to cash report
 - ⬜ `/reports/advance-report` Advance report
 - ⬜ `/reports/salary-report` Salary report
 - ⬜ `/reports/staff-loan-report` Staff loan report (not in the menu yet — decide)

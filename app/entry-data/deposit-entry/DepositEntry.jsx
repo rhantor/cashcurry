@@ -23,7 +23,7 @@ import { EntryLayout, EntrySection, RecentEntries, SummaryLine } from "@/app/com
 const day = (d) => (d ? format(parseISO(d), "EEE, d MMM") : "");
 
 /**
- * Cash deposit: cash from the till paid into the bank. Day, amount, the bank,
+ * Cash to bank (stored as a deposit): cash from the till paid into the bank. Day, amount, the bank,
  * the slip's trace number and a photo (or PDF) of the slip — all needed.
  * Banks used before are one tap away.
  */
@@ -90,7 +90,7 @@ export default function DepositEntryPage() {
         branchId,
         data: { date, amount, bankName, traceNo, fileURL, createdAt: serverTimestamp(), createdBy: createdBy || "Unknown" },
       }).unwrap();
-      toast.success("Deposit saved", { description: `${day(date)} · ${money(amount)} to ${bankName}` });
+      toast.success("Cash to bank saved", { description: `${day(date)} · ${money(amount)} to ${bankName}` });
       setSaved(true);
       setTimeout(() => setSaved(false), 1400);
       setAmount("");
@@ -101,7 +101,7 @@ export default function DepositEntryPage() {
       setDate(today);
     } catch (err) {
       console.error("Deposit save failed:", err);
-      toast.error("Couldn't save the deposit", { description: "Check your connection and try again." });
+      toast.error("Couldn't save it", { description: "Check your connection and try again." });
     } finally {
       setBusy(false);
     }
@@ -110,7 +110,7 @@ export default function DepositEntryPage() {
   const uploading = progress > 0 && progress < 100;
   const saveButton = (
     <Button size="lg" className="w-full" onClick={save} loading={busy && !uploading} success={saved} disabled={uploading}>
-      {uploading ? `Uploading slip ${Math.round(progress)}%` : "Save deposit"}
+      {uploading ? `Uploading slip ${Math.round(progress)}%` : "Save"}
     </Button>
   );
 
@@ -135,7 +135,7 @@ export default function DepositEntryPage() {
         bar={
           <div className="flex items-center gap-3">
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-subtle">Deposit</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-subtle">Cash to bank</p>
               <CountUp value={Number(amount) || 0} format={money} className="block truncate text-lg font-bold tracking-tight text-fg" />
             </div>
             <div className="w-40 shrink-0">{saveButton}</div>
@@ -143,7 +143,7 @@ export default function DepositEntryPage() {
         }
         below={
           <RecentEntries
-            title="Latest deposits"
+            title="Latest cash to bank"
             viewAllHref="/reports/deposit-report"
             loading={isLoading && !!args}
             error={isError}
@@ -223,7 +223,7 @@ export default function DepositEntryPage() {
       {viewing && (
         <RecordSheet
           onClose={() => setViewing(null)}
-          title={`Deposit · ${viewing.date ? format(parseISO(viewing.date), "EEEE, d MMMM yyyy") : ""}`}
+          title={`Cash to bank · ${viewing.date ? format(parseISO(viewing.date), "EEEE, d MMMM yyyy") : ""}`}
           branch={branchData?.name}
           amount={viewing.amount}
           amountLabel="Paid into the bank"
