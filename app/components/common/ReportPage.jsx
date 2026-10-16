@@ -1,22 +1,18 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
-import { endOfMonth, endOfWeek, format, isValid, parseISO, startOfMonth, startOfWeek, subDays, subMonths } from "date-fns";
+import { format, isValid, parseISO } from "date-fns";
 import { ArrowDownWideNarrow, ArrowUpNarrowWide, CalendarRange, Download, FileSpreadsheet, FileText, Hash, Search, Sigma, TrendingUp } from "lucide-react";
 import useCurrency from "@/app/hooks/useCurrency";
 import { useBusinessToday } from "@/app/hooks/useRegion";
 import { formatMoney } from "@/lib/region/currency";
-import { Button, Card, CountUp, DataTable, DateRangePicker, Input, Menu, Select, Skeleton, Tabs, cn } from "@/app/components/ui";
+import { Button, Card, CountUp, DataTable, Input, Menu, Skeleton, cn } from "@/app/components/ui";
 import { COLOR, ChartCard, TimeChart } from "@/app/components/dashboard/charts/kit";
+import PeriodBar from "@/app/components/dashboard/PeriodBar";
+import { dayKeyOfFilter, presetFilter } from "@/utils/dashboard/dateFilters";
 
-// The periods a report can show. The values are what the export functions
-// have always received as `filterType`, so their titles keep working.
-const PERIODS = [
-  { value: "monthly", label: "This month" },
-  { value: "weekly", label: "This week" },
-  { value: "last7days", label: "Last 7 days" },
-  { value: "month", label: "Pick a month" },
-  { value: "range", label: "Dates" },
-];
+// The export functions name the period by the old filter types; this maps
+// the dashboard's periods onto them so their titles keep working.
+const EXPORT_TYPE = { month: "monthly", week: "last7days" };
 const THEME = { sales: COLOR.in, cost: COLOR.out, deposit: COLOR.bank, default: COLOR.bank };
 const key = (d) => format(d, "yyyy-MM-dd");
 // A record's day as "yyyy-MM-dd", whether it is stored as text, a Date or a Firestore timestamp.
@@ -58,27 +54,15 @@ export default function ReportPage({
   const currency = useCurrency();
   const money = (v) => formatMoney(v, currency);
   const today = useBusinessToday();
-  const [filterType, setFilterType] = useState("monthly");
-  const [dateRange, setDateRange] = useState({ from: "", to: "" });
-  const [selectedMonth, setSelectedMonth] = useState("");
+  // the period, picked the same way as on the dashboards
+  const [filter, setFilter] = useState(() => presetFilter("month", new Date(), today));
   const [searchDesc, setSearchDesc] = useState("");
   const [sortOrder, setSortOrder] = useState("desc");
   const [selectedItem, setSelectedItem] = useState(null);
 
   const { dateField = "date", searchFields = [], customFilters } = filterConfig || {};
 
-  // the period as two day keys
-  const { from, to } = useMemo(() => {
-    const t = parseISO(today);
-    if (filterType === "weekly") return { from: key(startOfWeek(t)), to: key(endOfWeek(t)) };
-    if (filterType === "last7days") return { from: key(subDays(t, 6)), to: today };
-    if (filterType === "range") return { from: dateRange.from || today, to: dateRange.to || dateRange.from || today };
-    if (filterType === "month" && selectedMonth) {
-      const m = parseISO(`${selectedMonth}-01`);
-      return { from: key(startOfMonth(m)), to: key(endOfMonth(m)) };
-    }
-    return { from: key(startOfMonth(t)), to: key(endOfMonth(t)) };
-  }, [filterType, dateRange, selectedMonth, today]);
+  const { from, to } = dayKeyOfFilter(filter);
 
   // the page fetches the period from the server
   useEffect(() => {
@@ -142,8 +126,7 @@ export default function ReportPage({
     }));
   }, [columns, valueField]);
 
-  const exportArgs = [filteredData, branchData, filterType, dateRange, selectedMonth, searchDesc];
-  const months = useMemo(() => Array.from({ length: 18 }, (_, i) => format(subMonths(parseISO(today), i), "yyyy-MM")), [today]);
+  const exportArgs = [filteredData, branchData, EXPORT_TYPE[filter.preset] || "range", { from, to }, "", searchDesc];
   const periodText = from === to ? format(parseISO(from), "d MMM yyyy") : `${format(parseISO(from), "d MMM")} – ${format(parseISO(to), "d MMM yyyy")}`;
 
   const facts = valueField
@@ -157,40 +140,12 @@ export default function ReportPage({
 
   return (
     <div className="mx-auto max-w-7xl space-y-4 px-4 py-5 sm:px-6 sm:py-6">
-      {/* the period */}
-      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-        <div className="-mx-1 max-w-full overflow-x-auto px-1">
-          <Tabs
-            size="sm"
-            tabs={PERIODS}
-            value={filterType}
-            onChange={(v) => {
-              setFilterType(v);
-              if (v === "month" && !selectedMonth) setSelectedMonth(months[0]);
-            }}
-          />
+      {/* the period — the same bar as the dashboards */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="min-w-0 flex-1">
+          <PeriodBar filter={filter} setFilter={setFilter} busy={isLoading && data.length > 0} />
         </div>
-        {filterType === "month" && (
-          <Select className="h-9 w-44" value={selectedMonth || months[0]} onChange={(e) => setSelectedMonth(e.target.value)} aria-label="Month">
-            {months.map((m) => (
-              <option key={m} value={m}>
-                {format(parseISO(`${m}-01`), "MMMM yyyy")}
-              </option>
-            ))}
-          </Select>
-        )}
-        {filterType === "range" && (
-          <div className="w-full sm:w-64">
-            <DateRangePicker value={{ from, to }} max={today} onChange={(r) => setDateRange(r)} />
-          </div>
-        )}
-        {filterType !== "range" && (
-          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted">
-            <CalendarRange className="size-3.5" />
-            {periodText}
-          </span>
-        )}
-        {toolbar && <div className="ml-auto">{toolbar}</div>}
+        {toolbar}
       </div>
 
       {/* the period in four numbers */}
