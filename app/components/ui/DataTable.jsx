@@ -16,6 +16,7 @@ import EmptyState from "./EmptyState";
  *   sortValue?: (row) => value,   // makes the column sortable (or sortable: true to sort by row[key])
  *   align?: "right",              // numbers
  *   primary?: true,               // the card title on phones
+ *   aside?: true,                 // shown on the right of the card title on phones (e.g. the amount)
  *   hideOnMobile?: true,
  * }]
  * rows, rowKey (default "id"), loading, empty = { title, description, action },
@@ -52,6 +53,7 @@ export default function DataTable({
   };
   const cell = (c, r) => (c.render ? c.render(r) : r[c.key]);
   const primary = columns.find((c) => c.primary) || columns[0];
+  const aside = columns.find((c) => c.aside && c !== primary);
   const clickable = !!onRowClick;
 
   if (!loading && rows.length === 0 && empty) {
@@ -160,10 +162,13 @@ export default function DataTable({
                 onClick={clickable ? () => onRowClick(r) : undefined}
                 className={cn("p-4", clickable && "cursor-pointer active:bg-surface-2")}
               >
-                <div className="mb-1.5 text-sm font-semibold text-fg">{cell(primary, r)}</div>
+                <div className="mb-1.5 flex items-start justify-between gap-3">
+                  <div className="min-w-0 text-sm font-semibold text-fg">{cell(primary, r)}</div>
+                  {aside && <div className="shrink-0 text-sm font-bold tabular-nums text-fg">{cell(aside, r)}</div>}
+                </div>
                 <dl className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
                   {columns
-                    .filter((c) => c !== primary && !c.hideOnMobile)
+                    .filter((c) => c !== primary && c !== aside && !c.hideOnMobile)
                     .map((c) => (
                       <div key={c.key} className="contents">
                         <dt className="text-muted">{c.label}</dt>

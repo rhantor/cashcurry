@@ -23,7 +23,7 @@ export default function Tabs({ tabs, value, onChange, className, size = "md" }) 
             aria-selected={active}
             onClick={() => onChange?.(t.value)}
             className={cn(
-              "relative inline-flex items-center gap-1.5 rounded-lg font-semibold transition-colors",
+              "relative inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg font-semibold transition-colors",
               size === "sm" ? "px-2.5 py-1 text-xs" : "px-3.5 py-1.5 text-sm",
               active ? "text-fg" : "text-muted hover:text-fg"
             )}

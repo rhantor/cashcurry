@@ -1,524 +1,283 @@
 "use client";
-import React, { useState, useMemo } from "react";
-import Pagination from "@/app/components/common/Pagination";
-import FilterBar from "@/app/components/common/FilterBar";
-import { SkeletonReportPage } from "@/app/components/common/Skeleton";
-import {
-  startOfWeek,
-  endOfWeek,
-  startOfMonth,
-  endOfMonth,
-  subDays,
-  isWithinInterval,
-  format,
-} from "date-fns";
+import { useEffect, useMemo, useState } from "react";
+import { endOfMonth, endOfWeek, format, isValid, parseISO, startOfMonth, startOfWeek, subDays, subMonths } from "date-fns";
+import { ArrowDownWideNarrow, ArrowUpNarrowWide, CalendarRange, Download, FileSpreadsheet, FileText, Hash, Search, Sigma, TrendingUp } from "lucide-react";
 import useCurrency from "@/app/hooks/useCurrency";
+import { useBusinessToday } from "@/app/hooks/useRegion";
+import { formatMoney } from "@/lib/region/currency";
+import { Button, Card, CountUp, DataTable, DateRangePicker, Input, Menu, Select, Skeleton, Tabs, cn } from "@/app/components/ui";
+import { COLOR, ChartCard, TimeChart } from "@/app/components/dashboard/charts/kit";
 
-// Recharts
-import {
-  ResponsiveContainer,
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-} from "recharts";
+// The periods a report can show. The values are what the export functions
+// have always received as `filterType`, so their titles keep working.
+const PERIODS = [
+  { value: "monthly", label: "This month" },
+  { value: "weekly", label: "This week" },
+  { value: "last7days", label: "Last 7 days" },
+  { value: "month", label: "Pick a month" },
+  { value: "range", label: "Dates" },
+];
+const THEME = { sales: COLOR.in, cost: COLOR.out, deposit: COLOR.bank, default: COLOR.bank };
+const key = (d) => format(d, "yyyy-MM-dd");
+// A record's day as "yyyy-MM-dd", whether it is stored as text, a Date or a Firestore timestamp.
+const dayOf = (v) => {
+  if (!v) return "";
+  if (typeof v === "string") return v.length >= 10 ? v.slice(0, 10) : v.length === 7 ? `${v}-01` : v;
+  const d = v.toDate ? v.toDate() : v.seconds ? new Date(v.seconds * 1000) : new Date(v);
+  return isValid(d) ? key(d) : "";
+};
+// "createdBy.username" → entry.createdBy.username
+const pick = (obj, path) => path.split(".").reduce((o, k) => (o == null ? o : o[k]), obj);
 
+/**
+ * A report over a period: pick the period, see the total and the trend, then
+ * every record — a table on computers, cards on phones — searchable, newest
+ * or oldest first, exported to PDF or Excel. Tapping a record opens it.
+ *
+ * Props as before: data, branchData, columns [{ key, label, render(val, row), align?, primary?, aside?, hideOnMobile? }],
+ * filterConfig { dateField, searchFields, customFilters }, exportFunctions { exportPDF, exportExcel },
+ * modalContentRenderer(item, branchData, close, monthTotal), searchBarShow, searchPlaceholder,
+ * onDateSync({ startDate, endDate }), chartConfig { enabled, type, valueField, theme }, showTotalsFooter, isLoading.
+ * `title` is shown by the top bar now; `toolbar` adds controls next to the period.
+ */
 export default function ReportPage({
   data = [],
   branchData,
   columns = [],
   filterConfig = {},
   exportFunctions = {},
-  title = "Report",
   modalContentRenderer,
   searchBarShow,
   searchPlaceholder,
   onDateSync,
   chartConfig,
   showTotalsFooter,
-  isLoading = false, // ✅ NEW: show skeleton while data is fetching
+  isLoading = false,
+  toolbar,
 }) {
   const currency = useCurrency();
+  const money = (v) => formatMoney(v, currency);
+  const today = useBusinessToday();
   const [filterType, setFilterType] = useState("monthly");
-  const [searchDesc, setSearchDesc] = useState("");
-  const [sortOrder, setSortOrder] = useState("desc");
   const [dateRange, setDateRange] = useState({ from: "", to: "" });
   const [selectedMonth, setSelectedMonth] = useState("");
-  const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
+  const [searchDesc, setSearchDesc] = useState("");
+  const [sortOrder, setSortOrder] = useState("desc");
   const [selectedItem, setSelectedItem] = useState(null);
 
-  const today = new Date();
-  const {
-    dateField = "date",
-    searchFields = [],
-    customFilters = (rows) => rows,
-  } = filterConfig || {};
+  const { dateField = "date", searchFields = [], customFilters } = filterConfig || {};
 
-  // ---------- Sync State With Parent for Server-Side Fetching ----------
-  React.useEffect(() => {
-    if (!onDateSync) return;
-
-    let startDate = null;
-    let endDate = null;
-    const formatYMD = (d) => format(d, "yyyy-MM-dd");
-
-    if (filterType === "monthly") {
-      startDate = formatYMD(startOfMonth(today));
-      endDate = formatYMD(endOfMonth(today));
-    } else if (filterType === "weekly") {
-      startDate = formatYMD(startOfWeek(today));
-      endDate = formatYMD(endOfWeek(today));
-    } else if (filterType === "last7days") {
-      startDate = formatYMD(subDays(today, 7));
-      endDate = formatYMD(today);
-    } else if (filterType === "range") {
-      startDate = dateRange.from || formatYMD(today);
-      endDate = dateRange.to || dateRange.from || formatYMD(today);
-    } else if (filterType === "month") {
-      if (selectedMonth) {
-        const [year, month] = selectedMonth.split("-");
-        const d = new Date(parseInt(year), parseInt(month) - 1, 1);
-        startDate = formatYMD(startOfMonth(d));
-        endDate = formatYMD(endOfMonth(d));
-      } else {
-        startDate = formatYMD(startOfMonth(today));
-        endDate = formatYMD(endOfMonth(today));
-      }
+  // the period as two day keys
+  const { from, to } = useMemo(() => {
+    const t = parseISO(today);
+    if (filterType === "weekly") return { from: key(startOfWeek(t)), to: key(endOfWeek(t)) };
+    if (filterType === "last7days") return { from: key(subDays(t, 6)), to: today };
+    if (filterType === "range") return { from: dateRange.from || today, to: dateRange.to || dateRange.from || today };
+    if (filterType === "month" && selectedMonth) {
+      const m = parseISO(`${selectedMonth}-01`);
+      return { from: key(startOfMonth(m)), to: key(endOfMonth(m)) };
     }
+    return { from: key(startOfMonth(t)), to: key(endOfMonth(t)) };
+  }, [filterType, dateRange, selectedMonth, today]);
 
-    onDateSync({ startDate, endDate });
-  }, [filterType, dateRange, selectedMonth]);
+  // the page fetches the period from the server
+  useEffect(() => {
+    onDateSync?.({ startDate: from, endDate: to });
+  }, [from, to]);
 
-  // ---------- Filtered + Sorted ----------
   const filteredData = useMemo(() => {
-    let filtered = [...data];
-
-    // Date filters
-    if (filterType === "weekly") {
-      filtered = filtered.filter((entry) =>
-        isWithinInterval(new Date(entry[dateField]), {
-          start: startOfWeek(today),
-          end: endOfWeek(today),
-        })
-      );
-    } else if (filterType === "monthly") {
-      filtered = filtered.filter((entry) =>
-        isWithinInterval(new Date(entry[dateField]), {
-          start: startOfMonth(today),
-          end: endOfMonth(today),
-        })
-      );
-    } else if (filterType === "last7days") {
-      filtered = filtered.filter((entry) =>
-        isWithinInterval(new Date(entry[dateField]), {
-          start: subDays(today, 7),
-          end: today,
-        })
-      );
-    } else if (filterType === "range") {
-      const startStr = dateRange.from || format(today, "yyyy-MM-dd");
-      const endStr = dateRange.to || dateRange.from || format(today, "yyyy-MM-dd");
-      filtered = filtered.filter((entry) =>
-        isWithinInterval(new Date(entry[dateField]), {
-          start: new Date(startStr),
-          end: new Date(endStr),
-        })
-      );
-    } else if (filterType === "month") {
-      const yStr = selectedMonth ? selectedMonth.split("-")[0] : today.getFullYear();
-      const mStr = selectedMonth ? selectedMonth.split("-")[1] : today.getMonth() + 1;
-      filtered = filtered.filter((entry) => {
-        const d = new Date(entry[dateField]);
-        return (
-          d.getFullYear() === parseInt(yStr) &&
-          d.getMonth() + 1 === parseInt(mStr)
-        );
-      });
-    }
-
-    // Search
-    if (searchDesc && searchFields.length) {
-      const q = searchDesc.toLowerCase();
-      filtered = filtered.filter((entry) =>
-        searchFields.some((field) =>
-          entry[field]?.toString().toLowerCase().includes(q)
-        )
-      );
-    }
-
-    // Custom filters
-    filtered = customFilters(filtered);
-
-    // Sort by date asc/desc
-    filtered.sort((a, b) =>
-      sortOrder === "asc"
-        ? new Date(a[dateField]) - new Date(b[dateField])
-        : new Date(b[dateField]) - new Date(a[dateField])
-    );
-
-    return filtered;
-  }, [
-    data,
-    filterType,
-    dateRange,
-    selectedMonth,
-    searchDesc,
-    sortOrder,
-    dateField,
-    searchFields,
-    customFilters,
-    today,
-  ]);
-
-  // ---------- Pagination ----------
-  const totalPages = Math.ceil(filteredData.length / pageSize);
-  const paginatedData = filteredData.slice(
-    (currentPage - 1) * pageSize,
-    currentPage * pageSize
-  );
-
-  // ---------- Chart prep ----------
-  const valueField =
-    chartConfig?.valueField ??
-    (data.length && "total" in (data[0] || {}) ? "total" : undefined);
-
-  const chartEnabled = !!chartConfig?.enabled && !!valueField;
-
-  const chartThemeColors = useMemo(() => {
-    const presets = {
-      sales: { stroke: "#6B8E23", fill: "rgba(107,142,35,0.20)" }, // olive/green
-      cost: { stroke: "#E53E3E", fill: "rgba(229,62,62,0.15)" }, // red
-      deposit: { stroke: "#3182CE", fill: "rgba(49,130,206,0.15)" }, // blue
-      default: { stroke: "#4A5568", fill: "rgba(74,85,104,0.15)" }, // gray
-    };
-    if (!chartConfig?.theme) return presets.default;
-    if (typeof chartConfig.theme === "string") {
-      return presets[chartConfig.theme] || presets.default;
-    }
-    // custom { stroke, fill }
-    return {
-      stroke: chartConfig.theme.stroke || presets.default.stroke,
-      fill: chartConfig.theme.fill || presets.default.fill,
-    };
-  }, [chartConfig?.theme]);
-
-  const chartData = useMemo(() => {
-    if (!chartEnabled) return [];
-    const sorted = [...filteredData].sort(
-      (a, b) => new Date(a[dateField]) - new Date(b[dateField])
-    );
-    return sorted.map((row) => {
-      let label;
-      try {
-        label = format(new Date(row[dateField]), "dd/MM");
-      } catch {
-        label = String(row[dateField] ?? "");
-      }
-      const v = Number(row[valueField] ?? 0);
-      return { d: label, v };
+    let rows = data.filter((r) => {
+      const d = dayOf(r[dateField]);
+      return d >= from && d <= to;
     });
-  }, [chartEnabled, filteredData, dateField, valueField]);
+    const q = searchDesc.trim().toLowerCase();
+    if (q && searchFields.length) rows = rows.filter((r) => searchFields.some((f) => String(pick(r, f) ?? "").toLowerCase().includes(q)));
+    if (customFilters) rows = customFilters(rows);
+    return [...rows].sort((a, b) => {
+      const x = dayOf(a[dateField]);
+      const y = dayOf(b[dateField]);
+      return sortOrder === "asc" ? x.localeCompare(y) : y.localeCompare(x);
+    });
+  }, [data, dateField, from, to, searchDesc, searchFields, customFilters, sortOrder]);
 
-  // ---------- Totals footer ----------
-  const grandTotal = useMemo(() => {
-    if (!valueField) return 0;
-    return filteredData.reduce(
-      (sum, r) => sum + (Number.isFinite(+r[valueField]) ? +r[valueField] : 0),
-      0
-    );
-  }, [filteredData, valueField]);
+  // the figure the report adds up
+  const valueField = chartConfig?.valueField ?? (data.length && "total" in (data[0] || {}) ? "total" : columns.some((c) => c.key === "amount") ? "amount" : undefined);
+  const val = (r) => (Number.isFinite(+r[valueField]) ? +r[valueField] : 0);
+  const total = valueField ? filteredData.reduce((n, r) => n + val(r), 0) : 0;
+  const best = valueField ? filteredData.reduce((b, r) => (val(r) > (b ? val(b) : -Infinity) ? r : b), null) : null;
 
-  const thisMonthTotal = useMemo(() => {
-    if (!valueField) return 0;
+  // per day, for the chart
+  const chartData = useMemo(() => {
+    if (!chartConfig?.enabled || !valueField) return [];
+    const byDay = new Map();
+    for (const r of filteredData) {
+      const d = dayOf(r[dateField]);
+      byDay.set(d, (byDay.get(d) || 0) + val(r));
+    }
+    return [...byDay].sort(([a], [b]) => a.localeCompare(b)).map(([date, v]) => ({ date, v }));
+  }, [chartConfig?.enabled, valueField, filteredData, dateField]);
+  const color = typeof chartConfig?.theme === "object" ? chartConfig.theme.stroke : THEME[chartConfig?.theme] || THEME.default;
 
-    // Use selectedItem's date if available to show the correct month's total, otherwise fallback to today
-    const baseDate = selectedItem ? new Date(selectedItem[dateField] || today) : today;
-    const start = startOfMonth(baseDate);
-    const end = endOfMonth(baseDate);
-
+  // the month the open record falls in, for its sheet
+  const monthTotal = useMemo(() => {
+    if (!valueField) return "0.00";
+    const m = dayOf(selectedItem?.[dateField] || today).slice(0, 7);
     return data
-      .filter((r) =>
-        isWithinInterval(new Date(r[dateField]), {
-          start,
-          end,
-        })
-      )
-      .reduce(
-        (sum, r) =>
-          sum + (Number.isFinite(+r[valueField]) ? +r[valueField] : 0),
-        0
-      );
-  }, [data, valueField, dateField, today, selectedItem]);
+      .filter((r) => dayOf(r[dateField]).startsWith(m))
+      .reduce((n, r) => n + val(r), 0)
+      .toFixed(2);
+  }, [data, valueField, dateField, selectedItem, today]);
 
-  // ✅ Render skeleton AFTER all hooks (Rules of Hooks safe)
-  if (isLoading) {
-    return (
-      <SkeletonReportPage
-        cols={columns.length || 5}
-        chartEnabled={!!chartConfig?.enabled}
-      />
-    );
-  }
+  // columns for the table; the added-up figure sits on the right of each phone card
+  const tableColumns = useMemo(() => {
+    const anyAside = columns.some((c) => c.aside);
+    return columns.map((c, i) => ({
+      key: c.key,
+      label: c.label,
+      align: c.align || (c.key === valueField ? "right" : undefined),
+      primary: c.primary || (i === 0 && !columns.some((x) => x.primary)),
+      aside: c.aside || (!anyAside && c.key === valueField),
+      hideOnMobile: c.hideOnMobile || c.key === "__actions",
+      render: (r) => (c.render ? c.render(r[c.key], r) : r[c.key]),
+    }));
+  }, [columns, valueField]);
+
+  const exportArgs = [filteredData, branchData, filterType, dateRange, selectedMonth, searchDesc];
+  const months = useMemo(() => Array.from({ length: 18 }, (_, i) => format(subMonths(parseISO(today), i), "yyyy-MM")), [today]);
+  const periodText = from === to ? format(parseISO(from), "d MMM yyyy") : `${format(parseISO(from), "d MMM")} – ${format(parseISO(to), "d MMM yyyy")}`;
+
+  const facts = valueField
+    ? [
+        { icon: Sigma, label: "Total", value: <CountUp value={total} format={money} /> },
+        { icon: Hash, label: "Entries", value: filteredData.length },
+        { icon: TrendingUp, label: "Average", value: filteredData.length ? money(total / filteredData.length) : "—" },
+        { icon: CalendarRange, label: "Highest", value: best ? money(val(best)) : "—", note: best ? format(parseISO(dayOf(best[dateField])), "d MMM") : "" },
+      ]
+    : [];
 
   return (
-    <div className="p-4 sm:p-6">
-      <h1 className="text-xl sm:text-2xl font-semibold mb-3 capitalize">
-        {branchData?.name?.split(" ")[0]} {title}
-      </h1>
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3">
-        {/* ===== Filters ===== */}
-        <FilterBar
-          filterType={filterType}
-          dateRange={dateRange}
-          selectedMonth={selectedMonth}
-          searchDesc={searchDesc}
-          sortOrder={sortOrder}
-          onFilterChange={(updated) => {
-            if (updated.filterType !== undefined)
-              setFilterType(updated.filterType);
-            if (updated.dateRange !== undefined)
-              setDateRange(updated.dateRange);
-            if (updated.selectedMonth !== undefined)
-              setSelectedMonth(updated.selectedMonth);
-            if (updated.searchDesc !== undefined)
-              setSearchDesc(updated.searchDesc);
-            if (updated.sortOrder !== undefined)
-              setSortOrder(updated.sortOrder);
-            setCurrentPage(1); // reset to first page on filter changes
-          }}
-          searchBarShow={searchBarShow}
-          placeholder={searchPlaceholder}
-        />
-
-        {/* ===== Export Buttons ===== */}
-        <div className="flex flex-wrap gap-2 mb-4">
-          {exportFunctions.exportPDF && (
-            <button
-              onClick={() =>
-                exportFunctions.exportPDF(
-                  filteredData,
-                  branchData,
-                  filterType,
-                  dateRange,
-                  selectedMonth,
-                  searchDesc
-                )
-              }
-              className="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-sm"
-            >
-              Export Filtered (PDF)
-            </button>
-          )}
-          {exportFunctions.exportExcel && (
-            <button
-              onClick={() =>
-                exportFunctions.exportExcel(
-                  filteredData,
-                  branchData,
-                  filterType,
-                  dateRange,
-                  selectedMonth,
-                  searchDesc
-                )
-              }
-              className="px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-sm"
-            >
-              Export Filtered (Excel)
-            </button>
-          )}
+    <div className="mx-auto max-w-7xl space-y-4 px-4 py-5 sm:px-6 sm:py-6">
+      {/* the period */}
+      <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className="-mx-1 max-w-full overflow-x-auto px-1">
+          <Tabs
+            size="sm"
+            tabs={PERIODS}
+            value={filterType}
+            onChange={(v) => {
+              setFilterType(v);
+              if (v === "month" && !selectedMonth) setSelectedMonth(months[0]);
+            }}
+          />
         </div>
-      </div>
-      {/* ===== Chart (optional) ===== */}
-      {chartEnabled && chartData.length > 0 && (
-        <div className="bg-white rounded-lg shadow p-4 mb-4">
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-base md:text-lg font-semibold">Trend</h2>
-            <div className="text-sm text-gray-600">
-              Total:&nbsp;
-              <span className="font-semibold">{currency} {grandTotal.toFixed(2)}</span>
-            </div>
-          </div>
-          <div className="h-56 md:h-[260px]">
-            <ResponsiveContainer width="100%" height="100%">
-              {chartConfig?.type === "bar" ? (
-                <BarChart
-                  data={chartData}
-                  margin={{ top: 10, right: 12, left: -10, bottom: 0 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="d" tickMargin={8} />
-                  <YAxis tickMargin={8} width={60} />
-                  <Tooltip
-                    formatter={(v) => [`${currency} ${Number(v).toFixed(2)}`, "Total"]}
-                    labelFormatter={(lbl) => `Date: ${lbl}`}
-                  />
-                  <Bar
-                    dataKey="v"
-                    stroke={chartThemeColors.stroke}
-                    fill={chartThemeColors.fill}
-                  />
-                </BarChart>
-              ) : (
-                <AreaChart
-                  data={chartData}
-                  margin={{ top: 10, right: 12, left: -10, bottom: 0 }}
-                >
-                  <defs>
-                    <linearGradient id="gt" x1="0" y1="0" x2="0" y2="1">
-                      <stop
-                        offset="5%"
-                        stopColor={chartThemeColors.stroke}
-                        stopOpacity={0.35}
-                      />
-                      <stop
-                        offset="95%"
-                        stopColor={chartThemeColors.stroke}
-                        stopOpacity={0}
-                      />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="d" tickMargin={8} />
-                  <YAxis tickMargin={8} width={60} />
-                  <Tooltip
-                    formatter={(v) => [`${currency} ${Number(v).toFixed(2)}`, "Total"]}
-                    labelFormatter={(lbl) => `Date: ${lbl}`}
-                  />
-                  <Area
-                    type="monotone"
-                    dataKey="v"
-                    stroke={chartThemeColors.stroke}
-                    strokeWidth={2}
-                    fill="url(#gt)"
-                    activeDot={{ r: 4 }}
-                  />
-                </AreaChart>
-              )}
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
-
-      {/* ===== Table (sticky header, single table) ===== */}
-      <div className="relative bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-        {/* subtle top/bottom fade to suggest scroll */}
-        <div className="pointer-events-none absolute top-0 left-0 right-0 h-4 bg-gradient-to-b from-white/80 to-transparent z-10" />
-        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-4 bg-gradient-to-t from-white/80 to-transparent z-10" />
-
-        <div className="max-h-[65vh] overflow-auto styled-scrollbar">
-          <table className="min-w-full table-fixed divide-y divide-slate-100">
-            <thead className="sticky top-0 z-20">
-              <tr className="bg-white/90 backdrop-blur-md supports-[backdrop-filter]:bg-white/60">
-                {columns.map((col) => (
-                  <th
-                    key={col.key}
-                    className={[
-                      "px-4 py-3 text-xs font-semibold text-slate-500 tracking-wider uppercase",
-                      "border-b border-slate-100",
-                      col.headerClassName || "",
-                      col.align === "right"
-                        ? "text-right"
-                        : col.align === "center"
-                        ? "text-center"
-                        : "text-left",
-                    ].join(" ")}
-                    style={col.thStyle}
-                  >
-                    {col.label}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-
-            <tbody className="divide-y divide-slate-50">
-              {paginatedData.map((entry, rIdx) => (
-                <tr
-                  key={entry.id || entry[dateField] || rIdx}
-                  className={[
-                    "bg-white hover:bg-slate-50 transition-colors duration-200",
-                    "cursor-pointer group",
-                    "focus-within:ring-2 focus-within:ring-mint-500/20",
-                  ].join(" ")}
-                  onClick={() => setSelectedItem(entry)}
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ")
-                      setSelectedItem(entry);
-                  }}
-                >
-                  {columns.map((col) => (
-                    <td
-                      key={col.key}
-                      className={[
-                        "px-4 py-3 align-middle",
-                        "text-sm text-slate-700 font-medium",
-                        col.className || "",
-                        col.align === "right"
-                          ? "text-right"
-                          : col.align === "center"
-                          ? "text-center"
-                          : "text-left",
-                        col.truncate ? "truncate max-w-[12rem]" : "break-words",
-                      ].join(" ")}
-                      style={col.tdStyle}
-                    >
-                      {col.render
-                        ? col.render(entry[col.key], entry)
-                        : entry[col.key]}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {/* Empty state */}
-          {paginatedData.length === 0 && (
-            <div className="p-6 text-center text-gray-500">
-              No records found.
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* ===== Pagination ===== */}
-      <Pagination
-        currentPage={currentPage}
-        totalPages={totalPages}
-        onPageChange={setCurrentPage}
-      />
-
-      {/* ===== Totals footer (optional) ===== */}
-      {showTotalsFooter && valueField && (
-        <div className="max-w-7xl mx-auto mt-3">
-          <div className="w-full rounded border bg-gray-50">
-            <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 p-3 text-sm">
-              <div className="font-medium text-gray-600">Grand Total</div>
-              <div className="font-semibold">{currency} {grandTotal.toFixed(2)}</div>
-              <div className="font-medium text-gray-600">Average</div>
-              <div className="font-semibold">
-                {currency} {filteredData.length > 0 ? (grandTotal / filteredData.length).toFixed(2) : "0.00"}
-              </div>
-              <div className="text-gray-600 font-medium">Entries</div>
-              <div className="font-semibold">{filteredData.length}</div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ===== Modal ===== */}
-      {selectedItem &&
-        modalContentRenderer?.(
-          selectedItem,
-          branchData,
-          () => setSelectedItem(null),
-          thisMonthTotal.toFixed(2)
+        {filterType === "month" && (
+          <Select className="h-9 w-44" value={selectedMonth || months[0]} onChange={(e) => setSelectedMonth(e.target.value)} aria-label="Month">
+            {months.map((m) => (
+              <option key={m} value={m}>
+                {format(parseISO(`${m}-01`), "MMMM yyyy")}
+              </option>
+            ))}
+          </Select>
         )}
+        {filterType === "range" && (
+          <div className="w-full sm:w-64">
+            <DateRangePicker value={{ from, to }} max={today} onChange={(r) => setDateRange(r)} />
+          </div>
+        )}
+        {filterType !== "range" && (
+          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted">
+            <CalendarRange className="size-3.5" />
+            {periodText}
+          </span>
+        )}
+        {toolbar && <div className="ml-auto">{toolbar}</div>}
+      </div>
+
+      {/* the period in four numbers */}
+      {facts.length > 0 && (
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {facts.map((f) => (
+            <Card key={f.label} className="p-4">
+              <p className="flex items-center gap-1.5 text-xs font-semibold text-muted">
+                <f.icon className="size-3.5" /> {f.label}
+              </p>
+              {isLoading ? (
+                <Skeleton className="mt-2 h-6 w-24" />
+              ) : (
+                <>
+                  <p className="mt-1 truncate text-lg font-bold tabular-nums tracking-tight text-fg sm:text-xl">{f.value}</p>
+                  {f.note && <p className="text-[11px] text-subtle">{f.note}</p>}
+                </>
+              )}
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* the trend */}
+      {chartConfig?.enabled && valueField && (
+        <ChartCard title="Day by day" subtitle={periodText} loading={isLoading}>
+          <TimeChart
+            data={chartData}
+            currency={currency}
+            height={chartConfig.height || 240}
+            series={[{ key: "v", name: "Total", color, kind: chartConfig.type === "bar" ? "bar" : "area" }]}
+          />
+        </ChartCard>
+      )}
+
+      {/* the records */}
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {searchBarShow && (
+            <div className="relative w-full min-w-0 sm:w-auto sm:max-w-sm sm:flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-subtle" />
+              <Input value={searchDesc} onChange={(e) => setSearchDesc(e.target.value)} placeholder={searchPlaceholder || "Search"} className="pl-9" />
+            </div>
+          )}
+          <div className={cn("flex w-full items-center gap-2 sm:w-auto", "sm:ml-auto")}>
+            <Button
+              variant="secondary"
+              icon={sortOrder === "desc" ? ArrowDownWideNarrow : ArrowUpNarrowWide}
+              onClick={() => setSortOrder((s) => (s === "desc" ? "asc" : "desc"))}
+            >
+              {sortOrder === "desc" ? "Newest first" : "Oldest first"}
+            </Button>
+            {(exportFunctions.exportPDF || exportFunctions.exportExcel) && (
+              <Menu
+                align="end"
+                width={200}
+                trigger={(p) => (
+                  <Button {...p} variant="secondary" icon={Download} disabled={!filteredData.length}>
+                    Export
+                  </Button>
+                )}
+                items={[
+                  exportFunctions.exportPDF && { label: "PDF", icon: FileText, onSelect: () => exportFunctions.exportPDF(...exportArgs) },
+                  exportFunctions.exportExcel && { label: "Excel", icon: FileSpreadsheet, onSelect: () => exportFunctions.exportExcel(...exportArgs) },
+                ].filter(Boolean)}
+              />
+            )}
+          </div>
+        </div>
+
+        <DataTable
+          key={`${from}-${to}-${searchDesc}-${sortOrder}`}
+          columns={tableColumns}
+          rows={filteredData}
+          loading={isLoading}
+          onRowClick={modalContentRenderer ? setSelectedItem : undefined}
+          pageSize={10}
+          empty={{ icon: CalendarRange, title: "Nothing in this period", description: searchDesc ? "Nothing matches the search — try other words." : "Pick another period to see more." }}
+          footer={
+            showTotalsFooter && valueField && filteredData.length
+              ? Object.fromEntries(tableColumns.map((c, i) => [c.key, i === 0 ? "Total" : c.key === valueField ? money(total) : ""]))
+              : undefined
+          }
+        />
+      </div>
+
+      {selectedItem && modalContentRenderer?.(selectedItem, branchData, () => setSelectedItem(null), monthTotal)}
     </div>
   );
 }
