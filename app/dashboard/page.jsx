@@ -128,9 +128,10 @@ export default function DashboardPage() {
           </ChartCard>
         </div>
 
-        {/* ── Recent Activity ── */}
-        <SectionHeader title="Recent Activity" />
-        <RecentActivity rows={recent} />
+        {/* ── Latest records ── */}
+        <div className="pt-3">
+          <RecentActivity rows={recent} />
+        </div>
 
       </div>
     </div>
