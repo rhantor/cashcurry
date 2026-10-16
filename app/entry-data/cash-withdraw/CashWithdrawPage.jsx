@@ -1,435 +1,302 @@
-/* eslint-disable no-unused-vars */
 "use client";
-import React, { useEffect, useState } from "react";
-import { NumericFormat } from "react-number-format";
-import { useAddWithdrawEntryMutation } from "@/lib/redux/api/cashWithdrawApiSlice";
-import { storage } from "@/lib/firebase";
+import { useEffect, useMemo, useState } from "react";
+import { format, parseISO } from "date-fns";
+import { motion } from "framer-motion";
+import { ArrowRight, Landmark, Wallet } from "lucide-react";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { storage } from "@/lib/firebase";
+import { useAddWithdrawEntryMutation, useGetWithdrawEntriesQuery } from "@/lib/redux/api/cashWithdrawApiSlice";
+import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
+import { exportWithdrawalToExcel, exportWithdrawalToPDF, shareWithdrawal } from "@/utils/export/exportWithdrawData";
 import useCurrency from "@/app/hooks/useCurrency";
+import useSession from "@/app/hooks/useSession";
 import { useDefaultDate } from "@/app/hooks/useRegion";
+import { formatMoney } from "@/lib/region/currency";
 import { getSessionUser } from "@/lib/session";
-import { UploadIcon, FileText, Trash2, LoaderCircle, CircleCheck, CircleAlert } from "lucide-react";
+import { Button, CountUp, DatePicker, Field, Input, Textarea, cn, confirmDialog, toast } from "@/app/components/ui";
+import MoneyInput from "@/app/components/entry/MoneyInput";
+import ProofFiles from "@/app/components/entry/ProofFiles";
+import RecordSheet from "@/app/components/entry/RecordSheet";
+import { EntryLayout, EntrySection, RecentEntries, SummaryLine } from "@/app/components/entry/EntryLayout";
 
-const CATEGORIES = [
-  "Supplier Payment",
-  "Staff Advance",
-  "Staff Salary",
-  "Utility Bills",
-  "Rent/Deposit",
-  "Maintenance",
-  "Transport/Delivery",
-  "Petty Cash",
-  "Other",
-];
-
+// What the cash was taken out for (kept as stored before).
+const CATEGORIES = ["Supplier Payment", "Staff Advance", "Staff Salary", "Utility Bills", "Rent/Deposit", "Maintenance", "Transport/Delivery", "Petty Cash", "Other"];
 const METHODS = ["ATM Withdraw", "Online Transfer", "Other"];
+const day = (d) => (d ? format(parseISO(d), "EEE, d MMM") : "");
 
+function Chip({ on, onClick, children }) {
+  return (
+    <motion.button
+      whileTap={{ scale: 0.95 }}
+      type="button"
+      onClick={onClick}
+      aria-pressed={on}
+      className={cn(
+        "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+        on ? "border-brand bg-brand text-brand-fg" : "border-line bg-surface text-fg hover:bg-surface-2"
+      )}
+    >
+      {children}
+    </motion.button>
+  );
+}
+
+/**
+ * Cash withdrawal: money taken out of the bank into the till (an ATM
+ * withdrawal or a transfer). Not the owner taking money — that is drawings
+ * (roadmap 4.9). Day, amount, what for, how, a reference and note, and at
+ * least one slip or screenshot. Asks once before saving.
+ */
 export default function CashWithdrawPage() {
+  const { companyId, branchId } = useSession();
   const currency = useCurrency();
-  // Defaults to today on the branch's clock, after its day cut-off.
-  const [date, setDate] = useDefaultDate();
-  const [companyId, setCompanyId] = useState(null);
-  const [branchId, setBranchId] = useState(null);
-
+  const money = (v) => formatMoney(v, currency);
+  const [date, setDate, today] = useDefaultDate();
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [method, setMethod] = useState(METHODS[0]);
   const [reference, setReference] = useState("");
   const [notes, setNotes] = useState("");
+  const [files, setFiles] = useState([]); // [{ id, file, url }]
+  const [progress, setProgress] = useState(0);
+  const [errors, setErrors] = useState({});
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [viewing, setViewing] = useState(null);
 
-  // Multiple files state
-  const [files, setFiles] = useState([]);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [isUploading, setIsUploading] = useState(false);
+  const args = companyId && branchId ? { companyId, branchId } : null;
+  const [addWithdrawEntry] = useAddWithdrawEntryMutation();
+  const { data: branchData = {} } = useGetSingleBranchQuery(args ?? undefined, { skip: !args });
 
-  const [showConfirm, setShowConfirm] = useState(false);
-  const [msg, setMsg] = useState({ text: "", type: "" }); // type: 'success' | 'error'
+  // this month's withdrawals, for the list under the form
+  const month = (date || today || "").slice(0, 7);
+  const [y, m] = month.split("-").map(Number);
+  const { data: rows = [], isLoading, isError } = useGetWithdrawEntriesQuery(
+    { ...args, startDate: `${month}-01`, endDate: month ? `${month}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}` : "" },
+    { skip: !args || !month }
+  );
+  const recent = useMemo(() => [...rows].sort((a, b) => (a.date === b.date ? String(b.createdAt).localeCompare(String(a.createdAt)) : a.date < b.date ? 1 : -1)).slice(0, 5), [rows]);
 
-  const [addWithdrawEntry, { isLoading: isSaving }] = useAddWithdrawEntryMutation();
+  useEffect(() => setErrors((e) => (e.amount && Number(amount) > 0 ? { ...e, amount: undefined } : e)), [amount]);
+  useEffect(() => setErrors((e) => (e.files && files.length ? { ...e, files: undefined } : e)), [files.length]);
 
-  useEffect(() => {
-    const stored = getSessionUser();
-    if (stored) {
-      const u = stored;
-      setCompanyId(u.companyId);
-      setBranchId(u.branchId);
-    }
-  }, []);
-
-  const onAmountChange = (v) => {
-    const n = parseFloat(v);
-    if (v === "" || (!isNaN(n) && n >= 0)) setAmount(v);
-  };
-
-  // Handle multiple file selection
-  const onFileChange = (e) => {
-    const selectedFiles = Array.from(e.target.files);
-    if (selectedFiles.length === 0) return;
-
-    const validFiles = selectedFiles.filter(f => 
-      ["application/pdf", "image/jpeg", "image/png", "image/jpg"].includes(f.type)
-    );
-
-    if (validFiles.length !== selectedFiles.length) {
-      setMsg({ text: "Some files were rejected. Only PDF/JPG/PNG allowed.", type: "error" });
-    } else {
-      setMsg({ text: "", type: "" });
-    }
-
-    setFiles((prev) => [...prev, ...validFiles]);
-    setUploadProgress(0);
-  };
-
-  const removeFile = (indexToRemove) => {
-    setFiles((prev) => prev.filter((_, i) => i !== indexToRemove));
-  };
-
-  // Upload all files and return array of URLs
-  const uploadReceipts = async () => {
-    if (files.length === 0 || !companyId || !branchId) return [];
-
-    setIsUploading(true);
-    const urls = [];
-    let completedCount = 0;
-
-    try {
-      const uploadPromises = files.map((file) => {
-        return new Promise((resolve, reject) => {
-          const ext = file.name.split(".").pop();
-          const filePath = `withdrawReceipts/${companyId}/${branchId}/${date}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${ext}`;
-          const storageRef = ref(storage, filePath);
-          const task = uploadBytesResumable(storageRef, file);
-
-          task.on(
-            "state_changed",
-            (snap) => {
-              // Individual progress tracking is tricky with Promise.all, 
-              // we mostly care about completion here or use a total bytes calculation logic
-            },
-            (err) => reject(err),
-            async () => {
+  // every file at once; progress = how many are done
+  const uploadAll = async () => {
+    let done = 0;
+    return Promise.all(
+      files.map(
+        ({ file }) =>
+          new Promise((resolve, reject) => {
+            const ext = file.name.split(".").pop();
+            const path = `withdrawReceipts/${companyId}/${branchId}/${date}-${Date.now()}-${Math.random().toString(36).slice(2, 11)}.${ext}`;
+            const task = uploadBytesResumable(ref(storage, path), file);
+            task.on("state_changed", null, reject, async () => {
               const url = await getDownloadURL(task.snapshot.ref);
-              completedCount++;
-              setUploadProgress((completedCount / files.length) * 100);
+              done += 1;
+              setProgress((done / files.length) * 100);
               resolve(url);
-            }
-          );
-        });
-      });
-
-      const results = await Promise.all(uploadPromises);
-      urls.push(...results);
-    } catch (err) {
-      console.error("Upload error:", err);
-      throw new Error("Failed to upload one or more files.");
-    } finally {
-      setIsUploading(false);
-    }
-
-    return urls;
+            });
+          })
+      )
+    );
   };
 
-  const handleSave = async () => {
-    if (!companyId || !branchId) return;
-    if (!date) return setMsg({ text: "Select a date.", type: "error" });
-    if (!amount) return setMsg({ text: "Enter an amount.", type: "error" });
-    if (files.length === 0) {
-      return setMsg({ text: "Receipt is required. Please attach at least one file.", type: "error" });
-    }
+  const save = async () => {
+    if (!args || busy) return;
+    const problems = {};
+    if (!date) problems.date = "Pick the day";
+    if (!(Number(amount) > 0)) problems.amount = "Enter the amount taken out";
+    if (!files.length) problems.files = "Attach the ATM slip or transfer screenshot";
+    setErrors(problems);
+    if (Object.keys(problems).length) return toast.error("Check the highlighted fields");
 
+    const ok = await confirmDialog({
+      title: `Take ${money(amount)} out of the bank?`,
+      message: `${day(date)} · ${category} · ${method}${reference ? ` · ${reference}` : ""}\nThe till goes up and the bank goes down by this amount.`,
+      confirmLabel: "Save withdrawal",
+    });
+    if (!ok) return;
+
+    setBusy(true);
     try {
-      // 1. Upload Files
-      const uploadedUrls = await uploadReceipts();
-
-      // 2. Prepare Data
-      const storedUser = getSessionUser();
-      const createdBy = storedUser ? storedUser : {};
-
-      const data = {
-        date,
-        amount: Number(amount) || 0,
-        category,
-        method,
-        reference: reference || "",
-        notes: notes || "",
-        receiptUrl: uploadedUrls[0] || "", // Backward compatibility (save first image)
-        receiptUrls: uploadedUrls,         // New field: Array of all images
-        createdBy,
-        createdAt: new Date().toISOString(),
-      };
-
-      // 3. Submit API
-      await addWithdrawEntry({ companyId, branchId, data }).unwrap();
-
-      // 4. Reset Form
+      const urls = await uploadAll();
+      const createdBy = getSessionUser() || {};
+      await addWithdrawEntry({
+        companyId,
+        branchId,
+        data: {
+          date,
+          amount: Number(amount) || 0,
+          category,
+          method,
+          reference: reference || "",
+          notes: notes || "",
+          receiptUrl: urls[0] || "", // older screens read the first one
+          receiptUrls: urls,
+          createdBy,
+          createdAt: new Date().toISOString(),
+        },
+      }).unwrap();
+      toast.success("Withdrawal saved", { description: `${day(date)} · ${money(amount)} · ${category}` });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1400);
       setAmount("");
       setCategory(CATEGORIES[0]);
       setMethod(METHODS[0]);
       setReference("");
       setNotes("");
       setFiles([]);
-      setUploadProgress(0);
-      setShowConfirm(false);
-      setMsg({ text: "Entry saved successfully!", type: "success" });
-
-      // Clear success message after 3 seconds
-      setTimeout(() => setMsg({ text: "", type: "" }), 3000);
-
-    } catch (e) {
-      setMsg({ text: "Failed to save. Please try again.", type: "error" });
+      setProgress(0);
+    } catch (err) {
+      console.error("Withdrawal save failed:", err);
+      toast.error("Couldn't save the withdrawal", { description: "Check your connection and try again." });
+    } finally {
+      setBusy(false);
     }
   };
 
-  // Helper to determine icon based on file type
-  const getFileIcon = (fileName) => {
-    return fileName.toLowerCase().endsWith(".pdf") ? <FileText size="1em" className="text-red-500" /> : <FileText size="1em" className="text-blue-500" />;
-  };
+  const uploading = progress > 0 && progress < 100;
+  const saveButton = (
+    <Button size="lg" className="w-full" onClick={save} loading={busy && !uploading} success={saved} disabled={uploading}>
+      {uploading ? `Uploading ${Math.round(progress)}%` : "Save withdrawal"}
+    </Button>
+  );
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8">
-      <h1 className="text-xl md:text-2xl font-bold text-center mb-6 text-mint-600">
-        Cash Withdraw Entry
-      </h1>
-
-      {/* --- Main Form Card --- */}
-      <div className="max-w-4xl mx-auto space-y-6">
-        
-        {/* Date & Amount */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
-              Date
-            </label>
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full bg-transparent text-gray-800 font-medium focus:outline-none"
-            />
+    <>
+      <EntryLayout
+        aside={
+          <div className="space-y-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-subtle">Bank to till</p>
+              <CountUp value={Number(amount) || 0} format={money} className="mt-1 block text-3xl font-bold tracking-tight text-fg" />
+              <p className="mt-0.5 text-xs text-muted">{date ? day(date) : "Pick a day"}</p>
+            </div>
+            <div className="space-y-2 border-t border-line pt-3">
+              <SummaryLine label="Bank" value={`− ${money(amount || 0)}`} />
+              <SummaryLine label="Cash in the till" value={`+ ${money(amount || 0)}`} />
+              <SummaryLine label="For" value={category} />
+              <SummaryLine label="Slips" value={files.length ? `${files.length} attached` : "Needed"} muted={!files.length} />
+            </div>
+            {saveButton}
           </div>
-
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
-              Amount ({currency})
-            </label>
-            <NumericFormat
-              value={amount}
-              thousandSeparator={true}
-              decimalScale={2}
-              allowNegative={false}
-              placeholder="0.00"
-              className="w-full bg-transparent text-xl font-bold text-gray-800 placeholder-gray-300 focus:outline-none"
-              onValueChange={(values) => {
-                setAmount(values.value)
-              }}
-            />
+        }
+        bar={
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-subtle">Withdrawal</p>
+              <CountUp value={Number(amount) || 0} format={money} className="block truncate text-lg font-bold tracking-tight text-fg" />
+            </div>
+            <div className="w-40 shrink-0">{saveButton}</div>
           </div>
+        }
+        below={
+          <RecentEntries
+            title="Withdrawals this month"
+            viewAllHref="/reports/withdrawal-report"
+            loading={isLoading && !!args}
+            error={isError}
+            money={money}
+            items={recent.map((w) => ({
+              id: w.id,
+              date: w.date,
+              amount: w.amount,
+              proof: !!(w.receiptUrls?.length || w.receiptUrl),
+              note: [w.category, w.method].filter(Boolean).join(" · "),
+              onOpen: () => setViewing(w),
+            }))}
+          />
+        }
+      >
+        {/* what this screen is for, so it isn't mistaken for the owner taking money */}
+        <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3 text-sm">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-info-soft text-info">
+            <Landmark className="size-4" />
+          </span>
+          <ArrowRight className="size-4 shrink-0 text-subtle" />
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand">
+            <Wallet className="size-4" />
+          </span>
+          <p className="min-w-0 text-xs text-muted">
+            Cash taken <b className="text-fg">out of the bank into the till</b> — by ATM or transfer.
+          </p>
         </div>
 
-        {/* Category & Method */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
-              Category
-            </label>
-            <select
-              value={category}
-              onChange={(e) => setCategory(e.target.value)}
-              className="w-full bg-transparent text-gray-800 font-medium focus:outline-none cursor-pointer"
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
+        <EntrySection title="When and how much">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Day" error={errors.date}>
+              {({ invalid }) => <DatePicker value={date} onChange={setDate} max={today} invalid={invalid} />}
+            </Field>
+            <Field label="Amount taken out" error={errors.amount}>
+              {({ id, invalid }) => <MoneyInput id={id} currency={currency} value={amount} invalid={invalid} onValueChange={setAmount} />}
+            </Field>
           </div>
+        </EntrySection>
 
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
-              Method
-            </label>
-            <select
-              value={method}
-              onChange={(e) => setMethod(e.target.value)}
-              className="w-full bg-transparent text-gray-800 font-medium focus:outline-none cursor-pointer"
-            >
-              {METHODS.map((m) => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
+        <EntrySection title="What for and how">
+          <p className="mb-2 text-xs font-semibold text-muted">What the cash is for</p>
+          <div className="flex flex-wrap gap-2">
+            {CATEGORIES.map((c) => (
+              <Chip key={c} on={category === c} onClick={() => setCategory(c)}>
+                {c}
+              </Chip>
+            ))}
           </div>
-        </div>
-
-        {/* Reference & Notes */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-          <div className="grid grid-cols-1 gap-4">
-             <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
-                  Reference (Optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="Slip No, Transfer ID..."
-                  value={reference}
-                  onChange={(e) => setReference(e.target.value)}
-                  className="w-full border-b border-gray-200 pb-2 focus:border-mint-500 focus:outline-none text-sm"
-                />
-             </div>
-             <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-1">
-                  Notes
-                </label>
-                <textarea
-                  rows={2}
-                  placeholder="Additional details..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  className="w-full border-b border-gray-200 pb-2 focus:border-mint-500 focus:outline-none text-sm resize-none"
-                />
-             </div>
+          <p className="mb-2 mt-5 text-xs font-semibold text-muted">How it was taken out</p>
+          <div className="flex flex-wrap gap-2">
+            {METHODS.map((x) => (
+              <Chip key={x} on={method === x} onClick={() => setMethod(x)}>
+                {x}
+              </Chip>
+            ))}
           </div>
-        </div>
-
-        {/* Receipt Upload (Multiple) */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
-          <div className="flex justify-between items-center mb-3">
-            <label className="text-xs font-bold text-gray-500 uppercase tracking-wide">
-              Receipts <span className="text-red-500">*</span>
-            </label>
-            <span className="text-xs text-gray-400">{files.length} selected</span>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <Field label="Reference (optional)">
+              {({ id }) => <Input id={id} value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Slip or transfer number" />}
+            </Field>
+            <Field label="Note (optional)">
+              {({ id }) => <Textarea id={id} rows={1} className="min-h-10" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything worth remembering" />}
+            </Field>
           </div>
+        </EntrySection>
 
-          <label className="cursor-pointer flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-mint-200 rounded-lg hover:bg-mint-50 transition-colors">
-            <UploadIcon size="1em" className="text-mint-400 text-xl mb-1" />
-            <span className="text-sm text-gray-600 font-medium">Click to attach files</span>
-            <span className="text-xs text-gray-400">(PDF, JPG, PNG allowed)</span>
-            <input
-              type="file"
-              multiple // <--- Enable multiple files
-              accept="application/pdf,image/jpeg,image/png,image/jpg"
-              onChange={onFileChange}
-              className="hidden"
-            />
-          </label>
+        <EntrySection>
+          <ProofFiles
+            label="Slips and screenshots"
+            required
+            invalid={!!errors.files}
+            items={files}
+            onChange={setFiles}
+            progress={progress}
+            hint="ATM slip, bank app screenshot — add as many as you need."
+          />
+          {errors.files && <p className="mt-2 text-xs font-medium text-danger">{errors.files}</p>}
+        </EntrySection>
+      </EntryLayout>
 
-          {/* File List */}
-          {files.length > 0 && (
-            <div className="mt-4 space-y-2">
-              {files.map((file, idx) => (
-                <div key={idx} className="flex items-center justify-between bg-gray-50 p-2 rounded-md border border-gray-100">
-                  <div className="flex items-center gap-3 overflow-hidden">
-                    {getFileIcon(file.name)}
-                    <span className="text-sm text-gray-700 truncate">{file.name}</span>
-                    <span className="text-xs text-gray-400">({(file.size / 1024).toFixed(0)} KB)</span>
-                  </div>
-                  <button 
-                    onClick={() => removeFile(idx)}
-                    className="text-gray-400 hover:text-red-500 p-1 transition-colors"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Progress Bar (Only show when actually uploading) */}
-          {isUploading && (
-            <div className="mt-3">
-              <div className="flex justify-between text-xs text-mint-600 mb-1">
-                <span>Uploading files...</span>
-                <span>{uploadProgress.toFixed(0)}%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-1.5">
-                <div
-                  className="bg-mint-500 h-1.5 rounded-full transition-all duration-300"
-                  style={{ width: `${uploadProgress}%` }}
-                />
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Global Message */}
-        {msg.text && (
-            <div className={`p-3 rounded-lg flex items-center gap-2 text-sm ${msg.type === 'error' ? 'bg-red-50 text-red-600' : 'bg-green-50 text-green-600'}`}>
-                {msg.type === 'error' ? <CircleAlert size="1em" /> : <CircleCheck size="1em" />}
-                {msg.text}
-            </div>
-        )}
-
-        {/* Submit Button */}
-        <button
-          onClick={() => setShowConfirm(true)}
-          disabled={isSaving || isUploading || !companyId || !branchId}
-          className="w-full bg-gradient-to-r from-mint-500 to-mint-600 hover:from-mint-600 hover:to-mint-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3.5 rounded-xl font-bold text-lg shadow-md transition-all transform active:scale-[0.98] flex items-center justify-center gap-2"
-        >
-          {(isSaving || isUploading) ? (
-            <>
-              <LoaderCircle size="1em" className="animate-spin" />
-              <span>{isUploading ? "Uploading..." : "Saving..."}</span>
-            </>
-          ) : (
-            "Save Withdraw Entry"
-          )}
-        </button>
-
-      </div>
-
-      {/* --- Confirm Modal --- */}
-      {showConfirm && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm animate-in fade-in zoom-in duration-200">
-            <h2 className="text-lg font-bold mb-4 text-gray-800 text-center">Confirm Details</h2>
-
-            <div className="space-y-3 text-sm bg-gray-50 p-4 rounded-xl border border-gray-100">
-              <div className="flex justify-between border-b border-gray-200 pb-2">
-                <span className="text-gray-500">Amount</span>
-                <span className="font-bold text-lg text-red-600">{currency} {(Number(amount) || 0).toFixed(2)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Date</span>
-                <span className="font-medium">{date}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Category</span>
-                <span className="font-medium text-right">{category}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500">Method</span>
-                <span className="font-medium">{method}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                 <span className="text-gray-500">Attachments</span>
-                 <span className="text-xs bg-mint-100 text-mint-700 px-2 py-0.5 rounded-full font-bold">
-                    {files.length} Files
-                 </span>
-              </div>
-              {notes && (
-                <div className="pt-2 border-t border-gray-200">
-                  <span className="text-gray-500 block mb-1">Notes</span>
-                  <p className="text-gray-800 italic">{notes}</p>
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => setShowConfirm(false)}
-                className="flex-1 py-2.5 rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={isSaving || isUploading}
-                className="flex-1 py-2.5 rounded-xl bg-mint-500 hover:bg-mint-600 text-white font-bold transition-colors flex justify-center items-center gap-2"
-              >
-                 {(isSaving || isUploading) ? <LoaderCircle size="1em" className="animate-spin" /> : "Confirm"}
-              </button>
-            </div>
-          </div>
-        </div>
+      {viewing && (
+        <RecordSheet
+          onClose={() => setViewing(null)}
+          title={`Withdrawal · ${viewing.date ? format(parseISO(viewing.date), "EEEE, d MMMM yyyy") : ""}`}
+          branch={branchData?.name}
+          amount={viewing.amount}
+          amountLabel="Bank to till"
+          tone="bank"
+          money={money}
+          rows={[
+            { label: "For", value: viewing.category },
+            { label: "How", value: viewing.method },
+            { label: "Reference", value: viewing.reference },
+            { label: "Note", value: viewing.notes },
+          ]}
+          files={viewing.receiptUrls?.length ? viewing.receiptUrls : viewing.receiptUrl ? [viewing.receiptUrl] : []}
+          by={viewing.createdBy?.username || viewing.createdBy?.userName}
+          at={viewing.createdAt}
+          share={() => shareWithdrawal(viewing, branchData)}
+          pdf={() => exportWithdrawalToPDF(viewing, branchData)}
+          excel={() => exportWithdrawalToExcel(viewing, branchData)}
+        />
       )}
-    </div>
+    </>
   );
 }

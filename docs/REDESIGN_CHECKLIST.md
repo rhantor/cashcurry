@@ -13,8 +13,8 @@ computer, has its own loading look, and its old modals are redone too.
 ## 3.4.2 Entry screens
 - ✅ `/entry-data/sales-entry` Sales entry (+ the day's sales sheet, shared with the sales report)
 - ✅ `/entry-data/cost-entry` Cost entry (scanner inside is still the old look — 3.5)
-- ⬜ `/entry-data/deposit-entry` Cash deposit
-- ⬜ `/entry-data/cash-withdraw` Cash withdrawal
+- ✅ `/entry-data/deposit-entry` Cash deposit (+ its record sheet)
+- ✅ `/entry-data/cash-withdraw` Cash withdrawal (+ its record sheet)
 - ⬜ `/entry-data/advance-entry` Advance entry
 - ⬜ `/entry-data/salary-entry` Salary entry
 - ⬜ `/cash-tracker` Daily cash tracker
