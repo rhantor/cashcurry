@@ -377,7 +377,8 @@ export const sidebarItems = {
 const COMPANY_ROLES = ["owner", "gm", "superAdmin"];
 export const isCompanyRole = (role) => COMPANY_ROLES.includes(role);
 const SECTION_ORDER = ["Overview", "Daily work", "Reports", "Money", "Team", "Admin", "More"];
-const allowed = (item, role) => !role || !item.allowedRoles || item.allowedRoles.includes(role);
+// No role (signed out, or not known yet) → no menu at all, never every item.
+const allowed = (item, role) => !!role && (!item.allowedRoles || item.allowedRoles.includes(role));
 
 /** The sidebar for a role: [{ section, items }], children filtered too. */
 export function navFor(role) {
