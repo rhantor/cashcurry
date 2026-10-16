@@ -12,6 +12,7 @@ export { default as Switch } from "./Switch";
 export { default as Tabs } from "./Tabs";
 export { Dialog, Sheet } from "./Dialog";
 export { ToastProvider, useToast } from "./Toast";
+export { toast, confirmDialog, promptDialog } from "./notify";
 export { default as EmptyState } from "./EmptyState";
 export { default as Stagger } from "./Stagger";
 export { default as TopProgress, TopProgressBar } from "./TopProgress";

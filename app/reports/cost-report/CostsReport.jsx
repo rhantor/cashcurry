@@ -27,6 +27,7 @@ import CostCharts from "@/app/components/reports/costs/CostCharts";
 import EditCostModal from "@/app/components/reports/costs/EditCostModal";
 import AttachmentViewerModal from "@/app/components/reports/costs/AttachmentViewerModal";
 import useCurrency from "@/app/hooks/useCurrency";
+import { toast, confirmDialog } from "@/app/components/ui/notify";
 
 // Methods shown when paid from BACK office
 const BACK_METHODS = [
@@ -138,14 +139,14 @@ export default function CostsReport() {
   const [deleteCostEntry] = useDeleteCostEntryMutation();
 
   const handleDelete = async () => {
-    if (window.confirm("Are you sure you want to delete this cost entry?")) {
+    if (await confirmDialog({ title: "Delete this cost entry?", message: "This cannot be undone.", danger: true })) {
       try {
         await deleteCostEntry({ companyId, branchId, costId: selectedCost.id }).unwrap();
         setSelectedCost(null);
-        alert("Deleted successfully!");
+        toast.success("Deleted successfully!");
       } catch (err) {
         console.error(err);
-        alert("Failed to delete cost entry");
+        toast.error("Failed to delete cost entry");
       }
     }
   };

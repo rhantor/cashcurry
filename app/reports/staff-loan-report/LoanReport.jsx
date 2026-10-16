@@ -11,6 +11,7 @@ import LoanModal from './LoanModal'
 import LoanEditModal from './LoanEditModal'
 import LoanStaffSummaryModal from './LoanStaffSummaryModal'
 import useCurrency from '@/app/hooks/useCurrency'
+import { toast } from "@/app/components/ui/notify";
 
 /* ---------------------------
    Helpers
@@ -191,8 +192,8 @@ export default function LoanReport () {
             searchFields: ['staffName', 'reason']
           }}
           exportFunctions={{
-            exportPDF: () => alert('Loan PDF export - implement as needed'),
-            exportExcel: () => alert('Loan Excel export - implement as needed')
+            exportPDF: () => toast.info('Loan PDF export - implement as needed'),
+            exportExcel: () => toast.info('Loan Excel export - implement as needed')
           }}
           modalContentRenderer={(item, branchData, closeModal) => (
             <LoanModal
@@ -260,9 +261,9 @@ export default function LoanReport () {
           }}
           exportFunctions={{
             exportPDF: () =>
-              alert('Staff loan PDF export - implement as needed'),
+              toast.info('Staff loan PDF export - implement as needed'),
             exportExcel: () =>
-              alert('Staff loan Excel export - implement as needed')
+              toast.info('Staff loan Excel export - implement as needed')
           }}
           modalContentRenderer={(item, branchData, closeModal) => {
             setTimeout(() => setStaffModal(item), 0)

@@ -2,6 +2,7 @@ import { format, parseISO } from "date-fns";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { toast } from "@/app/components/ui/notify";
 
 // Fetch image → Base64 (same approach you used)
 const getBase64ImageFromUrl = async (url) => {
@@ -60,7 +61,7 @@ export const exportWithdrawalToExcel = (withdraw, branchData) => {
     XLSX.writeFile(wb, `withdrawal-${withdraw.date || "unknown"}.xlsx`);
   } catch (err) {
     console.error("Export failed:", err);
-    alert("Failed to export. Please try again.");
+    toast.error("Failed to export. Please try again.");
   }
 };
 
@@ -135,7 +136,7 @@ export const exportWithdrawalToPDF = async (withdraw, branchData) => {
     doc.save(`withdrawal-${withdraw.date || "unknown"}.pdf`);
   } catch (err) {
     console.error("Export failed:", err);
-    alert("Failed to export. Please try again.");
+    toast.error("Failed to export. Please try again.");
   }
 };
 
@@ -223,7 +224,7 @@ export const shareWithdrawal = async (withdraw, branchData) => {
     } else {
       const link = `${window.location.origin}/cash-withdraw/${withdraw.id}`;
       await navigator.clipboard.writeText(link);
-      alert("Link copied to clipboard ✅");
+      toast.success("Link copied to clipboard ✅");
     }
   } catch (err) {
     console.error("Withdrawal share failed:", err);
@@ -243,7 +244,7 @@ export const exportWithdrawalsToExcel = (
   selectedMonth = ""
 ) => {
   try {
-    if (!withdrawals.length) return alert("No withdrawal data to export!");
+    if (!withdrawals.length) return toast.warning("No withdrawal data to export!");
     const branchName = branchData?.name || "N/A";
 
     let filterText = "All Data";
@@ -342,7 +343,7 @@ export const exportWithdrawalsToExcel = (
     XLSX.writeFile(wb, `withdrawal-report_${fileFilterName}.xlsx`);
   } catch (err) {
     console.error("Export failed:", err);
-    alert("Failed to export. Please try again.");
+    toast.error("Failed to export. Please try again.");
   }
 };
 
@@ -354,7 +355,7 @@ export const exportWithdrawalsToPDF = (
   selectedMonth = ""
 ) => {
   try {
-    if (!withdrawals.length) return alert("No withdrawal data to export!");
+    if (!withdrawals.length) return toast.warning("No withdrawal data to export!");
     const branchName = branchData?.name || "N/A";
     const doc = new jsPDF("landscape");
 
@@ -474,6 +475,6 @@ export const exportWithdrawalsToPDF = (
     doc.save(`withdrawal-report_${fileFilterName}.pdf`);
   } catch (err) {
     console.error("Export failed:", err);
-    alert("Failed to export. Please try again.");
+    toast.error("Failed to export. Please try again.");
   }
 };

@@ -30,6 +30,7 @@ import { startOfMonth, endOfMonth, addDays, subDays, format } from 'date-fns'
 import { skipToken } from '@reduxjs/toolkit/query'
 import PayrollPrintView from './components/PayrollPrintView'
 import { getSessionUser } from '@/lib/session'
+import { confirmDialog } from "@/app/components/ui/notify";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -686,10 +687,11 @@ export default function PayrollBuilder () {
     })
     if (
       hasExisting &&
-      !confirm(
-        'Import will replace Hours/Days Worked and OT for this month from attendance punches. ' +
-        'Bonuses, penalties, allowances and notes are kept. Continue?'
-      )
+      !(await confirmDialog({
+        title: 'Replace hours from attendance?',
+        message: 'Hours/Days Worked and OT for this month are replaced from the attendance punches. Bonuses, penalties, allowances and notes are kept.',
+        confirmLabel: 'Import',
+      }))
     ) return
 
     setBusy(true); setError('')
@@ -814,7 +816,12 @@ export default function PayrollBuilder () {
 
   async function handleRevert () {
     if (!runId) return
-    if (!confirm('Are you sure you want to revert this payroll to draft? This will undo the finalize step and restore any deducted loan/advance installments back to pending.')) return
+    if (!(await confirmDialog({
+      title: 'Revert this payroll to draft?',
+      message: 'This undoes the finalize step and puts any deducted loan and advance instalments back to pending.',
+      danger: true,
+      confirmLabel: 'Revert',
+    }))) return
     setBusy(true); setError('')
     try {
       await revert({ companyId, branchId, runId, user: currentUser }).unwrap()
@@ -848,7 +855,7 @@ export default function PayrollBuilder () {
 
   async function handleDelete () {
     if (!runId || locked) return
-    if (!confirm('Delete this draft payroll run?')) return
+    if (!(await confirmDialog({ title: 'Delete this draft payroll run?', message: 'Nothing has been paid from it; the draft and its slips are removed.', danger: true }))) return
     setBusy(true)
     try {
       await deleteDraft({ companyId, branchId, runId, user: currentUser }).unwrap()

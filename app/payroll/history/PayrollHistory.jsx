@@ -15,6 +15,7 @@ import { useGetSingleBranchQuery } from '@/lib/redux/api/branchApiSlice'
 import { useGetStaffListQuery } from '@/lib/redux/api/staffApiSlice'
 import PayrollPrintView from '../components/PayrollPrintView'
 import { getSessionUser } from '@/lib/session'
+import { toast, confirmDialog } from "@/app/components/ui/notify";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -117,12 +118,12 @@ function RunRow ({ run, companyId, branchId, isAdminOrManager, setPrintTarget })
   const [deleting, setDeleting] = useState(false)
 
   async function handleDelete () {
-    if (!confirm('Delete this draft run?')) return
+    if (!(await confirmDialog({ title: 'Delete this draft payroll run?', message: 'Nothing has been paid from it; the draft and its slips are removed.', danger: true }))) return
     setDeleting(true)
     try {
       await deleteDraft({ companyId, branchId, runId: run.id }).unwrap()
     } catch (e) {
-      alert(e.message || 'Delete failed')
+      toast.error(e.message || 'Delete failed')
     } finally {
       setDeleting(false)
     }

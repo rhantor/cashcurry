@@ -7,6 +7,7 @@ import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { FileText, Clock, CheckCircle, XCircle } from "lucide-react";
 import useSession from "@/app/hooks/useSession";
+import { toast } from "@/app/components/ui/notify";
 
 export default function RequestsPage() {
   // Live session: the profile refresh after login fills in staffId.
@@ -41,8 +42,8 @@ export default function RequestsPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!user || !staffDocId) return alert("Still loading your profile...");
-    if (!form.amount || !form.reason) return alert("Fill all fields");
+    if (!user || !staffDocId) return toast.info("Still loading your profile...");
+    if (!form.amount || !form.reason) return toast.warning("Fill all fields");
 
     const reqTypeStr = form.advanceType === "personal" ? "Salary Advance" : form.advanceType === "medical" ? "Medical Leave" : "Annual Leave";
     const title = `New ${reqTypeStr} Request`;
@@ -77,9 +78,9 @@ export default function RequestsPage() {
       }).unwrap();
       
       setForm({ amount: "", reason: "", advanceType: "personal" });
-      alert("Request submitted successfully!");
+      toast.success("Request submitted successfully!");
     } catch(err) {
-      alert("Error submitting request: " + err.message);
+      toast.error("Error submitting request: " + err.message);
     }
   };
 

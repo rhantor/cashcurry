@@ -5,6 +5,7 @@ import { storage } from "@/lib/firebase";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import useCurrency from "@/app/hooks/useCurrency";
 import { X, LoaderCircle, SaveIcon, Upload, FileText, Trash2, Eye } from "lucide-react";
+import { toast, confirmDialog } from "@/app/components/ui/notify";
 
 const PAID_METHODS = [
   { value: "cash", label: "Cash" },
@@ -129,18 +130,18 @@ export default function EditSalaryModal({ item, onClose, companyId, branchId }) 
     } catch (error) {
       console.error("Failed to update salary:", error);
       setIsUploading(false);
-      alert(error?.message || "Failed to update. Please try again.");
+      toast.error(error?.message || "Failed to update. Please try again.");
     }
   };
 
   const handleDelete = async () => {
-    if (window.confirm("Are you sure you want to delete this salary entry? This action cannot be undone.")) {
+    if (await confirmDialog({ title: "Delete this salary entry?", message: "This cannot be undone.", danger: true })) {
       try {
         await deleteSalaryEntry({ companyId, branchId, salaryId: item.id, user: getSessionUser() }).unwrap();
         onClose();
       } catch (error) {
         console.error("Failed to delete salary:", error);
-        alert("Failed to delete. Please try again.");
+        toast.error("Failed to delete. Please try again.");
       }
     }
   };

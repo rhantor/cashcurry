@@ -5,6 +5,7 @@
 import { format, parseISO } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { toast } from "@/app/components/ui/notify";
 
 // xlsx-js-style is a drop-in fork of SheetJS that actually writes cell styles
 // (fills, borders, fonts, number formats); the plain `xlsx` writer drops them.
@@ -149,7 +150,7 @@ const xlBorder = (isDivider) => ({
 
 export const exportStatementToExcel = async (statementRows, totals, cols, meta = {}) => {
   try {
-    if (!statementRows?.length) return alert("No data to export.");
+    if (!statementRows?.length) return toast.warning("No data to export.");
 
     const XLSX = await loadXLSX();
     const { headers, bands } = buildHeaders(cols);
@@ -315,7 +316,7 @@ export const exportStatementToExcel = async (statementRows, totals, cols, meta =
     );
   } catch (err) {
     console.error("Statement Excel export failed:", err);
-    alert("Failed to export Excel. Please try again.");
+    toast.error("Failed to export Excel. Please try again.");
   }
 };
 
@@ -329,7 +330,7 @@ const BAND_FILL = {
 
 export const exportStatementToPDF = (statementRows, totals, cols, meta = {}) => {
   try {
-    if (!statementRows?.length) return alert("No data to export.");
+    if (!statementRows?.length) return toast.warning("No data to export.");
 
     const { headers, bands } = buildHeaders(cols);
     const period = meta.period || "";
@@ -446,7 +447,7 @@ export const exportStatementToPDF = (statementRows, totals, cols, meta = {}) => 
     doc.save(`${safeFilePart(meta.branchName)}_statement_${safeFilePart(period)}.pdf`);
   } catch (err) {
     console.error("Statement PDF export failed:", err);
-    alert("Failed to export PDF. Please try again.");
+    toast.error("Failed to export PDF. Please try again.");
   }
 };
 

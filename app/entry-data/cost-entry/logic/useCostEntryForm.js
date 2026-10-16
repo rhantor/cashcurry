@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import imageCompression from 'browser-image-compression'
 import { useDefaultDate } from '@/app/hooks/useRegion'
 import { getSessionUser } from '@/lib/session'
+import { toast } from "@/app/components/ui/notify";
 
 export function useCostEntryForm () {
   const [date, setDate] = useDefaultDate() // today on the branch's clock
@@ -125,7 +126,7 @@ export function useCostEntryForm () {
       setFile(processed)
     } catch (err) {
       console.error('File processing error:', err)
-      alert('❌ Failed to process file. Try again.')
+      toast.error('Failed to process file. Try again.')
     }
   }
 

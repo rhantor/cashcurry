@@ -9,6 +9,7 @@ import {
   handleShareImage as shareImage,
 } from "@/utils/export/exportData";
 import useCurrency from "@/app/hooks/useCurrency";
+import { toast } from "@/app/components/ui/notify";
 
 const DEFAULT_TENDERS = [
   { key: "cash", label: "Cash", enabled: true, includeInTotal: true, order: 1 },
@@ -84,7 +85,7 @@ export default function ItemsReportModal({
         setFallbackImage(dataUrl);
       }
     } catch (err) {
-      alert(`Share image error: ${err.message || err}`);
+      toast.error(`Share image error: ${err.message || err}`);
     }
     setSharingLabel("Share as Image");
   };

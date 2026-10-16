@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
+import { toast } from "@/app/components/ui/notify";
 
 /* ----------------------------- Helpers ----------------------------- */
 
@@ -120,7 +121,7 @@ export const exportCostToExcel = (cost, branchData) => {
   XLSX.writeFile(wb, `cost-${fmtDate(cost.date, "yyyy-MM-dd")}.xlsx`);
   } catch (err) {
     console.error("Excel export failed:", err);
-    alert("Failed to export Excel file. Please try again.");
+    toast.error("Failed to export Excel file. Please try again.");
   }
 };
 
@@ -216,7 +217,7 @@ export const exportCostToPDF = async (cost, branchData) => {
   doc.save(`cost-${fmtDate(cost.date, "yyyy-MM-dd")}.pdf`);
   } catch (err) {
     console.error("PDF export failed:", err);
-    alert("Failed to generate PDF. Please try again.");
+    toast.error("Failed to generate PDF. Please try again.");
   }
 };
 
@@ -321,7 +322,7 @@ export const handleCostShare = async (cost, branchData) => {
   } else {
     const link = `${window.location.origin}/cost/${cost.id}`;
     await navigator.clipboard.writeText(link);
-    alert("Link copied to clipboard ✅ (paste it into WhatsApp/Email)");
+    toast.success("Link copied to clipboard ✅ (paste it into WhatsApp/Email)");
   }
 };
 
@@ -336,7 +337,7 @@ export const exportCostsToExcel = (
   searchDesc
 ) => {
   try {
-  if (!costs?.length) return alert("No data to export!");
+  if (!costs?.length) return toast.warning("No data to export!");
 
   const branchName = Array.isArray(branchData)
     ? branchData
@@ -460,7 +461,7 @@ export const exportCostsToExcel = (
   XLSX.writeFile(wb, `costs-report_${fileFilterName}.xlsx`);
   } catch (err) {
     console.error("Excel export failed:", err);
-    alert("Failed to export Excel file. Please try again.");
+    toast.error("Failed to export Excel file. Please try again.");
   }
 };
 /* ------------------------------ Bulk: PDF (A4 Landscape + KPIs) ------------------------------ */
@@ -478,7 +479,7 @@ export const exportCostsToPDF = (
   searchDesc
 ) => {
   try {
-  if (!costs?.length) return alert("No data to export!");
+  if (!costs?.length) return toast.warning("No data to export!");
 
   /* ---------- Tiny safe helpers ---------- */
   const num = (v) => {
@@ -894,6 +895,6 @@ export const exportCostsToPDF = (
   doc.save(`costs-report_${fileFilterName}.pdf`);
   } catch (err) {
     console.error("PDF export failed:", err);
-    alert("Failed to generate PDF. Please try again.");
+    toast.error("Failed to generate PDF. Please try again.");
   }
 };

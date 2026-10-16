@@ -14,6 +14,7 @@ import BranchForm from "./BranchForm";
 import BranchList from "./BranchList";
 import { getSessionUser } from "@/lib/session";
 import AssignBranchUserForm from "./BranchUserForm";
+import { toast } from "@/app/components/ui/notify";
 
 export default function BranchManagement() {
   const user = getSessionUser();
@@ -200,7 +201,7 @@ export default function BranchManagement() {
         password: "",
       });
     } catch (err) {
-      alert(err?.error || err?.message || "Failed to assign user");
+      toast.error(err?.error || err?.message || "Failed to assign user");
     }
   };
 

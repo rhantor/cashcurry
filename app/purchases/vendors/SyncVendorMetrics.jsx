@@ -3,14 +3,15 @@ import React, { useState } from "react";
 import { db } from "@/lib/firebase";
 import { collection, getDocs, writeBatch } from "firebase/firestore";
 import Button from "@/app/components/common/Button";
+import { toast, confirmDialog } from "@/app/components/ui/notify";
 
 export default function SyncVendorMetrics({ companyId }) {
   const [syncing, setSyncing] = useState(false);
   const [lines, setLines] = useState([]);
 
   const handleSync = async () => {
-    if (!companyId) return alert("Missing company ID");
-    if (!confirm("Run vendor metrics sync builder? This will parse all bills/payments.")) return;
+    if (!companyId) return toast.warning("Missing company ID");
+    if (!(await confirmDialog({ title: "Rebuild vendor totals?", message: "This reads every bill and payment to recount each vendor's totals.", confirmLabel: "Rebuild" }))) return;
 
     setSyncing(true);
     setLines(["Starting synchronization..."]);

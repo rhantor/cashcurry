@@ -1,6 +1,7 @@
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { toast } from "@/app/components/ui/notify";
 
 /* ─── helpers ─── */
 const fmtAmt = (v) =>
@@ -99,7 +100,7 @@ export const exportLoanSummaryToExcel = ({ visible, nameOf, currency, companyNam
     XLSX.writeFile(wb, `loan_summary_${Date.now()}.xlsx`);
   } catch (err) {
     console.error("Loan summary Excel export failed:", err);
-    alert("Export failed. Please try again.");
+    toast.error("Export failed. Please try again.");
   }
 };
 
@@ -257,6 +258,6 @@ export const exportLoanSummaryToPDF = ({ visible, nameOf, currency, companyName,
     doc.save(`loan_summary_${Date.now()}.pdf`);
   } catch (err) {
     console.error("Loan summary PDF export failed:", err);
-    alert("Export failed. Please try again.");
+    toast.error("Export failed. Please try again.");
   }
 };

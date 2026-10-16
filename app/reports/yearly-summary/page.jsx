@@ -17,6 +17,7 @@ import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/utils/formatMoney";
 import { mkFmt, mkCompact } from "@/utils/dashboard/utils";
 import { useSummaryReportLogic } from "@/hook/useSummaryReportLogic";
+import { toast } from "@/app/components/ui/notify";
 
 // A month's total outflow, mirroring the monthly statement's definition of
 // expenses: cost entries (front + back), salaries, advances/staff loans, and
@@ -376,7 +377,7 @@ export default function YearlySummaryPage() {
       );
     } catch (err) {
       console.error(err);
-      alert("Failed to export Excel.");
+      toast.error("Failed to export Excel.");
     }
   };
 

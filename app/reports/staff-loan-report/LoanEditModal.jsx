@@ -3,6 +3,7 @@ import { useUpdateStaffLoanMutation, useDeleteStaffLoanMutation } from '@/lib/re
 import { getSessionUser } from '@/lib/session'
 import React, { useState, useMemo } from 'react'
 import useCurrency from '@/app/hooks/useCurrency'
+import { toast, confirmDialog } from "@/app/components/ui/notify";
 
 const LOAN_DURATIONS = [3, 6, 9, 12, 18, 24]
 
@@ -128,19 +129,19 @@ export default function LoanEditModal ({
       onClose()
     } catch (err) {
       console.error('Failed to update loan:', err)
-      alert('Failed to update loan. Please try again.')
+      toast.error('Failed to update loan. Please try again.')
     }
   }
 
   const handleDelete = async () => {
-    if (window.confirm('Are you sure you want to delete this loan entry? This action cannot be undone.')) {
+    if (await confirmDialog({ title: 'Delete this loan entry?', message: 'This cannot be undone.', danger: true })) {
       try {
         await deleteLoan({ companyId, branchId, id: item.id, user: getSessionUser() }).unwrap()
         onSuccess?.()
         onClose()
       } catch (err) {
         console.error('Failed to delete loan:', err)
-        alert('Failed to delete loan. Please try again.')
+        toast.error('Failed to delete loan. Please try again.')
       }
     }
   }

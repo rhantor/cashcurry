@@ -19,6 +19,7 @@ import {
 import Link from "next/link";
 import useCurrency from "@/app/hooks/useCurrency";
 import { getSessionUser } from "@/lib/session";
+import { toast } from "@/app/components/ui/notify";
 
 export default function DepositEntryPage() {
   const currency = useCurrency();
@@ -132,7 +133,7 @@ export default function DepositEntryPage() {
       setReceipt(null);
       setReceiptPreview(null);
       setUploadProgress(0);
-      alert("✅ Deposit entry saved successfully!");
+      toast.success("Deposit entry saved successfully!");
     } catch (err) {
       console.error("Save failed:", err);
       setError("❌ Failed to save deposit entry. Please try again.");

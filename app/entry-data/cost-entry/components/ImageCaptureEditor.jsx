@@ -5,6 +5,7 @@ import PropTypes from 'prop-types'
 import imageCompression from 'browser-image-compression'
 import { jsPDF } from 'jspdf'
 import { Camera, ImageIcon, Trash2, Pencil, CropIcon, FileText, Check } from "lucide-react";
+import { toast } from "@/app/components/ui/notify";
 
 export default function ImageCaptureEditor ({ onFilesReady }) {
   const [capturedImages, setCapturedImages] = useState([])
@@ -290,7 +291,7 @@ export default function ImageCaptureEditor ({ onFilesReady }) {
   // Convert images to PDF
   const convertToPDF = async () => {
     if (capturedImages.length === 0) {
-      alert('❌ No images to convert')
+      toast.warning('No images to convert')
       return
     }
 
@@ -336,10 +337,10 @@ export default function ImageCaptureEditor ({ onFilesReady }) {
       })
 
       onFilesReady?.([pdfFile])
-      alert('✅ PDF created successfully!')
+      toast.success('PDF created successfully!')
     } catch (error) {
       console.error('PDF conversion error:', error)
-      alert('❌ Failed to create PDF')
+      toast.error('Failed to create PDF')
     }
   }
 
@@ -353,13 +354,13 @@ export default function ImageCaptureEditor ({ onFilesReady }) {
 
   const saveIndividualImages = async () => {
     if (capturedImages.length === 0) {
-      alert('❌ No images to save')
+      toast.warning('No images to save')
       return
     }
 
     const files = capturedImages.map(img => img.file)
     onFilesReady?.(files)
-    alert(`✅ ${files.length} image(s) ready for upload!`)
+    toast.info(`${files.length} image(s) ready for upload!`)
   }
 
   // Mouse event listeners for crop

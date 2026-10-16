@@ -5,6 +5,7 @@ import autoTable from "jspdf-autotable";
 import { Download } from "lucide-react";
 import { useLazyGetVendorBillsQuery } from "@/lib/redux/api/vendorBillsApiSlice";
 import useCurrency from "@/app/hooks/useCurrency";
+import { toast } from "@/app/components/ui/notify";
 
 function formatDate(iso) {
   if (!iso) return "-";
@@ -124,7 +125,7 @@ export default function ExportVendorOverviewBtn({ companyId, branchId, vendor })
 
     } catch (e) {
       console.error(e);
-      alert("Failed to export vendor details.");
+      toast.error("Failed to export vendor details.");
     } finally {
       setIsExporting(false);
     }

@@ -35,6 +35,7 @@ import AddCompanyUserModal from "./modals/AddCompanyUserModal"; // <-- NEW
 import { canManageAllBranches } from "@/utils/roles";
 import { sanitizeUpdates, normalizeRole } from "@/utils/sanitize";
 import { getSessionUser } from "@/lib/session";
+import { toast, confirmDialog } from "@/app/components/ui/notify";
 
 export default function UserManagement() {
   // state for add modals
@@ -129,18 +130,18 @@ export default function UserManagement() {
       closeEditCompanyUser();
     } catch (e) {
       console.error(e);
-      alert("Failed to save company user.");
+      toast.error("Failed to save company user.");
     }
   };
 
   const handleDeleteCompanyUser = async (u) => {
-    if (normalizeRole(u.role) === "owner") return alert("Cannot delete owner.");
-    if (!confirm(`Delete company user "${u.userName}"?`)) return;
+    if (normalizeRole(u.role) === "owner") return toast.warning("Cannot delete owner.");
+    if (!(await confirmDialog({ title: `Delete ${u.userName}?`, message: "This company user will no longer be able to sign in.", danger: true }))) return;
     try {
       await deleteCompanyUser({ companyId, uid: u.id }).unwrap();
     } catch (e) {
       console.error(e);
-      alert("Failed to delete user.");
+      toast.error("Failed to delete user.");
     }
   };
 
@@ -207,17 +208,17 @@ export default function UserManagement() {
       closeEditAdmin();
     } catch (e) {
       console.error(e);
-      alert("Failed to save branch admin.");
+      toast.error("Failed to save branch admin.");
     }
   };
 
   const handleDeleteAdmin = async (branchId, a) => {
-    if (!confirm(`Delete admin "${a.name || a.username || a.id}"?`)) return;
+    if (!(await confirmDialog({ title: `Delete ${a.name || a.username || a.id}?`, message: "This branch admin will no longer be able to sign in.", danger: true }))) return;
     try {
       await deleteAdmin({ companyId, branchId, adminId: a.id }).unwrap();
     } catch (e) {
       console.error(e);
-      alert("Failed to delete admin.");
+      toast.error("Failed to delete admin.");
     }
   };
 
@@ -249,12 +250,12 @@ export default function UserManagement() {
       closeEditBranchUser();
     } catch (e) {
       console.error(e);
-      alert("Failed to save branch user.");
+      toast.error("Failed to save branch user.");
     }
   };
 
   const handleDeleteBranchUser = async (branchId, u) => {
-    if (!confirm(`Delete user "${u.fullName || u.userName || u.id}"?`)) return;
+    if (!(await confirmDialog({ title: `Delete ${u.fullName || u.userName || u.id}?`, message: "This user will no longer be able to sign in.", danger: true }))) return;
     try {
       await deleteBranchUser({
         companyId,
@@ -264,7 +265,7 @@ export default function UserManagement() {
       }).unwrap();
     } catch (e) {
       console.error(e);
-      alert("Failed to delete user.");
+      toast.error("Failed to delete user.");
     }
   };
 

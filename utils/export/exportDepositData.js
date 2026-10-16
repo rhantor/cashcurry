@@ -2,6 +2,7 @@ import { format, parseISO } from "date-fns";
 import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { toast } from "@/app/components/ui/notify";
 
 // 🔹 Helper: Fetch image and convert to Base64
 const getBase64ImageFromUrl = async (url) => {
@@ -45,7 +46,7 @@ export const exportDepositToExcel = (deposit, branchData) => {
     XLSX.writeFile(wb, `deposit-${deposit.date}.xlsx`);
   } catch (err) {
     console.error("Export failed:", err);
-    alert("Failed to export. Please try again.");
+    toast.error("Failed to export. Please try again.");
   }
 };
 
@@ -120,7 +121,7 @@ export const exportDepositToPDF = async (deposit, branchData) => {
     doc.save(`deposit-${deposit.date}.pdf`);
   } catch (err) {
     console.error("Export failed:", err);
-    alert("Failed to export. Please try again.");
+    toast.error("Failed to export. Please try again.");
   }
 };
 
@@ -206,7 +207,7 @@ export const shareDeposit = async (deposit, branchData) => {
     } else {
       const link = `${window.location.origin}/deposits/${deposit.id}`;
       await navigator.clipboard.writeText(link);
-      alert("Link copied to clipboard ✅");
+      toast.success("Link copied to clipboard ✅");
     }
   } catch (err) {
     console.error("Deposit share failed:", err);
@@ -221,7 +222,7 @@ export const exportDepositsToExcel = (
   selectedMonth = ""
 ) => {
   try {
-    if (!deposits.length) return alert("No deposit data to export!");
+    if (!deposits.length) return toast.warning("No deposit data to export!");
 
     const branchName = branchData?.name || "N/A";
 
@@ -318,7 +319,7 @@ export const exportDepositsToExcel = (
     XLSX.writeFile(wb, `deposit-report_${fileFilterName}.xlsx`);
   } catch (err) {
     console.error("Export failed:", err);
-    alert("Failed to export. Please try again.");
+    toast.error("Failed to export. Please try again.");
   }
 };
 //
@@ -330,7 +331,7 @@ export const exportDepositsToPDF = (
   selectedMonth = ""
 ) => {
   try {
-    if (!deposits.length) return alert("No deposit data to export!");
+    if (!deposits.length) return toast.warning("No deposit data to export!");
 
     const branchName = branchData?.name || "N/A";
     const doc = new jsPDF("landscape");
@@ -449,6 +450,6 @@ export const exportDepositsToPDF = (
     doc.save(`deposit-report_${fileFilterName}.pdf`);
   } catch (err) {
     console.error("Export failed:", err);
-    alert("Failed to export. Please try again.");
+    toast.error("Failed to export. Please try again.");
   }
 };

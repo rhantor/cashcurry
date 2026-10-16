@@ -19,6 +19,7 @@ import Settings from "./Settings";
 import UserModal from "./UserModal";
 import AddBranchUserModal from "@/app/components/settings/users/modals/AddBranchUserModal";
 import { LoaderCircle } from "lucide-react";
+import { confirmDialog } from "@/app/components/ui/notify";
 
 const BranchDetailsPage = () => {
   const user = getSessionUser();
@@ -156,7 +157,7 @@ const BranchDetailsPage = () => {
   };
 
   const handleDeleteAdmin = async (adminId) => {
-    if (!window.confirm("Are you sure you want to remove this admin?")) return;
+    if (!(await confirmDialog({ title: "Remove this admin?", message: "They lose access to this branch.", danger: true, confirmLabel: "Remove" }))) return;
     try {
       await deleteAdmin({
         companyId: user?.companyId,
@@ -169,7 +170,7 @@ const BranchDetailsPage = () => {
   };
 
   const handleDeleteUser = async (userId) => {
-    if (!window.confirm("Are you sure you want to remove this user?")) return;
+    if (!(await confirmDialog({ title: "Remove this user?", message: "They lose access to this branch.", danger: true, confirmLabel: "Remove" }))) return;
     try {
       await deleteBranchUser({
         companyId: user?.companyId,

@@ -7,6 +7,7 @@ import ReportPreferences from "@/app/components/settings/ReportPreferences";
 import LogoUploader from "@/app/components/settings/LogoUploader";
 import NotificationsSettings from "@/app/components/settings/NotificationSettings";
 import AccessControl from "@/app/components/settings/AccessControl";
+import { toast } from "@/app/components/ui/notify";
 
 export default function Settings() {
   const [company, setCompany] = useState({
@@ -30,7 +31,7 @@ export default function Settings() {
 
   const handleSave = () => {
     console.log({ company, reportPrefs, exportOpts });
-    alert("✅ Settings saved (later connect to Firestore)");
+    toast.success("Settings saved (later connect to Firestore)");
   };
 
   return (

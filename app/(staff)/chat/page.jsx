@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { useGetChatMessagesQuery, useSendMessageMutation } from "@/lib/redux/api/chatApiSlice";
 import { Send, Hash, MessageCircle } from "lucide-react";
 import { getSessionUser } from "@/lib/session";
+import { toast } from "@/app/components/ui/notify";
 
 export default function StaffChatPage() {
   const [user, setUser] = useState(null);
@@ -45,7 +46,7 @@ export default function StaffChatPage() {
         text: content
       }).unwrap();
     } catch(err) {
-      alert("Failed to send message: " + err.message);
+      toast.error("Failed to send message: " + err.message);
       setText(content); // revert
     }
   };

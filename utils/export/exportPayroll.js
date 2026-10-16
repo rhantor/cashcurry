@@ -7,6 +7,7 @@ import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import * as XLSX from 'xlsx'
 import { fmtAmt, periodLabel } from '@/utils/payrollCalculations'
+import { toast } from "@/app/components/ui/notify";
 
 const RM = v => `RM ${fmtAmt(v || 0)}`
 const n2 = v => Number(v || 0).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -329,7 +330,7 @@ export function exportPayrollToPDF (slips = [], branchName = '', period = '', ru
     doc.save(`Payroll_${branchName}_${period}.pdf`)
   } catch (err) {
     console.error('Payroll PDF export failed:', err)
-    alert('PDF export failed. Please try again.')
+    toast.error('PDF export failed. Please try again.')
   }
 }
 
@@ -342,12 +343,12 @@ export function exportPayslipToPDF (slip, branchName = '', period = '', companyN
     doc.save(`Payslip_${slip.staffName?.replace(/\s+/g,'_') || 'staff'}_${period}.pdf`)
   } catch (err) {
     console.error('Payslip PDF export failed:', err)
-    alert('PDF export failed. Please try again.')
+    toast.error('PDF export failed. Please try again.')
   }
 }
 
 export function exportAllPayslipsToPDF (slips = [], branchName = '', period = '', companyName = '', twoPerPage = false) {
-  if (!slips.length) return alert('No payslips to export')
+  if (!slips.length) return toast.warning('No payslips to export')
   try {
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
 
@@ -371,7 +372,7 @@ export function exportAllPayslipsToPDF (slips = [], branchName = '', period = ''
     doc.save(`All_Payslips_${branchName.replace(/\s+/g,'_')}_${period}.pdf`)
   } catch (err) {
     console.error('All Payslips PDF export failed:', err)
-    alert('PDF export failed. Please try again.')
+    toast.error('PDF export failed. Please try again.')
   }
 }
 
@@ -891,6 +892,6 @@ export function exportPayrollToExcel (slips = [], branchName = '', period = '', 
     XLSX.writeFile(wb, `Payroll_${branchName}_${period}.xlsx`)
   } catch (err) {
     console.error('Payroll Excel export failed:', err)
-    alert('Excel export failed. Please try again.')
+    toast.error('Excel export failed. Please try again.')
   }
 }

@@ -5,6 +5,7 @@ import { AlertTriangle, CheckCircle2, Info, X, XCircle } from "lucide-react";
 import { cn } from "./cn";
 import { spring } from "./motion";
 import { Spinner } from "./Spinner";
+import { registerToasts } from "./notify";
 
 const ToastContext = createContext(null);
 
@@ -17,7 +18,8 @@ const TONES = {
 };
 
 /**
- * Toasts — the replacement for alert(). Wrap the app in <ToastProvider>, then:
+ * Toasts — the replacement for alert(). Inside React: useToast(); anywhere
+ * else: `toast` from ./notify. Wrap the app in <ToastProvider>, then:
  *   const toast = useToast();
  *   toast.success("Sale saved");
  *   toast.error("Could not save", { description: err.message });
@@ -59,6 +61,9 @@ export function ToastProvider({ children }) {
     };
     return t;
   }, [show, dismiss]);
+
+  // Make toast.success(…) from ./notify reach this list (code outside React too).
+  useEffect(() => registerToasts(api), [api]);
 
   return (
     <ToastContext.Provider value={api}>

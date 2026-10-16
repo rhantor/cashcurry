@@ -10,6 +10,7 @@ import { useUpdateSalesEntryMutation } from "@/lib/redux/api/salesApiSlice";
 import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
 import { hasRole, ALLOWED_EDIT_ROLES } from "@/lib/authz/roles";
 import { getSessionUser } from "@/lib/session";
+import { toast } from "@/app/components/ui/notify";
 
 // Fallback tenders if no settings found
 const DEFAULT_TENDERS = [
@@ -170,7 +171,7 @@ export default function SalesEditModal({
         });
       }
       if (working.size > HARD_LIMIT_MB * 1024 * 1024) {
-        alert(
+        toast.warning(
           `Image is too large (${(working.size / 1024 / 1024).toFixed(
             2
           )} MB). Max is ${HARD_LIMIT_MB} MB.`
@@ -182,7 +183,7 @@ export default function SalesEditModal({
       setUploadProgress(0);
     } catch (err) {
       console.error("compression failed", err);
-      alert("Failed to process image. Try another file.");
+      toast.error("Failed to process image. Try another file.");
     }
   };
 
@@ -256,11 +257,11 @@ export default function SalesEditModal({
 
   const onSave = async () => {
     if (!canEdit) {
-      alert("You don't have permission to edit.");
+      toast.warning("You don't have permission to edit.");
       return;
     }
     if (proofRequired && !(zReportFile || zReportUrl)) {
-      alert("Proof required. Please attach a Z Report image.");
+      toast.warning("Proof required. Please attach a Z Report image.");
       return;
     }
 
@@ -291,7 +292,7 @@ export default function SalesEditModal({
       onClose?.();
     } catch (err) {
       console.error("Update failed", err);
-      alert("❌ Failed to update. Please try again.");
+      toast.error("Failed to update. Please try again.");
     }
   };
 

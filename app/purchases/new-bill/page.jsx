@@ -14,6 +14,7 @@ import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
 import { uploadInvoiceFile } from "@/utils/storage/uploadInvoice";
 // payVendorBills not needed here — payment happens via Due Bills page
 import useCurrency from "@/app/hooks/useCurrency";
+import { toast } from "@/app/components/ui/notify";
 
 /* ----------------------- tiny helpers ----------------------- */
 const todayISO = () => {
@@ -227,7 +228,7 @@ export default function NewBillPage() {
     const err = validate();
     if (err) {
       setErrText(err);
-      alert(err);
+      toast.error(err);
       return;
     }
 
@@ -283,11 +284,11 @@ export default function NewBillPage() {
       // 4) Clear
       resetForm();
       lastSubmitHashRef.current = "";
-      alert("✅ Bill saved successfully!");
+      toast.success("Bill saved successfully!");
     } catch (e) {
       console.error(e);
       setErrText(e?.data?.message || e?.message || "Failed to save bill.");
-      alert("❌ Failed to save bill.");
+      toast.error("Failed to save bill.");
       lastSubmitHashRef.current = "";
     } finally {
       setSubmitting(false);

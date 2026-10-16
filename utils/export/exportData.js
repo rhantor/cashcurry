@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import autoTable from "jspdf-autotable";
+import { toast } from "@/app/components/ui/notify";
 
 /** ---------- Tender helpers ---------- */
 const DEFAULT_TENDERS = [
@@ -217,7 +218,7 @@ export const exportToExcel = (sale, branchData, tendersOpt = null) => {
   XLSX.writeFile(wb, `sales-${sale.date}.xlsx`);
   } catch (err) {
     console.error("Excel export failed:", err);
-    alert("Failed to export Excel file. Please try again.");
+    toast.error("Failed to export Excel file. Please try again.");
   }
 };
 
@@ -319,7 +320,7 @@ export const exportToPDF = async (
   doc.save(`sales-${sale.date}.pdf`);
   } catch (err) {
     console.error("PDF export failed:", err);
-    alert("Failed to generate PDF. Please try again.");
+    toast.error("Failed to generate PDF. Please try again.");
   }
 };
 
@@ -458,7 +459,7 @@ export const handleShare = async (
       // Desktop fallback: copy a link (adjust to your route if needed)
       const link = `${window.location.origin}/sales/${sale.id}`;
       await navigator.clipboard.writeText(link);
-      alert("Link copied to clipboard ✅");
+      toast.success("Link copied to clipboard ✅");
     }
   } catch (err) {
     console.error("Share failed:", err);
@@ -707,7 +708,7 @@ export const handleShareImage = async (
               [imgBlob.type]: imgBlob,
             }),
           ]);
-          alert("✅ Image successfully copied to clipboard!\n\nYou can now right-click -> Paste (or Ctrl+V) directly into WhatsApp, Telegram, or any chat.");
+          toast.error("Image successfully copied to clipboard!\n\nYou can now right-click -> Paste (or Ctrl+V) directly into WhatsApp, Telegram, or any chat.");
           return null; // Handled by clipboard
         }
         throw new Error("Clipboard not supported");
@@ -718,7 +719,7 @@ export const handleShareImage = async (
     }
   } catch (err) {
     console.error("Image share failed:", err);
-    alert(`Failed to share image: ${err.message || err}`);
+    toast.error(`Failed to share image: ${err.message || err}`);
     return null;
   }
 };
@@ -739,7 +740,7 @@ export const exportSalesToExcel = (
   tendersOpt = null
 ) => {
   try {
-  if (!sales?.length) return alert("No data to export!");
+  if (!sales?.length) return toast.warning("No data to export!");
 
   const branchName = Array.isArray(branchData)
     ? branchData
@@ -838,7 +839,7 @@ export const exportSalesToExcel = (
   XLSX.writeFile(wb, `sales-report_${fileFilterName}.xlsx`);
   } catch (err) {
     console.error("Excel export failed:", err);
-    alert("Failed to export Excel file. Please try again.");
+    toast.error("Failed to export Excel file. Please try again.");
   }
 };
 
@@ -854,7 +855,7 @@ export const exportSalesToPDF = (
   tendersOpt = null
 ) => {
   try {
-  if (!sales?.length) return alert("No data to export!");
+  if (!sales?.length) return toast.warning("No data to export!");
 
   const branchName = Array.isArray(branchData)
     ? branchData
@@ -975,6 +976,6 @@ export const exportSalesToPDF = (
   doc.save(`sales-report_${fileFilterName}.pdf`);
   } catch (err) {
     console.error("PDF export failed:", err);
-    alert("Failed to generate PDF. Please try again.");
+    toast.error("Failed to generate PDF. Please try again.");
   }
 };

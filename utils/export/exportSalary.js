@@ -4,6 +4,7 @@
 import { jsPDF } from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
+import { toast } from "@/app/components/ui/notify";
 
 const branchLabel = (branchData) =>
   Array.isArray(branchData)
@@ -50,7 +51,7 @@ export function exportSalariesToPDF(list = [], branchData, meta = {}) {
     doc.save(`Salary_Report.pdf`);
   } catch (err) {
     console.error("Export failed:", err);
-    alert("Failed to export. Please try again.");
+    toast.error("Failed to export. Please try again.");
   }
 }
 
@@ -80,7 +81,7 @@ export function exportSalariesToExcel(list = [], branchData, meta = {}) {
     XLSX.writeFile(wb, "Salary_Report.xlsx");
   } catch (err) {
     console.error("Export failed:", err);
-    alert("Failed to export. Please try again.");
+    toast.error("Failed to export. Please try again.");
   }
 }
 
@@ -113,7 +114,7 @@ export function exportOneSalaryToPDF(item, branchData) {
     doc.save(`Salary_${item.month || "entry"}.pdf`);
   } catch (err) {
     console.error("Export failed:", err);
-    alert("Failed to export. Please try again.");
+    toast.error("Failed to export. Please try again.");
   }
 }
 
@@ -137,7 +138,7 @@ export function exportOneSalaryToExcel(item, branchData) {
     XLSX.writeFile(wb, `Salary_${item.month || "entry"}.xlsx`);
   } catch (err) {
     console.error("Export failed:", err);
-    alert("Failed to export. Please try again.");
+    toast.error("Failed to export. Please try again.");
   }
 }
 
@@ -152,10 +153,10 @@ export function shareSalary(item, branchData) {
       navigator.share({ title: "Salary Entry", text }).catch(() => {});
     } else {
       navigator.clipboard.writeText(text);
-      alert("Copied to clipboard!");
+      toast.success("Copied to clipboard!");
     }
   } catch (err) {
     console.error("Export failed:", err);
-    alert("Failed to export. Please try again.");
+    toast.error("Failed to export. Please try again.");
   }
 }
