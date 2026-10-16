@@ -16,30 +16,14 @@ import SalesVsCosts from "../components/dashboard/charts/SalesVsCosts";
 import CashVsCost from "../components/dashboard/charts/CashVsCost";
 import BankedVsBackCost from "../components/dashboard/charts/BankedVsBackCost";
 import LoansTimeline from "../components/dashboard/charts/LoansTimeline";
+import { ChartCard } from "../components/dashboard/charts/kit";
 
-/* ── Reusable section divider ── */
+/** A small heading between groups of charts. */
 function SectionHeader({ title }) {
   return (
-    <div className="flex items-center gap-4 pt-4 pb-1">
-      <span className="text-[11px] font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap">
-        {title}
-      </span>
-      <div className="flex-1 h-px bg-slate-200/60" />
-    </div>
-  );
-}
-
-/* ── Chart wrapper card ── */
-function ChartCard({ title, subtitle, children }) {
-  return (
-    <div className="rounded-3xl bg-white shadow-[0_2px_12px_rgba(0,0,0,0.03)] border border-slate-100/60 p-6 transition-all duration-300 hover:shadow-[0_8px_24px_rgba(0,0,0,0.05)]">
-      <div className="mb-5">
-        <div className="font-semibold text-slate-800 tracking-tight">{title}</div>
-        {subtitle && (
-          <div className="text-xs text-slate-400 mt-1 font-medium">{subtitle}</div>
-        )}
-      </div>
-      {children}
+    <div className="flex items-center gap-3 pt-3">
+      <span className="whitespace-nowrap text-[11px] font-bold uppercase tracking-[0.14em] text-subtle">{title}</span>
+      <div className="h-px flex-1 bg-line" />
     </div>
   );
 }
@@ -71,6 +55,8 @@ export default function DashboardPage() {
     totalSales,
     bankedTenderLabelList,
   } = useBranchData(filter);
+  // Skeletons only on the first load; later refreshes keep the figures and show "Updating".
+  const firstLoad = loading && !totalSales;
 
   return (
     <div className="min-h-screen bg-bg">
@@ -80,10 +66,10 @@ export default function DashboardPage() {
 
         {/* ── Headline figures ── */}
         <Stagger className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-          <StatCard loading={loading && !totalSales} label="Total sales" value={totalSales} format={fmt} icon={TrendingUp} tone="brand" hint="All payment types" />
-          <StatCard loading={loading && !totalSales} label="Cash in hand" value={estCashOnHand} format={fmt} icon={Wallet} tone="brand" hint="Opening + cash in − cash out" />
-          <StatCard loading={loading && !totalSales} label="Bank (expected)" value={effectiveBankedAfterWithdrawals} format={fmt} icon={Landmark} tone="info" hint={bankedTenderLabelList || "Card · QR · online"} />
-          <StatCard loading={loading && !totalSales} label="Total costs" value={totalCosts} format={fmt} icon={Receipt} tone="neutral" hint="Front + back office" />
+          <StatCard loading={firstLoad} label="Total sales" value={totalSales} format={fmt} icon={TrendingUp} tone="brand" hint="All payment types" />
+          <StatCard loading={firstLoad} label="Cash in hand" value={estCashOnHand} format={fmt} icon={Wallet} tone="brand" hint="Opening + cash in − cash out" />
+          <StatCard loading={firstLoad} label="Bank (expected)" value={effectiveBankedAfterWithdrawals} format={fmt} icon={Landmark} tone="info" hint={bankedTenderLabelList || "Card · QR · online"} />
+          <StatCard loading={firstLoad} label="Total costs" value={totalCosts} format={fmt} icon={Receipt} tone="neutral" hint="Front + back office" />
         </Stagger>
 
         {/* ── The rest: a swipeable row on phones, a grid on computers ── */}
@@ -98,7 +84,7 @@ export default function DashboardPage() {
             <StatCard
               key={label}
               size="sm"
-              loading={loading && !totalSales}
+              loading={firstLoad}
               label={label}
               value={value}
               format={fmt}
@@ -111,33 +97,33 @@ export default function DashboardPage() {
 
         {/* ── Performance ── */}
         <SectionHeader title="Performance" />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <ChartCard title="Sales Trend" subtitle="This period vs prior period — bars show comparison">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <ChartCard title="Sales trend" subtitle="Each day this period, against the same days before" legend={SalesTrend.legend(compareSalesTrend?.some((d) => d.previous > 0))} loading={firstLoad}>
             <SalesTrend data={salesTrend} compareData={compareSalesTrend} currency={currency} />
           </ChartCard>
-          <ChartCard title="Sales vs Costs" subtitle="Revenue vs total expenses per day">
+          <ChartCard title="Sales vs costs" subtitle="What came in against everything spent, per day" legend={SalesVsCosts.legend} loading={firstLoad}>
             <SalesVsCosts data={salesVsCosts} currency={currency} />
           </ChartCard>
         </div>
 
-        {/* ── Cash Flow ── */}
-        <SectionHeader title="Cash Flow" />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <ChartCard title="Cash vs Cost" subtitle="Cash sales against front-office (cash) costs">
+        {/* ── Cash flow ── */}
+        <SectionHeader title="Cash flow" />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <ChartCard title="Cash vs costs" subtitle="Cash sales against costs paid from the till" legend={CashVsCost.legend} loading={firstLoad}>
             <CashVsCost data={cashVsCost} currency={currency} />
           </ChartCard>
-          <ChartCard title="Banked vs Withdrawals" subtitle="Banked sales vs withdrawals from bank account">
+          <ChartCard title="Bank vs withdrawals" subtitle="Card, QR and online sales against money taken out" legend={BankedVsWithdrawals.legend} loading={firstLoad}>
             <BankedVsWithdrawals data={bankedVsWdr} currency={currency} />
           </ChartCard>
         </div>
 
-        {/* ── Bank Health ── */}
-        <SectionHeader title="Bank Health" />
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <ChartCard title="Banked vs Back-Office Cost" subtitle="Banked receipts vs bank-paid expenses">
+        {/* ── Bank ── */}
+        <SectionHeader title="Bank" />
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <ChartCard title="Bank vs back-office costs" subtitle="Money into the bank against costs paid from it" legend={BankedVsBackCost.legend} loading={firstLoad}>
             <BankedVsBackCost data={bankedVsBackCost} currency={currency} />
           </ChartCard>
-          <ChartCard title="Loans Timeline" subtitle="Inter-branch lending and repayments">
+          <ChartCard title="Loans between branches" subtitle="Borrowed, lent and repaid" legend={LoansTimeline.legend} loading={firstLoad}>
             <LoansTimeline data={loanTimeline} currency={currency} />
           </ChartCard>
         </div>

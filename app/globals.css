@@ -55,6 +55,12 @@
   --cc-shadow-lg: 0 24px 64px -24px rgb(15 31 27 / 0.35);
   --cc-shimmer: #e9efed;
   --cc-shimmer-hi: #f7faf9;
+  /* Chart series, fixed order (validated for colour-blind separation in both
+     modes): 1 money in / sales, 2 money out / costs, 3 bank, 4 the rest. */
+  --cc-series-1: #22a082;
+  --cc-series-2: #eb6834;
+  --cc-series-3: #2a78d6;
+  --cc-series-4: #e87ba4;
   color-scheme: light;
 }
 
@@ -83,6 +89,10 @@
   --cc-shadow-lg: 0 24px 64px -24px rgb(0 0 0 / 0.75);
   --cc-shimmer: #18231f;
   --cc-shimmer-hi: #22302b;
+  --cc-series-1: #199e70;
+  --cc-series-2: #d95926;
+  --cc-series-3: #3987e5;
+  --cc-series-4: #d55181;
   color-scheme: dark;
 }
 

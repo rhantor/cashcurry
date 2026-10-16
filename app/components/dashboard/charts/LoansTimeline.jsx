@@ -1,49 +1,28 @@
 "use client";
-import React from "react";
-import {
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-} from "recharts";
-import { mkFmt, mkCompact } from "@/utils/dashboard/utils";
+import { COLOR, TimeChart } from "./kit";
 
-export default function LoansTimeline({ data = [], currency = "RM" }) {
-  const fmt     = mkFmt(currency);
-  const compact = mkCompact();
+/**
+ * Loans between branches, per day, from this branch's side.
+ * Rows: { date, borrowed, lent, repayReceived, repayPaid }.
+ */
+export default function LoansTimeline({ data = [], currency }) {
   return (
-    <div className="h-72">
-      <ResponsiveContainer>
-        <BarChart data={data} margin={{ top: 8, right: 16, left: 10, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-          <XAxis
-            dataKey="date"
-            tick={{ fontSize: 11, fill: "#94a3b8" }}
-            tickLine={false}
-            axisLine={false}
-          />
-          <YAxis
-            tickFormatter={compact}
-            tick={{ fontSize: 11, fill: "#94a3b8" }}
-            tickLine={false}
-            axisLine={false}
-            width={44}
-          />
-          <Tooltip
-            formatter={(v, name) => [fmt(v), name]}
-            contentStyle={{ borderRadius: 10, fontSize: 12, border: "1px solid #e2e8f0" }}
-          />
-          <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
-          <Bar dataKey="borrowed"      name="Borrowed (Taken)"      fill="#f59e0b" radius={[3, 3, 0, 0]} />
-          <Bar dataKey="lent"          name="Lent (Provided)"        fill="#10b981" radius={[3, 3, 0, 0]} />
-          <Bar dataKey="repayReceived" name="Repayments Received"    fill="#6366f1" radius={[3, 3, 0, 0]} />
-          <Bar dataKey="repayPaid"     name="Repayments Paid"        fill="#f43f5e" radius={[3, 3, 0, 0]} />
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
+    <TimeChart
+      data={data}
+      currency={currency}
+      series={[
+        { key: "borrowed", name: "Borrowed", color: COLOR.in, kind: "bar" },
+        { key: "lent", name: "Lent", color: COLOR.out, kind: "bar" },
+        { key: "repayReceived", name: "Repaid to us", color: COLOR.bank, kind: "bar" },
+        { key: "repayPaid", name: "We repaid", color: COLOR.other, kind: "bar" },
+      ]}
+    />
   );
 }
+
+LoansTimeline.legend = [
+  { name: "Borrowed", color: COLOR.in },
+  { name: "Lent", color: COLOR.out },
+  { name: "Repaid to us", color: COLOR.bank },
+  { name: "We repaid", color: COLOR.other },
+];
