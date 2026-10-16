@@ -11,9 +11,10 @@ const span = (a, b) => (a && b ? `${format(parseISO(a), "d MMM")} – ${format(p
 /**
  * The headline: this period's sales, how it compares with the period before,
  * three quick facts, and the day-by-day chart against the previous period.
- * compareData rows: { label, current, previous, currentDate, prevDate }.
+ * compareData rows: { label, current, previous, currentDate, prevDate };
+ * rows without a `previous` field (e.g. company-wide) skip the comparison.
  */
-export default function SalesHero({ total = 0, compareData = [], currency, loading }) {
+export default function SalesHero({ total = 0, compareData = [], currency, loading, title = "Sales this period" }) {
   const money = (v) => formatMoney(v, currency);
   const days = compareData.filter((d) => d.currentDate);
   const prevDays = compareData.filter((d) => d.prevDate);
@@ -22,6 +23,7 @@ export default function SalesHero({ total = 0, compareData = [], currency, loadi
   const selling = days.filter((d) => Number(d.current) > 0).length;
   const avg = days.length ? total / days.length : 0;
   const compare = before > 0;
+  const comparable = compareData.some((d) => "previous" in d);
   // Days at the end with nothing yet (today, before the sales are entered)
   // stop the line instead of dropping it to zero.
   let last = compareData.length - 1;
@@ -53,12 +55,12 @@ export default function SalesHero({ total = 0, compareData = [], currency, loadi
     <Card className="overflow-hidden p-4 sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-subtle">Sales this period</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-subtle">{title}</p>
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1">
             <CountUp value={total} format={money} className="text-3xl font-bold tracking-tight text-fg sm:text-4xl" />
             <Delta now={total} before={before} />
           </div>
-          <p className="mt-1 text-xs text-muted">
+          {comparable && <p className="mt-1 text-xs text-muted">
             {compare ? (
               <>
                 vs <span className="font-semibold text-fg">{money(before)}</span> in {span(prevDays[0]?.prevDate, prevDays.at(-1)?.prevDate)}
@@ -66,7 +68,7 @@ export default function SalesHero({ total = 0, compareData = [], currency, loadi
             ) : (
               "No sales in the period before to compare with"
             )}
-          </p>
+          </p>}
         </div>
         <Legend
           items={[

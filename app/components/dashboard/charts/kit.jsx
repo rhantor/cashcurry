@@ -13,7 +13,7 @@
 import { format, parseISO } from "date-fns";
 import { motion } from "framer-motion";
 import { Bar, CartesianGrid, Cell, ComposedChart, Line, Area, ReferenceDot, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { ArrowDownRight, ArrowUpRight, BarChart3 } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, BarChart3, ChevronRight } from "lucide-react";
 import { Card, Skeleton, cn } from "@/app/components/ui";
 import { formatMoney } from "@/lib/region/currency";
 
@@ -95,9 +95,10 @@ export function Delta({ now, before, good = "up", className }) {
 
 /**
  * A ranked list with a bar per row: easier to read than a pie. Rows past
- * `limit` fold into "Other". rows: [{ name, value, tag? }].
+ * `limit` fold into "Other". rows: [{ name, value, tag? }]. With `onPick(row)`
+ * each row is tappable (e.g. to split it by branch).
  */
-export function RankedBars({ rows = [], format, color = COLOR.in, limit = 6, showShare = true, empty = "Nothing in this period" }) {
+export function RankedBars({ rows = [], format, color = COLOR.in, limit = 6, showShare = true, empty = "Nothing in this period", onPick }) {
   const sorted = [...rows].filter((r) => r.value).sort((a, b) => b.value - a.value);
   const shown = sorted.length > limit ? [...sorted.slice(0, limit - 1), { name: "Other", value: sorted.slice(limit - 1).reduce((n, r) => n + r.value, 0), other: true }] : sorted;
   const total = sorted.reduce((n, r) => n + r.value, 0);
@@ -112,13 +113,22 @@ export function RankedBars({ rows = [], format, color = COLOR.in, limit = 6, sho
   }
   return (
     <ul className="space-y-3.5">
-      {shown.map((r, i) => (
+      {shown.map((r, i) => {
+        const pick = onPick && !r.other;
+        const Row = pick ? "button" : "div";
+        return (
         <li key={r.name}>
+          <Row
+            {...(pick ? { type: "button", onClick: () => onPick(r) } : {})}
+            className={cn("block w-full text-left", pick && "-mx-2 rounded-xl px-2 py-1 transition-colors hover:bg-surface-2 active:bg-surface-2")}
+            style={pick ? { width: "calc(100% + 1rem)" } : undefined}
+          >
           <div className="mb-1.5 flex items-baseline gap-2 text-sm">
             <span className={cn("min-w-0 truncate font-medium", r.other ? "text-muted" : "text-fg")}>{r.name}</span>
             {r.tag && <span className="shrink-0 rounded-md bg-surface-2 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-muted">{r.tag}</span>}
             <span className="ml-auto shrink-0 font-semibold tabular-nums text-fg">{format(r.value)}</span>
             {showShare && <span className="w-11 shrink-0 text-right text-xs tabular-nums text-subtle">{total ? Math.round((r.value / total) * 100) : 0}%</span>}
+            {pick && <ChevronRight className="size-3.5 shrink-0 self-center text-subtle" />}
           </div>
           <div className="h-2 overflow-hidden rounded-full bg-surface-2">
             <motion.div
@@ -129,8 +139,10 @@ export function RankedBars({ rows = [], format, color = COLOR.in, limit = 6, sho
               transition={{ duration: 0.7, delay: i * 0.05, ease: [0.22, 1, 0.36, 1] }}
             />
           </div>
+          </Row>
         </li>
-      ))}
+        );
+      })}
     </ul>
   );
 }

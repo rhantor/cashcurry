@@ -701,18 +701,51 @@ export default function useCompanyData(filter) {
     [bankedTenderKeys, tenderLabelsByKey]
   );
 
-  // Each branch's cash and bank at the end of the period (for "per branch" views).
-  const branchBalances = ledgers.map((l) => ({
-    branchId: l.branchId,
-    name: branchesList.find((b) => b.id === l.branchId)?.name || l.branchId,
-    cash: l.closing.cash,
-    bank: l.closing.bank,
-  }));
+  // Each branch's figures straight from its ledger — the same numbers the
+  // company cards add up, so a split by branch always sums to its card.
+  const branchTotals = ledgers.map((l) => {
+    const t = l.totals;
+    return {
+      branchId: l.branchId,
+      name: branchesList.find((b) => b.id === l.branchId)?.name || l.branchId,
+      sales: t.totalSales,
+      costs: t.costCash + t.costBank,
+      salaries: t.salaryCash + t.salaryBank,
+      advances: t.advance + t.advanceBank,
+      staffLoans: t.staffLoanGiven,
+      withdrawals: t.withdrawal,
+      cash: l.closing.cash,
+      bank: l.closing.bank,
+      tenders: Object.entries(t.tenders).map(([key, value]) => ({
+        key,
+        value,
+        label: l.tenders.byKey.get(key)?.label || tenderLabelsByKey[key] || key,
+        banked: l.tenders.isBanked(key),
+      })),
+    };
+  });
+  const branchBalances = branchTotals.map(({ branchId, name, cash, bank }) => ({ branchId, name, cash, bank }));
+
+  // Company sales and costs per day of the period (every day, zeros included).
+  const companyDays = (() => {
+    const map = new Map();
+    for (const l of ledgers) {
+      for (const d of l.days) {
+        const row = map.get(d.date) || { date: d.date, sales: 0, costs_total: 0 };
+        row.sales += d.totalSales;
+        row.costs_total += d.costCash + d.costBank;
+        map.set(d.date, row);
+      }
+    }
+    return [...map.values()].sort((a, b) => (a.date < b.date ? -1 : 1));
+  })();
 
   return {
     companyId,
     loading,
     branchBalances,
+    branchTotals,
+    companyDays,
     // filtered collections (company scope)
     fSales,
     fCosts,

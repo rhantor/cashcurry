@@ -1,21 +1,20 @@
 "use client";
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { AlertTriangle, ArrowDownToLine, HandCoins, Landmark, Percent, PiggyBank, Receipt, TrendingUp, Wallet } from "lucide-react";
 import useCompanyData from "@/utils/dashboard/useCompanyData";
 import { presetFilter } from "@/utils/dashboard/dateFilters";
 import { businessToday } from "@/lib/region";
-import { Stagger } from "@/app/components/ui";
+import { Stagger, Tabs } from "@/app/components/ui";
 import PeriodBar from "@/app/components/dashboard/PeriodBar";
 import StatCard from "@/app/components/dashboard/StatCard";
 import BreakdownSheet from "@/app/components/dashboard/BreakdownSheet";
 import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/utils/formatMoney";
-import SalesBreakdownTenders from "@/app/components/dashboard/charts/SalesBreakdownTenders";
-import ExpensePie from "@/app/components/dashboard/charts/ExpensePie";
 import RecentActivity from "@/app/components/dashboard/RecentActivity";
-import SalesVsCosts from "@/app/components/dashboard/charts/SalesVsCosts";
-import BranchPerformanceBar from "@/app/components/dashboard/charts/BranchPerformanceBar";
-import BranchLeaderboard from "@/app/components/dashboard/BranchLeaderboard";
+import SalesHero from "@/app/components/dashboard/charts/SalesHero";
+import DailyNet from "@/app/components/dashboard/charts/DailyNet";
+import BranchRanking from "@/app/components/dashboard/charts/BranchRanking";
+import { COLOR, ChartCard, RankedBars } from "@/app/components/dashboard/charts/kit";
 
 /** A titled group of figures or charts. */
 function Section({ title, note, children }) {
@@ -38,8 +37,6 @@ export default function OwnerDashboardPage() {
 
   const {
     loading,
-    // charts
-    salesVsCosts,
     recent,
     // kpis
     totalWdr,
@@ -50,14 +47,9 @@ export default function OwnerDashboardPage() {
     totalAdv,
     totalStaffLoanCash,
     totalSales,
-    // labels
-    tenderKeys,
-    tenderLabelsByKey,
-    branchPerf,
-    fSales,
-    branchesList,
     currencies,
-    branchBalances,
+    branchTotals,
+    companyDays,
   } = useCompanyData(filter);
   // Skeletons only on the first load; later refreshes keep the figures and show "Updating".
   const firstLoad = loading && !totalSales;
@@ -69,29 +61,6 @@ export default function OwnerDashboardPage() {
   const currency = currencies.length === 1 ? currencies[0] : activeBranchCurrency;
   const fmt = (v) => formatMoney(v, currency);
 
-  const expensePie = [
-    { 
-      name: "Costs", 
-      value: totalCosts || 0,
-      breakdown: branchPerf?.map(r => ({ name: r.name, value: r.costs })).filter(x => x.value > 0).sort((a, b) => b.value - a.value) || []
-    },
-    { 
-      name: "Salaries", 
-      value: totalSal || 0,
-      breakdown: branchPerf?.map(r => ({ name: r.name, value: r.salaries })).filter(x => x.value > 0).sort((a, b) => b.value - a.value) || []
-    },
-    { 
-      name: "Advances", 
-      value: totalAdv || 0,
-      breakdown: branchPerf?.map(r => ({ name: r.name, value: r.advances })).filter(x => x.value > 0).sort((a, b) => b.value - a.value) || []
-    },
-    { 
-      name: "Staff Loans", 
-      value: totalStaffLoanCash || 0,
-      breakdown: branchPerf?.map(r => ({ name: r.name, value: r.staffLoans })).filter(x => x.value > 0).sort((a, b) => b.value - a.value) || []
-    },
-  ];
-
   const totalOperatingExpenses = (totalCosts || 0) + (totalSal || 0);
   const netOperatingProfit = (totalSales || 0) - totalOperatingExpenses;
   const operatingMargin = totalSales ? ((netOperatingProfit / totalSales) * 100).toFixed(1) : "0.0";
@@ -99,17 +68,46 @@ export default function OwnerDashboardPage() {
 
   // Per-branch splits behind each figure (tap a card). Each uses the same
   // formula as its company total, so the branches add up to it.
-  const per = (pick) => (branchPerf || []).map((r) => ({ name: r.name, value: pick(r) }));
+  const per = (pick) => (branchTotals || []).map((r) => ({ name: r.name, value: pick(r) }));
   const SPLITS = {
     sales: () => per((r) => r.sales),
     expenses: () => per((r) => r.costs + r.salaries),
     profit: () => per((r) => r.sales - r.costs - r.salaries),
-    cash: () => (branchBalances || []).map((b) => ({ name: b.name, value: b.cash })),
-    bank: () => (branchBalances || []).map((b) => ({ name: b.name, value: b.bank })),
+    cash: () => per((r) => r.cash),
+    bank: () => per((r) => r.bank),
     owed: () => per((r) => r.advances + r.staffLoans),
     withdrawals: () => per((r) => r.withdrawals),
+    costs: () => per((r) => r.costs),
+    salaries: () => per((r) => r.salaries),
+    advances: () => per((r) => r.advances),
+    staffLoans: () => per((r) => r.staffLoans),
   };
   const show = (title, key) => () => setBreakdown({ title, rows: SPLITS[key]() });
+
+  // The day-by-day company sales for the headline chart.
+  const heroDays = companyDays.map((d) => ({ label: d.date, current: d.sales, currentDate: d.date }));
+  const kept = DailyNet.summary(companyDays, currency);
+  // Where the money went out, each tappable to see it by branch.
+  const outgoings = [
+    { name: "Costs", key: "costs", value: totalCosts || 0 },
+    { name: "Salaries", key: "salaries", value: totalSal || 0 },
+    { name: "Advances", key: "advances", value: totalAdv || 0 },
+    { name: "Staff loans", key: "staffLoans", value: totalStaffLoanCash || 0 },
+  ];
+  // Payment types, for all branches or one.
+  const [mixOf, setMixOf] = useState("all");
+  const tenderMix = useMemo(() => {
+    const map = new Map();
+    for (const b of branchTotals || []) {
+      if (mixOf !== "all" && b.branchId !== mixOf) continue;
+      for (const t of b.tenders) {
+        const row = map.get(t.key) || { name: t.label, value: 0, tag: t.banked ? "Bank" : t.key === "cash" ? "Till" : null };
+        row.value += t.value;
+        map.set(t.key, row);
+      }
+    }
+    return [...map.values()];
+  }, [branchTotals, mixOf]);
 
   return (
     <div className="min-h-screen bg-bg">
@@ -148,61 +146,52 @@ export default function OwnerDashboardPage() {
 
         <BreakdownSheet open={!!breakdown} onClose={() => setBreakdown(null)} title={breakdown?.title} rows={breakdown?.rows} format={fmt} />
 
-        {/* Section 3: Branch Performance */}
-        <div>
-          <h2 className="text-xl font-semibold mb-4 text-slate-800">3. Branch Performance</h2>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="rounded-2xl bg-white/80 backdrop-blur-sm shadow p-4 flex flex-col">
-              <div className="font-medium mb-2">Branch Leaderboard (Net Profit)</div>
-              <div className="flex-1">
-                <BranchLeaderboard data={branchPerf} />
-              </div>
-            </div>
-            <div className="rounded-2xl bg-white/80 backdrop-blur-sm shadow p-4 flex flex-col">
-              <div className="font-medium mb-2">Sales vs Costs by Branch</div>
-              <div className="flex-1">
-                <BranchPerformanceBar
-                  data={branchPerf.map((r) => ({
-                    name: r.name,
-                    sales: r.sales,
-                    costs: r.costs,
-                  }))}
-                />
-              </div>
+        {/* ── Sales across the company ── */}
+        <Section title="Sales">
+          <div className="space-y-4">
+            <SalesHero title="Company sales this period" total={totalSales} compareData={heroDays} currency={currency} loading={firstLoad} />
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+              <ChartCard
+                title="Money kept each day"
+                subtitle={`${kept.kept} kept, ${kept.share} of sales${kept.losing ? ` · ${kept.losing} day${kept.losing > 1 ? "s" : ""} spent more than sold` : ""}`}
+                legend={DailyNet.legend}
+                loading={firstLoad}
+              >
+                <DailyNet data={companyDays} currency={currency} />
+              </ChartCard>
+              <ChartCard title="How customers paid" subtitle="Sales by payment type, and where each one lands" loading={firstLoad}>
+                {(branchTotals || []).length > 1 && (
+                  <div className="-mx-1 mb-4 max-w-full overflow-x-auto px-1">
+                    <Tabs
+                      size="sm"
+                      tabs={[{ value: "all", label: "All" }, ...branchTotals.map((b) => ({ value: b.branchId, label: b.name }))]}
+                      value={mixOf}
+                      onChange={setMixOf}
+                    />
+                  </div>
+                )}
+                <RankedBars format={fmt} rows={tenderMix} />
+              </ChartCard>
             </div>
           </div>
-        </div>
+        </Section>
 
-        {/* Section 4: Key Visualizations */}
-        <div>
-          <h2 className="text-xl font-semibold mb-4 text-slate-800">4. Key Visualizations</h2>
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="rounded-2xl bg-white/80 backdrop-blur-sm shadow p-4 lg:col-span-2">
-              <div className="font-medium mb-2">Daily Revenue vs Expenses Trend</div>
-              <SalesVsCosts data={salesVsCosts} />
-            </div>
-            <div className="rounded-2xl bg-white/80 backdrop-blur-sm shadow p-4">
-              <div className="font-medium mb-2">Expense Distribution</div>
-              <ExpensePie data={expensePie} />
-            </div>
+        {/* ── Branch against branch ── */}
+        <Section title="Branches">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            <ChartCard title="Branch ranking" subtitle="Who sold most, kept most, and kept the most of each sale" loading={firstLoad}>
+              <BranchRanking rows={branchTotals} format={fmt} />
+            </ChartCard>
+            <ChartCard title="Where the money went" subtitle="Everything paid out — tap one to see it by branch" loading={firstLoad}>
+              <RankedBars format={fmt} color={COLOR.out} rows={outgoings} onPick={(r) => show(r.name, r.key)()} empty="Nothing paid out in this period" />
+            </ChartCard>
           </div>
-          <div className="grid grid-cols-1 mt-6">
-            <div className="rounded-2xl bg-white/80 backdrop-blur-sm shadow p-4">
-              <SalesBreakdownTenders
-                rawSales={fSales}
-                branches={branchesList}
-                seriesKeys={tenderKeys}
-                labels={tenderLabelsByKey}
-              />
-            </div>
-          </div>
-        </div>
+        </Section>
 
-        {/* Recent Activity */}
-        <div className="mt-8">
+        {/* ── Latest records ── */}
+        <Section title="Activity">
           <RecentActivity rows={recent} />
-        </div>
-
+        </Section>
       </div>
     </div>
   );
