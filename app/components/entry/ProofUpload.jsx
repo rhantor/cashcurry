@@ -24,6 +24,7 @@ export default function ProofUpload({
   invalid = false,
   pageDrop = true,
   pdf = false,
+  pdfOnly = false,
   shrink = { maxMB: 1.2, maxSide: 2200 },
   hint,
   onPick,
@@ -37,7 +38,7 @@ export default function ProofUpload({
     if (!picked || uploading) return;
     setBusy(true);
     try {
-      const ready = await prepareFile(picked, { pdf, shrink });
+      const ready = await prepareFile(picked, { pdf, pdfOnly, shrink });
       onPick?.(ready, URL.createObjectURL(ready));
       toast.success(`${label} attached`);
     } catch (err) {
@@ -103,13 +104,13 @@ export default function ProofUpload({
               {busy ? <ImageUp className="size-5 animate-pulse" /> : target ? <ImageDown className="size-5" /> : <Camera className="size-5" />}
             </span>
             <span className="text-sm font-semibold text-fg">
-              {busy ? "Preparing…" : target ? "Drop it here" : pdf ? "Take a photo or choose a file" : "Take or choose a photo"}
+              {busy ? "Preparing…" : target ? "Drop it here" : pdfOnly ? "Choose a PDF" : pdf ? "Take a photo or choose a file" : "Take or choose a photo"}
             </span>
             {/* computers: say it can be dragged or pasted too */}
             {!busy && !target && <span className="hidden text-xs text-muted lg:block">or drag one here · Ctrl+V to paste</span>}
-            <input type="file" accept={pdf ? "image/*,application/pdf" : "image/*"} onChange={pick} className="sr-only" />
+            <input type="file" accept={pdfOnly ? "application/pdf" : pdf ? "image/*,application/pdf" : "image/*"} onChange={pick} className="sr-only" />
           </motion.label>
-        ) : pdf && isPdf(file) ? (
+        ) : (pdf || pdfOnly) && isPdf(file) ? (
           <motion.div
             key="pdf"
             initial={{ opacity: 0, scale: 0.97 }}

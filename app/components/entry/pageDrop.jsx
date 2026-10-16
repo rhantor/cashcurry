@@ -116,8 +116,9 @@ export const sizeOf = (b = 0) => (b > 1024 * 1024 ? `${(b / 1024 / 1024).toFixed
  * Checks a picked or dropped file and shrinks a big photo. Resolves to the
  * file to upload; rejects with { title, hint } to show the person.
  */
-export async function prepareFile(file, { pdf = false, shrink = { maxMB: 1.2, maxSide: 2200 } } = {}) {
-  const asPdf = pdf && isPdf(file);
+export async function prepareFile(file, { pdf = false, pdfOnly = false, shrink = { maxMB: 1.2, maxSide: 2200 } } = {}) {
+  if (pdfOnly && !isPdf(file)) throw { title: "Use a PDF", hint: "This one takes a PDF file only." };
+  const asPdf = (pdf || pdfOnly) && isPdf(file);
   if (!asPdf && !file.type?.startsWith("image/")) {
     throw { title: pdf ? "Use a photo or a PDF" : "That isn't a photo", hint: pdf ? "JPG, PNG or PDF." : "Use an image file (JPG or PNG)." };
   }

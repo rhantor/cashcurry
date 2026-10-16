@@ -16,7 +16,7 @@ computer, has its own loading look, and its old modals are redone too.
 - ✅ `/entry-data/deposit-entry` Cash to bank (was "Cash deposit") (+ its record sheet)
 - ✅ `/entry-data/cash-withdraw` Bank to cash (was "Cash withdrawal") (+ its record sheet)
 - ✅ `/entry-data/advance-entry` Advance & staff loan (+ "waiting to be paid", shared with the requested panel)
-- ⬜ `/entry-data/salary-entry` Salary entry
+- ✅ `/entry-data/salary-entry` Salary entry (salaries outside payroll; guards against counting a month twice, also on payroll's Mark as paid). Moving it under Payroll in the menu waits for 4.1 (Payroll is managers-only today)
 - ⬜ `/cash-tracker` Daily cash tracker
 
 ## 3.4.3 Reports

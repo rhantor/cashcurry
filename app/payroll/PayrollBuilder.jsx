@@ -31,6 +31,7 @@ import { skipToken } from '@reduxjs/toolkit/query'
 import PayrollPrintView from './components/PayrollPrintView'
 import { getSessionUser } from '@/lib/session'
 import { confirmDialog } from "@/app/components/ui/notify";
+import { salaryMonth } from '@/lib/payroll/salaryMonth'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -837,6 +838,26 @@ export default function PayrollBuilder () {
     if (!runId) return
     setBusy(true); setError('')
     try {
+      // Salaries for this month already entered by hand (Salary Entry)? Then
+      // marking the run paid would count the month's salaries twice.
+      const { byHand } = await salaryMonth(companyId, branchId, period)
+      if (byHand.length) {
+        const total = byHand.reduce((n, s) => n + s.amount, 0)
+        const ok = await confirmDialog({
+          title: `${periodLabel(period)} salaries are already entered by hand`,
+          message:
+            `${byHand.length === 1 ? 'One salary entry' : `${byHand.length} salary entries`} for this month (${fmtAmt(total)}) ` +
+            `${byHand.length === 1 ? 'was' : 'were'} saved on the Salary Entry screen` +
+            `${byHand[0]?.paymentDate ? `, paid ${byHand[0].paymentDate}` : ''}.
+
+` +
+            'Marking this payroll paid adds every slip as salary too, so the month would be counted twice. ' +
+            'Only go on if those entries were for something else (e.g. part-timers not on this payroll).',
+          danger: true,
+          confirmLabel: 'Mark paid anyway'
+        })
+        if (!ok) return
+      }
       await markPaid({
         companyId, branchId, runId,
         paidBy:           currentUser,
