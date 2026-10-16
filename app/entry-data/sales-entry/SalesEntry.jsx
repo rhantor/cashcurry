@@ -1,392 +1,437 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { format, parseISO } from "date-fns";
+import { AnimatePresence, motion } from "framer-motion";
+import { CalendarCheck2, Landmark, NotebookPen, Pencil, Wallet, X } from "lucide-react";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import {
   useAddSalesEntryMutation,
   useGetSalesEntriesQuery,
   useUpdateSalesEntryMutation,
   useDeleteSalesEntryMutation,
 } from "@/lib/redux/api/salesApiSlice";
-import { collection, getDocs, query, where } from "firebase/firestore";
 import { db, storage } from "@/lib/firebase";
 import { useDefaultDate } from "@/app/hooks/useRegion";
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import useCurrency from "@/app/hooks/useCurrency";
+import useSession from "@/app/hooks/useSession";
 import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
 import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
-import imageCompression from "browser-image-compression";
-
-import ConfirmDeleteModal from "@/app/components/common/ConfirmDeleteModal";
-import useCrudActions from "@/app/components/common/useCrudActions";
+import { formatMoney } from "@/lib/region/currency";
 import { getSessionUser } from "@/lib/session";
+import useCrudActions from "@/app/components/common/useCrudActions";
 import ItemsReportModal from "@/app/reports/sales-report/SalesReportModal";
+import { Badge, Button, CountUp, DatePicker, Field, Input, Skeleton, cn, confirmDialog, toast } from "@/app/components/ui";
+import MoneyInput from "@/app/components/entry/MoneyInput";
+import ProofUpload from "@/app/components/entry/ProofUpload";
+import { EntryLayout, EntrySection, RecentEntries, SummaryLine } from "@/app/components/entry/EntryLayout";
 
-// --- IMPORT NEW SUB-COMPONENTS ---
-import SalesForm from "./SalesForm";
-import SalesTable from "./SalesTable";
+const day = (d) => (d ? format(parseISO(d), "EEE, d MMM") : "");
+const blank = (tenders) => Object.fromEntries(tenders.map((t) => [t.key, ""]));
 
+/**
+ * Sales entry: one day's takings by payment type, with the Z report photo.
+ * The total, what goes to the bank and what stays in the till update as you
+ * type. A day that is already in is flagged before saving, with a way to edit
+ * it instead.
+ */
 export default function SalesEntry() {
+  const { companyId, branchId, role } = useSession();
+  const currency = useCurrency();
+  const money = (v) => formatMoney(v, currency);
   // Defaults to today on the branch's clock, after its day cut-off.
   const [date, setDate, today] = useDefaultDate();
-  const [companyId, setCompanyId] = useState(null);
-  const [branchId, setBranchId] = useState(null);
-  const [userRole, setUserRole] = useState(null);
 
-  const [errorMessage, setErrorMessage] = useState("");
-  const [confirmMode, setConfirmMode] = useState("create"); // "create" | "update"
-  const [openNote, setOpenNote] = useState(null);
-  const [selectedSale, setSelectedSale] = useState(null); // for view modal
-  const [editingSale, setEditingSale] = useState(null); // entry being edited
-  const [confirmBusy, setConfirmBusy] = useState(false);
-
-  // Form State
   const [form, setForm] = useState({});
   const [notes, setNotes] = useState({});
+  const [openNote, setOpenNote] = useState(null);
+  const [editing, setEditing] = useState(null); // the entry being edited
+  const [viewing, setViewing] = useState(null); // the entry open in the view modal
+  const [proofFile, setProofFile] = useState(null);
+  const [proofPreview, setProofPreview] = useState(null);
+  const [proofUrl, setProofUrl] = useState(null);
+  const [progress, setProgress] = useState(0);
+  const [errors, setErrors] = useState({});
+  const [busy, setBusy] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [nudge, setNudge] = useState(0); // shakes the "already entered" box
 
-  const [addSalesEntry, { isLoading: isCreating }] = useAddSalesEntryMutation();
+  const args = companyId && branchId ? { companyId, branchId } : null;
+  const { data: settings, isLoading: settingsLoading } = useGetBranchSettingsQuery(args ?? undefined, { skip: !args });
+  const { data: branchData = {} } = useGetSingleBranchQuery(args ?? undefined, { skip: !args });
+  const [addSalesEntry, { isLoading: creating }] = useAddSalesEntryMutation();
+  const { canEdit, doUpdate, updating } = useCrudActions({
+    useUpdateMutationHook: useUpdateSalesEntryMutation,
+    useDeleteMutationHook: useDeleteSalesEntryMutation,
+  });
 
-  // File Upload State
-  const [zReportFile, setZReportFile] = useState(null);
-  const [zReportPreview, setZReportPreview] = useState(null);
-  const [uploadProgress, setUploadProgress] = useState(0);
-  const [zReportUrl, setZReportUrl] = useState(null);
-
-  const TARGET_MAX_MB = 1.2;
-  const MAX_DIMENSION = 2200;
-
-  useEffect(() => {
-    const storedUser = getSessionUser();
-    if (storedUser) {
-      const parsed = storedUser;
-      setCompanyId(parsed.companyId);
-      setBranchId(parsed.branchId);
-      setUserRole(parsed.role);
-    }
-  }, []);
-
-  const { data: settings, isLoading: settingsLoading } = useGetBranchSettingsQuery(
-    { companyId, branchId },
-    { skip: !companyId || !branchId }
-  );
-
-  const { data: branchData = {} } = useGetSingleBranchQuery(
-    { companyId, branchId },
-    { skip: !companyId || !branchId }
-  );
-
-  const tendersConfig = useMemo(() => {
+  const tenders = useMemo(() => {
     const list = settings?.financeSales?.tenders || [];
     return list.filter((t) => t.enabled !== false).sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
   }, [settings]);
 
-  // Init form
+  // a field per payment type, keeping anything already typed
   useEffect(() => {
-    if (!tendersConfig.length) return;
-    setForm((prev) => {
-      const next = {};
-      tendersConfig.forEach((t) => { next[t.key] = prev?.[t.key] ?? ""; });
-      return next;
-    });
-    setNotes((prev) => {
-        const next = {};
-        tendersConfig.forEach((t) => { next[t.key] = prev?.[t.key] ?? ""; });
-        return next;
-    });
-  }, [tendersConfig]);
+    if (!tenders.length) return;
+    setForm((prev) => Object.fromEntries(tenders.map((t) => [t.key, prev?.[t.key] ?? ""])));
+    setNotes((prev) => Object.fromEntries(tenders.map((t) => [t.key, prev?.[t.key] ?? ""])));
+  }, [tenders]);
 
-  const resetToCreateMode = () => {
-    setEditingSale(null);
-    setConfirmMode("create");
-    setForm(tendersConfig.reduce((acc, t) => ((acc[t.key] = ""), acc), {}));
-    setNotes(tendersConfig.reduce((acc, t) => ((acc[t.key] = ""), acc), {}));
-    setDate(today);
-    setZReportFile(null);
-    setZReportPreview(null);
-    setUploadProgress(0);
-    setZReportUrl(null);
+  // this month's sales: the recent list, the "already entered" check, the view modal's month total
+  const month = (date || today || "").slice(0, 7);
+  const [y, m] = month.split("-").map(Number);
+  const monthEnd = month ? `${month}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}` : "";
+  const { data: sales = [], isLoading: salesLoading, isError: salesError } = useGetSalesEntriesQuery(
+    { companyId, branchId, startDate: `${month}-01`, endDate: monthEnd },
+    { skip: !args || !month }
+  );
+  const recent = useMemo(() => [...sales].sort((a, b) => (a.date < b.date ? 1 : -1)).slice(0, 5), [sales]);
+  const taken = sales.find((s) => s.date === date && s.id !== editing?.id);
+
+  // figures
+  const num = (k) => parseFloat(form[k]) || 0;
+  const total = tenders.reduce((n, t) => n + (t.includeInTotal === false ? 0 : num(t.key)), 0);
+  const banked = tenders.reduce((n, t) => n + (t.banked ? num(t.key) : 0), 0);
+  const till = num("cash");
+  const proofNeeded = tenders.some((t) => t.requireProof && num(t.key) > 0);
+  const hasProof = !!(proofFile || proofUrl);
+
+  const reset = () => {
+    setEditing(null);
+    setForm(blank(tenders));
+    setNotes(blank(tenders));
     setOpenNote(null);
-    setErrorMessage("");
+    setDate(today);
+    setProofFile(null);
+    setProofPreview(null);
+    setProofUrl(null);
+    setProgress(0);
+    setErrors({});
   };
 
-  const handleChange = (field, value) => {
-    const numValue = parseFloat(value);
-    if (!isNaN(numValue) && numValue >= 0) setForm((prev) => ({ ...prev, [field]: value }));
-    else if (value === "") setForm((prev) => ({ ...prev, [field]: "" }));
+  const startEdit = (entry) => {
+    setEditing(entry);
+    setDate(entry.date);
+    setForm(Object.fromEntries(tenders.map((t) => [t.key, entry[t.key] ? String(entry[t.key]) : ""])));
+    setNotes({ ...blank(tenders), ...(entry.notes || {}) });
+    setProofFile(null);
+    setProofPreview(entry.zReportUrl || null);
+    setProofUrl(entry.zReportUrl || null);
+    setProgress(0);
+    setErrors({});
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
-  const handleNoteChange = (field, value) => setNotes((prev) => ({ ...prev, [field]: value }));
-
-  const total = useMemo(() => {
-    return tendersConfig.reduce((sum, t) => {
-      if (t.includeInTotal === false) return sum;
-      return sum + (parseFloat(form[t.key]) || 0);
-    }, 0);
-  }, [form, tendersConfig]);
-
-  // File Handlers
-  const handleFileChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    
-    if (!file.type?.startsWith("image/")) {
-      setErrorMessage("Please select an image file.");
-      return;
-    }
-
-    try {
-      let workingFile = file;
-      if (file.size > TARGET_MAX_MB * 1024 * 1024) {
-        workingFile = await imageCompression(file, {
-          maxSizeMB: TARGET_MAX_MB,
-          maxWidthOrHeight: MAX_DIMENSION,
-          useWebWorker: true,
-        });
-      }
-      
-      setErrorMessage("");
-      setZReportFile(workingFile);
-      setZReportPreview(URL.createObjectURL(workingFile));
-      setUploadProgress(0);
-    } catch (err) {
-      console.error("Compression failed:", err);
-      setErrorMessage("Failed to process image.");
-    }
-  };
-
-  const removeFile = () => {
-    setZReportFile(null);
-    setZReportPreview(editingSale?.zReportUrl || null); // revert to existing if editing
-    setUploadProgress(0);
-  };
-
-  const uploadZReport = () => {
-    if (!zReportFile || !companyId || !branchId) return null;
-    const ext = zReportFile.name.split('.').pop() || 'jpg';
-    const filePath = `zReports/${companyId}/${branchId}/${date}-${Date.now()}.${ext}`;
-    const storageRef = ref(storage, filePath);
-    
+  const uploadProof = () => {
+    const ext = proofFile.name?.split(".").pop() || "jpg";
+    const task = uploadBytesResumable(ref(storage, `zReports/${companyId}/${branchId}/${date}-${Date.now()}.${ext}`), proofFile);
     return new Promise((resolve, reject) => {
-      const uploadTask = uploadBytesResumable(storageRef, zReportFile);
-      uploadTask.on(
+      task.on(
         "state_changed",
-        (snap) => setUploadProgress((snap.bytesTransferred / snap.totalBytes) * 100),
+        (s) => setProgress((s.bytesTransferred / s.totalBytes) * 100),
         reject,
-        async () => resolve(await getDownloadURL(uploadTask.snapshot.ref))
+        async () => resolve(await getDownloadURL(task.snapshot.ref))
       );
     });
   };
 
-  const proofRequired = useMemo(() => 
-    tendersConfig.some(t => t.requireProof && (parseFloat(form[t.key]) || 0) > 0), 
-  [tendersConfig, form]);
+  const save = async () => {
+    if (busy) return;
+    const problems = {};
+    if (!date) problems.date = "Pick the day these sales are for";
+    if (taken) {
+      setNudge((n) => n + 1);
+      toast.error("This day is already entered", { description: "Edit that entry instead." });
+      return;
+    }
+    if (proofNeeded && !hasProof) problems.proof = "A photo of the Z report is needed for these payment types";
+    setErrors(problems);
+    if (Object.keys(problems).length) {
+      toast.error("Check the highlighted fields");
+      return;
+    }
 
-  const handleSubmit = async () => {
-    if (confirmBusy) return;
-    setConfirmBusy(true);
-    setErrorMessage("");
+    // A day with nothing taken (e.g. closed) is allowed, but asked about.
+    if (!tenders.some((t) => num(t.key) > 0)) {
+      const ok = await confirmDialog({
+        title: `Save ${day(date)} with no sales?`,
+        message: "Every amount is empty. Save it only if the restaurant took nothing that day.",
+        confirmLabel: "Save with no sales",
+      });
+      if (!ok) return;
+    }
 
+    setBusy(true);
     try {
-        // Check duplication (if date changed or creating new)
-        if (!editingSale || (editingSale && editingSale.date !== date)) {
-            const salesRef = collection(db, "companies", companyId, "branches", branchId, "sales");
-            const q = query(salesRef, where("date", "==", date));
-            const snapshot = await getDocs(q);
-            // If editing, check if ID is different. If creating, just check existence.
-            const exists = snapshot.docs.some(d => editingSale ? d.id !== editingSale.id : true);
-            
-            if (exists) {
-                setErrorMessage("Sales entry already exists for this date.");
-                setConfirmBusy(false);
-                return;
-            }
+      // The month list may be out of date: ask the database once more before creating.
+      if (!editing || editing.date !== date) {
+        const snap = await getDocs(query(collection(db, "companies", companyId, "branches", branchId, "sales"), where("date", "==", date)));
+        if (snap.docs.some((d) => d.id !== editing?.id)) {
+          setNudge((n) => n + 1);
+          toast.error("This day is already entered", { description: "Someone just saved it — see Recent entries." });
+          return;
         }
+      }
 
-        // Check Proof
-        if (proofRequired && !(zReportFile || zReportUrl || editingSale?.zReportUrl)) {
-            setErrorMessage("Proof is required: please attach Z Report image.");
-            setConfirmBusy(false);
-            return;
-        }
+      const url = proofFile ? await uploadProof() : proofUrl || null;
+      const payload = {
+        date,
+        ...form,
+        notes,
+        total,
+        zReportUrl: url,
+        tenderMeta: tenders.map((t) => ({
+          key: t.key,
+          label: t.label,
+          includeInTotal: t.includeInTotal !== false,
+          banked: !!t.banked,
+          requireProof: !!t.requireProof,
+          order: t.order ?? null,
+        })),
+      };
 
-        // Upload
-        let finalUrl = zReportUrl || editingSale?.zReportUrl || null;
-        if (zReportFile) {
-            finalUrl = await uploadZReport();
-        }
-
-        const payload = {
-            date,
-            ...form,
-            notes,
-            total,
-            zReportUrl: finalUrl,
-            tenderMeta: tendersConfig.map(t => ({
-                key: t.key,
-                label: t.label,
-                includeInTotal: t.includeInTotal !== false,
-                banked: !!t.banked,
-                requireProof: !!t.requireProof,
-                order: t.order ?? null,
-            })),
-        };
-
-        if (confirmMode === "create") {
-            const createdBy = getSessionUser() || {};
-            await addSalesEntry({ 
-                companyId, 
-                branchId, 
-                data: { ...payload, createdBy, createdAt: new Date().toISOString() } 
-            }).unwrap();
-        } else {
-            await doUpdate({ 
-                companyId, 
-                branchId, 
-                id: editingSale.id, 
-                patch: payload 
-            });
-        }
-        
-        resetToCreateMode();
-
+      if (editing) {
+        await doUpdate({ companyId, branchId, id: editing.id, patch: payload });
+        toast.success("Sales updated", { description: `${day(date)} · ${money(total)}` });
+      } else {
+        const createdBy = getSessionUser() || {};
+        await addSalesEntry({ companyId, branchId, data: { ...payload, createdBy, createdAt: new Date().toISOString() } }).unwrap();
+        toast.success("Sales saved", { description: `${day(date)} · ${money(total)}` });
+      }
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1400);
+      reset();
     } catch (err) {
-        console.error("Submit Error:", err);
-        setErrorMessage("Failed to save entry. Please try again.");
+      console.error("Sales entry save failed:", err);
+      toast.error("Couldn't save the sales", { description: "Check your connection and try again." });
     } finally {
-        setConfirmBusy(false);
+      setBusy(false);
     }
   };
 
-  // CRUD Hooks
-  function useSalesCrud() {
-    const base = useCrudActions({
-      useUpdateMutationHook: useUpdateSalesEntryMutation,
-      useDeleteMutationHook: useDeleteSalesEntryMutation,
-      idFieldName: "saleId",
-    });
-    const doUpdate = async ({ companyId, branchId, id, patch }) => base.doUpdate({ companyId, branchId, id, patch });
-    const doDelete = async ({ companyId, branchId, id }) => base.doDelete({ companyId, branchId, id });
-    return { ...base, doUpdate, doDelete };
-  }
-  
-  const { canEdit, confirmingDelete, setConfirmingDelete, doUpdate, doDelete, updating } = useSalesCrud();
-  
-  // Fetch this month's sales to compute "Grand Total (This Month)" for the modal
-  const selectedMonthStr = date?.slice(0, 7) || new Date().toISOString().slice(0, 7);
-  const [y, m] = selectedMonthStr.split("-");
-  const monthStart = `${selectedMonthStr}-01`;
-  const lastDay = new Date(y, m, 0).getDate();
-  const monthEnd = `${selectedMonthStr}-${lastDay.toString().padStart(2, "0")}`;
-
-  const { data: sales = [], isLoading: salesLoading, isError: salesError } = useGetSalesEntriesQuery(
-    { companyId, branchId, startDate: monthStart, endDate: monthEnd },
-    { skip: !companyId || !branchId }
+  const uploading = progress > 0 && progress < 100;
+  const saving = busy || creating || updating;
+  const label = uploading ? "Uploading photo…" : editing ? "Update sales" : "Save sales";
+  const saveButton = (
+    <Button size="lg" className="w-full" onClick={save} loading={saving} success={saved} disabled={settingsLoading || !tenders.length}>
+      {label}
+    </Button>
   );
 
-  const lastFiveSales = useMemo(() => {
-    const list = Array.isArray(sales) ? [...sales] : [];
-    return list.sort((a, b) => (new Date(b.date) - new Date(a.date))).slice(0, 5);
-  }, [sales]);
-
-  // Edit Handler
-  const startEdit = (entry) => {
-    setEditingSale(entry);
-    setConfirmMode("update");
-    setDate(entry.date);
-    
-    const nextForm = {};
-    const nextNotes = entry.notes || {};
-    tendersConfig.forEach((t) => { nextForm[t.key] = entry[t.key] ? String(entry[t.key]) : ""; });
-    
-    setForm(nextForm);
-    setNotes(nextNotes);
-    
-    if (entry.zReportUrl) {
-        setZReportPreview(entry.zReportUrl);
-        setZReportUrl(entry.zReportUrl);
-    } else {
-        setZReportPreview(null);
-        setZReportUrl(null);
-    }
-    setZReportFile(null);
-    setUploadProgress(0);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const isUploading = uploadProgress > 0 && uploadProgress < 100;
-  
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-8 max-w-5xl mx-auto">
-      <h1 className="text-2xl font-bold text-center mb-6 text-gray-800">
-        Sales Entry <span className="text-mint-500">{editingSale ? "(Edit Mode)" : ""}</span>
-      </h1>
-
-      <SalesForm 
-        date={date}
-        setDate={setDate}
-        tendersConfig={tendersConfig}
-        form={form}
-        handleChange={handleChange}
-        notes={notes}
-        handleNoteChange={handleNoteChange}
-        openNote={openNote}
-        setOpenNote={setOpenNote}
-        zReportFile={zReportFile}
-        zReportPreview={zReportPreview}
-        handleFileChange={handleFileChange}
-        removeFile={removeFile}
-        uploadProgress={uploadProgress}
-        total={total}
-        onSubmit={handleSubmit}
-        isSubmitDisabled={confirmBusy || isCreating || updating || isUploading || settingsLoading}
-        submitLabel={
-            confirmBusy || isCreating || updating 
-            ? "Saving..." 
-            : isUploading 
-            ? "Uploading..." 
-            : editingSale 
-            ? "Update Entry" 
-            : "Save Entry"
+    <>
+      <EntryLayout
+        aside={
+          <div className="space-y-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-subtle">Total sales</p>
+              <CountUp value={total} format={money} className="mt-1 block text-3xl font-bold tracking-tight text-fg" />
+              <p className="mt-0.5 text-xs text-muted">{date ? day(date) : "Pick a day"}</p>
+            </div>
+            <div className="space-y-2 border-t border-line pt-3">
+              <SummaryLine label="To the bank" value={money(banked)} />
+              <SummaryLine label="Cash in the till" value={money(till)} />
+              {tenders.some((t) => t.includeInTotal === false && num(t.key)) && (
+                <SummaryLine muted label="Not counted in total" value={money(tenders.reduce((n, t) => n + (t.includeInTotal === false ? num(t.key) : 0), 0))} />
+              )}
+            </div>
+            {saveButton}
+            {editing && (
+              <Button variant="ghost" className="w-full" onClick={reset} icon={X}>
+                Cancel editing
+              </Button>
+            )}
+          </div>
         }
-        onCancel={resetToCreateMode}
-        showCancel={!!editingSale}
-        errorMessage={errorMessage}
-      />
-
-      <SalesTable
-        sales={lastFiveSales}
-        loading={salesLoading}
-        error={salesError}
-        canEdit={canEdit}
-        role={userRole}
-        onEdit={startEdit}
-        onView={setSelectedSale}
-      />
-
-      {selectedSale && (() => {
-        // Compute Grand Total for the same month as the selected entry
-        const selectedMonth = selectedSale.date?.slice(0, 7); // "YYYY-MM"
-        const monthTotal = sales
-          .filter(s => s.date?.startsWith(selectedMonth))
-          .reduce((sum, s) => sum + (parseFloat(s.total) || 0), 0)
-          .toFixed(2);
-
-        return (
-          <ItemsReportModal
-            item={selectedSale}
-            branchData={branchData}
-            monthTotal={monthTotal}
-            onClose={() => setSelectedSale(null)}
+        bar={
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-subtle">Total</p>
+              <CountUp value={total} format={money} className="block truncate text-lg font-bold tracking-tight text-fg" />
+            </div>
+            {editing && (
+              <Button variant="secondary" size="lg" onClick={reset} aria-label="Cancel editing" className="px-3">
+                <X className="size-5" />
+              </Button>
+            )}
+            <div className="w-40 shrink-0">{saveButton}</div>
+          </div>
+        }
+        below={
+          <RecentEntries
+            viewAllHref="/reports/sales-report"
+            loading={salesLoading && !!args}
+            error={salesError}
+            money={money}
+            items={recent.map((s, i) => ({
+              id: s.id,
+              date: s.date,
+              amount: s.total,
+              proof: !!s.zReportUrl,
+              note: s.createdBy?.username || s.createdBy?.userName || "—",
+              onOpen: () => setViewing(s),
+              // A supervisor may change only the latest day.
+              onEdit: canEdit && (role !== "supervisor" || i === 0) ? () => startEdit(s) : undefined,
+            }))}
           />
-        );
-      })()}
+        }
+      >
+        {/* editing banner */}
+        <AnimatePresence>
+          {editing && (
+            <motion.div
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              className="flex items-center gap-3 rounded-2xl border border-info/30 bg-info-soft px-4 py-3 text-sm text-fg"
+            >
+              <Pencil className="size-4 shrink-0 text-info" />
+              <span className="min-w-0 flex-1">
+                Editing the sales for <b>{day(editing.date)}</b>
+              </span>
+              <button type="button" onClick={reset} className="text-xs font-semibold text-info hover:underline">
+                Cancel
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-      <ConfirmDeleteModal
-        visible={!!confirmingDelete}
-        onClose={() => setConfirmingDelete(null)}
-        date={confirmingDelete?.date}
-        onConfirm={async () => {
-          await doDelete({ companyId, branchId, id: confirmingDelete.id });
-        }}
-      />
-    </div>
+        <EntrySection title="Which day">
+          <Field error={errors.date}>
+            {({ invalid }) => <DatePicker value={date} onChange={(d) => (setDate(d), setErrors((e) => ({ ...e, date: undefined })))} max={today} invalid={invalid} />}
+          </Field>
+          <AnimatePresence>
+            {taken && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <motion.div
+                  key={nudge}
+                  animate={nudge ? { x: [0, -6, 6, -4, 4, 0] } : undefined}
+                  transition={{ duration: 0.35 }}
+                  className="mt-3 flex items-center gap-3 rounded-xl bg-warning-soft px-3.5 py-2.5 text-sm"
+                >
+                  <CalendarCheck2 className="size-4 shrink-0 text-warning" />
+                  <span className="min-w-0 flex-1 text-fg">
+                    {day(date)} is already entered: <b>{money(taken.total)}</b>
+                  </span>
+                  {canEdit && (
+                    <button type="button" onClick={() => startEdit(taken)} className="shrink-0 text-xs font-semibold text-warning hover:underline">
+                      Edit it
+                    </button>
+                  )}
+                </motion.div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </EntrySection>
+
+        <EntrySection title="Takings by payment type">
+          {settingsLoading || (!tenders.length && args) ? (
+            settingsLoading ? (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {[0, 1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-[4.5rem]" rounded="rounded-xl" />
+                ))}
+              </div>
+            ) : (
+              <p className="rounded-xl bg-surface-2 px-4 py-6 text-center text-sm text-muted">
+                No payment types are set up for this branch yet. Add them in Branch Settings.
+              </p>
+            )
+          ) : (
+            <div className="grid gap-x-4 gap-y-4 sm:grid-cols-2">
+              {tenders.map((t) => {
+                const noteOpen = openNote === t.key || !!notes[t.key];
+                return (
+                  <div key={t.key}>
+                    <div className="mb-1.5 flex items-center gap-1.5">
+                      <label htmlFor={`tender-${t.key}`} className="text-xs font-semibold text-muted">
+                        {t.label}
+                      </label>
+                      {t.banked ? (
+                        <Landmark className="size-3 text-info" aria-label="Goes to the bank" />
+                      ) : t.key === "cash" ? (
+                        <Wallet className="size-3 text-brand" aria-label="Stays in the till" />
+                      ) : null}
+                      {t.requireProof && <Badge tone="warning">Photo needed</Badge>}
+                      {t.includeInTotal === false && <Badge>Not in total</Badge>}
+                      <button
+                        type="button"
+                        onClick={() => setOpenNote(openNote === t.key ? null : t.key)}
+                        aria-label={`Note for ${t.label}`}
+                        className={cn(
+                          "ml-auto rounded-lg p-1 transition",
+                          notes[t.key] ? "text-brand" : "text-subtle hover:bg-surface-2 hover:text-fg"
+                        )}
+                      >
+                        <NotebookPen className="size-3.5" />
+                      </button>
+                    </div>
+                    <MoneyInput
+                      id={`tender-${t.key}`}
+                      currency={currency}
+                      value={form[t.key]}
+                      onValueChange={(v) => setForm((f) => ({ ...f, [t.key]: v }))}
+                    />
+                    <AnimatePresence initial={false}>
+                      {noteOpen && (
+                        <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                          <Input
+                            className="mt-2 h-9 text-xs"
+                            placeholder={`Note for ${t.label}…`}
+                            value={notes[t.key] ?? ""}
+                            onChange={(e) => setNotes((n) => ({ ...n, [t.key]: e.target.value }))}
+                          />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </EntrySection>
+
+        <EntrySection>
+          <ProofUpload
+            label="Z report photo"
+            preview={proofPreview}
+            progress={progress}
+            required={proofNeeded}
+            invalid={!!errors.proof}
+            onPick={(file, url) => {
+              setProofFile(file);
+              setProofPreview(url);
+              setProgress(0);
+              setErrors((e) => ({ ...e, proof: undefined }));
+            }}
+            onRemove={() => {
+              setProofFile(null);
+              setProofPreview(null);
+              setProofUrl(null);
+              setProgress(0);
+            }}
+          />
+          {errors.proof && <p className="mt-2 text-xs font-medium text-danger">{errors.proof}</p>}
+        </EntrySection>
+      </EntryLayout>
+
+      {viewing && (
+        <ItemsReportModal
+          item={viewing}
+          branchData={branchData}
+          monthTotal={sales
+            .filter((s) => s.date?.startsWith(viewing.date?.slice(0, 7)))
+            .reduce((n, s) => n + (parseFloat(s.total) || 0), 0)
+            .toFixed(2)}
+          onClose={() => setViewing(null)}
+        />
+      )}
+    </>
   );
 }
