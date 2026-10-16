@@ -65,3 +65,6 @@ functions/engine.cjs
 
 # Cloud Functions dependencies (npm install in functions/; deploy installs them itself)
 functions/node_modules/
+
+# npm run dev:phone writes this (firebase.json with emulators open to the Wi-Fi)
+.firebase.lan.json

@@ -31,6 +31,7 @@ walkthrough figures are computed from the same list of entries, and
 | `npm run staff:link` | Records on each staff login which staff record it is (`users.staffId`), from the `uid` on the staff record. The seed runs it. |
 | `npm run summaries:rebuild` | Recomputes every branch's monthly totals in the running emulators (the seed already does this; the Cloud Functions keep them up to date as you work). |
 | `npm run dev:local` | Starts the emulators + the app at http://localhost:3000. Changes you make are kept between runs. Stop with **Ctrl+C** (waits a few seconds to save). |
+| `npm run dev:phone` | Same, and phones on the same Wi-Fi can open it too: it prints the address to open (e.g. http://192.168.x.x:3000). The local data becomes reachable by anyone on that network, so only use it at home or the office. If the phone can't connect: allow Node.js and Java through Windows Firewall, and let a VPN allow local-network access (or pause it). |
 
 Emulator dashboard (browse the data, users, function logs): http://127.0.0.1:4000
 

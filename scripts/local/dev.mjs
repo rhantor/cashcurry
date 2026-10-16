@@ -2,8 +2,13 @@
 // Starts Firestore/Auth/Storage/Functions emulators with the seeded data, waits
 // for them, then starts `next dev` pointed at them. Ctrl+C stops both and
 // saves any changes you made back to .local/emulator-data.
+//
+// `npm run dev:phone` (--lan) also lets phones on the same Wi-Fi open it: the
+// emulators listen on the network too, and the address to open is printed.
+// Only on a network you trust — anyone on it could read the local data.
 import fs from "node:fs";
 import net from "node:net";
+import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { ROOT, LOCAL_DIR, LOCAL_PROJECT_ID, EMULATOR_DATA_DIR, NEXT_LOCAL_ENV } from "./config.mjs";
@@ -11,6 +16,35 @@ import { ROOT, LOCAL_DIR, LOCAL_PROJECT_ID, EMULATOR_DATA_DIR, NEXT_LOCAL_ENV } 
 if (!fs.existsSync(EMULATOR_DATA_DIR)) {
   console.error("No local data yet. Run `npm run local:seed` first.");
   process.exit(1);
+}
+
+// ── phone mode ──
+const lanArg = process.argv.find((a) => a === "--lan" || a.startsWith("--lan="));
+const lanIp = lanArg ? lanArg.split("=")[1] || wifiAddress() : null;
+if (lanArg && !lanIp) {
+  console.error("No Wi-Fi/LAN address found. Pass it yourself: npm run dev:phone -- --lan=192.168.x.x");
+  process.exit(1);
+}
+
+/** This machine's address on the local network (Wi-Fi first; VPN adapters skipped). */
+function wifiAddress() {
+  const isPrivate = (ip) => /^(192\.168\.|10\.|172\.(1[6-9]|2\d|3[01])\.)/.test(ip);
+  const all = Object.entries(os.networkInterfaces()).flatMap(([name, addrs]) =>
+    (addrs || []).filter((a) => a.family === "IPv4" && !a.internal && isPrivate(a.address)).map((a) => ({ name, ip: a.address }))
+  );
+  const usable = all.filter((a) => !/vpn|surfshark|wireguard|tap|tun|virtual|vethernet|wsl/i.test(a.name));
+  return (usable.find((a) => /wi-?fi|wlan|wireless/i.test(a.name)) || usable.find((a) => a.ip.startsWith("192.168.")) || usable[0])?.ip;
+}
+
+/** A copy of firebase.json whose emulators listen on the network, not only this machine. */
+function lanFirebaseConfig() {
+  const cfg = JSON.parse(fs.readFileSync(path.join(ROOT, "firebase.json"), "utf8"));
+  for (const [name, emu] of Object.entries(cfg.emulators || {})) {
+    if (emu && typeof emu === "object" && name !== "singleProjectMode") emu.host = "0.0.0.0";
+  }
+  const file = path.join(ROOT, ".firebase.lan.json"); // next to firebase.json: rule paths stay valid
+  fs.writeFileSync(file, JSON.stringify(cfg, null, 2));
+  return path.basename(file);
 }
 
 const children = [];
@@ -62,6 +96,7 @@ run("firebase", [
   "--project", LOCAL_PROJECT_ID,
   "--import", `"${EMULATOR_DATA_DIR}"`,
   "--export-on-exit", `"${EMULATOR_DATA_DIR}"`,
+  ...(lanIp ? ["--config", lanFirebaseConfig()] : []),
 ], { FUNCTIONS_DISCOVERY_TIMEOUT: "60" });
 
 // Firestore is the last of the core emulators to come up.
@@ -112,4 +147,9 @@ setInterval(() => {
 }, AUTOSAVE_MS).unref();
 
 console.log("\n  Local data ready — emulator dashboard: http://127.0.0.1:4000\n");
-run("npx", ["next", "dev"], { ...NEXT_LOCAL_ENV, ...localLoginEnv() });
+if (lanIp) {
+  console.log(`  📱 On your phone (same Wi-Fi), open:  http://${lanIp}:3000`);
+  console.log("     If it doesn't load: allow Node.js and Java through Windows Firewall (Private networks),");
+  console.log("     and let your VPN allow local-network access (or pause it).\n");
+}
+run("npx", ["next", "dev"], { ...NEXT_LOCAL_ENV, ...localLoginEnv(), ...(lanIp ? { CC_LAN_HOST: lanIp } : {}) });

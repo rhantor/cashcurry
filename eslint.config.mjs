@@ -25,7 +25,7 @@ export default defineConfig([
   },
   {
     // Run in Node, not the browser.
-    files: ["scripts/**", "lib/server/**", "functions/**", "tests/**", "tests-rules/**", "vitest.config.mjs"],
+    files: ["scripts/**", "lib/server/**", "functions/**", "tests/**", "tests-rules/**", "vitest.config.mjs", "next.config.mjs"],
     languageOptions: { globals: globals.node },
   },
   {
