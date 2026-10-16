@@ -24,6 +24,7 @@ import {
   Info
 } from "lucide-react";
 import { getSessionUser } from "@/lib/session";
+import { toast } from "@/app/components/ui/notify";
 
 // Draw an image scaled to fit inside a box without distorting it, then return
 // the height it actually used. addImage() stretches to whatever width/height it
@@ -427,7 +428,7 @@ export default function AppointmentLetterGenerator() {
   // --- Draft Storage Logic ---
   const handleSaveDraft = () => {
     if (!draftName.trim()) {
-      alert("Please enter a name for the draft.");
+      toast.warning("Please enter a name for the draft.");
       return;
     }
     
@@ -454,7 +455,7 @@ export default function AppointmentLetterGenerator() {
     setSavedDrafts(updated);
     localStorage.setItem("cc_appointment_letter_drafts", JSON.stringify(updated));
     setDraftName("");
-    alert(`Draft "${newDraft.name}" saved successfully!`);
+    toast.success(`Draft "${newDraft.name}" saved successfully!`);
   };
 
   const handleLoadDraft = (id) => {
@@ -474,7 +475,7 @@ export default function AppointmentLetterGenerator() {
       setEmployeeSignature(draft.employeeSignature || null);
       setStylingOptions(draft.stylingOptions || stylingOptions);
       setSelectedDraft(id);
-      alert(`Draft "${draft.name}" loaded successfully.`);
+      toast.success(`Draft "${draft.name}" loaded successfully.`);
     }
   };
 
@@ -555,7 +556,7 @@ export default function AppointmentLetterGenerator() {
     const isBlank = !buffer.some(color => color !== 0);
     
     if (isBlank) {
-      alert("Please draw your signature before saving.");
+      toast.warning("Please draw your signature before saving.");
       return;
     }
 

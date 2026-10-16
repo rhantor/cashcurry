@@ -9,6 +9,7 @@ import { useUpdateCostEntryMutation } from "@/lib/redux/api/costApiSlice";
 import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
 import useCurrency from "@/app/hooks/useCurrency";
 import { UploadIcon, X } from "lucide-react";
+import { toast } from "@/app/components/ui/notify";
 
 const CATEGORIES = [
   'Utilities', 'Inventory', 'Maintenance', 'Staff Cost', 'Rent/Deposit',
@@ -97,7 +98,7 @@ export default function EditCostModal({ cost, onClose, onSuccess }) {
       setFile(processedFile);
     } catch (err) {
       console.error('File processing error:', err);
-      alert('Failed to process file. Try again.');
+      toast.error('Failed to process file. Try again.');
     }
   };
 
@@ -111,7 +112,7 @@ export default function EditCostModal({ cost, onClose, onSuccess }) {
       setReceiptRemoved(false);
     } catch (err) {
       console.error('Receipt processing error:', err);
-      alert('Failed to process receipt. Try again.');
+      toast.error('Failed to process receipt. Try again.');
     }
   };
 
@@ -153,10 +154,10 @@ export default function EditCostModal({ cost, onClose, onSuccess }) {
   };
 
   const handleSave = async () => {
-    if (!amount) return alert('Please enter amount.');
-    if (!resolvedCategory) return alert('Please select a category.');
-    if (category === 'Other' && !customCategory.trim()) return alert('Please type a custom category name.');
-    if (paidFromOffice === 'back' && !paidMethod) return alert('Please select a payment method for Back Office.');
+    if (!amount) return toast.warning('Please enter amount.');
+    if (!resolvedCategory) return toast.warning('Please select a category.');
+    if (category === 'Other' && !customCategory.trim()) return toast.warning('Please type a custom category name.');
+    if (paidFromOffice === 'back' && !paidMethod) return toast.warning('Please select a payment method for Back Office.');
 
     try {
       // Viewers and exports read `attachments` in preference to `fileURL`, so
@@ -219,7 +220,7 @@ export default function EditCostModal({ cost, onClose, onSuccess }) {
       onSuccess();
     } catch (err) {
       console.error('Update failed:', err);
-      alert('Failed to update cost entry.');
+      toast.error('Failed to update cost entry.');
     }
   };
 

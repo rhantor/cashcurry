@@ -11,6 +11,7 @@ import {
 } from '../logic/constants'
 import ImageCaptureEditor from './ImageCaptureEditor'
 import useCurrency from '@/app/hooks/useCurrency'
+import { toast } from "@/app/components/ui/notify";
 
 export default function CostEntryForm ({ form, onSave }) {
   const {
@@ -55,7 +56,7 @@ export default function CostEntryForm ({ form, onSave }) {
       setFile(selectedFile)
     } else if (files.length > 1) {
       // Multiple images - user should convert to PDF first
-      alert('⚠️ Multiple images detected. Please convert to PDF first.')
+      toast.warning('Multiple images detected. Please convert to PDF first.')
       return
     }
 

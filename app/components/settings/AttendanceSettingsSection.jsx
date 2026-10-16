@@ -6,6 +6,7 @@ import ShiftRulesSection from "./ShiftRulesSection";
 import { useGetStaffListQuery, useUpdateStaffMutation } from "@/lib/redux/api/staffApiSlice";
 import { registerBiometric, isBiometricAvailable } from "@/lib/biometricUtils";
 import { Fingerprint, CheckCircle2, ShieldAlert, Loader2 } from "lucide-react";
+import { toast } from "@/app/components/ui/notify";
 
 export default function AttendanceSettingsSection({ role, companyId, branchId, value, onChange }) {
   const v = value || {};
@@ -42,7 +43,7 @@ export default function AttendanceSettingsSection({ role, companyId, branchId, v
     } catch (err) {
       console.error(err);
       setEnrollStatus(prev => ({ ...prev, [staff.id]: 'error' }));
-      alert(err.message || "Enrollment failed. Make sure your device supports biometrics.");
+      toast.error(err.message || "Enrollment failed. Make sure your device supports biometrics.");
     } finally {
       setTimeout(() => {
         setEnrollStatus(prev => ({ ...prev, [staff.id]: 'idle' }));

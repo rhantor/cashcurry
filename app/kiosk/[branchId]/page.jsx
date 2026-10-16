@@ -13,6 +13,8 @@ import { verifyBiometric } from "@/lib/biometricUtils";
 import { getAttendanceDate, todayLocalStr } from "@/lib/attendance/computeHours";
 import { otRequestId, resolveStaffShift, shiftRules, shiftWindow } from "@/lib/attendance/shifts";
 import { getSessionUser } from "@/lib/session";
+// `toast` here is the kiosk's own punch popup; app messages are `notify`.
+import { toast as notify } from "@/app/components/ui/notify";
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
 function todayStr() {
@@ -423,7 +425,7 @@ export default function KioskPage() {
       const nowMs = Date.now();
       const diffMin = (nowMs - lastMs) / 60000;
       if (diffMin < attendanceSettings.duplicatePunchInterval) {
-        alert(`Please wait ${Math.ceil(attendanceSettings.duplicatePunchInterval - diffMin)} more minute(s) before punching again.`);
+        notify.warning(`Please wait ${Math.ceil(attendanceSettings.duplicatePunchInterval - diffMin)} more minute(s) before punching again.`);
         return;
       }
     }
@@ -453,7 +455,7 @@ export default function KioskPage() {
 
     // 3. PIN Fallback
     if (!staff.pinCode) {
-      alert(`${staff.firstName} does not have a Kiosk PIN configured. Please ask admin to set one.`);
+      notify.warning(`${staff.firstName} does not have a Kiosk PIN configured. Please ask admin to set one.`);
       return;
     }
     setSelectedStaff(staff);
@@ -492,7 +494,7 @@ export default function KioskPage() {
       refetchPunches();
       maybeRequestEarlyOt(staff, punchType);
     } catch (err) {
-      alert("Punch failed: " + (err?.message || "Unknown error"));
+      notify.error("Punch failed: " + (err?.message || "Unknown error"));
     }
 
     setSelectedStaff(null);

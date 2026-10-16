@@ -4,6 +4,7 @@ import { useAddLoanEntryMutation } from "@/lib/redux/api/loanApiSlice";
 import { useGetBranchesBasicQuery } from "@/lib/redux/api/branchApiSlice";
 import { serverTimestamp } from "firebase/firestore";
 import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
+import { toast } from "@/app/components/ui/notify";
 
 const LoanRequestForm = () => {
   const { ready, companyId, branchId, user } = useResolvedCompanyBranch();
@@ -83,7 +84,7 @@ const LoanRequestForm = () => {
       setReason("");
       setToBranchId("");
       setTouched({ amount: false, toBranchId: false });
-      alert("✅ Loan request sent!");
+      toast.success("Loan request sent!");
     } catch (err) {
       console.error(err);
     }

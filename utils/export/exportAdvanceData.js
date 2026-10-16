@@ -12,6 +12,7 @@ import {
 import * as XLSX from 'xlsx'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { toast } from "@/app/components/ui/notify";
 
 /* ==========================================================
    Helpers
@@ -151,7 +152,7 @@ const calcStaffTotalsFromEntries = (entries = []) => {
 ========================================================== */
 export const exportAdvanceToExcel = (advance, branchData) => {
   try {
-    if (!advance) return alert('No advance data!')
+    if (!advance) return toast.warning('No advance data!')
 
     const branchName = branchData?.name || 'N/A'
     const createdTime = getCreatedAtText(advance)
@@ -192,7 +193,7 @@ export const exportAdvanceToExcel = (advance, branchData) => {
     XLSX.writeFile(wb, `advance_${name}_${date}.xlsx`)
   } catch (err) {
     console.error("Export failed:", err);
-    alert("Failed to export. Please try again.");
+    toast.error("Failed to export. Please try again.");
   }
 }
 
@@ -201,7 +202,7 @@ export const exportAdvanceToExcel = (advance, branchData) => {
 ========================================================== */
 export const exportAdvanceToPDF = (advance, branchData) => {
   try {
-    if (!advance) return alert('No advance data!')
+    if (!advance) return toast.warning('No advance data!')
 
     const branchName = branchData?.name || 'N/A'
     const doc = new jsPDF()
@@ -265,7 +266,7 @@ export const exportAdvanceToPDF = (advance, branchData) => {
     doc.save(`advance_${name}_${date}.pdf`)
   } catch (err) {
     console.error("Export failed:", err);
-    alert("Failed to export. Please try again.");
+    toast.error("Failed to export. Please try again.");
   }
 }
 
@@ -281,7 +282,7 @@ export const exportAdvancesToExcel = (
   selectedMonth = ''
 ) => {
   try {
-    if (!advances?.length) return alert('No advance data to export!')
+    if (!advances?.length) return toast.warning('No advance data to export!')
 
     const branchName = branchData?.name || 'N/A'
     const { filterText, fileFilterName } = buildFilterMeta(
@@ -376,7 +377,7 @@ export const exportAdvancesToExcel = (
     XLSX.writeFile(wb, `advance-report_${fileFilterName}.xlsx`)
   } catch (err) {
     console.error("Export failed:", err);
-    alert("Failed to export. Please try again.");
+    toast.error("Failed to export. Please try again.");
   }
 }
 
@@ -392,7 +393,7 @@ export const exportAdvancesToPDF = (
   selectedMonth = ''
 ) => {
   try {
-    if (!advances?.length) return alert('No advance data to export!')
+    if (!advances?.length) return toast.warning('No advance data to export!')
 
     const branchName = branchData?.name || 'N/A'
     const doc = new jsPDF('landscape')
@@ -464,7 +465,7 @@ export const exportAdvancesToPDF = (
     doc.save(`advance-report_${fileFilterName}.pdf`)
   } catch (err) {
     console.error("Export failed:", err);
-    alert("Failed to export. Please try again.");
+    toast.error("Failed to export. Please try again.");
   }
 }
 
@@ -481,7 +482,7 @@ export const exportAdvanceStaffSummaryToExcel = (
   selectedMonth = ''
 ) => {
   try {
-    if (!staffSummary?.length) return alert('No staff summary data to export!')
+    if (!staffSummary?.length) return toast.warning('No staff summary data to export!')
 
     const branchName = branchData?.name || 'N/A'
     const { filterText, fileFilterName } = buildFilterMeta(
@@ -562,7 +563,7 @@ export const exportAdvanceStaffSummaryToExcel = (
     XLSX.writeFile(wb, `advance-staff-summary_${fileFilterName}.xlsx`)
   } catch (err) {
     console.error("Export failed:", err);
-    alert("Failed to export. Please try again.");
+    toast.error("Failed to export. Please try again.");
   }
 }
 
@@ -578,7 +579,7 @@ export const exportAdvanceStaffSummaryToPDF = (
   selectedMonth = ''
 ) => {
   try {
-    if (!staffSummary?.length) return alert('No staff summary data to export!')
+    if (!staffSummary?.length) return toast.warning('No staff summary data to export!')
 
     const branchName = branchData?.name || 'N/A'
     const doc = new jsPDF('landscape')
@@ -652,7 +653,7 @@ export const exportAdvanceStaffSummaryToPDF = (
     doc.save(`advance-staff-summary_${fileFilterName}.pdf`)
   } catch (err) {
     console.error("Export failed:", err);
-    alert("Failed to export. Please try again.");
+    toast.error("Failed to export. Please try again.");
   }
 }
 
@@ -662,7 +663,7 @@ export const exportAdvanceStaffSummaryToPDF = (
 ========================================================== */
 export const exportAdvanceStaffDetailToPDF = (staff, branchData) => {
   try {
-    if (!staff) return alert('No staff data to export!')
+    if (!staff) return toast.warning('No staff data to export!')
 
     const branchName = branchData?.name || 'N/A'
     const doc = new jsPDF('portrait')
@@ -704,7 +705,7 @@ export const exportAdvanceStaffDetailToPDF = (staff, branchData) => {
     doc.save(`advance_staff_${staffName.replace(/\s+/g, '_')}.pdf`)
   } catch (err) {
     console.error("Export failed:", err);
-    alert("Failed to export. Please try again.");
+    toast.error("Failed to export. Please try again.");
   }
 }
 
@@ -713,7 +714,7 @@ export const exportAdvanceStaffDetailToPDF = (staff, branchData) => {
 ========================================================== */
 export const exportAdvanceStaffDetailToExcel = (staff, branchData) => {
   try {
-    if (!staff) return alert('No staff data to export!')
+    if (!staff) return toast.warning('No staff data to export!')
 
     const branchName = branchData?.name || 'N/A'
     const staffName = staff.staffName || 'N/A'
@@ -772,7 +773,7 @@ export const exportAdvanceStaffDetailToExcel = (staff, branchData) => {
     XLSX.writeFile(wb, `advance_staff_${staffName.replace(/\s+/g, '_')}.xlsx`)
   } catch (err) {
     console.error("Export failed:", err);
-    alert("Failed to export. Please try again.");
+    toast.error("Failed to export. Please try again.");
   }
 }
 
@@ -791,7 +792,7 @@ export const exportAdvanceAllStaffToPDF = (
   selectedMonth = ''
 ) => {
   try {
-  if (!staffSummary?.length) return alert('No staff data to export!')
+  if (!staffSummary?.length) return toast.warning('No staff data to export!')
 
   const branchName = branchData?.name || 'N/A'
   const { filterText, fileFilterName } = buildFilterMeta(
@@ -822,7 +823,7 @@ export const exportAdvanceAllStaffToPDF = (
     .filter(s => s.count > 0)
     .sort((a, b) => b.totalAmount - a.totalAmount)
 
-  if (!filteredStaff.length) return alert('No data for this filter!')
+  if (!filteredStaff.length) return toast.warning('No data for this filter!')
 
   // ✅ Grand totals
   const grandTotal = filteredStaff.reduce((sum, s) => sum + s.totalAmount, 0)
@@ -949,7 +950,7 @@ export const exportAdvanceAllStaffToPDF = (
   doc.save(`advance_all_staff_${fileFilterName}.pdf`)
   } catch (err) {
     console.error("Export failed:", err);
-    alert("Failed to export. Please try again.");
+    toast.error("Failed to export. Please try again.");
   }
 }
 
@@ -966,7 +967,7 @@ export const exportAdvanceAllStaffToExcel = (
   selectedMonth = ''
 ) => {
   try {
-  if (!staffSummary?.length) return alert('No staff data to export!')
+  if (!staffSummary?.length) return toast.warning('No staff data to export!')
 
   const branchName = branchData?.name || 'N/A'
   const { filterText, fileFilterName } = buildFilterMeta(
@@ -996,7 +997,7 @@ export const exportAdvanceAllStaffToExcel = (
     .filter(s => s.count > 0)
     .sort((a, b) => b.totalAmount - a.totalAmount)
 
-  if (!filteredStaff.length) return alert('No data for this filter!')
+  if (!filteredStaff.length) return toast.warning('No data for this filter!')
 
   // ✅ Grand totals
   const grandTotal = filteredStaff.reduce((sum, s) => sum + s.totalAmount, 0)
@@ -1125,7 +1126,7 @@ export const exportAdvanceAllStaffToExcel = (
   XLSX.writeFile(wb, `advance_all_staff_${fileFilterName}.xlsx`)
   } catch (err) {
     console.error("Export failed:", err);
-    alert("Failed to export. Please try again.");
+    toast.error("Failed to export. Please try again.");
   }
 }
 
@@ -1134,7 +1135,7 @@ export const exportAdvanceAllStaffToExcel = (
 ========================================================== */
 export const shareAdvance = async (advance, branchData) => {
   try {
-    if (!advance) return alert('No advance data!')
+    if (!advance) return toast.warning('No advance data!')
 
     const branchName = branchData?.name || 'N/A'
     const fileName = `advance-${advance.date || 'unknown'}.pdf`
@@ -1204,10 +1205,10 @@ export const shareAdvance = async (advance, branchData) => {
     } else {
       const link = `${window.location.origin}/advance/${advance.id || ''}`
       await navigator.clipboard.writeText(link)
-      alert('Link copied to clipboard ✅ (paste it into WhatsApp/Email)')
+      toast.success('Link copied to clipboard ✅ (paste it into WhatsApp/Email)')
     }
   } catch (err) {
     console.error("Export failed:", err);
-    alert("Failed to export. Please try again.");
+    toast.error("Failed to export. Please try again.");
   }
 }

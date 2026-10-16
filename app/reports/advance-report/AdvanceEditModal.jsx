@@ -2,6 +2,7 @@
 import React, { useState } from 'react'
 import { useUpdateAdvanceEntryMutation, useDeleteAdvanceEntryMutation } from '@/lib/redux/api/AdvanceApiSlice'
 import { getSessionUser } from '@/lib/session'
+import { toast, confirmDialog } from "@/app/components/ui/notify";
 
 const ADVANCE_TYPES = [
   { value: 'salary', label: 'Salary Advance' },
@@ -57,7 +58,7 @@ export default function AdvanceEditModal ({
       onClose()
     } catch (err) {
       console.error('Failed to update advance:', err)
-      alert('Failed to update advance. Please try again.')
+      toast.error('Failed to update advance. Please try again.')
     }
   }
 
@@ -214,14 +215,14 @@ export default function AdvanceEditModal ({
               <button
                 type='button'
                 onClick={async () => {
-                  if (window.confirm('Are you sure you want to delete this advance entry? This action cannot be undone.')) {
+                  if (await confirmDialog({ title: 'Delete this advance entry?', message: 'This cannot be undone.', danger: true })) {
                     try {
                       await deleteAdvance({ companyId, branchId, id: item.id, user: getSessionUser() }).unwrap()
                       onSuccess?.()
                       onClose()
                     } catch (err) {
                       console.error('Delete failed:', err)
-                      alert('Failed to delete entry.')
+                      toast.error('Failed to delete entry.')
                     }
                   }
                 }}

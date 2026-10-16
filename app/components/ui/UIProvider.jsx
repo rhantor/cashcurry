@@ -2,12 +2,16 @@
 import { useCallback, useEffect, useState } from "react";
 import { MotionConfig } from "framer-motion";
 import { ToastProvider } from "./Toast";
+import DialogHost from "./DialogHost";
 
-/** Everything the UI kit needs once at the top of the app: motion settings and toasts. */
+/** Everything the UI kit needs once at the top of the app: motion settings, toasts, dialogs. */
 export default function UIProvider({ children }) {
   return (
     <MotionConfig reducedMotion="user">
-      <ToastProvider>{children}</ToastProvider>
+      <ToastProvider>
+        {children}
+        <DialogHost />
+      </ToastProvider>
     </MotionConfig>
   );
 }

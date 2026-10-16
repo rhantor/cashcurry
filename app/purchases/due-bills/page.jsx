@@ -29,6 +29,7 @@ import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 import * as XLSX from "xlsx"
 import { PDFDocument } from 'pdf-lib'
+import { toast, confirmDialog } from "@/app/components/ui/notify";
 
 // --- Helper Functions ---
 function daysBetween (aISO, bISO) {
@@ -295,16 +296,14 @@ export default function DueBillsPage () {
 
   const handleDeleteClick = async billId => {
     if (
-      confirm(
-        'Are you sure you want to delete this bill? This will adjust the vendor balance.'
-      )
+      await confirmDialog({ title: 'Delete this bill?', message: "The vendor's balance is adjusted to match.", danger: true })
     ) {
       try {
         await deleteBill({ companyId, branchId, billId }).unwrap()
         setSelectedIds(prev => prev.filter(id => id !== billId))
       } catch (err) {
         console.error('Failed to delete bill:', err)
-        alert('Failed to delete bill.')
+        toast.error('Failed to delete bill.')
       }
     }
   }
@@ -354,7 +353,7 @@ const handleSaveEdit = async (billId, formData) => {
     setEditModalOpen(false)
   } catch (err) {
     console.error('Failed to update bill:', err)
-    alert('Failed to update bill.')
+    toast.error('Failed to update bill.')
   }
 }
 
@@ -433,11 +432,11 @@ const handleSaveEdit = async (billId, formData) => {
       await Promise.all([refetchUnpaid(), refetchPartial()])
       setPayOpen(false)
       setSelectedIds([])
-      alert('✅ Payment recorded!')
+      toast.success('Payment recorded!')
       router.refresh?.()
     } catch (e) {
       console.error(e)
-      alert('❌ Failed to record payment.')
+      toast.error('Failed to record payment.')
     }
   }
 

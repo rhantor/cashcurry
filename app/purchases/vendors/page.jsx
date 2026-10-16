@@ -20,6 +20,7 @@ import SyncVendorMetrics from "./SyncVendorMetrics";
 import VendorPaidBills from "./VendorPaidBills";
 import VendorUnpaidBills from "./VendorUnpaidBills";
 import ExportVendorOverviewBtn from "./ExportVendorOverviewBtn";
+import { toast, confirmDialog } from "@/app/components/ui/notify";
 
 export default function VendorsPage() {
   const { companyId, branchId } = useResolvedCompanyBranch();
@@ -66,7 +67,7 @@ export default function VendorsPage() {
   const [viewTab, setViewTab] = useState("overview"); // "overview" | "unpaid" | "paid"
 
   const handleSaveNew = async () => {
-    if (!addForm.name?.trim()) return alert("Please enter vendor name");
+    if (!addForm.name?.trim()) return toast.warning("Please enter vendor name");
     try {
       await addVendor({
         companyId,
@@ -98,7 +99,7 @@ export default function VendorsPage() {
       setOpenAdd(false);
     } catch (e) {
       console.error(e);
-      alert("Failed to add vendor");
+      toast.error("Failed to add vendor");
     }
   };
 
@@ -157,7 +158,7 @@ export default function VendorsPage() {
       setEditOpen(false);
     } catch (e) {
       console.error(e);
-      alert("Failed to update vendor");
+      toast.error("Failed to update vendor");
     }
   };
 
@@ -171,22 +172,22 @@ export default function VendorsPage() {
       }).unwrap();
     } catch (e) {
       console.error(e);
-      alert("Failed to update");
+      toast.error("Failed to update");
     }
   };
 
   const handleDelete = async (v) => {
-    if (!confirm(`Delete ${v.name}? This cannot be undone.`)) return;
+    if (!(await confirmDialog({ title: `Delete ${v.name}?`, message: "This cannot be undone.", danger: true }))) return;
     try {
       await deleteVendor({ companyId, vendorId: v.id }).unwrap();
     } catch (e) {
       console.error(e);
-      alert("Failed to delete vendor");
+      toast.error("Failed to delete vendor");
     }
   };
 
   const handleExportExcel = (mode) => {
-    if (!vendors?.length) return alert("No vendors to export");
+    if (!vendors?.length) return toast.warning("No vendors to export");
     try {
       const dataForExcel = vendors.map(v => {
         const base = {
@@ -223,12 +224,12 @@ export default function VendorsPage() {
       XLSX.writeFile(wb, mode === 'full' ? "Vendors_Full_Financials.xlsx" : "Vendors_Directory.xlsx");
     } catch (e) {
       console.error(e);
-      alert("Failed to export Excel.");
+      toast.error("Failed to export Excel.");
     }
   };
 
   const handleExportPDFMain = () => {
-    if (!vendors?.length) return alert("No vendors to export");
+    if (!vendors?.length) return toast.warning("No vendors to export");
     const doc = new jsPDF();
     
     doc.setFontSize(20);

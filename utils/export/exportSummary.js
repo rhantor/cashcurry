@@ -4,6 +4,7 @@ import * as XLSX from "xlsx";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { aggregateLoanMovements } from "@/utils/finance/loanAgg";
+import { toast } from "@/app/components/ui/notify";
 
 /* ----------------------- tiny helpers ----------------------- */
 const num = (v) => {
@@ -765,7 +766,7 @@ export const exportSummaryToExcel = (
   meta = {}
 ) => {
   try {
-    if (!rows?.length) return alert("No data!");
+    if (!rows?.length) return toast.warning("No data!");
 
     meta = { ...meta, externalKpis: _kpis };
 
@@ -817,7 +818,7 @@ export const exportSummaryToExcel = (
     XLSX.writeFile(wb, `summary_${safeName}.xlsx`);
   } catch (err) {
     console.error("Export failed:", err);
-    alert("Failed to export. Please try again.");
+    toast.error("Failed to export. Please try again.");
   }
 };
 
@@ -871,7 +872,7 @@ export const exportSummaryToPDF = (
   meta = {}
 ) => {
   try {
-    if (!rows?.length) return alert("No data!");
+    if (!rows?.length) return toast.warning("No data!");
 
     meta = { ...meta, externalKpis: _kpis };
 
@@ -1094,7 +1095,7 @@ export const exportSummaryToPDF = (
     doc.save(`summary_${safeName}.pdf`);
   } catch (err) {
     console.error("Export failed:", err);
-    alert("Failed to export. Please try again.");
+    toast.error("Failed to export. Please try again.");
   }
 };
 

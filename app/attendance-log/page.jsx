@@ -19,6 +19,7 @@ import Cookies from "js-cookie";
 import { computeAttendance, formatHours as fmtHours, toLocalDateStr } from "@/lib/attendance/computeHours";
 import { shiftsEnabled } from "@/lib/attendance/shifts";
 import { getSessionUser } from "@/lib/session";
+import { toast, confirmDialog } from "@/app/components/ui/notify";
 
 export default function AttendanceLogPage() {
   const [user, setUser] = useState(null);
@@ -100,7 +101,7 @@ export default function AttendanceLogPage() {
     setIsExporting(true);
     try {
       if (!monthlyPunches.length) {
-        alert("No data to export for this month");
+        toast.warning("No data to export for this month");
         return;
       }
 
@@ -153,7 +154,7 @@ export default function AttendanceLogPage() {
       XLSX.writeFile(wb, `TimeCard_${selectedDate.substring(0, 7)}.xlsx`);
     } catch (e) {
       console.error(e);
-      alert("Export failed");
+      toast.error("Export failed");
     } finally {
       setIsExporting(false);
     }
@@ -341,8 +342,8 @@ export default function AttendanceLogPage() {
                         <Edit2 size={14} />
                       </button>
                       <button 
-                        onClick={() => {
-                          if (confirm("Delete this punch record?")) {
+                        onClick={async () => {
+                          if (await confirmDialog({ title: "Delete this punch?", message: "It is removed from the attendance log and from the hours worked.", danger: true })) {
                             deletePunch({ companyId, branchId, punchId: punch.id });
                           }
                         }}
@@ -514,7 +515,7 @@ export default function AttendanceLogPage() {
                     }
                     setEditModal(null);
                   } catch {
-                    alert("Save failed");
+                    toast.error("Save failed");
                   } finally {
                     setIsSaving(false);
                   }

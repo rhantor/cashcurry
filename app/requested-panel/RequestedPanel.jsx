@@ -27,6 +27,7 @@ import AdvanceRequests from "./AdvanceRequests";
 import LoanRequests from "./LoanRequests";
 import OtRequests from "./OtRequests";
 import { getSessionUser } from "@/lib/session";
+import { confirmDialog, promptDialog } from "@/app/components/ui/notify";
 
 export default function RequestedPanel() {
   const [companyId, setCompanyId] = useState(null);
@@ -193,10 +194,13 @@ export default function RequestedPanel() {
           }).unwrap();
         } else {
           // Ask whether to auto-create refund entry
-          const needRefund = window.confirm(
-            "This repayment will be rejected.\nDo you also want to create a pending refund entry back to the payer?"
-          );
-          const reason = window.prompt("Reason / note (optional):", "");
+          const needRefund = await confirmDialog({
+            title: "Also create a refund?",
+            message: "This repayment will be rejected. Create a pending refund entry back to the payer as well?",
+            confirmLabel: "Create refund",
+            cancelLabel: "No refund",
+          });
+          const reason = await promptDialog({ title: "Reason or note", label: "Optional", placeholder: "Why is it rejected?" });
 
           await rejectRepayment({
             companyId,

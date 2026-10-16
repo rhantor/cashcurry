@@ -8,6 +8,7 @@ import useCurrency from "@/app/hooks/useCurrency";
 import { storage } from "@/lib/firebase";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
+import { toast } from "@/app/components/ui/notify";
 
 export default function LoanPayCards({ summary = {} }) {
   const currency = useCurrency();
@@ -114,22 +115,22 @@ export default function LoanPayCards({ summary = {} }) {
     if (!companyId || !branchId || !user) return;
 
     const amt = Number(amounts[otherId] || 0);
-    if (!amt || amt <= 0) return alert("Enter a valid amount");
+    if (!amt || amt <= 0) return toast.warning("Enter a valid amount");
     if (amt > Number(outstanding) + 0.0001)
-      return alert("Amount cannot exceed outstanding");
+      return toast.warning("Amount cannot exceed outstanding");
 
     const m = method[otherId] || "cash";
     const up = uploads[otherId] || {};
     const hasProof = !!up.url;
     if (!hasProof)
-      return alert("Please upload proof (voucher/receipt) before paying.");
+      return toast.warning("Please upload proof (voucher/receipt) before paying.");
 
     if (m === "cash") {
-      if (!voucherNo[otherId]) return alert("Please enter voucher no.");
+      if (!voucherNo[otherId]) return toast.warning("Please enter voucher no.");
     } else {
-      if (!bankName[otherId]) return alert("Please enter bank name");
+      if (!bankName[otherId]) return toast.warning("Please enter bank name");
       if (!referenceNo[otherId])
-        return alert("Please enter transaction/reference no.");
+        return toast.warning("Please enter transaction/reference no.");
     }
 
     try {
@@ -170,10 +171,10 @@ export default function LoanPayCards({ summary = {} }) {
           error: "",
         },
       }));
-      alert("✅ Repayment submitted for approval");
+      toast.success("Repayment submitted for approval");
     } catch (err) {
       console.error(err);
-      alert("❌ Failed to submit repayment");
+      toast.error("Failed to submit repayment");
     }
   };
 

@@ -4,6 +4,7 @@ import { useGetChatMessagesQuery, useSendMessageMutation } from "@/lib/redux/api
 import { Send, Hash, MessageCircle } from "lucide-react";
 import Cookies from "js-cookie";
 import { getSessionUser } from "@/lib/session";
+import { toast } from "@/app/components/ui/notify";
 
 export default function BranchChatPage() {
   const [user, setUser] = useState(null);
@@ -52,7 +53,7 @@ export default function BranchChatPage() {
         text: content,
       }).unwrap();
     } catch (err) {
-      alert("Failed to send: " + err.message);
+      toast.error("Failed to send: " + err.message);
       setText(content);
     }
   };

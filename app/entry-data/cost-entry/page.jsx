@@ -7,6 +7,7 @@ import { useCostEntryForm } from './logic/useCostEntryForm'
 import { uploadCostFile } from './logic/storageUpload'
 import CostEntryForm from './components/CostEntryForm'
 import { getSessionUser } from '@/lib/session'
+import { toast } from "@/app/components/ui/notify";
 
 
 
@@ -33,21 +34,21 @@ export default function CostEntryPage () {
   } = form
 
   const handleSave = async () => {
-    if (!companyId || !branchId) return alert('❌ Invalid company or branch.')
+    if (!companyId || !branchId) return toast.warning('Invalid company or branch.')
 
     const amt = Number(amount)
     if (!Number.isFinite(amt) || amt <= 0) {
-      return alert('❌ Please enter a valid amount (> 0).')
+      return toast.warning('Please enter a valid amount (> 0).')
     }
 
-    if (!resolvedCategory) return alert('❌ Please select a category.')
+    if (!resolvedCategory) return toast.warning('Please select a category.')
 
     if (category === 'Other' && !customCategory.trim()) {
-      return alert('❌ Please type a custom category name.')
+      return toast.warning('Please type a custom category name.')
     }
 
     if (paidFromOffice === 'back' && !paidMethod) {
-      return alert('❌ Please select a payment method for Back Office.')
+      return toast.warning('Please select a payment method for Back Office.')
     }
 
     setIsSaving(true)
@@ -114,10 +115,10 @@ export default function CostEntryPage () {
       await addDoc(costRef, data)
 
       resetForm()
-      alert('✅ Cost entry saved successfully!')
+      toast.success('Cost entry saved successfully!')
     } catch (err) {
       console.error('Save failed:', err)
-      alert('❌ Failed to save cost entry. Please try again.')
+      toast.error('Failed to save cost entry. Please try again.')
     } finally {
       setIsSaving(false)
     }
