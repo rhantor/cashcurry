@@ -41,6 +41,7 @@ export default function DialogHost() {
       open={!!current}
       onClose={cancel}
       size="sm"
+      layer="z-[400]"
       footer={
         <>
           <Button variant="ghost" onClick={cancel}>

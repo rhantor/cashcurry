@@ -87,7 +87,7 @@ export default function CommandPalette({ open, onClose, pages, branches, activeB
   return createPortal(
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-[65] flex items-start justify-center px-3 pt-[12vh]" role="dialog" aria-modal="true" aria-label="Search">
+        <div className="fixed inset-0 z-[350] flex items-start justify-center px-3 pt-[12vh]" role="dialog" aria-modal="true" aria-label="Search">
           <motion.div variants={fade} initial="hidden" animate="show" exit="exit" onClick={onClose} className="fixed inset-0 bg-black/40 backdrop-blur-[2px]" />
           <motion.div variants={pop} initial="hidden" animate="show" exit="exit" className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-line bg-surface shadow-float">
             <div className="flex items-center gap-3 border-b border-line px-4">

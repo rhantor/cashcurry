@@ -63,8 +63,12 @@ const Head = ({ title, description, onClose }) =>
     </div>
   );
 
-/** Centred dialog that pops in. `footer` sits on a tinted strip at the bottom. */
-export function Dialog({ open, onClose, title, description, footer, size = "md", children }) {
+// Stacking: page dialogs sit at z-50; the app-wide layers (popovers 300,
+// Ctrl+K 350, confirm/prompt 400, progress bar 450, toasts 500) stay above
+// everything, including the older screens' own modals (up to z-[200]).
+
+/** Centred dialog that pops in. `footer` sits on a tinted strip at the bottom. `layer`: its z-index class. */
+export function Dialog({ open, onClose, title, description, footer, size = "md", layer = "z-50", children }) {
   const panel = useRef(null);
   const mounted = useOverlay(open, onClose, panel);
   if (!mounted) return null;
@@ -72,7 +76,7 @@ export function Dialog({ open, onClose, title, description, footer, size = "md",
   return createPortal(
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+        <div className={cn("fixed inset-0 flex items-center justify-center p-4", layer)} role="dialog" aria-modal="true">
           <Backdrop onClick={onClose} />
           <motion.div
             ref={panel}
@@ -97,7 +101,7 @@ export function Dialog({ open, onClose, title, description, footer, size = "md",
  * Bottom sheet — the phone-friendly dialog. Slides up from the bottom; drag the
  * handle down (or flick) to close. On wide screens it sits centred at the bottom.
  */
-export function Sheet({ open, onClose, title, description, footer, children }) {
+export function Sheet({ open, onClose, title, description, footer, layer = "z-50", children }) {
   const panel = useRef(null);
   const drag = useDragControls();
   const mounted = useOverlay(open, onClose, panel);
@@ -105,7 +109,7 @@ export function Sheet({ open, onClose, title, description, footer, children }) {
   return createPortal(
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center" role="dialog" aria-modal="true">
+        <div className={cn("fixed inset-0 flex items-end justify-center", layer)} role="dialog" aria-modal="true">
           <Backdrop onClick={onClose} />
           <motion.div
             ref={panel}

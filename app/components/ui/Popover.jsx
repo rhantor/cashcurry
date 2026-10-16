@@ -92,7 +92,7 @@ export default function Popover({ trigger, children, align = "start", width, cla
                   width,
                   transformOrigin: `${align === "end" ? "right" : "left"} ${pos?.below === false ? "bottom" : "top"}`,
                 }}
-                className={cn("z-[55] rounded-2xl border border-line bg-surface p-1.5 shadow-float", className)}
+                className={cn("z-[300] rounded-2xl border border-line bg-surface p-1.5 shadow-float", className)}
               >
                 {typeof children === "function" ? children({ close }) : children}
               </motion.div>
