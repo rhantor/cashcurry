@@ -92,7 +92,9 @@ export default function ClientLayoutWrapper({ children }) {
           </div>
         ) : (
           <AppShell onSignOut={logout}>
-            <React.Suspense fallback={<Loader />}>{children}</React.Suspense>
+            {/* No spinner here: the top progress bar shows the page is coming,
+                and each page brings its own skeleton (one loading look, not two). */}
+            <React.Suspense fallback={null}>{children}</React.Suspense>
           </AppShell>
         )}
       </UIProvider>
