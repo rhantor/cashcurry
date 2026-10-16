@@ -55,12 +55,14 @@ const portOpen = (port) =>
 // The Functions emulator loads the finance engine bundle; build it fresh.
 spawnSync("node", ["scripts/build-functions-engine.mjs"], { cwd: ROOT, stdio: "inherit" });
 
+// The Functions emulator gives the code 10 s to load by default — too short
+// while Next.js compiles at the same time on this machine.
 run("firebase", [
   "emulators:start",
   "--project", LOCAL_PROJECT_ID,
   "--import", `"${EMULATOR_DATA_DIR}"`,
   "--export-on-exit", `"${EMULATOR_DATA_DIR}"`,
-]);
+], { FUNCTIONS_DISCOVERY_TIMEOUT: "60" });
 
 // Firestore is the last of the core emulators to come up.
 const started = Date.now();

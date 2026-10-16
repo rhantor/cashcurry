@@ -12,6 +12,7 @@ import SideNav from "./SideNav";
 import TopBar from "./TopBar";
 import MobileNav from "./MobileNav";
 import CommandPalette, { rememberPage } from "./CommandPalette";
+import usePendingRequests from "./usePendingRequests";
 
 const COLLAPSE_KEY = "cc-nav-collapsed";
 
@@ -34,6 +35,10 @@ export default function AppShell({ onSignOut, children }) {
   useEffect(() => {
     if (page?.path) rememberPage(page.path);
   }, [page?.path]);
+
+  // ── counts on menu items: requests waiting for approval ──
+  const pending = usePendingRequests({ companyId, branchId, role });
+  const badges = useMemo(() => ({ "/requested-panel": pending.total }), [pending.total]);
 
   // ── branches ──
   const { data: branchList = [] } = useGetBranchesQuery(isCompany && companyId ? companyId : skipToken);
@@ -98,6 +103,7 @@ export default function AppShell({ onSignOut, children }) {
       <SideNav
         sections={sections}
         activePath={page?.path}
+        badges={badges}
         user={user}
         companyName={company?.name}
         collapsed={collapsed}
@@ -129,6 +135,7 @@ export default function AppShell({ onSignOut, children }) {
         items={bottom}
         sections={sections}
         activePath={page?.path}
+        badges={badges}
         user={user}
         isCompany={isCompany}
         branches={branches}

@@ -9,7 +9,7 @@ import { spring } from "@/app/components/ui/motion";
 const roleName = (r) => ({ owner: "Owner", gm: "General manager", superAdmin: "Super admin", branchAdmin: "Branch admin" })[r] || (r ? r[0].toUpperCase() + r.slice(1) : "");
 
 /** The computer's sidebar: sections, a sliding highlight, groups that open, and a collapsed (icons only) mode. */
-export default function SideNav({ sections, activePath, user, companyName, collapsed, onToggleCollapsed, onSignOut }) {
+export default function SideNav({ sections, activePath, badges = {}, user, companyName, collapsed, onToggleCollapsed, onSignOut }) {
   return (
     <motion.aside
       animate={{ width: collapsed ? 76 : 256 }}
@@ -44,7 +44,7 @@ export default function SideNav({ sections, activePath, user, companyName, colla
                   <Group key={it.label} item={it} activePath={activePath} collapsed={collapsed} onExpand={onToggleCollapsed} />
                 ) : (
                   <li key={it.path}>
-                    <NavLink href={it.path} icon={it.icon} label={it.label} active={it.path === activePath} collapsed={collapsed} />
+                    <NavLink href={it.path} icon={it.icon} label={it.label} active={it.path === activePath} collapsed={collapsed} badge={badges[it.path]} />
                   </li>
                 )
               )}
@@ -95,7 +95,33 @@ export default function SideNav({ sections, activePath, user, companyName, colla
   );
 }
 
-function NavLink({ href, icon, label, active, collapsed, sub = false }) {
+/**
+ * A count that pops in, and whose number pops when it changes. The badge stays
+ * in place while the number changes, so the label next to it never jumps.
+ */
+export function CountBadge({ count, className }) {
+  return (
+    <AnimatePresence initial={false}>
+      {count > 0 && (
+        <motion.span
+          initial={{ scale: 0.4, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1, transition: spring.bouncy }}
+          exit={{ scale: 0.4, opacity: 0, transition: { duration: 0.12 } }}
+          className={cn(
+            "inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-danger px-1.5 text-[11px] font-bold leading-none text-white tabular-nums",
+            className
+          )}
+        >
+          <motion.span key={count} initial={{ scale: 1.6 }} animate={{ scale: 1, transition: spring.bouncy }}>
+            {count > 99 ? "99+" : count}
+          </motion.span>
+        </motion.span>
+      )}
+    </AnimatePresence>
+  );
+}
+
+function NavLink({ href, icon, label, active, collapsed, sub = false, badge = 0 }) {
   const Icon = icon ? menuIcon(icon) : null;
   const link = (
     <Link
@@ -115,11 +141,19 @@ function NavLink({ href, icon, label, active, collapsed, sub = false }) {
         />
       )}
       {Icon && <Icon className="relative size-[18px] shrink-0 transition-transform group-hover:scale-110" strokeWidth={1.9} />}
-      {!collapsed && <span className="relative truncate">{label}</span>}
+      {!collapsed && <span className="relative flex-1 truncate">{label}</span>}
+      {!collapsed && <CountBadge count={badge} className="relative" />}
+      {collapsed && badge > 0 && (
+        // icons only: a dot that breathes on the icon's corner
+        <span className="absolute right-2 top-2 flex size-2.5">
+          <span className="absolute inline-flex size-full animate-ping rounded-full bg-danger opacity-60" />
+          <span className="relative inline-flex size-2.5 rounded-full bg-danger ring-2 ring-surface" />
+        </span>
+      )}
     </Link>
   );
   return collapsed ? (
-    <Tooltip label={label} side="bottom" className="w-full justify-center">
+    <Tooltip label={badge > 0 ? `${label} · ${badge} waiting` : label} side="bottom" className="w-full justify-center">
       {link}
     </Tooltip>
   ) : (
