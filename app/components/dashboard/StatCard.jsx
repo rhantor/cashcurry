@@ -1,4 +1,5 @@
 "use client";
+import { ChevronRight } from "lucide-react";
 import { Card, CountUp, Skeleton, cn } from "@/app/components/ui";
 
 const TONES = {
@@ -10,9 +11,10 @@ const TONES = {
 /**
  * One figure on a dashboard: label, the amount counting up, a short note.
  * `size="lg"` for the headline figures, `"sm"` for the secondary ones.
- * While `loading`, a skeleton of the same shape holds the place.
+ * While `loading`, a skeleton of the same shape holds the place. With
+ * `onClick` the card is tappable (e.g. to show the figure per branch).
  */
-export default function StatCard({ label, value, format, icon: Icon, tone = "neutral", hint, size = "lg", loading = false, className }) {
+export default function StatCard({ label, value, format, icon: Icon, tone = "neutral", hint, size = "lg", loading = false, onClick, className }) {
   const lg = size === "lg";
   if (loading) {
     return (
@@ -24,7 +26,14 @@ export default function StatCard({ label, value, format, icon: Icon, tone = "neu
     );
   }
   return (
-    <Card className={cn(lg ? "p-4 sm:p-5" : "p-4", className)}>
+    <Card
+      interactive={!!onClick}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), onClick()) : undefined}
+      className={cn(lg ? "p-4 sm:p-5" : "p-4", className)}
+    >
       <div className="flex items-start justify-between gap-2">
         <span title={label} className={cn("min-w-0 truncate font-semibold text-muted", lg ? "text-xs sm:text-[13px]" : "text-xs")}>{label}</span>
         {Icon && (
@@ -38,7 +47,12 @@ export default function StatCard({ label, value, format, icon: Icon, tone = "neu
         format={format}
         className={cn("mt-2 block whitespace-nowrap font-bold tracking-tight text-fg", lg ? "text-lg sm:text-xl 2xl:text-2xl" : "text-base")}
       />
-      {hint && <p className={cn("mt-1 truncate text-muted", lg ? "text-xs" : "text-[11px]")}>{hint}</p>}
+      {(hint || onClick) && (
+        <p className={cn("mt-1 flex items-center gap-1 text-muted", lg ? "text-xs" : "text-[11px]")}>
+          <span className="truncate">{hint}</span>
+          {onClick && <ChevronRight className="ml-auto size-3.5 shrink-0 text-subtle" />}
+        </p>
+      )}
     </Card>
   );
 }

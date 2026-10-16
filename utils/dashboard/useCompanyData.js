@@ -701,9 +701,18 @@ export default function useCompanyData(filter) {
     [bankedTenderKeys, tenderLabelsByKey]
   );
 
+  // Each branch's cash and bank at the end of the period (for "per branch" views).
+  const branchBalances = ledgers.map((l) => ({
+    branchId: l.branchId,
+    name: branchesList.find((b) => b.id === l.branchId)?.name || l.branchId,
+    cash: l.closing.cash,
+    bank: l.closing.bank,
+  }));
+
   return {
     companyId,
     loading,
+    branchBalances,
     // filtered collections (company scope)
     fSales,
     fCosts,

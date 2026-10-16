@@ -1,10 +1,13 @@
 "use client";
 import React, { useState } from "react";
+import { AlertTriangle, ArrowDownToLine, HandCoins, Landmark, Percent, PiggyBank, Receipt, TrendingUp, Wallet } from "lucide-react";
 import useCompanyData from "@/utils/dashboard/useCompanyData";
-import Filters from "@/app/components/dashboard/Filters";
 import { presetFilter } from "@/utils/dashboard/dateFilters";
 import { businessToday } from "@/lib/region";
-import KPICard from "@/app/components/dashboard/KPICard";
+import { Stagger } from "@/app/components/ui";
+import PeriodBar from "@/app/components/dashboard/PeriodBar";
+import StatCard from "@/app/components/dashboard/StatCard";
+import BreakdownSheet from "@/app/components/dashboard/BreakdownSheet";
 import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/utils/formatMoney";
 import SalesBreakdownTenders from "@/app/components/dashboard/charts/SalesBreakdownTenders";
@@ -13,6 +16,20 @@ import RecentActivity from "@/app/components/dashboard/RecentActivity";
 import SalesVsCosts from "@/app/components/dashboard/charts/SalesVsCosts";
 import BranchPerformanceBar from "@/app/components/dashboard/charts/BranchPerformanceBar";
 import BranchLeaderboard from "@/app/components/dashboard/BranchLeaderboard";
+
+/** A titled group of figures or charts. */
+function Section({ title, note, children }) {
+  return (
+    <section>
+      <div className="mb-3 flex items-baseline gap-3">
+        <h2 className="whitespace-nowrap text-[11px] font-bold uppercase tracking-[0.14em] text-subtle">{title}</h2>
+        <div className="h-px flex-1 bg-line" />
+        {note && <span className="hidden text-xs text-subtle sm:inline">{note}</span>}
+      </div>
+      {children}
+    </section>
+  );
+}
 
 export default function OwnerDashboardPage() {
   const [filter, setFilter] = useState(() => presetFilter("month", new Date(), businessToday()));
@@ -40,7 +57,11 @@ export default function OwnerDashboardPage() {
     fSales,
     branchesList,
     currencies,
+    branchBalances,
   } = useCompanyData(filter);
+  // Skeletons only on the first load; later refreshes keep the figures and show "Updating".
+  const firstLoad = loading && !totalSales;
+  const [breakdown, setBreakdown] = useState(null); // { title, rows }
 
   // Company totals are written in the branches' currency; when branches use
   // different currencies the totals add them together, so say so (below).
@@ -76,52 +97,56 @@ export default function OwnerDashboardPage() {
   const operatingMargin = totalSales ? ((netOperatingProfit / totalSales) * 100).toFixed(1) : "0.0";
   const totalReceivables = (totalAdv || 0) + (totalStaffLoanCash || 0);
 
-  const revenueBreakdown = branchPerf?.map(r => ({ label: r.name, value: fmt(r.sales) })) || [];
-  const expenseBreakdown = branchPerf?.map(r => ({ label: r.name, value: fmt(r.costs + r.salaries) })) || [];
-  const profitBreakdown = branchPerf?.map(r => ({ label: r.name, value: fmt(r.net) })) || [];
+  // Per-branch splits behind each figure (tap a card). Each uses the same
+  // formula as its company total, so the branches add up to it.
+  const per = (pick) => (branchPerf || []).map((r) => ({ name: r.name, value: pick(r) }));
+  const SPLITS = {
+    sales: () => per((r) => r.sales),
+    expenses: () => per((r) => r.costs + r.salaries),
+    profit: () => per((r) => r.sales - r.costs - r.salaries),
+    cash: () => (branchBalances || []).map((b) => ({ name: b.name, value: b.cash })),
+    bank: () => (branchBalances || []).map((b) => ({ name: b.name, value: b.bank })),
+    owed: () => per((r) => r.advances + r.staffLoans),
+    withdrawals: () => per((r) => r.withdrawals),
+  };
+  const show = (title, key) => () => setBreakdown({ title, rows: SPLITS[key]() });
 
   return (
-    <div className="min-h-screen p-6 bg-gradient-to-br from-[#f2edff] via-[#ffe1e1] to-[#ffd1f1]">
-      <div className="mx-auto max-w-7xl space-y-8">
-        {/* Header */}
-        <div className="flex items-center justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-bold">CEO Dashboard</h1>
-            <p className="text-sm text-black/60">
-              Executive summary of company health, liquidity, and branch performance
-            </p>
-          </div>
-          <Filters filter={filter} setFilter={setFilter} />
-        </div>
+    <div className="min-h-screen bg-bg">
+      <div className="mx-auto max-w-7xl space-y-5 px-4 py-5 sm:px-6 sm:py-6">
+        <PeriodBar filter={filter} setFilter={setFilter} busy={loading && !firstLoad} />
 
         {mixedCurrencies && (
-          <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-            <b>Branches use different currencies ({currencies.join(", ")}).</b> Company totals on this page add
-            them together and are not meaningful. Use each branch&apos;s own dashboard and reports.
+          <div className="flex gap-3 rounded-2xl border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-fg">
+            <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
+            <p>
+              <b>Branches use different currencies ({currencies.join(", ")}).</b> The company totals add them together,
+              so they are not meaningful — use each branch&apos;s own dashboard and reports.
+            </p>
           </div>
         )}
 
-        {/* Section 1: The Bottom Line */}
-        <div>
-          <h2 className="text-xl font-semibold mb-4 text-slate-800">1. Operating Performance</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <KPICard title="Total Revenue" value={fmt(totalSales)} color="emerald" sub="All branches combined" breakdown={revenueBreakdown} />
-            <KPICard title="Total Operating Expenses" value={fmt(totalOperatingExpenses)} color="rose" sub="Costs + Salaries" breakdown={expenseBreakdown} />
-            <KPICard title="Net Operating Profit" value={fmt(netOperatingProfit)} color={netOperatingProfit >= 0 ? "emerald" : "rose"} sub="Revenue minus operating expenses" breakdown={profitBreakdown} />
-            <KPICard title="Operating Margin" value={`${operatingMargin}%`} color={netOperatingProfit >= 0 ? "emerald" : "rose"} sub="Profit percentage" />
-          </div>
-        </div>
+        {/* ── How the business did ── */}
+        <Section title="Performance" note="Tap a figure to see it by branch">
+          <Stagger className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <StatCard loading={firstLoad} label="Sales" value={totalSales} format={fmt} icon={TrendingUp} tone="brand" hint="All branches" onClick={show("Sales", "sales")} />
+            <StatCard loading={firstLoad} label="Operating expenses" value={totalOperatingExpenses} format={fmt} icon={Receipt} hint="Costs + salaries" onClick={show("Operating expenses", "expenses")} />
+            <StatCard loading={firstLoad} label="Operating profit" value={netOperatingProfit} format={fmt} icon={PiggyBank} tone={netOperatingProfit >= 0 ? "brand" : "neutral"} hint="Sales − expenses" onClick={show("Operating profit", "profit")} />
+            <StatCard loading={firstLoad} label="Operating margin" value={Number(operatingMargin)} format={(v) => `${v.toFixed(1)}%`} icon={Percent} hint="Profit as % of sales" />
+          </Stagger>
+        </Section>
 
-        {/* Section 2: Liquidity & Cash Flow */}
-        <div>
-          <h2 className="text-xl font-semibold mb-4 text-slate-800">2. Liquidity & Cash Flow</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <KPICard title="Physical Cash on Hand" value={fmt(estCashOnHand)} color="slate" sub="Consolidated cash in registers" />
-            <KPICard title="Estimated Bank Balance" value={fmt(effectiveBankedAfterWithdrawals)} color="slate" sub="Consolidated bank account balance" />
-            <KPICard title="Total Receivables" value={fmt(totalReceivables)} color="amber" sub="Advances + Staff Loans" />
-            <KPICard title="Owner Withdrawals" value={fmt(totalWdr)} color="orange" sub="Total money withdrawn from bank" />
-          </div>
-        </div>
+        {/* ── Where the money is ── */}
+        <Section title="Cash & bank">
+          <Stagger className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <StatCard loading={firstLoad} label="Cash in hand" value={estCashOnHand} format={fmt} icon={Wallet} tone="brand" hint="In every till, end of period" onClick={show("Cash in hand", "cash")} />
+            <StatCard loading={firstLoad} label="Bank" value={effectiveBankedAfterWithdrawals} format={fmt} icon={Landmark} tone="info" hint="Expected balance" onClick={show("Bank", "bank")} />
+            <StatCard loading={firstLoad} label="Owed by staff" value={totalReceivables} format={fmt} icon={HandCoins} hint="Advances + staff loans" onClick={show("Owed by staff", "owed")} />
+            <StatCard loading={firstLoad} label="Withdrawals" value={totalWdr} format={fmt} icon={ArrowDownToLine} hint="Taken out of the bank" onClick={show("Withdrawals", "withdrawals")} />
+          </Stagger>
+        </Section>
+
+        <BreakdownSheet open={!!breakdown} onClose={() => setBreakdown(null)} title={breakdown?.title} rows={breakdown?.rows} format={fmt} />
 
         {/* Section 3: Branch Performance */}
         <div>
@@ -178,11 +203,6 @@ export default function OwnerDashboardPage() {
           <RecentActivity rows={recent} />
         </div>
 
-        {loading && (
-          <div className="fixed bottom-4 right-4 bg-white/90 px-4 py-2 rounded-xl shadow">
-            Loading…
-          </div>
-        )}
       </div>
     </div>
   );
