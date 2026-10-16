@@ -430,6 +430,14 @@ export default function SalesEntry() {
             .reduce((n, s) => n + (parseFloat(s.total) || 0), 0)
             .toFixed(2)}
           onClose={() => setViewing(null)}
+          onEdit={
+            canEdit && (role !== "supervisor" || viewing.id === recent[0]?.id)
+              ? () => {
+                  setViewing(null);
+                  startEdit(viewing);
+                }
+              : undefined
+          }
         />
       )}
     </>

@@ -1,20 +1,17 @@
-/* eslint-disable react/no-unknown-property */
 "use client";
-import React, { useMemo, useState, useRef } from "react";
-import { format } from "date-fns";
-import {
-  exportToExcel,
-  exportToPDF,
-  handleShare,
-  handleShareImage as shareImage,
-} from "@/utils/export/exportData";
+import { useMemo, useState } from "react";
+import { format, isValid, parseISO } from "date-fns";
+import { motion } from "framer-motion";
+import { Building2, Download, FileSpreadsheet, FileText, ImageIcon, Landmark, MoreHorizontal, Pencil, Share2, Wallet } from "lucide-react";
+import { exportToExcel, exportToPDF, handleShare, handleShareImage as shareImage } from "@/utils/export/exportData";
 import useCurrency from "@/app/hooks/useCurrency";
-import { toast } from "@/app/components/ui/notify";
+import { formatMoney } from "@/lib/region/currency";
+import { Badge, Button, CountUp, Menu, Sheet, Skeleton, cn, toast } from "@/app/components/ui";
 
 const DEFAULT_TENDERS = [
   { key: "cash", label: "Cash", enabled: true, includeInTotal: true, order: 1 },
-  { key: "card", label: "Card", enabled: true, includeInTotal: true, order: 2 },
-  { key: "qr", label: "QR", enabled: true, includeInTotal: true, order: 3 },
+  { key: "card", label: "Card", enabled: true, includeInTotal: true, order: 2, banked: true },
+  { key: "qr", label: "QR", enabled: true, includeInTotal: true, order: 3, banked: true },
   { key: "grab", label: "Grab", enabled: true, includeInTotal: true, order: 4 },
   { key: "foodpanda", label: "Foodpanda", enabled: true, includeInTotal: true, order: 5 },
   { key: "online", label: "Online", enabled: false, includeInTotal: true, order: 6 },
@@ -22,190 +19,177 @@ const DEFAULT_TENDERS = [
   { key: "promotion", label: "Promotion", enabled: false, includeInTotal: false, order: 8 },
 ];
 
-const fmt = (v) => {
-  const n = parseFloat(v);
-  return Number.isFinite(n) ? n.toFixed(2) : v ?? "0.00";
+const when = (v) => {
+  const d = typeof v === "string" ? parseISO(v) : v?.toDate ? v.toDate() : v ? new Date(v) : null;
+  return d && isValid(d) ? d : null;
 };
 
-export default function ItemsReportModal({
-  item,
-  branchData,
-  onClose,
-  monthTotal,
-}) {
-  const [imgLoading, setImgLoading] = useState(true);
-  const [sharingLabel, setSharingLabel] = useState("Share as Image");
-  const [fallbackImage, setFallbackImage] = useState(null);
-  const reportRef = useRef(null);
+/**
+ * One day's sales, like a receipt: the day's total and the month so far,
+ * each payment type (with its note, and whether it goes to the bank or
+ * stays in the till), the Z report photo, who entered it. Share as an image
+ * or PDF, download PDF/Excel, and — when `onEdit` is given — edit it.
+ * Props as before: item (the sale), branchData, monthTotal ("1234.50"), onClose.
+ */
+export default function ItemsReportModal({ item, branchData, onClose, monthTotal, onEdit }) {
   const currency = useCurrency();
+  const money = (v) => formatMoney(v, currency);
+  const [imgLoading, setImgLoading] = useState(true);
+  const [sharing, setSharing] = useState(false);
+  const [shared, setShared] = useState(null); // a generated image the device couldn't share directly
 
   const tenders = useMemo(() => {
     if (!item) return DEFAULT_TENDERS;
     if (Array.isArray(item.tenderMeta) && item.tenderMeta.length) {
       return [...item.tenderMeta]
-        .map((t) => ({
-          key: t.key,
-          label: t.label ?? t.key,
-          includeInTotal: t.includeInTotal !== false,
-          enabled: true,
-          order: t.order ?? 9999,
-        }))
-        .sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999));
+        .map((t) => ({ key: t.key, label: t.label ?? t.key, includeInTotal: t.includeInTotal !== false, banked: !!t.banked, enabled: true, order: t.order ?? 9999 }))
+        .sort((a, b) => a.order - b.order);
     }
     const present = DEFAULT_TENDERS.filter((t) => Object.hasOwn(item, t.key));
-    if (present.length) {
-      return present.sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999));
-    }
-    return DEFAULT_TENDERS;
+    return (present.length ? present : DEFAULT_TENDERS).sort((a, b) => a.order - b.order);
   }, [item]);
-
-  const recalculatedTotal = useMemo(() => {
-    if (!item) return "0.00";
-    const cents = tenders
-      .filter((t) => t.includeInTotal !== false)
-      .reduce((sum, t) => sum + Math.round((parseFloat(item[t.key]) || 0) * 100), 0);
-    return (cents / 100).toFixed(2);
-  }, [tenders, item]);
 
   if (!item) return null;
 
-  const branchTitle = Array.isArray(branchData)
-    ? branchData.map((b) => b.name).join(", ")
-    : branchData?.name || "Branch";
-
-  const doExportPDF = () => exportToPDF(item, branchData, tenders, monthTotal);
-  const doExportExcel = () => exportToExcel(item, branchData, tenders, monthTotal);
-  const doShare = () => handleShare(item, branchData, tenders, monthTotal);
+  const total =
+    item.total ??
+    tenders.filter((t) => t.includeInTotal).reduce((n, t) => n + Math.round((parseFloat(item[t.key]) || 0) * 100), 0) / 100;
+  const branchTitle = Array.isArray(branchData) ? branchData.map((b) => b.name).join(", ") : branchData?.name || "Branch";
+  const day = when(item.date);
+  const created = when(item.createdAt);
+  const by = item.createdBy?.username || item.createdBy?.userName || "Unknown";
 
   const doShareImage = async () => {
-    setSharingLabel("Capturing...");
+    setSharing(true);
     try {
       const dataUrl = await shareImage(item, branchData, tenders, monthTotal);
-      if (dataUrl) {
-        setFallbackImage(dataUrl);
-      }
+      if (dataUrl) setShared(dataUrl);
     } catch (err) {
-      toast.error(`Share image error: ${err.message || err}`);
+      toast.error("Couldn't make the image", { description: String(err?.message || err) });
+    } finally {
+      setSharing(false);
     }
-    setSharingLabel("Share as Image");
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-white rounded-lg shadow-lg w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-        <div ref={reportRef} className="p-6" style={{ backgroundColor: "#ffffff", color: "#111827" }}>
-          <div className="flex justify-between items-center mb-4 border-b pb-2" style={{ borderColor: "#e5e7eb" }}>
-            <h2 className="text-lg font-bold" style={{ color: "#1f2937" }}>{branchTitle}</h2>
-            <div className="text-right">
-              <p className="text-sm font-semibold" style={{ color: "#4b5563" }}>Sales Report</p>
-              <p className="text-xs" style={{ color: "#9ca3af" }}>{format(new Date(item.date), "dd MMM yyyy")}</p>
-            </div>
-          </div>
-
-          <div className="space-y-3 text-sm">
-            {tenders.map((t) => {
-              const value = item[t.key];
-              const note = item.notes?.[t.key];
-              return (
-                <div key={t.key} className="flex justify-between gap-3 items-start py-1 border-b last:border-0" style={{ borderColor: "#f9fafb" }}>
-                  <span className="font-medium" style={{ color: "#374151" }}>{t.label}</span>
-                  <div className="text-right">
-                    {note && (
-                      <span className="block text-[10px] italic leading-tight mb-1 max-w-[150px]" style={{ color: "#9ca3af" }}>
-                        Note: {note}
-                      </span>
-                    )}
-                    <span className="font-semibold" style={{ color: "#111827" }}>{fmt(value)}</span>
-                  </div>
-                </div>
-              );
-            })}
-
-            <div className="mt-4 pt-3 border-t-2" style={{ borderColor: "#f3f4f6" }}>
-              <div className="flex justify-between font-bold text-base" style={{ color: "#111827" }}>
-                <span>Daily Total</span>
-                <span>{fmt(item.total ?? recalculatedTotal)}</span>
-              </div>
-            </div>
-
-            <div className="mt-4 p-4 rounded-xl border flex items-center justify-between" style={{ backgroundColor: "#ecfdf5", borderColor: "#d1fae5" }}>
-              <div className="text-xs font-semibold uppercase tracking-wider" style={{ color: "#059669" }}>
-                Monthly Grand Total
-              </div>
-              <div className="text-xl font-black" style={{ color: "#047857" }}>
-                {currency} {monthTotal}
-              </div>
-            </div>
-
-            <div className="flex justify-between pt-4 text-[10px] uppercase tracking-widest" style={{ color: "#9ca3af" }}>
-              <span>Added By: {item.createdBy?.username || "Unknown"}</span>
-              <span>{format(new Date(), "HH:mm")}</span>
-            </div>
-
-            {item.zReportUrl && (
-              <div className="mt-6 pt-4 border-t border-dashed" style={{ borderColor: "#e5e7eb" }}>
-                <p className="text-xs font-bold mb-2 uppercase" style={{ color: "#6b7280" }}>Z Report Attached:</p>
-                <div className="w-full rounded-lg overflow-hidden border relative min-h-[100px] flex items-center justify-center" style={{ backgroundColor: "#f9fafb", borderColor: "#f3f4f6" }}>
-                  {imgLoading && (
-                    <div className="absolute inset-0 flex items-center justify-center z-10" style={{ backgroundColor: "rgba(249, 250, 251, 0.8)" }}>
-                      <div className="loader border-t-4 w-8 h-8 rounded-full animate-spin" style={{ borderTopColor: "transparent", borderRightColor: "#10b981", borderBottomColor: "#10b981", borderLeftColor: "#10b981" }}></div>
-                    </div>
-                  )}
-                  <img
-                    src={item.zReportUrl}
-                    alt="Z Report Preview"
-                    className="w-full object-contain max-h-[400px]"
-                    onLoad={() => setImgLoading(false)}
-                    onError={() => setImgLoading(false)}
-                  />
-                </div>
-              </div>
+    <Sheet
+      open
+      onClose={onClose}
+      title={day ? format(day, "EEEE, d MMMM yyyy") : "Sales"}
+      description={
+        <span className="inline-flex items-center gap-1.5">
+          <Building2 className="size-3.5" />
+          {branchTitle}
+        </span>
+      }
+      footer={
+        <>
+          <Menu
+            align="start"
+            width={210}
+            trigger={(p) => (
+              <Button {...p} variant="secondary" size="lg" icon={MoreHorizontal} className="px-4">
+                More
+              </Button>
             )}
-            {item.total === 0 && (
-              <p className="text-center text-gray-500 italic text-sm mt-4">
-                No sales recorded
-              </p>
-            )}
-          </div>
-        </div>
-
-        {fallbackImage && (
-          <div className="bg-gray-100 p-4 border-t border-gray-200 flex flex-col items-center">
-            <p className="text-xs font-bold text-gray-700 mb-2">✅ Image Ready! Right-click or long-press to Save/Copy</p>
-            <img src={fallbackImage} alt="Generated Report" className="max-w-[80%] border border-gray-300 shadow-sm rounded-lg mb-2" />
-            <button onClick={() => setFallbackImage(null)} className="text-xs text-blue-500 underline">Dismiss</button>
-          </div>
+            items={[
+              { label: "Share as PDF", icon: Share2, onSelect: () => handleShare(item, branchData, tenders, monthTotal) },
+              { label: "Download PDF", icon: FileText, onSelect: () => exportToPDF(item, branchData, tenders, monthTotal) },
+              { label: "Download Excel", icon: FileSpreadsheet, onSelect: () => exportToExcel(item, branchData, tenders, monthTotal) },
+            ]}
+          />
+          {onEdit && (
+            <Button variant="secondary" size="lg" icon={Pencil} onClick={onEdit} className="px-4">
+              Edit
+            </Button>
+          )}
+          <Button size="lg" className="flex-1" icon={ImageIcon} loading={sharing} onClick={doShareImage}>
+            Share image
+          </Button>
+        </>
+      }
+    >
+      {/* the day and the month */}
+      <div className="rounded-2xl bg-gradient-to-br from-[#1f9a7c] to-[#0f5c4c] p-4 text-white">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/70">Day total</p>
+        <CountUp value={Number(total) || 0} format={money} className="mt-0.5 block text-3xl font-bold tracking-tight" />
+        {monthTotal != null && (
+          <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold">
+            Month so far · {money(monthTotal)}
+          </p>
         )}
-
-        <div className="bg-gray-50 p-6 flex flex-wrap justify-center gap-2 sm:gap-3 border-t border-gray-100">
-          <button onClick={onClose} className="flex-1 min-w-[80px] py-2 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 text-gray-600 text-xs font-semibold transition">
-            Close
-          </button>
-          
-          <button onClick={doShareImage} className="flex-1 min-w-[120px] py-2 rounded-lg bg-mint-500 hover:bg-mint-600 text-white text-xs font-bold shadow-sm transition">
-            {sharingLabel}
-          </button>
-
-          <div className="w-full flex gap-2">
-            <button onClick={doShare} className="flex-1 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white text-[10px] font-bold transition">
-              Share PDF
-            </button>
-            <button onClick={doExportPDF} className="flex-1 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white text-[10px] font-bold transition">
-              PDF
-            </button>
-            <button onClick={doExportExcel} className="flex-1 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white text-[10px] font-bold transition">
-              Excel
-            </button>
-          </div>
-        </div>
       </div>
 
-      <style jsx>{`
-        .loader {
-          border-top-color: transparent;
-          border-width: 4px;
-        }
-      `}</style>
-    </div>
+      {/* payment types */}
+      <ul className="mt-4 divide-y divide-line">
+        {tenders.map((t, i) => {
+          const v = parseFloat(item[t.key]) || 0;
+          const note = item.notes?.[t.key];
+          return (
+            <motion.li
+              key={t.key}
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.04 * i }}
+              className="flex items-start gap-3 py-2.5"
+            >
+              <span
+                className={cn(
+                  "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-lg",
+                  t.banked ? "bg-info-soft text-info" : t.key === "cash" ? "bg-brand-soft text-brand" : "bg-surface-2 text-muted"
+                )}
+              >
+                {t.banked ? <Landmark className="size-3.5" /> : <Wallet className="size-3.5" />}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-1.5">
+                  <span className={cn("text-sm font-medium", v ? "text-fg" : "text-subtle")}>{t.label}</span>
+                  {!t.includeInTotal && <Badge>Not in total</Badge>}
+                </span>
+                {note && <span className="mt-0.5 block text-xs italic text-muted">“{note}”</span>}
+              </span>
+              <span className={cn("shrink-0 text-sm tabular-nums", v ? "font-semibold text-fg" : "text-subtle")}>{money(v)}</span>
+            </motion.li>
+          );
+        })}
+      </ul>
+
+      {/* Z report */}
+      {item.zReportUrl ? (
+        <a href={item.zReportUrl} target="_blank" rel="noreferrer" className="mt-4 block">
+          <p className="mb-1.5 text-xs font-semibold text-muted">Z report</p>
+          <div className="relative overflow-hidden rounded-2xl border border-line bg-surface-2">
+            {imgLoading && <Skeleton className="absolute inset-0" rounded="rounded-none" />}
+            <img
+              src={item.zReportUrl}
+              alt="Z report"
+              className="max-h-80 w-full object-contain"
+              onLoad={() => setImgLoading(false)}
+              onError={() => setImgLoading(false)}
+            />
+          </div>
+        </a>
+      ) : (
+        <p className="mt-4 rounded-xl bg-surface-2 px-3 py-2.5 text-center text-xs text-muted">No Z report photo</p>
+      )}
+
+      {/* the image made for sharing, when the device can't share it directly */}
+      {shared && (
+        <div className="mt-4 rounded-2xl border border-brand/30 bg-brand-soft p-3 text-center">
+          <p className="mb-2 flex items-center justify-center gap-1.5 text-xs font-semibold text-brand">
+            <Download className="size-3.5" /> Image ready — long-press (or right-click) to save or copy
+          </p>
+          <img src={shared} alt="Sales summary to share" className="mx-auto max-w-[85%] rounded-xl border border-line shadow-card" />
+          <button type="button" onClick={() => setShared(null)} className="mt-2 text-xs font-semibold text-brand hover:underline">
+            Done
+          </button>
+        </div>
+      )}
+
+      <p className="mt-4 text-center text-[11px] text-subtle">
+        Entered by {by}
+        {created ? ` · ${format(created, "d MMM, h:mm a")}` : ""}
+      </p>
+    </Sheet>
   );
 }
