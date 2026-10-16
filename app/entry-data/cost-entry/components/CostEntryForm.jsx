@@ -1,19 +1,115 @@
 'use client'
 
-import React, { useState } from 'react'
+import { useState } from 'react'
 import PropTypes from 'prop-types'
-import { NumericFormat } from 'react-number-format'
-import UploadInvoice from '@/app/components/purchases/UploadInvoice'
-import {
-  CATEGORIES,
-  BACK_OFFICE_METHODS,
-  DESCRIPTION_CHIPS
-} from '../logic/constants'
-import ImageCaptureEditor from './ImageCaptureEditor'
+import { format, parseISO } from 'date-fns'
+import { AnimatePresence, motion } from 'framer-motion'
+import { Check, Landmark, ScanLine, Wallet } from 'lucide-react'
+import { Button, CountUp, DatePicker, Field, Input, Sheet, Textarea, cn } from '@/app/components/ui'
+import MoneyInput from '@/app/components/entry/MoneyInput'
+import ProofUpload from '@/app/components/entry/ProofUpload'
+import { EntryLayout, EntrySection, SummaryLine } from '@/app/components/entry/EntryLayout'
 import useCurrency from '@/app/hooks/useCurrency'
-import { toast } from "@/app/components/ui/notify";
+import { formatMoney } from '@/lib/region/currency'
+import { CATEGORIES, BACK_OFFICE_METHODS, DESCRIPTION_CHIPS } from '../logic/constants'
+import ImageCaptureEditor from './ImageCaptureEditor'
 
-export default function CostEntryForm ({ form, onSave }) {
+// Invoices and receipts: photos shrunk like the old uploader did.
+const SHRINK = { maxMB: 0.6, maxSide: 1600 }
+const day = d => (d ? format(parseISO(d), 'EEE, d MMM') : '')
+const methodLabel = v => BACK_OFFICE_METHODS.find(m => m.value === v)?.label
+
+/** Two big choices: paid from the till, or from the bank (then how). */
+function PaidFrom ({ office, setOffice, method, setMethod, error }) {
+  const choices = [
+    { value: 'front', title: 'From the till', note: 'Cash — front office', icon: Wallet, tone: 'brand' },
+    { value: 'back', title: 'From the bank', note: 'Card, QR, online, transfer — back office', icon: Landmark, tone: 'info' }
+  ]
+  return (
+    <div>
+      <div className='grid gap-2 sm:grid-cols-2'>
+        {choices.map(c => {
+          const on = office === c.value
+          return (
+            <button
+              key={c.value}
+              type='button'
+              onClick={() => setOffice(c.value)}
+              aria-pressed={on}
+              className={cn(
+                'relative flex items-center gap-3 rounded-2xl border p-3.5 text-left transition',
+                on ? 'border-brand bg-brand-soft/50 ring-4 ring-[var(--cc-ring)]' : 'border-line bg-surface hover:bg-surface-2'
+              )}
+            >
+              <span
+                className={cn(
+                  'flex size-10 shrink-0 items-center justify-center rounded-xl',
+                  c.tone === 'info' ? 'bg-info-soft text-info' : 'bg-brand-soft text-brand'
+                )}
+              >
+                <c.icon className='size-5' />
+              </span>
+              <span className='min-w-0'>
+                <span className='block text-sm font-semibold text-fg'>{c.title}</span>
+                <span className='block text-xs text-muted'>{c.note}</span>
+              </span>
+              {on && (
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className='absolute right-3 top-3 flex size-5 items-center justify-center rounded-full bg-brand text-brand-fg'
+                >
+                  <Check className='size-3' strokeWidth={3} />
+                </motion.span>
+              )}
+            </button>
+          )
+        })}
+      </div>
+      <AnimatePresence initial={false}>
+        {office === 'back' && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className='overflow-hidden'>
+            <p className='mb-2 mt-4 text-xs font-semibold text-muted'>How was it paid?</p>
+            <div className='flex flex-wrap gap-2'>
+              {BACK_OFFICE_METHODS.map(m => (
+                <Chip key={m.value} on={method === m.value} onClick={() => setMethod(m.value)}>
+                  {m.label}
+                </Chip>
+              ))}
+            </div>
+            {error && <p className='mt-2 text-xs font-medium text-danger'>{error}</p>}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+function Chip ({ on, onClick, children, className }) {
+  return (
+    <motion.button
+      whileTap={{ scale: 0.95 }}
+      type='button'
+      onClick={onClick}
+      aria-pressed={on}
+      className={cn(
+        'rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
+        on ? 'border-brand bg-brand text-brand-fg' : 'border-line bg-surface text-fg hover:bg-surface-2',
+        className
+      )}
+    >
+      {children}
+    </motion.button>
+  )
+}
+
+/**
+ * Cost entry: when, how much, paid from the till or the bank, what for,
+ * a note, the invoice (photo, PDF, or several pages scanned into one PDF)
+ * and an optional payment receipt. Summary and save stay in view.
+ * `errors` = { amount, category, custom, method } from the page's checks.
+ */
+export default function CostEntryForm ({ form, onSave, errors = {}, saved = false, recent }) {
   const {
     date,
     setDate,
@@ -26,6 +122,9 @@ export default function CostEntryForm ({ form, onSave }) {
     description,
     setDescription,
     file,
+    setFile,
+    filePreview,
+    setFilePreview,
     uploadProgress,
     paidFromOffice,
     setPaidFromOffice,
@@ -33,285 +132,194 @@ export default function CostEntryForm ({ form, onSave }) {
     setPaidMethod,
     isSaving,
     handleDescriptionKeyDown,
-    setFile,
     receiptFile,
     setReceiptFile,
-    receiptProgress
+    receiptProgress,
+    resolvedCategory
   } = form
 
-  const [showImageCapture, setShowImageCapture] = useState(false)
   const currency = useCurrency()
+  const money = v => formatMoney(v, currency)
+  const [scanning, setScanning] = useState(false)
+  const [receiptPreview, setReceiptPreview] = useState(null)
+  const amt = Number(amount) || 0
 
-  const isUploading =
-    (uploadProgress > 0 && uploadProgress < 100) ||
-    (receiptProgress > 0 && receiptProgress < 100)
+  const uploadingInvoice = uploadProgress > 0 && uploadProgress < 100
+  const uploadingReceipt = receiptProgress > 0 && receiptProgress < 100
+  const label = uploadingInvoice
+    ? `Uploading invoice ${Math.round(uploadProgress)}%`
+    : uploadingReceipt
+      ? `Uploading receipt ${Math.round(receiptProgress)}%`
+      : 'Save cost'
+  const saveButton = (
+    <Button size='lg' className='w-full' onClick={onSave} loading={isSaving && !uploadingInvoice && !uploadingReceipt} success={saved} disabled={uploadingInvoice || uploadingReceipt}>
+      {label}
+    </Button>
+  )
+  const paidLine = paidFromOffice === 'front' ? 'Till (cash)' : `Bank${paidMethod ? ` · ${methodLabel(paidMethod)}` : ''}`
 
-  const isDisabled = isSaving || isUploading || !amount
-
-  // Handle files from ImageCaptureEditor
-  const handleFilesReady = files => {
-    if (files.length === 1) {
-      // Single file (PDF or image)
-      const selectedFile = files[0]
-      setFile(selectedFile)
-    } else if (files.length > 1) {
-      // Multiple images - user should convert to PDF first
-      toast.warning('Multiple images detected. Please convert to PDF first.')
-      return
-    }
-
-    setShowImageCapture(false)
+  // the scanner hands back one file (a PDF of the pages, or one image)
+  const scanned = files => {
+    if (files.length !== 1) return
+    setFile(files[0])
+    setFilePreview(URL.createObjectURL(files[0]))
+    setScanning(false)
   }
 
   return (
-    <div className='min-h-screen bg-gray-50 p-4 flex flex-col items-center'>
-      <div className='w-full max-w-lg'>
-        <h1 className='text-xl font-bold text-sage-300 mb-4'>Cost Entry</h1>
+    <>
+      <EntryLayout
+        aside={
+          <div className='space-y-4'>
+            <div>
+              <p className='text-xs font-semibold uppercase tracking-[0.12em] text-subtle'>Cost</p>
+              <CountUp value={amt} format={money} className='mt-1 block text-3xl font-bold tracking-tight text-fg' />
+              <p className='mt-0.5 text-xs text-muted'>{date ? day(date) : 'Pick a day'}</p>
+            </div>
+            <div className='space-y-2 border-t border-line pt-3'>
+              <SummaryLine label='Paid from' value={paidLine} />
+              <SummaryLine label='For' value={resolvedCategory || '—'} />
+              <SummaryLine label='Invoice' value={file ? 'Attached' : 'None'} muted={!file} />
+            </div>
+            {saveButton}
+          </div>
+        }
+        bar={
+          <div className='flex items-center gap-3'>
+            <div className='min-w-0 flex-1'>
+              <p className='truncate text-[11px] font-semibold uppercase tracking-wider text-subtle'>{resolvedCategory || 'Cost'}</p>
+              <CountUp value={amt} format={money} className='block truncate text-lg font-bold tracking-tight text-fg' />
+            </div>
+            <div className='w-40 shrink-0'>{saveButton}</div>
+          </div>
+        }
+        below={recent}
+      >
+        <EntrySection title='When and how much'>
+          <div className='grid gap-4 sm:grid-cols-2'>
+            <Field label='Day'>{({ invalid }) => <DatePicker value={date} onChange={setDate} invalid={invalid} />}</Field>
+            <Field label='Amount' error={errors.amount}>
+              {({ id, invalid }) => <MoneyInput id={id} currency={currency} value={amount} invalid={invalid} onValueChange={setAmount} />}
+            </Field>
+          </div>
+        </EntrySection>
 
-        {/* Date */}
-        <div className='bg-white rounded-lg shadow p-4 mb-4'>
-          <label className='block text-sm font-medium text-gray-600'>
-            Date
-          </label>
-          <input
-            type='date'
-            value={date}
-            onChange={e => setDate(e.target.value)}
-            className='mt-1 w-full rounded-lg border p-3 text-gray-700'
-          />
-        </div>
+        <EntrySection title='Paid from'>
+          <PaidFrom office={paidFromOffice} setOffice={setPaidFromOffice} method={paidMethod} setMethod={setPaidMethod} error={errors.method} />
+        </EntrySection>
 
-        {/* Amount */}
-        <div className='bg-white rounded-lg shadow p-4 mb-4'>
-          <label className='block text-sm font-medium text-gray-600'>
-            Amount ({currency})
-          </label>
-          <NumericFormat
-            value={amount}
-            thousandSeparator={true}
-            decimalScale={2}
-            allowNegative={false}
-            placeholder="0.00"
-            className='mt-1 w-full rounded-lg border p-3 text-gray-700'
-            onValueChange={(values) => {
-              setAmount(values.value)
+        <EntrySection title='What for'>
+          <motion.div
+            key={errors.category ? 'err' : 'ok'}
+            animate={errors.category ? { x: [0, -6, 6, -4, 4, 0] } : undefined}
+            transition={{ duration: 0.35 }}
+            className='flex flex-wrap gap-2'
+          >
+            {CATEGORIES.map(c => (
+              <Chip key={c} on={category === c} onClick={() => setCategory(c)}>
+                {c}
+              </Chip>
+            ))}
+          </motion.div>
+          {errors.category && <p className='mt-2 text-xs font-medium text-danger'>{errors.category}</p>}
+          <AnimatePresence initial={false}>
+            {category === 'Other' && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className='overflow-hidden'>
+                <Field label='Name the category' error={errors.custom} className='mt-4'>
+                  {({ id, invalid }) => (
+                    <Input id={id} invalid={invalid} value={customCategory} onChange={e => setCustomCategory(e.target.value)} placeholder='e.g. Pest control, License renewal' />
+                  )}
+                </Field>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <Field label='Note' className='mt-5'>
+            {({ id }) => (
+              <Textarea
+                id={id}
+                rows={3}
+                value={description}
+                onChange={e => setDescription(e.target.value)}
+                onKeyDown={handleDescriptionKeyDown}
+                placeholder='Anything worth remembering. Lines starting with "- " or "1. " keep their bullets.'
+              />
+            )}
+          </Field>
+          <div className='mt-2 flex flex-wrap gap-1.5'>
+            {DESCRIPTION_CHIPS.map(item => (
+              <button
+                key={item.key}
+                type='button'
+                onClick={() => setDescription(d => (d ? d + '\n' + item.text : item.text))}
+                className='rounded-full bg-surface-2 px-2.5 py-1 text-[11px] font-semibold text-muted transition hover:bg-brand-soft hover:text-brand'
+              >
+                + {item.text.replace(/- /, '').replace(': ', '')}
+              </button>
+            ))}
+          </div>
+        </EntrySection>
+
+        <EntrySection title='Invoice and receipt'>
+          <ProofUpload
+            label='Invoice'
+            pdf
+            shrink={SHRINK}
+            file={file}
+            preview={filePreview}
+            progress={uploadProgress}
+            onPick={(f, url) => {
+              setFile(f)
+              setFilePreview(url)
+            }}
+            onRemove={() => {
+              setFile(null)
+              setFilePreview(null)
             }}
           />
-        </div>
-
-        {/* Paid From */}
-        <div className='bg-white rounded-lg shadow p-4 mb-4'>
-          <label className='block text-sm font-medium text-gray-600 mb-2'>
-            Paid From
-          </label>
-
-          <div className='flex items-center gap-4'>
-            <label className='flex items-center gap-2'>
-              <input
-                type='radio'
-                name='paidFromOffice'
-                value='front'
-                checked={paidFromOffice === 'front'}
-                onChange={() => setPaidFromOffice('front')}
-              />
-              <span>Front Office (Cash)</span>
-            </label>
-
-            <label className='flex items-center gap-2'>
-              <input
-                type='radio'
-                name='paidFromOffice'
-                value='back'
-                checked={paidFromOffice === 'back'}
-                onChange={() => setPaidFromOffice('back')}
-              />
-              <span>Back Office (Bank/Card/QR/Online)</span>
-            </label>
-          </div>
-
-          {paidFromOffice === 'back' ? (
-            <div className='mt-3'>
-              <label className='block text-sm font-medium text-gray-600'>
-                Method
-              </label>
-              <select
-                value={paidMethod}
-                onChange={e => setPaidMethod(e.target.value)}
-                className='mt-1 w-full rounded-lg border p-3 text-gray-700 bg-white'
-              >
-                <option value=''>Select method</option>
-                {BACK_OFFICE_METHODS.map(m => (
-                  <option key={m.value} value={m.value}>
-                    {m.label}
-                  </option>
-                ))}
-              </select>
-              <p className='text-xs text-gray-500 mt-1'>
-                This will be deducted from your {paidMethod || 'selected'} pool
-                in summary.
-              </p>
-            </div>
-          ) : (
-            <p className='text-xs text-gray-500 mt-2'>
-              Method: <span className='font-medium'>Cash</span> (fixed)
-            </p>
-          )}
-        </div>
-
-        {/* Category */}
-        <div className='bg-white rounded-lg shadow p-4 mb-4'>
-          <label className='block text-sm font-medium text-gray-600'>
-            Category
-          </label>
-          <select
-            value={category}
-            onChange={e => setCategory(e.target.value)}
-            className='mt-1 w-full rounded-lg border p-3 text-gray-700 bg-white'
-          >
-            <option value=''>Select a category</option>
-            {CATEGORIES.map(c => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-
-          {category === 'Other' && (
-            <div className='mt-3'>
-              <label className='block text-sm font-medium text-gray-600'>
-                Custom Category
-              </label>
-              <input
-                type='text'
-                value={customCategory}
-                onChange={e => setCustomCategory(e.target.value)}
-                placeholder='e.g., License Renewal, Pest Control'
-                className='mt-1 w-full rounded-lg border p-3 text-gray-700'
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Description */}
-        <div className='bg-white rounded-lg shadow p-4 mb-4'>
-          <label className='block text-sm font-medium text-gray-600'>
-            Description
-          </label>
-          <textarea
-            value={description}
-            onChange={e => setDescription(e.target.value)}
-            onKeyDown={handleDescriptionKeyDown}
-            placeholder='Add notes. Tip: start lines with `- ` or `1. ` to keep bullets/numbering.'
-            rows={4}
-            className='mt-1 w-full rounded-lg border p-3 text-gray-700'
-          />
-
-          {/* Quick add chips */}
-          <div className='mt-3'>
-            <p className='text-xs font-medium text-gray-600 mb-2'>Quick add</p>
-            <div className='flex flex-wrap gap-2'>
-              {DESCRIPTION_CHIPS.map(item => (
-                <button
-                  key={item.key}
-                  type='button'
-                  onClick={() =>
-                    setDescription(d => (d ? d + '\n' + item.text : item.text))
-                  }
-                  className='px-2 py-1 text-xs rounded-full bg-sage-100 text-sage-400 hover:bg-sage-400 hover:text-white'
-                >
-                  {item.text.replace(/- /, '').replace(': ', '')}
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* File Upload - Enhanced with Drag & Drop and ImageCaptureEditor */}
-        <div className='bg-white rounded-lg shadow p-4 mb-4'>
-          <UploadInvoice
-            file={file}
-            onChange={setFile}
-            progress={uploadProgress}
-            allowCamera={false}
-          />
-
-          {/* OR separator */}
-          <div className='flex items-center gap-3 my-4'>
-            <div className='flex-1 border-t border-gray-200'></div>
-            <span className='text-xs text-gray-400 font-semibold'>OR</span>
-            <div className='flex-1 border-t border-gray-200'></div>
-          </div>
-
-          {/* Camera + Multi-image + PDF conversion */}
           <button
             type='button'
-            onClick={() => setShowImageCapture(true)}
-            className='w-full px-4 py-3 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-semibold text-sm shadow-sm hover:shadow transition duration-200 flex items-center justify-center gap-2 cursor-pointer'
+            onClick={() => setScanning(true)}
+            className='mt-2 inline-flex items-center gap-1.5 rounded-lg px-1 py-1 text-xs font-semibold text-brand hover:underline'
           >
-            📷 Capture & Edit Images / Convert to PDF
+            <ScanLine className='size-3.5' /> Several pages? Scan them into one PDF
           </button>
-        </div>
 
-        {/* Payment Receipt — optional second attachment */}
-        <div className='bg-white rounded-lg shadow p-4 mb-4'>
-          <UploadInvoice
-            file={receiptFile}
-            onChange={setReceiptFile}
-            progress={receiptProgress}
-            allowCamera={true}
-            enablePaste={false}
-            label='Payment Receipt (optional)'
-          />
-          <p className='text-xs text-gray-500 mt-2'>
-            Proof of payment — bank slip, card slip or transfer confirmation.
-            Leave empty if you do not have one.
-          </p>
-        </div>
-
-        {/* Save Button */}
-        <button
-          type='button'
-          onClick={onSave}
-          disabled={isDisabled}
-          className={`w-full py-3 rounded-lg font-semibold transition ${
-            isDisabled
-              ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
-              : 'bg-mint-500 text-white hover:bg-mint-600 cursor-pointer'
-          }`}
-        >
-          {isSaving
-            ? 'Saving...'
-            : uploadProgress > 0 && uploadProgress < 100
-            ? `Uploading invoice ${Math.round(uploadProgress)}%`
-            : receiptProgress > 0 && receiptProgress < 100
-            ? `Uploading receipt ${Math.round(receiptProgress)}%`
-            : 'Save'}
-        </button>
-      </div>
-
-      {/* Image Capture Modal */}
-      {showImageCapture && (
-        <div className='fixed inset-0 bg-black bg-opacity-50 z-40 flex items-center justify-center p-4'>
-          <div className='bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto p-6'>
-            <div className='flex justify-between items-center mb-4'>
-              <h2 className='text-xl font-bold'>Capture & Edit Images</h2>
-              <button
-                onClick={() => setShowImageCapture(false)}
-                className='text-gray-500 hover:text-gray-700 text-2xl'
-              >
-                ✕
-              </button>
-            </div>
-
-            <ImageCaptureEditor onFilesReady={handleFilesReady} />
+          <div className='mt-5'>
+            <ProofUpload
+              label='Payment receipt (optional)'
+              pdf
+              shrink={SHRINK}
+              pageDrop={false}
+              file={receiptFile}
+              preview={receiptFile ? receiptPreview : null}
+              progress={receiptProgress}
+              hint='Bank slip, card slip or transfer confirmation.'
+              onPick={(f, url) => {
+                setReceiptFile(f)
+                setReceiptPreview(url)
+              }}
+              onRemove={() => {
+                setReceiptFile(null)
+                setReceiptPreview(null)
+              }}
+            />
           </div>
-        </div>
-      )}
-    </div>
+        </EntrySection>
+      </EntryLayout>
+
+      <Sheet open={scanning} onClose={() => setScanning(false)} size='lg' title='Scan pages' description='Take or choose photos, tidy them up, then turn them into one PDF.'>
+        <ImageCaptureEditor onFilesReady={scanned} />
+      </Sheet>
+    </>
   )
 }
 
 CostEntryForm.propTypes = {
   form: PropTypes.object.isRequired,
-  onSave: PropTypes.func.isRequired
+  onSave: PropTypes.func.isRequired,
+  errors: PropTypes.object,
+  saved: PropTypes.bool,
+  recent: PropTypes.node
 }
+

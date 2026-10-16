@@ -3,22 +3,38 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import imageCompression from "browser-image-compression";
-import { Camera, ExternalLink, ImageDown, ImageUp, Trash2 } from "lucide-react";
+import { Camera, ExternalLink, FileText, ImageDown, ImageUp, Trash2 } from "lucide-react";
 import { cn, toast } from "@/app/components/ui";
 
-const MAX_MB = 1.2;
-const MAX_SIDE = 2200;
+const MAX_FILE_MB = 20;
+const isPdf = (f) => f?.type === "application/pdf" || /\.pdf$/i.test(f?.name || "");
+const sizeOf = (b = 0) => (b > 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 const hasFiles = (e) => Array.from(e.dataTransfer?.types || []).includes("Files");
 
 /**
  * A photo as proof (Z report, receipt…): tap to take or choose one, see it,
  * remove it. On a computer a photo can also be dragged onto the page —
  * anywhere: the whole screen becomes the drop target — or pasted (Ctrl+V).
- * Big photos are shrunk before upload. `progress` (0–100) shows the upload;
- * `required` marks it as needed. `pageDrop={false}` limits dropping to the box.
- * onPick(file, previewUrl) · onRemove()
+ * Big photos are shrunk before upload (`shrink` = { maxMB, maxSide }).
+ * `pdf` also takes PDF files (shown as a file card; pass the picked `file`).
+ * `progress` (0–100) shows the upload; `required` marks it as needed.
+ * `pageDrop={false}` limits dropping to the box (use it when a page has two).
+ * onPick(file, url) · onRemove()
  */
-export default function ProofUpload({ label = "Photo", preview, progress = 0, required = false, invalid = false, pageDrop = true, onPick, onRemove }) {
+export default function ProofUpload({
+  label = "Photo",
+  preview,
+  file,
+  progress = 0,
+  required = false,
+  invalid = false,
+  pageDrop = true,
+  pdf = false,
+  shrink = { maxMB: 1.2, maxSide: 2200 },
+  hint,
+  onPick,
+  onRemove,
+}) {
   const [busy, setBusy] = useState(false);
   const [dragging, setDragging] = useState(false); // a file is being dragged over the page
   const [overBox, setOverBox] = useState(false);
@@ -29,15 +45,23 @@ export default function ProofUpload({ label = "Photo", preview, progress = 0, re
 
   // the latest handler for the page-wide listeners below
   const take = useRef(null);
-  take.current = async (file) => {
-    if (!file || uploading) return;
-    if (!file.type?.startsWith("image/")) {
-      toast.error("That isn't a photo", { description: "Use an image file (JPG or PNG)." });
+  take.current = async (picked) => {
+    if (!picked || uploading) return;
+    const asPdf = pdf && isPdf(picked);
+    if (!asPdf && !picked.type?.startsWith("image/")) {
+      toast.error(pdf ? "Use a photo or a PDF" : "That isn't a photo", { description: pdf ? "JPG, PNG or PDF." : "Use an image file (JPG or PNG)." });
+      return;
+    }
+    if (picked.size > MAX_FILE_MB * 1024 * 1024) {
+      toast.error("That file is too big", { description: `Up to ${MAX_FILE_MB} MB.` });
       return;
     }
     setBusy(true);
     try {
-      const small = file.size > MAX_MB * 1024 * 1024 ? await imageCompression(file, { maxSizeMB: MAX_MB, maxWidthOrHeight: MAX_SIDE, useWebWorker: true }) : file;
+      const small =
+        !asPdf && picked.size > shrink.maxMB * 1024 * 1024
+          ? await imageCompression(picked, { maxSizeMB: shrink.maxMB, maxWidthOrHeight: shrink.maxSide, useWebWorker: true })
+          : picked;
       onPick?.(small, URL.createObjectURL(small));
       toast.success(`${label} attached`);
     } catch {
@@ -75,10 +99,10 @@ export default function ProofUpload({ label = "Photo", preview, progress = 0, re
       take.current(e.dataTransfer.files?.[0]);
     };
     const paste = (e) => {
-      const file = Array.from(e.clipboardData?.files || []).find((f) => f.type?.startsWith("image/"));
-      if (!file) return;
+      const pasted = Array.from(e.clipboardData?.files || []).find((f) => f.type?.startsWith("image/"));
+      if (!pasted) return;
       e.preventDefault();
-      take.current(file);
+      take.current(pasted);
     };
     window.addEventListener("dragenter", enter);
     window.addEventListener("dragover", over);
@@ -95,9 +119,9 @@ export default function ProofUpload({ label = "Photo", preview, progress = 0, re
   }, [pageDrop]);
 
   const pick = (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // the same photo can be picked again after removing it
-    take.current(file);
+    const picked = e.target.files?.[0];
+    e.target.value = ""; // the same file can be picked again after removing it
+    take.current(picked);
   };
 
   // dropping onto the box itself (also when page-wide dropping is off)
@@ -147,11 +171,53 @@ export default function ProofUpload({ label = "Photo", preview, progress = 0, re
             <span className="flex size-10 items-center justify-center rounded-xl bg-surface text-brand shadow-card">
               {busy ? <ImageUp className="size-5 animate-pulse" /> : target ? <ImageDown className="size-5" /> : <Camera className="size-5" />}
             </span>
-            <span className="text-sm font-semibold text-fg">{busy ? "Preparing photo…" : target ? "Drop it here" : "Take or choose a photo"}</span>
+            <span className="text-sm font-semibold text-fg">
+              {busy ? "Preparing…" : target ? "Drop it here" : pdf ? "Take a photo or choose a file" : "Take or choose a photo"}
+            </span>
             {/* computers: say it can be dragged or pasted too */}
             {!busy && !target && <span className="hidden text-xs text-muted lg:block">or drag one here · Ctrl+V to paste</span>}
-            <input type="file" accept="image/*" onChange={pick} className="sr-only" />
+            <input type="file" accept={pdf ? "image/*,application/pdf" : "image/*"} onChange={pick} className="sr-only" />
           </motion.label>
+        ) : pdf && isPdf(file) ? (
+          <motion.div
+            key="pdf"
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0 }}
+            {...boxDrop}
+            className={cn("relative flex items-center gap-3 overflow-hidden rounded-2xl border bg-surface-2/60 p-3", target ? "border-brand ring-4 ring-[var(--cc-ring)]" : "border-line")}
+          >
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-danger-soft text-danger">
+              <FileText className="size-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold text-fg">{file.name || "Document.pdf"}</span>
+              <span className="text-xs text-muted">PDF · {sizeOf(file.size)}</span>
+            </span>
+            <a
+              href={preview}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Open the PDF"
+              className="flex size-9 items-center justify-center rounded-xl text-muted transition hover:bg-surface hover:text-fg"
+            >
+              <ExternalLink className="size-4" />
+            </a>
+            <button
+              type="button"
+              onClick={onRemove}
+              disabled={uploading}
+              aria-label="Remove file"
+              className="flex size-9 items-center justify-center rounded-xl text-danger transition hover:bg-surface disabled:opacity-50"
+            >
+              <Trash2 className="size-4" />
+            </button>
+            {uploading && (
+              <div className="absolute inset-x-0 bottom-0 h-1 bg-black/10">
+                <motion.div className="h-full bg-brand" animate={{ width: `${progress}%` }} transition={{ duration: 0.2 }} />
+              </div>
+            )}
+          </motion.div>
         ) : (
           <motion.div
             key="photo"
@@ -190,6 +256,7 @@ export default function ProofUpload({ label = "Photo", preview, progress = 0, re
           </motion.div>
         )}
       </AnimatePresence>
+      {hint && <p className="mt-1.5 text-xs text-muted">{hint}</p>}
 
       {/* the whole screen is the drop target while a file is dragged over it */}
       {pageDrop && mounted &&

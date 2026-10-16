@@ -100,8 +100,9 @@ export function Dialog({ open, onClose, title, description, footer, size = "md",
 /**
  * Bottom sheet — the phone-friendly dialog. Slides up from the bottom; drag the
  * handle down (or flick) to close. On wide screens it sits centred at the bottom.
+ * `size="lg"` for wide content (e.g. an image editor).
  */
-export function Sheet({ open, onClose, title, description, footer, layer = "z-50", children }) {
+export function Sheet({ open, onClose, title, description, footer, layer = "z-50", size = "md", children }) {
   const panel = useRef(null);
   const drag = useDragControls();
   const mounted = useOverlay(open, onClose, panel);
@@ -124,7 +125,10 @@ export function Sheet({ open, onClose, title, description, footer, layer = "z-50
             onDragEnd={(_, info) => {
               if (info.offset.y > 120 || info.velocity.y > 600) onClose?.();
             }}
-            className="relative flex max-h-[90vh] w-full max-w-xl flex-col rounded-t-3xl border border-line bg-surface shadow-float"
+            className={cn(
+              "relative flex max-h-[90vh] w-full flex-col rounded-t-3xl border border-line bg-surface shadow-float",
+              size === "lg" ? "max-w-4xl" : "max-w-xl"
+            )}
           >
             <div
               onPointerDown={(e) => drag.start(e)}
