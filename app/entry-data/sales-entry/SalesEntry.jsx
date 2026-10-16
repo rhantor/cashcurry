@@ -299,7 +299,7 @@ export default function SalesEntry() {
 
         <EntrySection title="Which day">
           <Field error={errors.date}>
-            {({ invalid }) => <DatePicker value={date} onChange={(d) => (setDate(d), setErrors((e) => ({ ...e, date: undefined })))} max={today} invalid={invalid} />}
+            {({ invalid }) => <DatePicker size="lg" value={date} onChange={(d) => (setDate(d), setErrors((e) => ({ ...e, date: undefined })))} max={today} invalid={invalid} />}
           </Field>
           <AnimatePresence>
             {taken && (

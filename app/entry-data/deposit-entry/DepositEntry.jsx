@@ -18,7 +18,7 @@ import { Button, CountUp, DatePicker, Field, Input, cn, toast } from "@/app/comp
 import MoneyInput from "@/app/components/entry/MoneyInput";
 import ProofUpload from "@/app/components/entry/ProofUpload";
 import RecordSheet from "@/app/components/entry/RecordSheet";
-import { EntryLayout, EntrySection, RecentEntries, SummaryLine } from "@/app/components/entry/EntryLayout";
+import { EntryLayout, EntrySection, MoneyRoute, RecentEntries, SummaryLine } from "@/app/components/entry/EntryLayout";
 
 const day = (d) => (d ? format(parseISO(d), "EEE, d MMM") : "");
 
@@ -159,10 +159,14 @@ export default function DepositEntryPage() {
           />
         }
       >
+        <MoneyRoute from="till" to="bank">
+          Cash taken <b className="text-fg">out of the till and paid into the bank</b>, with the bank slip.
+        </MoneyRoute>
+
         <EntrySection title="When and how much">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Day" error={errors.date}>
-              {({ invalid }) => <DatePicker value={date} onChange={setDate} max={today} invalid={invalid} />}
+              {({ invalid }) => <DatePicker size="lg" value={date} onChange={setDate} max={today} invalid={invalid} />}
             </Field>
             <Field label="Amount paid in" error={errors.amount}>
               {({ id, invalid }) => <MoneyInput id={id} currency={currency} value={amount} invalid={invalid} onValueChange={setAmount} />}
@@ -173,10 +177,10 @@ export default function DepositEntryPage() {
         <EntrySection title="The bank slip">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Bank" error={errors.bank}>
-              {({ id, invalid }) => <Input id={id} invalid={invalid} value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. Maybank" />}
+              {({ id, invalid }) => <Input id={id} size="lg" invalid={invalid} value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. Maybank" />}
             </Field>
             <Field label="Trace number" error={errors.trace}>
-              {({ id, invalid }) => <Input id={id} invalid={invalid} value={traceNo} onChange={(e) => setTraceNo(e.target.value)} placeholder="On the slip" />}
+              {({ id, invalid }) => <Input id={id} size="lg" invalid={invalid} value={traceNo} onChange={(e) => setTraceNo(e.target.value)} placeholder="On the slip" />}
             </Field>
           </div>
           {banks.length > 0 && (

@@ -17,7 +17,8 @@ const key = (d) => format(d, "yyyy-MM-dd");
 const nice = (k) => (k ? format(parseISO(k), "d MMM yyyy") : "");
 
 /** The picker's button looks like a field. */
-function TriggerButton({ refEl, open, toggle, text, placeholder, invalid, className }) {
+/** The picker's field. `size="lg"` (48px) sits level with the big amount fields. */
+function TriggerButton({ refEl, open, toggle, text, placeholder, invalid, size = "md", className }) {
   return (
     <button
       ref={refEl}
@@ -25,7 +26,8 @@ function TriggerButton({ refEl, open, toggle, text, placeholder, invalid, classN
       onClick={toggle}
       aria-expanded={open}
       className={cn(
-        "flex h-10 w-full items-center gap-2 rounded-xl border bg-surface px-3.5 text-left text-sm outline-none transition",
+        "flex w-full items-center gap-2 rounded-xl border bg-surface px-3.5 text-left text-sm outline-none transition",
+        size === "lg" ? "h-12" : "h-10",
         "focus:border-brand focus:ring-4 focus:ring-[var(--cc-ring)]",
         open ? "border-brand ring-4 ring-[var(--cc-ring)]" : invalid ? "border-danger" : "border-line",
         className
@@ -170,7 +172,7 @@ function Calendar({ month, setMonth, today, selected, range, hover, setHover, pi
 }
 
 /** One date. `value`/`onChange` use "yyyy-MM-dd". Future dates can be blocked with `max`. */
-export function DatePicker({ value, onChange, placeholder = "Pick a date", max, invalid, className }) {
+export function DatePicker({ value, onChange, placeholder = "Pick a date", max, invalid, size, className }) {
   const today = useBusinessToday();
   const [month, setMonth] = useState(() => parseISO(value || today));
   return (
@@ -178,7 +180,7 @@ export function DatePicker({ value, onChange, placeholder = "Pick a date", max, 
       title={placeholder}
       onOpen={() => setMonth(parseISO(value || today))}
       trigger={({ open, toggle, ref }) => (
-        <TriggerButton refEl={ref} open={open} toggle={toggle} text={nice(value)} placeholder={placeholder} invalid={invalid} className={className} />
+        <TriggerButton refEl={ref} open={open} toggle={toggle} text={nice(value)} placeholder={placeholder} invalid={invalid} size={size} className={className} />
       )}
     >
       {({ close, phone }) => (

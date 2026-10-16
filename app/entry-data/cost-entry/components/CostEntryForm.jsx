@@ -138,7 +138,7 @@ export default function CostEntryForm ({ form, onSave, errors = {}, saved = fals
       >
         <EntrySection title='When and how much'>
           <div className='grid gap-4 sm:grid-cols-2'>
-            <Field label='Day'>{({ invalid }) => <DatePicker value={date} onChange={setDate} invalid={invalid} />}</Field>
+            <Field label='Day'>{({ invalid }) => <DatePicker size='lg' value={date} onChange={setDate} invalid={invalid} />}</Field>
             <Field label='Amount' error={errors.amount}>
               {({ id, invalid }) => <MoneyInput id={id} currency={currency} value={amount} invalid={invalid} onValueChange={setAmount} />}
             </Field>

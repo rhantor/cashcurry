@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { format, isValid, parseISO } from "date-fns";
 import { motion } from "framer-motion";
-import { ArrowRight, Image as ImageIcon, Inbox, Pencil } from "lucide-react";
+import { ArrowRight, Image as ImageIcon, Inbox, Landmark, Pencil, Wallet } from "lucide-react";
 import { Card, EmptyState, SkeletonRows, Stagger, cn } from "@/app/components/ui";
 
 /**
@@ -117,5 +117,30 @@ export function RecentEntries({ title = "Recent entries", viewAllHref, loading, 
         </Stagger>
       )}
     </Card>
+  );
+}
+
+const PLACES = {
+  till: { icon: Wallet, tone: "bg-brand-soft text-brand" },
+  bank: { icon: Landmark, tone: "bg-info-soft text-info" },
+};
+
+/** Which way the money moves, at the top of a transfer screen: from → to, and a line saying so. */
+export function MoneyRoute({ from, to, children }) {
+  const A = PLACES[from];
+  const B = PLACES[to];
+  return (
+    <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3 text-sm">
+      <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-xl", A.tone)}>
+        <A.icon className="size-4" />
+      </span>
+      <motion.span animate={{ x: [0, 3, 0] }} transition={{ duration: 1.6, repeat: Infinity, ease: "easeInOut" }}>
+        <ArrowRight className="size-4 shrink-0 text-subtle" />
+      </motion.span>
+      <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-xl", B.tone)}>
+        <B.icon className="size-4" />
+      </span>
+      <p className="min-w-0 text-xs text-muted">{children}</p>
+    </div>
   );
 }

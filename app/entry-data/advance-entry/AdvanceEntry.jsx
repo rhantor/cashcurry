@@ -192,7 +192,7 @@ function AdvanceForm ({ head, staff, staffLoading, companyId, branchId, manager,
               />
             )}
           </Field>
-          <Field label='Given on'>{() => <DatePicker value={when} onChange={setDate} max={today} />}</Field>
+          <Field label='Given on'>{() => <DatePicker size='lg' value={when} onChange={setDate} max={today} />}</Field>
         </div>
         <p className='mb-2 mt-4 text-xs font-semibold text-muted'>Kind</p>
         <div className='flex flex-wrap gap-2'>
@@ -380,7 +380,7 @@ function LoanForm ({ head, staff, staffLoading, companyId, branchId, manager, mo
               />
             )}
           </Field>
-          <Field label='Given on'>{() => <DatePicker value={when} onChange={setDate} max={today} />}</Field>
+          <Field label='Given on'>{() => <DatePicker size='lg' value={when} onChange={setDate} max={today} />}</Field>
         </div>
         <Field label='What it is for' error={errors.reason} className='mt-4'>
           {({ id, invalid }) => (

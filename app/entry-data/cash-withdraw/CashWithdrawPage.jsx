@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { ArrowRight, Landmark, Wallet } from "lucide-react";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 import { useAddWithdrawEntryMutation, useGetWithdrawEntriesQuery } from "@/lib/redux/api/cashWithdrawApiSlice";
@@ -12,12 +11,12 @@ import useSession from "@/app/hooks/useSession";
 import { useDefaultDate } from "@/app/hooks/useRegion";
 import { formatMoney } from "@/lib/region/currency";
 import { getSessionUser } from "@/lib/session";
-import { Button, CountUp, DatePicker, Field, Input, Textarea, confirmDialog, toast } from "@/app/components/ui";
+import { Button, CountUp, DatePicker, Field, Input, confirmDialog, toast } from "@/app/components/ui";
 import MoneyInput from "@/app/components/entry/MoneyInput";
 import ProofFiles from "@/app/components/entry/ProofFiles";
 import { Chip } from "@/app/components/entry/Choices";
 import RecordSheet from "@/app/components/entry/RecordSheet";
-import { EntryLayout, EntrySection, RecentEntries, SummaryLine } from "@/app/components/entry/EntryLayout";
+import { EntryLayout, EntrySection, MoneyRoute, RecentEntries, SummaryLine } from "@/app/components/entry/EntryLayout";
 
 // What the cash was taken out for (kept as stored before).
 const CATEGORIES = ["Supplier Payment", "Staff Advance", "Staff Salary", "Utility Bills", "Rent/Deposit", "Maintenance", "Transport/Delivery", "Petty Cash", "Other"];
@@ -192,23 +191,14 @@ export default function CashWithdrawPage() {
         }
       >
         {/* what this screen is for, so it isn't mistaken for the owner taking money */}
-        <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3 text-sm">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-info-soft text-info">
-            <Landmark className="size-4" />
-          </span>
-          <ArrowRight className="size-4 shrink-0 text-subtle" />
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand">
-            <Wallet className="size-4" />
-          </span>
-          <p className="min-w-0 text-xs text-muted">
-            Cash taken <b className="text-fg">out of the bank into the till</b> — by ATM or transfer.
-          </p>
-        </div>
+        <MoneyRoute from="bank" to="till">
+          Cash taken <b className="text-fg">out of the bank into the till</b> — by ATM or transfer.
+        </MoneyRoute>
 
         <EntrySection title="When and how much">
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Day" error={errors.date}>
-              {({ invalid }) => <DatePicker value={date} onChange={setDate} max={today} invalid={invalid} />}
+              {({ invalid }) => <DatePicker size="lg" value={date} onChange={setDate} max={today} invalid={invalid} />}
             </Field>
             <Field label="Amount taken out" error={errors.amount}>
               {({ id, invalid }) => <MoneyInput id={id} currency={currency} value={amount} invalid={invalid} onValueChange={setAmount} />}
@@ -235,10 +225,10 @@ export default function CashWithdrawPage() {
           </div>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <Field label="Reference (optional)">
-              {({ id }) => <Input id={id} value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Slip or transfer number" />}
+              {({ id }) => <Input id={id} size="lg" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Slip or transfer number" />}
             </Field>
             <Field label="Note (optional)">
-              {({ id }) => <Textarea id={id} rows={1} className="min-h-10" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything worth remembering" />}
+              {({ id }) => <Input id={id} size="lg" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Anything worth remembering" />}
             </Field>
           </div>
         </EntrySection>
