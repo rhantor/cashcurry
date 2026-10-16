@@ -88,8 +88,8 @@ export default function ItemsReportModal({ item, branchData, onClose, monthTotal
             align="start"
             width={210}
             trigger={(p) => (
-              <Button {...p} variant="secondary" size="lg" icon={MoreHorizontal} className="px-4">
-                More
+              <Button {...p} variant="secondary" size="lg" icon={MoreHorizontal} aria-label="More: PDF, Excel" className="shrink-0 px-3.5 sm:px-4">
+                <span className="hidden sm:inline">More</span>
               </Button>
             )}
             items={[
@@ -99,11 +99,11 @@ export default function ItemsReportModal({ item, branchData, onClose, monthTotal
             ]}
           />
           {onEdit && (
-            <Button variant="secondary" size="lg" icon={Pencil} onClick={onEdit} className="px-4">
-              Edit
+            <Button variant="secondary" size="lg" icon={Pencil} onClick={onEdit} aria-label="Edit" className="shrink-0 px-3.5 sm:px-4">
+              <span className="hidden sm:inline">Edit</span>
             </Button>
           )}
-          <Button size="lg" className="flex-1" icon={ImageIcon} loading={sharing} onClick={doShareImage}>
+          <Button size="lg" className="min-w-0 flex-1 whitespace-nowrap" icon={ImageIcon} loading={sharing} onClick={doShareImage}>
             Share image
           </Button>
         </>
