@@ -8,9 +8,10 @@ import { updateSessionUser } from "@/lib/session";
 /**
  * Which branch the screens show (owners, GMs). A search box appears once there
  * are more than a few branches; the star makes a branch your default (the one
- * you land on after login).
+ * you land on after login). `inline` draws the trigger as a small line of
+ * text (under the page title on phones).
  */
-export default function BranchSwitcher({ user, branches, activeId, onSwitch, compact = false }) {
+export default function BranchSwitcher({ user, branches, activeId, onSwitch, compact = false, inline = false }) {
   const toast = useToast();
   const [q, setQ] = useState("");
   const [saveDefault, { isLoading: saving }] = useUpdateUserDefaultBranchMutation();
@@ -32,10 +33,24 @@ export default function BranchSwitcher({ user, branches, activeId, onSwitch, com
 
   return (
     <Popover
-      align="end"
+      align={inline ? "start" : "end"}
       width={300}
       onOpenChange={(o) => !o && setQ("")}
-      trigger={({ open, toggle, ref }) => (
+      trigger={({ open, toggle, ref }) =>
+        inline ? (
+          <button
+            ref={ref}
+            type="button"
+            onClick={toggle}
+            aria-expanded={open}
+            aria-label={`Branch: ${active?.name || "none"}. Change branch`}
+            className="-ml-1 flex max-w-full items-center gap-1 rounded-md px-1 text-xs font-semibold text-brand transition active:bg-brand-soft"
+          >
+            <Building2 className="size-3 shrink-0" />
+            <span className="min-w-0 truncate">{active?.name || "Choose branch"}</span>
+            <ChevronsUpDown className="size-3 shrink-0 opacity-70" />
+          </button>
+        ) : (
         <button
           ref={ref}
           type="button"
@@ -50,7 +65,8 @@ export default function BranchSwitcher({ user, branches, activeId, onSwitch, com
           <span className="min-w-0 truncate text-sm font-semibold text-fg">{active?.name || "Choose branch"}</span>
           <ChevronsUpDown className="size-3.5 shrink-0 text-subtle" />
         </button>
-      )}
+        )
+      }
     >
       {({ close }) => (
         <div>

@@ -1,300 +1,120 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { sidebarItems } from "@/app/components/shell/navigation";
+import { useMemo, useState } from "react";
+import { Inbox, ShoppingBag } from "lucide-react";
+import { skipToken } from "@reduxjs/toolkit/query";
 import useSession from "@/app/hooks/useSession";
-import { menuIcon } from "@/app/components/ui/icons";
+import { useBusinessToday } from "@/app/hooks/useRegion";
+import useCurrency from "@/app/hooks/useCurrency";
+import { formatMoney } from "@/lib/region/currency";
+import { presetFilter } from "@/utils/dashboard/dateFilters";
+import useBranchData from "@/utils/dashboard/useBranchData";
+import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
+import { useGetCompanyDetailsQuery } from "@/lib/redux/api/authApiSlice";
+import { navFor, pagesFor } from "@/app/components/shell/navigation";
+import usePendingRequests from "@/app/components/shell/usePendingRequests";
+import { Skeleton } from "@/app/components/ui";
+import HomeHero from "@/app/components/home/HomeHero";
+import { AllPages, Attention, HomeSection, QuickActions } from "@/app/components/home/HomeSections";
 
-// Card accent colours — cycles through these for visual variety
-const CARD_ACCENTS = [
-  { bg: "bg-indigo-50",   border: "border-indigo-200",  icon: "bg-indigo-500",   text: "text-indigo-700"  },
-  { bg: "bg-emerald-50",  border: "border-emerald-200", icon: "bg-emerald-500",  text: "text-emerald-700" },
-  { bg: "bg-amber-50",    border: "border-amber-200",   icon: "bg-amber-500",    text: "text-amber-700"   },
-  { bg: "bg-blue-50",     border: "border-blue-200",    icon: "bg-blue-500",     text: "text-blue-700"    },
-  { bg: "bg-rose-50",     border: "border-rose-200",    icon: "bg-rose-500",     text: "text-rose-700"    },
-  { bg: "bg-violet-50",   border: "border-violet-200",  icon: "bg-violet-500",   text: "text-violet-700"  },
-  { bg: "bg-teal-50",     border: "border-teal-200",    icon: "bg-teal-500",     text: "text-teal-700"    },
-  { bg: "bg-orange-50",   border: "border-orange-200",  icon: "bg-orange-500",   text: "text-orange-700"  },
-];
+const ROLE = {
+  owner: "Owner", gm: "General manager", superAdmin: "Super admin", branchAdmin: "Branch admin",
+  manager: "Manager", accountant: "Accountant", cashier: "Cashier", supervisor: "Supervisor",
+};
 
-/* ─── greeting based on time of day ─── */
-function getGreeting() {
-  const h = new Date().getHours();
-  if (h < 12) return "Good morning";
-  if (h < 17) return "Good afternoon";
-  return "Good evening";
-}
+/**
+ * Home: today at a glance, what needs doing, one-tap shortcuts, and every
+ * page the role can open. People who can see the branch dashboard also see
+ * today's money for the branch they're in.
+ */
+export default function HomePage() {
+  const { user, role, companyId, branchId } = useSession();
+  const pages = useMemo(() => pagesFor(role), [role]);
+  const sections = useMemo(() => navFor(role), [role]);
+  const seesMoney = pages.some((p) => p.path === "/dashboard");
 
-/* ─── the signed-in user (shared session) ─── */
-function useUser() {
-  return useSession().user;
-}
-
-/* ─── role helpers ─── */
-function pickMenuByRole(role) {
-  return ["gm", "superAdmin", "owner"].includes(role) ? "company" : "branchUser";
-}
-
-function isAllowed(item, role) {
-  if (!item) return false;
-  if (!item.allowedRoles?.length) return true;
-  return item.allowedRoles.includes(role);
-}
-
-function firstPathFor(item) {
-  if (item?.path) return item.path;
-  return item?.children?.[0]?.path ?? null;
-}
-
-function buildCards(menuItems, role) {
-  return (menuItems || [])
-    .filter((item) => isAllowed(item, role))
-    .map((item) => ({
-      label:    item.label,
-      path:     firstPathFor(item),
-      iconName: item.icon,
-      children: (item.children || []).filter((c) => isAllowed(c, role)),
-    }))
-    .filter((c) => c.path);
-}
-
-/* ─── role display name ─── */
-function roleLabel(role) {
-  const map = {
-    owner:      "Owner",
-    gm:         "General Manager",
-    superAdmin: "Super Admin",
-    branchAdmin:"Branch Admin",
-    manager:    "Manager",
-    accountant: "Accountant",
-    cashier:    "Cashier",
-    supervisor: "Supervisor",
-  };
-  return map[role] || role || "User";
-}
-
-/* ─── skeleton loader ─── */
-const Skeleton = () => (
-  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-    {Array.from({ length: 6 }).map((_, i) => (
-      <div key={i} className="h-36 rounded-2xl border border-slate-100 bg-slate-50 animate-pulse" />
-    ))}
-  </div>
-);
-
-/* ─── sub-page modal ─── */
-function SubPageModal({ card, accent, onClose }) {
-  const Icon = menuIcon(card.iconName);
-
-  // close on backdrop click
-  const handleBackdrop = (e) => {
-    if (e.target === e.currentTarget) onClose();
-  };
-
-  // close on Escape
-  useEffect(() => {
-    const handler = (e) => { if (e.key === "Escape") onClose(); };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [onClose]);
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
-      onClick={handleBackdrop}
-    >
-      <div className={`w-full max-w-sm rounded-2xl border ${accent.border} bg-white shadow-2xl overflow-hidden`}>
-        {/* Header */}
-        <div className={`flex items-center gap-3 px-5 py-4 ${accent.bg}`}>
-          <div className={`inline-flex items-center justify-center h-9 w-9 rounded-xl ${accent.icon} shadow`}>
-            <Icon className="h-4 w-4 text-white" aria-hidden />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className={`font-semibold text-sm ${accent.text}`}>{card.label}</p>
-            <p className="text-[11px] text-slate-500">Select a page to open</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-slate-400 hover:text-slate-600 transition-colors p-1 rounded-lg hover:bg-white/60"
-            aria-label="Close"
-          >
-            ✕
-          </button>
-        </div>
-
-        {/* Sub-page list */}
-        <ul className="divide-y divide-slate-100">
-          {card.children.map((c) => (
-            <li key={c.path}>
-              <Link
-                href={c.path}
-                onClick={onClose}
-                className={`flex items-center gap-3 px-5 py-3.5 text-sm text-slate-700 hover:${accent.bg} hover:${accent.text} transition-colors`}
-              >
-                <span className={`inline-block h-1.5 w-1.5 rounded-full ${accent.icon} opacity-70 flex-shrink-0`} />
-                {c.label}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      </div>
-    </div>
-  );
-}
-
-/* ─── nav card ─── */
-function NavCard({ label, path, iconName, children, accent }) {
-  const Icon = menuIcon(iconName);
-  const hasMultiple = children?.length > 1;
-  const [open, setOpen] = useState(false);
-
-  if (hasMultiple) {
+  if (!role) {
     return (
-      <>
-        <button
-          onClick={() => setOpen(true)}
-          className={`group relative flex flex-col w-full text-left rounded-2xl border ${accent.border} ${accent.bg} p-5 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5`}
-        >
-          {/* Icon */}
-          <div className={`inline-flex items-center justify-center h-10 w-10 rounded-xl ${accent.icon} shadow mb-3`}>
-            <Icon className="h-5 w-5 text-white" aria-hidden />
-          </div>
-
-          {/* Label */}
-          <h3 className={`font-semibold text-sm ${accent.text} mb-1`}>{label}</h3>
-
-          {/* Sub-pages preview */}
-          <ul className="mt-1 space-y-0.5">
-            {children.slice(0, 3).map((c) => (
-              <li key={c.path} className="text-[11px] text-slate-500 flex items-center gap-1.5">
-                <span className={`inline-block h-1 w-1 rounded-full ${accent.icon} opacity-60`} />
-                {c.label}
-              </li>
-            ))}
-            {children.length > 3 && (
-              <li className="text-[11px] text-slate-400">+{children.length - 3} more</li>
-            )}
-          </ul>
-
-          {/* Expand indicator */}
-          <div className={`absolute top-4 right-4 text-xs ${accent.text} opacity-0 group-hover:opacity-100 transition-opacity`}>
-            ⊞
-          </div>
-        </button>
-
-        {open && (
-          <SubPageModal
-            card={{ label, iconName, children }}
-            accent={accent}
-            onClose={() => setOpen(false)}
-          />
-        )}
-      </>
+      <div className="mx-auto max-w-6xl space-y-6 px-4 py-5 sm:px-6 sm:py-6">
+        <Skeleton className="h-56 w-full" rounded="rounded-3xl" />
+        <div className="grid grid-cols-4 gap-3 lg:grid-cols-8">
+          {Array.from({ length: 8 }, (_, i) => (
+            <Skeleton key={i} className="h-20" rounded="rounded-2xl" />
+          ))}
+        </div>
+      </div>
     );
   }
-
-  return (
-    <Link
-      href={path}
-      className={`group relative flex flex-col rounded-2xl border ${accent.border} ${accent.bg} p-5 shadow-sm hover:shadow-md transition-all duration-200 hover:-translate-y-0.5`}
-    >
-      {/* Icon */}
-      <div className={`inline-flex items-center justify-center h-10 w-10 rounded-xl ${accent.icon} shadow mb-3`}>
-        <Icon className="h-5 w-5 text-white" aria-hidden />
-      </div>
-
-      {/* Label */}
-      <h3 className={`font-semibold text-sm ${accent.text} mb-1`}>{label}</h3>
-
-      {/* Single child label if any */}
-      {children?.length === 1 && (
-        <p className="text-[11px] text-slate-500 mt-1">{children[0].label}</p>
-      )}
-
-      {/* Arrow */}
-      <div className={`absolute top-4 right-4 text-xs ${accent.text} opacity-0 group-hover:opacity-100 transition-opacity`}>
-        →
-      </div>
-    </Link>
-  );
+  const props = { user, role, companyId, branchId, pages, sections };
+  return seesMoney ? <WithMoney {...props} /> : <Home {...props} />;
 }
 
-/* ─── main page ─── */
-export default function HomePage() {
-  const user = useUser();
-  const role = user?.role ?? null;
-  const displayName = user?.name || user?.fullName || user?.username || user?.userName || roleLabel(role);
+/** Home for roles that see the branch's money: today's figures come from the dashboard's data. */
+function WithMoney(props) {
+  const today = useBusinessToday();
+  const [filter] = useState(() => presetFilter("week", new Date(), today));
+  const currency = useCurrency();
+  const { loading, salesTrend, estCashOnHand, totalSales } = useBranchData(filter);
+  const sales = salesTrend.find((d) => d.date === today)?.total || 0;
+  const figures = {
+    loading: loading && !totalSales,
+    todayKey: today,
+    sales,
+    cash: estCashOnHand,
+    week: salesTrend,
+    money: (v) => formatMoney(v, currency),
+  };
+  // Today's sales not in yet: a nudge, to the entry form if they can use it.
+  const canEnter = props.pages.some((p) => p.path === "/entry-data/sales-entry");
+  const nudge =
+    !figures.loading && !sales
+      ? [{
+          icon: ShoppingBag,
+          tone: "in",
+          title: "Today's sales aren't in yet",
+          note: canEnter ? "Add them when the day closes" : "Nothing entered for today so far",
+          href: canEnter ? "/entry-data/sales-entry" : "/reports/sales-report",
+        }]
+      : [];
+  return <Home {...props} figures={figures} extra={nudge} />;
+}
 
-  const { menuKey, cards } = useMemo(() => {
-    if (!role) return { menuKey: null, cards: [] };
-    const key   = pickMenuByRole(role);
-    const items = sidebarItems?.[key] || [];
-    return { menuKey: key, cards: buildCards(items, role) };
-  }, [role]);
+function Home({ user, role, companyId, branchId, pages, sections, figures = null, extra = [] }) {
+  const { data: branch } = useGetSingleBranchQuery(companyId && branchId ? { companyId, branchId } : skipToken);
+  const { data: company } = useGetCompanyDetailsQuery(companyId ?? skipToken);
+  const pending = usePendingRequests({ companyId, branchId, role });
 
-  const greeting = getGreeting();
-  const today    = new Date().toLocaleDateString(undefined, {
-    weekday: "long", year: "numeric", month: "long", day: "numeric",
-  });
+  const name = user?.name || user?.fullName || user?.userName || user?.username || "";
+  const attention = [
+    ...(pending.total > 0
+      ? [{
+          icon: Inbox,
+          tone: "out",
+          title: `${pending.total} request${pending.total > 1 ? "s" : ""} waiting`,
+          note: "Advances, loans and overtime to approve",
+          href: "/requested-panel",
+        }]
+      : []),
+    ...extra,
+  ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
-      <main className="mx-auto max-w-7xl px-4 sm:px-6 py-8 space-y-8">
+    <div className="min-h-screen bg-bg">
+      <div className="mx-auto max-w-6xl space-y-7 px-4 py-5 sm:px-6 sm:py-6">
+        <HomeHero name={name} role={ROLE[role] || role} branchName={branch?.name} company={company?.name} today={figures} />
 
-        {/* ── Hero header ── */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4
-                        bg-white rounded-2xl border border-slate-100 shadow-sm px-6 py-5">
-          <div>
-            <p className="text-xs font-medium text-slate-400 uppercase tracking-widest mb-0.5">{today}</p>
-            <h1 className="text-2xl font-bold text-slate-800">
-              {greeting}{displayName && displayName !== roleLabel(role) ? `, ${displayName}` : ""}
-            </h1>
-            <p className="text-sm text-slate-500 mt-0.5">
-              {role ? `Logged in as ${roleLabel(role)}` : "Loading your workspace…"}
-            </p>
-          </div>
+        <HomeSection title="Quick actions">
+          <QuickActions pages={pages} badges={{ "/requested-panel": pending.total }} />
+        </HomeSection>
 
-          {role && (
-            <span className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 text-sm font-medium self-start sm:self-auto">
-              <span className="h-2 w-2 rounded-full bg-indigo-500 animate-pulse" />
-              {menuKey === "company" ? "Company Panel" : "Branch Panel"}
-            </span>
-          )}
-        </div>
+        <HomeSection title="Needs attention">
+          <Attention items={attention} />
+        </HomeSection>
 
-        {/* ── Loading skeleton ── */}
-        {!role && <Skeleton />}
-
-        {/* ── Navigation cards ── */}
-        {role && cards.length > 0 && (
-          <div>
-            <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider mb-3 px-1">
-              Quick Access
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {cards.map((card, i) => (
-                <NavCard
-                  key={card.label}
-                  {...card}
-                  accent={CARD_ACCENTS[i % CARD_ACCENTS.length]}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {role && cards.length === 0 && (
-          <div className="text-center py-16 text-slate-400 text-sm">
-            No shortcuts available for your role.
-          </div>
-        )}
-
-        {/* ── Footer note ── */}
-        <p className="text-center text-xs text-slate-300 pb-4">
-          Cash Curry — Internal Management System
-        </p>
-      </main>
+        <HomeSection title="Everything else">
+          <AllPages sections={sections} />
+        </HomeSection>
+      </div>
     </div>
   );
 }

@@ -11,6 +11,9 @@ import BranchSwitcher from "./BranchSwitcher";
  */
 export default function TopBar({ page, user, isCompany, branches, activeBranchId, branchName, onSwitchBranch, onSearch, onSignOut }) {
   const crumb = page?.parent || page?.section;
+  // Phones have no room for the branch box, so the branch sits under the
+  // title — except on company-wide pages, which show every branch.
+  const companyWide = page?.path?.startsWith("/company");
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-surface/80 backdrop-blur-xl">
       <div className="flex h-14 items-center gap-3 px-4 sm:px-6 lg:h-16">
@@ -27,8 +30,24 @@ export default function TopBar({ page, user, isCompany, branches, activeBranchId
             animate={{ opacity: 1, y: 0, transition: { duration: 0.18 } }}
           >
             {crumb && <p className="hidden truncate text-[11px] font-semibold uppercase tracking-wider text-subtle sm:block">{crumb}</p>}
-            <h1 className="truncate text-base font-bold tracking-tight text-fg lg:text-lg">{page?.label || "Cash Curry"}</h1>
+            <h1 className={cn("truncate font-bold tracking-tight text-fg lg:text-lg", companyWide ? "text-base" : "text-[15px] leading-5 sm:text-base")}>
+              {page?.label || "Cash Curry"}
+            </h1>
           </motion.div>
+          {!companyWide && (
+            <div className="flex min-w-0 sm:hidden">
+              {isCompany ? (
+                branches.length > 0 && <BranchSwitcher inline user={user} branches={branches} activeId={activeBranchId} onSwitch={onSwitchBranch} />
+              ) : (
+                branchName && (
+                  <span className="flex min-w-0 items-center gap-1 text-xs font-semibold text-brand">
+                    <Building2 className="size-3 shrink-0" />
+                    <span className="truncate">{branchName}</span>
+                  </span>
+                )
+              )}
+            </div>
+          )}
         </div>
 
         {/* search: a box on computers, an icon on phones */}
