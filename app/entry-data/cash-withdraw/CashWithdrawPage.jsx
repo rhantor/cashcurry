@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { motion } from "framer-motion";
 import { ArrowRight, Landmark, Wallet } from "lucide-react";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
@@ -13,9 +12,10 @@ import useSession from "@/app/hooks/useSession";
 import { useDefaultDate } from "@/app/hooks/useRegion";
 import { formatMoney } from "@/lib/region/currency";
 import { getSessionUser } from "@/lib/session";
-import { Button, CountUp, DatePicker, Field, Input, Textarea, cn, confirmDialog, toast } from "@/app/components/ui";
+import { Button, CountUp, DatePicker, Field, Input, Textarea, confirmDialog, toast } from "@/app/components/ui";
 import MoneyInput from "@/app/components/entry/MoneyInput";
 import ProofFiles from "@/app/components/entry/ProofFiles";
+import { Chip } from "@/app/components/entry/Choices";
 import RecordSheet from "@/app/components/entry/RecordSheet";
 import { EntryLayout, EntrySection, RecentEntries, SummaryLine } from "@/app/components/entry/EntryLayout";
 
@@ -23,23 +23,6 @@ import { EntryLayout, EntrySection, RecentEntries, SummaryLine } from "@/app/com
 const CATEGORIES = ["Supplier Payment", "Staff Advance", "Staff Salary", "Utility Bills", "Rent/Deposit", "Maintenance", "Transport/Delivery", "Petty Cash", "Other"];
 const METHODS = ["ATM Withdraw", "Online Transfer", "Other"];
 const day = (d) => (d ? format(parseISO(d), "EEE, d MMM") : "");
-
-function Chip({ on, onClick, children }) {
-  return (
-    <motion.button
-      whileTap={{ scale: 0.95 }}
-      type="button"
-      onClick={onClick}
-      aria-pressed={on}
-      className={cn(
-        "rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
-        on ? "border-brand bg-brand text-brand-fg" : "border-line bg-surface text-fg hover:bg-surface-2"
-      )}
-    >
-      {children}
-    </motion.button>
-  );
-}
 
 /**
  * Bank to cash (stored as a withdrawal): money taken out of the bank into the till (an ATM

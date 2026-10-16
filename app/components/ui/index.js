@@ -21,7 +21,7 @@ export { default as Popover } from "./Popover";
 export { default as Menu } from "./Menu";
 export { default as Tooltip } from "./Tooltip";
 export { default as Avatar } from "./Avatar";
-export { DatePicker, DateRangePicker } from "./DatePicker";
+export { DatePicker, DateRangePicker, PickerShell } from "./DatePicker";
 export { default as DataTable } from "./DataTable";
 export { MENU_ICONS, menuIcon } from "./icons";
 export { cn } from "./cn";

@@ -10,6 +10,10 @@ import useCurrency from "@/app/hooks/useCurrency";
 import { useBusinessToday } from "@/app/hooks/useRegion";
 import { formatMoney } from "@/lib/region";
 import { isLeaveRequest } from "@/lib/finance/rules";
+import { AnimatePresence, motion } from "framer-motion";
+import { Clock3 } from "lucide-react";
+import { Avatar, Badge, Button, Card, DatePicker, Field } from "@/app/components/ui";
+import { Chip } from "@/app/components/entry/Choices";
 
 // Roles allowed to hand over money — the same list the database rules
 // enforce (firestore.rules: isPayer).
@@ -70,98 +74,88 @@ export default function PayOutQueue({ companyId, branchId, user, title = "Waitin
   };
 
   return (
-    <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-4 space-y-3">
-      <div className="flex items-baseline justify-between gap-2">
-        <h2 className="font-semibold text-amber-900">{title}</h2>
-        <span className="text-sm text-amber-800">
-          {items.length} · {formatMoney(total, currency)}
+    <Card className="overflow-hidden border-warning/30 p-0">
+      <div className="flex items-center gap-3 bg-warning-soft/70 px-4 py-3">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-surface text-warning shadow-card">
+          <Clock3 className="size-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <h2 className="text-sm font-semibold text-fg">{title}</h2>
+          <p className="text-xs text-muted">Approved, but not handed over — cash in hand moves only when marked paid.</p>
+        </div>
+        <span className="shrink-0 text-right">
+          <span className="block text-sm font-bold tabular-nums text-fg">{formatMoney(total, currency)}</span>
+          <span className="block text-[11px] text-muted">{items.length} waiting</span>
         </span>
       </div>
-      <p className="text-xs text-amber-800">
-        Approved, but no money has left yet — these do not reduce cash in hand until marked paid.
-      </p>
 
-      <ul className="space-y-2">
+      <ul className="divide-y divide-line">
         {items.map((item) => {
           const key = `${item.kind}-${item.id}`;
           const isOpen = openId === key;
           return (
-            <li key={key} className="rounded-xl border border-amber-100 bg-white p-3">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="font-medium text-gray-900">
-                    {item.staffName || "—"}{" "}
-                    <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-600">{item.label}</span>
+            <li key={key} className="px-4 py-3">
+              <div className="flex items-center gap-3">
+                <Avatar name={item.staffName} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <p className="flex items-center gap-1.5 text-sm font-semibold text-fg">
+                    <span className="truncate">{item.staffName || "—"}</span>
+                    <Badge tone={item.kind === "advance" ? "brand" : "info"} className="shrink-0 whitespace-nowrap px-2 py-px text-[10px]">
+                      {item.label}
+                    </Badge>
                   </p>
-                  <p className="text-xs text-gray-500">
-                    Requested {showDate(item.date)}
+                  <p className="line-clamp-2 text-xs text-muted">
+                    {showDate(item.date)}
                     {item.approvedBy?.name ? ` · approved by ${item.approvedBy.name}` : ""}
                     {item.reason ? ` · ${item.reason}` : ""}
                   </p>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="font-semibold text-gray-900">{formatMoney(item.amount, currency)}</span>
+                <span className="flex shrink-0 flex-col items-end gap-1.5">
+                  <span className="text-sm font-bold tabular-nums text-fg">{formatMoney(item.amount, currency)}</span>
                   {canPay && !isOpen && (
-                    <button
-                      type="button"
-                      onClick={() => open(item)}
-                      className="rounded-lg bg-mint-600 px-3 py-1.5 text-sm font-semibold text-white hover:bg-mint-700"
-                    >
+                    <Button size="sm" onClick={() => open(item)}>
                       Mark paid
-                    </button>
+                    </Button>
                   )}
-                </div>
+                </span>
               </div>
 
-              {isOpen && (
-                <div className="mt-3 grid gap-3 border-t border-gray-100 pt-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end">
-                  <label className="text-sm">
-                    <span className="mb-1 block font-medium text-gray-700">Paid on</span>
-                    <input
-                      type="date"
-                      value={draft.date}
-                      max={today}
-                      onChange={(e) => setDraft((d) => ({ ...d, date: e.target.value }))}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2"
-                    />
-                  </label>
-                  <label className="text-sm">
-                    <span className="mb-1 block font-medium text-gray-700">Paid from</span>
-                    <select
-                      value={draft.from}
-                      onChange={(e) => setDraft((d) => ({ ...d, from: e.target.value }))}
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2"
-                    >
-                      <option value="front">Till (cash)</option>
-                      <option value="back">Bank (transfer)</option>
-                    </select>
-                  </label>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => confirm(item)}
-                      className="rounded-lg bg-mint-600 px-4 py-2 text-sm font-semibold text-white hover:bg-mint-700 disabled:opacity-60"
-                    >
-                      {busy ? "Saving…" : `Confirm ${formatMoney(item.amount, currency)}`}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy}
-                      onClick={() => setOpenId(null)}
-                      className="rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                  {error && <p className="text-sm text-red-600 sm:col-span-3">{error}</p>}
-                </div>
-              )}
+              <AnimatePresence initial={false}>
+                {isOpen && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+                    <div className="mt-3 space-y-3 rounded-2xl bg-surface-2/60 p-3">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <Field label="Handed over on">{() => <DatePicker value={draft.date} max={today} onChange={(d) => setDraft((x) => ({ ...x, date: d }))} />}</Field>
+                        <div>
+                          <p className="mb-1.5 text-xs font-semibold text-muted">From</p>
+                          <div className="flex gap-2">
+                            <Chip on={draft.from === "front"} onClick={() => setDraft((x) => ({ ...x, from: "front" }))}>
+                              Till (cash)
+                            </Chip>
+                            <Chip on={draft.from === "back"} onClick={() => setDraft((x) => ({ ...x, from: "back" }))}>
+                              Bank (transfer)
+                            </Chip>
+                          </div>
+                        </div>
+                      </div>
+                      {error && <p className="text-xs font-medium text-danger">{error}</p>}
+                      <div className="flex justify-end gap-2">
+                        <Button variant="ghost" size="sm" disabled={busy} onClick={() => setOpenId(null)}>
+                          Cancel
+                        </Button>
+                        <Button size="sm" loading={busy} onClick={() => confirm(item)}>
+                          Paid {formatMoney(item.amount, currency)}
+                        </Button>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </li>
           );
         })}
       </ul>
-      {!canPay && <p className="text-xs text-amber-800">Only a cashier, supervisor, accountant, manager or branch admin can mark these paid.</p>}
-    </div>
+      {!canPay && <p className="border-t border-line px-4 py-2.5 text-xs text-muted">Only a cashier, supervisor, accountant, manager or branch admin can mark these paid.</p>}
+    </Card>
   );
 }

@@ -15,7 +15,7 @@ computer, has its own loading look, and its old modals are redone too.
 - ✅ `/entry-data/cost-entry` Cost entry (scanner inside is still the old look — 3.5)
 - ✅ `/entry-data/deposit-entry` Cash to bank (was "Cash deposit") (+ its record sheet)
 - ✅ `/entry-data/cash-withdraw` Bank to cash (was "Cash withdrawal") (+ its record sheet)
-- ⬜ `/entry-data/advance-entry` Advance entry
+- ✅ `/entry-data/advance-entry` Advance & staff loan (+ "waiting to be paid", shared with the requested panel)
 - ⬜ `/entry-data/salary-entry` Salary entry
 - ⬜ `/cash-tracker` Daily cash tracker
 

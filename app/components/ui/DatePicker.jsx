@@ -42,7 +42,7 @@ function TriggerButton({ refEl, open, toggle, text, placeholder, invalid, classN
  * sheet on phones (a floating calendar doesn't fit beside a thumb).
  * children({ close, phone }) draws the inside.
  */
-function PickerShell({ title, trigger, onOpen, align, children }) {
+export function PickerShell({ title, trigger, onOpen, align, width, children }) {
   const phone = useIsPhone();
   const [open, setOpen] = useState(false);
   const change = (o) => {
@@ -61,7 +61,7 @@ function PickerShell({ title, trigger, onOpen, align, children }) {
     );
   }
   return (
-    <Popover align={align} open={open} onOpenChange={change} trigger={trigger}>
+    <Popover align={align} width={width} open={open} onOpenChange={change} trigger={trigger}>
       {() => children({ close, phone: false })}
     </Popover>
   );

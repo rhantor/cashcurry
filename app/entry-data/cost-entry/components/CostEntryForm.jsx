@@ -4,10 +4,11 @@ import { useState } from 'react'
 import PropTypes from 'prop-types'
 import { format, parseISO } from 'date-fns'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Check, Landmark, ScanLine, Wallet } from 'lucide-react'
-import { Button, CountUp, DatePicker, Field, Input, Sheet, Textarea, cn } from '@/app/components/ui'
+import { ScanLine } from 'lucide-react'
+import { Button, CountUp, DatePicker, Field, Input, Sheet, Textarea } from '@/app/components/ui'
 import MoneyInput from '@/app/components/entry/MoneyInput'
 import ProofUpload from '@/app/components/entry/ProofUpload'
+import { Chip, PaidFromChoice } from '@/app/components/entry/Choices'
 import { EntryLayout, EntrySection, SummaryLine } from '@/app/components/entry/EntryLayout'
 import useCurrency from '@/app/hooks/useCurrency'
 import { formatMoney } from '@/lib/region/currency'
@@ -19,53 +20,11 @@ const SHRINK = { maxMB: 0.6, maxSide: 1600 }
 const day = d => (d ? format(parseISO(d), 'EEE, d MMM') : '')
 const methodLabel = v => BACK_OFFICE_METHODS.find(m => m.value === v)?.label
 
-/** Two big choices: paid from the till, or from the bank (then how). */
+/** Paid from the till or the bank; for the bank, how. */
 function PaidFrom ({ office, setOffice, method, setMethod, error }) {
-  const choices = [
-    { value: 'front', title: 'From the till', note: 'Cash — front office', icon: Wallet, tone: 'brand' },
-    { value: 'back', title: 'From the bank', note: 'Card, QR, online, transfer — back office', icon: Landmark, tone: 'info' }
-  ]
   return (
     <div>
-      <div className='grid gap-2 sm:grid-cols-2'>
-        {choices.map(c => {
-          const on = office === c.value
-          return (
-            <button
-              key={c.value}
-              type='button'
-              onClick={() => setOffice(c.value)}
-              aria-pressed={on}
-              className={cn(
-                'relative flex items-center gap-3 rounded-2xl border p-3.5 text-left transition',
-                on ? 'border-brand bg-brand-soft/50 ring-4 ring-[var(--cc-ring)]' : 'border-line bg-surface hover:bg-surface-2'
-              )}
-            >
-              <span
-                className={cn(
-                  'flex size-10 shrink-0 items-center justify-center rounded-xl',
-                  c.tone === 'info' ? 'bg-info-soft text-info' : 'bg-brand-soft text-brand'
-                )}
-              >
-                <c.icon className='size-5' />
-              </span>
-              <span className='min-w-0'>
-                <span className='block text-sm font-semibold text-fg'>{c.title}</span>
-                <span className='block text-xs text-muted'>{c.note}</span>
-              </span>
-              {on && (
-                <motion.span
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className='absolute right-3 top-3 flex size-5 items-center justify-center rounded-full bg-brand text-brand-fg'
-                >
-                  <Check className='size-3' strokeWidth={3} />
-                </motion.span>
-              )}
-            </button>
-          )
-        })}
-      </div>
+      <PaidFromChoice value={office} onChange={setOffice} bankNote='Card, QR, online, transfer — back office' />
       <AnimatePresence initial={false}>
         {office === 'back' && (
           <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className='overflow-hidden'>
@@ -82,24 +41,6 @@ function PaidFrom ({ office, setOffice, method, setMethod, error }) {
         )}
       </AnimatePresence>
     </div>
-  )
-}
-
-function Chip ({ on, onClick, children, className }) {
-  return (
-    <motion.button
-      whileTap={{ scale: 0.95 }}
-      type='button'
-      onClick={onClick}
-      aria-pressed={on}
-      className={cn(
-        'rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
-        on ? 'border-brand bg-brand text-brand-fg' : 'border-line bg-surface text-fg hover:bg-surface-2',
-        className
-      )}
-    >
-      {children}
-    </motion.button>
   )
 }
 
