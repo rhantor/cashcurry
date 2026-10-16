@@ -9,14 +9,12 @@ import PeriodBar from "../components/dashboard/PeriodBar";
 import StatCard from "../components/dashboard/StatCard";
 import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/utils/formatMoney";
-import SalesTrend from "../components/dashboard/charts/SalesTrend";
-import BankedVsWithdrawals from "../components/dashboard/charts/BankedVsWithdrawals";
 import RecentActivity from "../components/dashboard/RecentActivity";
-import SalesVsCosts from "../components/dashboard/charts/SalesVsCosts";
-import CashVsCost from "../components/dashboard/charts/CashVsCost";
-import BankedVsBackCost from "../components/dashboard/charts/BankedVsBackCost";
-import LoansTimeline from "../components/dashboard/charts/LoansTimeline";
-import { ChartCard } from "../components/dashboard/charts/kit";
+import SalesHero from "../components/dashboard/charts/SalesHero";
+import DailyNet from "../components/dashboard/charts/DailyNet";
+import MoneyFlow from "../components/dashboard/charts/MoneyFlow";
+import BalanceTrend from "../components/dashboard/charts/BalanceTrend";
+import { COLOR, ChartCard, RankedBars } from "../components/dashboard/charts/kit";
 
 /** A small heading between groups of charts. */
 function SectionHeader({ title }) {
@@ -36,14 +34,13 @@ export default function DashboardPage() {
 
   const {
     loading,
-    salesTrend,
     compareSalesTrend,
     salesVsCosts,
-    cashVsCost,
-    bankedVsWdr,
-    bankedVsBackCost,
-    loanTimeline,
     recent,
+    moneyFlow,
+    balanceTrend,
+    tenderMix,
+    costByCategory,
     effectiveBankedAfterWithdrawals,
     estCashOnHand,
     totalCosts,
@@ -57,6 +54,17 @@ export default function DashboardPage() {
   } = useBranchData(filter);
   // Skeletons only on the first load; later refreshes keep the figures and show "Updating".
   const firstLoad = loading && !totalSales;
+  const kept = DailyNet.summary(salesVsCosts, currency);
+  const t = moneyFlow?.totals;
+  const loans = t
+    ? [
+        ["Borrowed", t.loanReceived],
+        ["Lent", t.loanGiven],
+        ["Repaid to us", t.repayCashIn + t.repayBankIn],
+        ["We repaid", t.repayCashOut + t.repayBankOut],
+      ]
+    : [];
+  const anyLoans = loans.some(([, v]) => v);
 
   return (
     <div className="min-h-screen bg-bg">
@@ -95,44 +103,59 @@ export default function DashboardPage() {
           ))}
         </Stagger>
 
-        {/* ── Performance ── */}
-        <SectionHeader title="Performance" />
+        {/* ── Sales ── */}
+        <SectionHeader title="Sales" />
+        <SalesHero total={totalSales} compareData={compareSalesTrend} currency={currency} loading={firstLoad} />
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <ChartCard title="Sales trend" subtitle="Each day this period, against the same days before" legend={SalesTrend.legend(compareSalesTrend?.some((d) => d.previous > 0))} loading={firstLoad}>
-            <SalesTrend data={salesTrend} compareData={compareSalesTrend} currency={currency} />
+          <ChartCard
+            title="Money kept each day"
+            subtitle={`${kept.kept} kept, ${kept.share} of sales${kept.losing ? ` · ${kept.losing} day${kept.losing > 1 ? "s" : ""} spent more than sold` : ""}`}
+            legend={DailyNet.legend}
+            loading={firstLoad}
+          >
+            <DailyNet data={salesVsCosts} currency={currency} />
           </ChartCard>
-          <ChartCard title="Sales vs costs" subtitle="What came in against everything spent, per day" legend={SalesVsCosts.legend} loading={firstLoad}>
-            <SalesVsCosts data={salesVsCosts} currency={currency} />
+          <ChartCard title="How customers paid" subtitle="Sales by payment type, and where each one lands" loading={firstLoad}>
+            <RankedBars
+              format={fmt}
+              rows={(tenderMix || []).map((r) => ({ name: r.label, value: r.value, tag: r.banked ? "Bank" : r.key === "cash" ? "Till" : null }))}
+            />
           </ChartCard>
         </div>
 
-        {/* ── Cash flow ── */}
-        <SectionHeader title="Cash flow" />
+        {/* ── Cash & bank ── */}
+        <SectionHeader title="Cash & bank" />
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <ChartCard title="Cash vs costs" subtitle="Cash sales against costs paid from the till" legend={CashVsCost.legend} loading={firstLoad}>
-            <CashVsCost data={cashVsCost} currency={currency} />
+          <ChartCard title="Where the money went" subtitle="Everything that added or took money away, step by step" loading={firstLoad}>
+            <MoneyFlow flow={moneyFlow} currency={currency} />
           </ChartCard>
-          <ChartCard title="Bank vs withdrawals" subtitle="Card, QR and online sales against money taken out" legend={BankedVsWithdrawals.legend} loading={firstLoad}>
-            <BankedVsWithdrawals data={bankedVsWdr} currency={currency} />
-          </ChartCard>
+          <div className="space-y-4">
+            <ChartCard title="Day by day" subtitle="Cash in hand at each day's end, and the bank's change so far" legend={BalanceTrend.legend} loading={firstLoad}>
+              <BalanceTrend data={balanceTrend} currency={currency} />
+            </ChartCard>
+            {anyLoans && (
+              <ChartCard title="Loans between branches" subtitle="This period, from this branch's side">
+                <dl className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  {loans.map(([label, v]) => (
+                    <div key={label} className="rounded-xl bg-surface-2/70 px-3 py-2">
+                      <dt className="text-[11px] font-medium text-muted">{label}</dt>
+                      <dd className="mt-0.5 truncate text-sm font-bold tabular-nums text-fg">{fmt(v)}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </ChartCard>
+            )}
+          </div>
         </div>
 
-        {/* ── Bank ── */}
-        <SectionHeader title="Bank" />
+        {/* ── Costs and the latest records ── */}
+        <SectionHeader title="Costs & activity" />
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-          <ChartCard title="Bank vs back-office costs" subtitle="Money into the bank against costs paid from it" legend={BankedVsBackCost.legend} loading={firstLoad}>
-            <BankedVsBackCost data={bankedVsBackCost} currency={currency} />
+          <ChartCard title="Top costs" subtitle="By category, largest first" loading={firstLoad}>
+            <RankedBars format={fmt} color={COLOR.out} rows={costByCategory} empty="No costs in this period" />
           </ChartCard>
-          <ChartCard title="Loans between branches" subtitle="Borrowed, lent and repaid" legend={LoansTimeline.legend} loading={firstLoad}>
-            <LoansTimeline data={loanTimeline} currency={currency} />
-          </ChartCard>
-        </div>
-
-        {/* ── Latest records ── */}
-        <div className="pt-3">
           <RecentActivity rows={recent} />
         </div>
-
       </div>
     </div>
   );

@@ -594,6 +594,47 @@ export default function useBranchData (filter) {
       .slice(0, 15)
   }, [fSales, fCosts, fDep, fWdr, fSal, fAdv, fLoans, saleTotal])
 
+  /* --------------- charts read straight off the ledger --------------- */
+  // Display only: every figure here is one the cards already show, split up.
+  const moneyFlow = useMemo(
+    () => ({ broughtForward: ledger.broughtForward, totals: ledger.totals, closing: ledger.closing }),
+    [ledger]
+  )
+
+  // End-of-day cash in hand, and the bank's movement so far this period
+  // (each ends on its card's figure).
+  const balanceTrend = useMemo(() => {
+    let bank = 0
+    return ledger.days.map(d => {
+      bank += d.bankChange
+      return { date: d.date, cash: d.runningCash, bank }
+    })
+  }, [ledger])
+
+  // Sales by payment type, and whether each lands in the bank.
+  const tenderMix = useMemo(() => {
+    const t = ledger.tenders
+    return t.keys
+      .map(k => ({
+        key: k,
+        label: t.byKey.get(k)?.label || (k === 'qr' ? 'QR' : titleCase(k)),
+        value: num(ledger.totals.tenders[k]),
+        banked: t.isBanked(k),
+        inTotal: t.countsInTotal(k)
+      }))
+      .filter(r => r.value)
+  }, [ledger])
+
+  // Costs by category, largest first.
+  const costByCategory = useMemo(() => {
+    const map = new Map()
+    fCosts.forEach(c => {
+      const name = String(c.category || '').trim() || 'Uncategorized'
+      map.set(name, (map.get(name) || 0) + num(c.amount))
+    })
+    return [...map].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value)
+  }, [fCosts])
+
   const loading =
     !source.ready ||
     salesLoading ||
@@ -639,6 +680,10 @@ export default function useBranchData (filter) {
     bankedVsBackCost,
     loanTimeline,
     recent,
+    moneyFlow,
+    balanceTrend,
+    tenderMix,
+    costByCategory,
 
     // NEW summary-aligned KPIs
     handInCash: totals.handInCash,
