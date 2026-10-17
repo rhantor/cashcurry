@@ -2,7 +2,8 @@
 import React from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { AlertTriangle, CalendarClock, Download, FileSpreadsheet, FileText, Wallet } from 'lucide-react'
-import { Button, Card, Menu, cn } from '@/app/components/ui'
+import { Button, Menu } from '@/app/components/ui'
+import StatTiles from '@/app/components/purchases/StatTiles'
 
 /**
  * The top of Due bills: what is owed in all, what is overdue and what falls
@@ -22,22 +23,12 @@ const DueBillsHeader = ({ bills = [], selectedCount = 0, totalSelectedBalance, c
 
   return (
     <>
-      <div className='mb-4 flex flex-wrap items-start justify-between gap-3'>
-        <div className='grid flex-1 grid-cols-1 gap-3 sm:grid-cols-3'>
-          {tiles.map(t => (
-            <Card key={t.label} className='p-4'>
-              <div className='flex items-start justify-between gap-2'>
-                <p className='text-xs font-semibold text-muted'>{t.label}</p>
-                <span className={cn('flex size-7 items-center justify-center rounded-lg', t.tone)}>
-                  <t.icon className='size-3.5' />
-                </span>
-              </div>
-              <p className='mt-1.5 text-xl font-bold tabular-nums text-fg'>{t.value}</p>
-              <p className='text-[11px] text-subtle'>{t.note}</p>
-            </Card>
-          ))}
+      <div className='mb-4 flex flex-col-reverse gap-3 sm:flex-row sm:items-start'>
+        <div className='min-w-0 flex-1'>
+          <StatTiles tiles={tiles} />
         </div>
         {(onExportPDF || onExportExcel) && (
+          <div className='self-end sm:self-auto'>
           <Menu
             align='end'
             width={190}
@@ -51,6 +42,7 @@ const DueBillsHeader = ({ bills = [], selectedCount = 0, totalSelectedBalance, c
               onExportExcel && { label: 'Excel', icon: FileSpreadsheet, onSelect: onExportExcel },
             ].filter(Boolean)}
           />
+          </div>
         )}
       </div>
 

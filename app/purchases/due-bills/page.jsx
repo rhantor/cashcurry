@@ -5,7 +5,7 @@ import { formatMoney } from '@/lib/region/currency'
 import React, { useMemo, useState } from 'react'
 import { skipToken } from '@reduxjs/toolkit/query'
 import { useRouter } from 'next/navigation'
-import { Edit3, AlertCircle, Trash2, Eye, Paperclip } from 'lucide-react'
+import { Edit3, AlertCircle, Trash2, Eye, Paperclip, ChevronRight, PartyPopper } from 'lucide-react'
 
 import useResolvedCompanyBranch from '@/utils/useResolvedCompanyBranch'
 import { useGetSingleBranchQuery } from '@/lib/redux/api/branchApiSlice'
@@ -31,6 +31,8 @@ import autoTable from "jspdf-autotable"
 import * as XLSX from "xlsx"
 import { PDFDocument } from 'pdf-lib'
 import { toast, confirmDialog } from "@/app/components/ui/notify";
+import { Badge, DataTable } from '@/app/components/ui'
+import { format } from 'date-fns'
 
 // --- Helper Functions ---
 function daysBetween (aISO, bISO) {
@@ -257,6 +259,7 @@ export default function DueBillsPage () {
       return {
         ...v,
         code,
+        reasons: emergencyReason,
         isEmergency: emergencyReason.length > 0 ? '! ' + emergencyReason.join(' + ') : '-',
         emergencyLevel: emergencyReason.length
       };
@@ -774,73 +777,52 @@ const handleSaveEdit = async (billId, formData) => {
 
       <div className='bg-surface border rounded-xl shadow-sm overflow-hidden'>
         {!selectedVendor ? (
-          <div className='overflow-x-auto'>
-            <table className='w-full text-left text-sm'>
-              <thead className='bg-surface-2/60 border-b'>
-                <tr>
-                  <th className='px-6 py-4 font-semibold text-fg'>Vendor Name</th>
-                  <th className='px-6 py-4 font-semibold text-fg text-center'>Pending Bills</th>
-                  <th className='px-6 py-4 font-semibold text-fg text-center'>Last Purchase</th>
-                  <th className='px-6 py-4 font-semibold text-fg text-right'>Total Pending</th>
-                  <th className='px-6 py-4 font-semibold text-fg text-center'>Remarks</th>
-                  <th className='px-6 py-4 font-semibold text-fg text-center'>Action</th>
-                </tr>
-              </thead>
-              <tbody className='divide-y divide-line'>
-                {vendorSummaryData.length === 0 ? (
-                  <tr>
-                    <td colSpan='6' className='px-6 py-12 text-center text-muted'>
-                      No vendors with outstanding bills found.
-                    </td>
-                  </tr>
-                ) : (
-                  vendorSummaryData.map(v => (
-                    <tr key={v.id} className='group hover:bg-surface-2 transition-colors cursor-pointer' onClick={() => setSelectedVendor(v.id)}>
-                      <td className='px-6 py-4'>
-                        <div className="font-medium text-fg">{v.name}</div>
-                        {v.code ? (
-                          <div className="text-[11px] text-muted font-mono tracking-wide mt-0.5 uppercase">
-                            Code: <span className="font-bold text-fg">{v.code}</span>
-                          </div>
-                        ) : (
-                          <div className="text-[10px] text-subtle italic mt-0.5">No Code</div>
-                        )}
-                      </td>
-                      <td className='px-6 py-4 text-center text-muted'>
-                        {v.billsCount}
-                      </td>
-                      <td className='px-6 py-4 text-center text-muted'>
-                        {v.lastPurchaseTimestamp ? new Date(v.lastPurchaseTimestamp).toLocaleDateString() : "-"}
-                      </td>
-                      <td className='px-6 py-4 text-right font-bold text-fg'>
-                        {fmtRM(v.totalPending)}
-                      </td>
-                      <td className='px-6 py-4 text-center'>
-                        {v.isEmergency !== '-' ? (
-                          <span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-danger-soft text-danger'>
-                            {v.isEmergency}
-                          </span>
-                        ) : (
-                          <span className='text-subtle'>-</span>
-                        )}
-                      </td>
-                      <td className='px-6 py-4 text-center'>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedVendor(v.id);
-                          }}
-                          className='px-3 py-1.5 text-xs font-medium bg-brand-soft text-brand hover:bg-brand-soft rounded-lg transition-colors'
-                        >
-                          View Bills
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            className='rounded-none border-0'
+            rows={vendorSummaryData}
+            onRowClick={v => setSelectedVendor(v.id)}
+            pageSize={0}
+            empty={{ icon: PartyPopper, title: 'Nothing owed', description: searchTerm ? 'No unpaid bill matches the search.' : 'Every vendor bill is paid.' }}
+            columns={[
+              {
+                key: 'name',
+                label: 'Vendor',
+                primary: true,
+                sortable: true,
+                render: v => (
+                  <div className='min-w-0'>
+                    <p className='truncate font-semibold text-fg'>{v.name}</p>
+                    {v.code && <p className='text-[11px] font-normal text-muted'>{v.code}</p>}
+                  </div>
+                )
+              },
+              { key: 'billsCount', label: 'Unpaid bills', sortable: true, render: v => v.billsCount },
+              {
+                key: 'last',
+                label: 'Last bill',
+                sortValue: v => v.lastPurchaseTimestamp,
+                render: v => (v.lastPurchaseTimestamp ? format(new Date(v.lastPurchaseTimestamp), 'd MMM yyyy') : '—')
+              },
+              {
+                key: 'reasons',
+                label: 'Needs',
+                render: v =>
+                  v.reasons.length ? (
+                    <span className='inline-flex flex-wrap gap-1'>
+                      {v.reasons.map(r => (
+                        <Badge key={r} tone={r === 'Overdue' ? 'danger' : 'warning'}>
+                          {r === 'Overdue' ? 'Overdue' : 'At bill limit'}
+                        </Badge>
+                      ))}
+                    </span>
+                  ) : (
+                    <span className='text-subtle'>—</span>
+                  )
+              },
+              { key: 'totalPending', label: 'Owed', align: 'right', aside: true, sortable: true, render: v => <span className='font-semibold'>{fmtRM(v.totalPending)}</span> },
+              { key: 'go', label: '', align: 'right', hideOnMobile: true, render: () => <ChevronRight className='ml-auto size-4 text-subtle' /> }
+            ]}
+          />
         ) : (
           <>
         {/* Desktop Table View */}

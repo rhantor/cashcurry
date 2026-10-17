@@ -10,8 +10,9 @@ import PaymentDetailsModal from "@/app/components/purchases/PaymentDetailsModal"
 import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/lib/region/currency";
 import { dayKey } from "@/lib/finance/rules";
-import { Badge, Button, Card, DataTable, DateRangePicker, Select, Skeleton, cn } from "@/app/components/ui";
+import { Badge, Button, Card, DataTable, DateRangePicker, Select, Skeleton } from "@/app/components/ui";
 import { Chip } from "@/app/components/entry/Choices";
+import StatTiles from "@/app/components/purchases/StatTiles";
 
 const METHODS = [
   ["cash", "Cash"],
@@ -116,20 +117,7 @@ export default function PaymentsPage() {
         </Button>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        {tiles.map((t) => (
-          <Card key={t.label} className="p-4">
-            <div className="flex items-start justify-between gap-2">
-              <p className="text-xs font-semibold text-muted">{t.label}</p>
-              <span className={cn("flex size-7 items-center justify-center rounded-lg", t.tone)}>
-                <t.icon className="size-3.5" />
-              </span>
-            </div>
-            {isLoading ? <Skeleton className="mt-2 h-6 w-28" /> : <p className="mt-1.5 text-xl font-bold tabular-nums text-fg">{t.value}</p>}
-            <p className="text-[11px] text-subtle">{t.note}</p>
-          </Card>
-        ))}
-      </div>
+      <StatTiles tiles={tiles} loading={isLoading} />
 
       <Card className="space-y-3 p-3 sm:p-4">
         <div className="flex flex-col gap-2 sm:flex-row">

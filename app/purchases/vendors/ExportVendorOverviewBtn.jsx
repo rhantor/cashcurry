@@ -6,6 +6,7 @@ import { Download } from "lucide-react";
 import { useLazyGetVendorBillsQuery } from "@/lib/redux/api/vendorBillsApiSlice";
 import useCurrency from "@/app/hooks/useCurrency";
 import { toast } from "@/app/components/ui/notify";
+import { Button } from "@/app/components/ui";
 
 function formatDate(iso) {
   if (!iso) return "-";
@@ -132,13 +133,8 @@ export default function ExportVendorOverviewBtn({ companyId, branchId, vendor })
   };
 
   return (
-    <button
-      onClick={handleExport}
-      disabled={isExporting}
-      className="flex items-center gap-2 px-4 py-2 bg-brand hover:bg-brand text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-card disabled:opacity-50"
-    >
-      <Download className="w-4 h-4" />
-      {isExporting ? "Exporting..." : "Export Full Details"}
-    </button>
+    <Button size="sm" variant="secondary" icon={Download} loading={isExporting} onClick={handleExport}>
+      All bills (PDF)
+    </Button>
   );
 }

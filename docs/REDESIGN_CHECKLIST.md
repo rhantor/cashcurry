@@ -55,7 +55,7 @@ computer, has its own loading look, and its old modals are redone too.
 - ✅ `/purchases/new-bill` New vendor bill
 - ✅ `/purchases/due-bills` Due bills (+ pay bills, edit bill, export)
 - ✅ `/purchases/payments` Payments — totals by office, date/vendor/method filters (the date filter now works), details sheet
-- ⬜ `/purchases/vendors` Vendors
+- ✅ `/purchases/vendors` Vendors — owed/paid tiles, list, add/edit sheet, vendor sheet (owed · paid · details), export menu; recount only for owners and refuses a partial count
 - ⬜ `/purchases/items` Items catalog
 - ⬜ `/purchases/reports` Purchase report
 

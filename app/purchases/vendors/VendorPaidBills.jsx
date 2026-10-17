@@ -2,7 +2,11 @@
 import React, { useMemo, useState } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
-import { Download } from "lucide-react";
+import { Download, ReceiptText, Wallet } from "lucide-react";
+import { formatMoney } from "@/lib/region/currency";
+import { Button, Select, Tabs } from "@/app/components/ui";
+import { Chip } from "@/app/components/entry/Choices";
+import { ListHead, Row, RowList, niceDate } from "./parts";
 import { useGetVendorBillsQuery } from "@/lib/redux/api/vendorBillsApiSlice";
 import { useGetVendorPaymentsQuery } from "@/lib/redux/api/vendorPaymentsApiSlice";
 import PaymentDetailsModal from "@/app/components/purchases/PaymentDetailsModal";
@@ -14,7 +18,7 @@ const METHOD_LABELS = {
   card: "Card",
   qr: "QR",
   online: "Online",
-  bank_transfer: "Bank Transfer",
+  bank_transfer: "Bank transfer",
 };
 
 function formatDate(iso) {
@@ -25,22 +29,6 @@ function formatDate(iso) {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
-    });
-  } catch {
-    return iso;
-  }
-}
-
-function formatDateTime(iso) {
-  if (!iso) return "-";
-  try {
-    const d = new Date(iso);
-    return d.toLocaleDateString(undefined, {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
     });
   } catch {
     return iso;
@@ -98,11 +86,7 @@ export default function VendorPaidBills({ companyId, branchId, vendorId }) {
     { skip: !ready || view !== "payments" }
   );
 
-  const fmtRM = (v) =>
-    `${currency} ${Number(v ?? 0).toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    })}`;
+  const fmtRM = (v) => formatMoney(Number(v ?? 0), currency);
 
   const bills = useMemo(() => {
     const rows = paidBills.map((b) => ({ ...b, __lastPaid: lastPaidOf(b) }));
@@ -193,279 +177,88 @@ export default function VendorPaidBills({ companyId, branchId, vendorId }) {
     doc.save(`${label}_${vendorName.replace(/\s+/g, "_")}_${month || "all-time"}.pdf`);
   };
 
+  // the last twelve months to pick from
+  const months = Array.from({ length: 12 }, (_, i) => monthKey(-i));
+
   return (
-    <div className="space-y-4">
-      {/* View switch + period filters */}
-      <div className="flex flex-wrap items-center gap-2 justify-between px-1">
-        <div className="inline-flex rounded-lg border border-line overflow-hidden">
-          <button
-            onClick={() => setView("bills")}
-            className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all ${
-              view === "bills"
-                ? "bg-brand text-white"
-                : "bg-surface text-muted hover:bg-surface-2"
-            }`}
-          >
-            Bills
-          </button>
-          <button
-            onClick={() => setView("payments")}
-            className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all border-l border-line ${
-              view === "payments"
-                ? "bg-brand text-white"
-                : "bg-surface text-muted hover:bg-surface-2"
-            }`}
-          >
-            Payments
-          </button>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={() => setMonth(monthKey(-1))}
-            className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all ${
-              month === monthKey(-1)
-                ? "bg-brand-soft text-brand border-brand/30"
-                : "bg-surface text-muted border-line hover:bg-surface-2"
-            }`}
-          >
-            Last Month
-          </button>
-          <button
-            onClick={() => setMonth(monthKey(0))}
-            className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all ${
-              month === monthKey(0)
-                ? "bg-brand-soft text-brand border-brand/30"
-                : "bg-surface text-muted border-line hover:bg-surface-2"
-            }`}
-          >
-            This Month
-          </button>
-          <input
-            type="month"
-            value={month}
-            onChange={(e) => setMonth(e.target.value)}
-            className="px-2 py-1.5 rounded-lg border border-line text-xs text-fg focus:outline-none focus:ring-2 focus:ring-[var(--cc-ring)]"
-          />
-          {month && (
-            <button
-              onClick={() => setMonth("")}
-              className="px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border border-line bg-surface text-muted hover:bg-surface-2"
-            >
-              All Time
-            </button>
-          )}
-          <button
-            onClick={handleExportPDF}
-            disabled={!rowCount}
-            className="flex items-center gap-2 px-3 py-1.5 bg-brand-soft text-brand hover:bg-brand-soft disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-xs font-bold transition-all border border-brand/30"
-          >
-            <Download className="w-3.5 h-3.5" />
-            Export PDF
-          </button>
-        </div>
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Tabs
+          size="sm"
+          value={view}
+          onChange={setView}
+          tabs={[
+            { value: "bills", label: "Paid bills", icon: ReceiptText },
+            { value: "payments", label: "Payments", icon: Wallet },
+          ]}
+        />
+        <Select className="h-9 w-auto text-xs" value={month} onChange={(e) => setMonth(e.target.value)} aria-label="Month">
+          <option value="">All time</option>
+          {months.map((m) => (
+            <option key={m} value={m}>
+              {monthLabel(m)}
+            </option>
+          ))}
+        </Select>
       </div>
 
-      {/* Summary strip */}
-      <div className="flex flex-wrap items-center gap-4 px-4 py-3 rounded-xl bg-surface-2/60 border border-line">
-        <div>
-          <span className="block text-[9px] uppercase font-black tracking-widest text-subtle">
-            {view === "bills" ? "Bills" : "Payments"}
-          </span>
-          <span className="text-lg font-black text-fg tabular-nums">{rowCount}</span>
+      {view === "bills" && month && (
+        <div className="flex items-center gap-1.5 text-xs text-muted">
+          Month of the
+          <Chip on={basis === "invoice"} onClick={() => setBasis("invoice")}>
+            invoice
+          </Chip>
+          <Chip on={basis === "paid"} onClick={() => setBasis("paid")}>
+            payment
+          </Chip>
         </div>
-        <div className="h-8 w-px bg-surface-2" />
-        <div>
-          <span className="block text-[9px] uppercase font-black tracking-widest text-subtle">
-            {view === "bills" ? "Billed Amount" : "Paid Amount"}
-          </span>
-          <span className="text-lg font-black text-brand tabular-nums">
-            {fmtRM(view === "bills" ? billsTotal : paymentsTotal)}
-          </span>
-        </div>
-        <div className="h-8 w-px bg-surface-2" />
-        <div>
-          <span className="block text-[9px] uppercase font-black tracking-widest text-subtle">
-            Period
-          </span>
-          <span className="text-sm font-bold text-fg">{monthLabel(month)}</span>
-        </div>
-        {view === "bills" && month && (
-          <div className="ml-auto flex items-center gap-1">
-            <span className="text-[9px] uppercase font-black tracking-widest text-subtle mr-1">
-              Match on
-            </span>
-            {["invoice", "paid"].map((b) => (
-              <button
-                key={b}
-                onClick={() => setBasis(b)}
-                className={`px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-widest transition-all ${
-                  basis === b
-                    ? "bg-surface text-brand border border-brand/30"
-                    : "text-subtle hover:text-muted"
-                }`}
-              >
-                {b === "invoice" ? "Invoice Date" : "Paid Date"}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
+      )}
 
-      {isLoading ? (
-        <div className="py-8 text-center text-muted animate-pulse">
-          {view === "bills" ? "Loading paid bills..." : "Loading payment history..."}
-        </div>
-      ) : !rowCount ? (
-        <div className="py-12 text-center bg-surface-2/60 rounded-2xl border-2 border-dashed border-line">
-          <div className="w-12 h-12 bg-surface-2 rounded-full flex items-center justify-center mx-auto mb-3 text-subtle">
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </div>
-          <p className="text-muted font-medium">
-            {view === "bills"
-              ? "No fully paid bills for this vendor."
-              : "No payments found for this vendor."}
-          </p>
-          <p className="text-xs text-subtle mt-1">
-            {month
-              ? `Nothing recorded in ${monthLabel(month)}.`
-              : "Records in this branch will appear here."}
-          </p>
-        </div>
-      ) : view === "bills" ? (
-        <div className="overflow-x-auto rounded-xl border border-line shadow-sm">
-          <table className="min-w-full text-sm">
-            <thead className="bg-surface-2/60 text-left text-muted font-black uppercase tracking-widest text-[9px]">
-              <tr>
-                <th className="px-4 py-3">Inv. Date</th>
-                <th className="px-4 py-3">Invoice #</th>
-                <th className="px-4 py-3">Last Paid</th>
-                <th className="px-4 py-3 text-center">Payments</th>
-                <th className="px-4 py-3 text-right">Total</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line bg-surface">
-              {bills.map((b) => (
-                <tr key={b.id} className="hover:bg-surface-2/50 transition-colors">
-                  <td className="px-4 py-3 text-muted whitespace-nowrap">
-                    {formatDate(b.invoiceDate)}
-                  </td>
-                  <td className="px-4 py-3 font-bold text-fg uppercase font-mono">
-                    {b.invoiceNo || b.reference || "-"}
-                  </td>
-                  <td className="px-4 py-3 text-muted whitespace-nowrap">
-                    {formatDate(b.__lastPaid)}
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <span className="px-2 py-0.5 rounded-full text-[10px] bg-surface-2 text-muted font-bold tabular-nums">
-                      {b.paymentHistory?.length || 0}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-right font-black text-fg">
-                    {fmtRM(b.total)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => setSelectedBill(b)}
-                      className="text-brand hover:text-brand font-bold text-xs"
-                    >
-                      View
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot className="bg-surface-2/60 border-t-2 border-line">
-              <tr>
-                <td colSpan={4} className="px-4 py-3 font-black text-[10px] uppercase tracking-widest text-subtle">
-                  {bills.length} Paid Bill{bills.length === 1 ? "" : "s"}
-                </td>
-                <td className="px-4 py-3 text-right font-black text-brand text-base">
-                  {fmtRM(billsTotal)}
-                </td>
-                <td></td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+      {rowCount > 0 && (
+        <ListHead label={view === "bills" ? `${rowCount} paid bill${rowCount === 1 ? "" : "s"} ·` : `${rowCount} payment${rowCount === 1 ? "" : "s"} ·`} value={fmtRM(view === "bills" ? billsTotal : paymentsTotal)}>
+          <Button size="sm" variant="secondary" icon={Download} onClick={handleExportPDF}>
+            PDF
+          </Button>
+        </ListHead>
+      )}
+
+      {view === "bills" ? (
+        <RowList
+          loading={isLoading}
+          rows={bills}
+          empty={{ icon: ReceiptText, title: "No paid bills", description: month ? `Nothing in ${monthLabel(month)}.` : "Bills show here once they're fully paid." }}
+        >
+          {bills.map((b) => (
+            <Row
+              key={b.id}
+              title={b.invoiceNo || b.reference || "No invoice no."}
+              sub={`Dated ${niceDate(b.invoiceDate)} · paid ${niceDate(b.__lastPaid)}${b.paymentHistory?.length > 1 ? ` in ${b.paymentHistory.length} payments` : ""}`}
+              amount={fmtRM(b.total)}
+              onClick={() => setSelectedBill(b)}
+            />
+          ))}
+        </RowList>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-line shadow-sm">
-          <table className="min-w-full text-sm">
-            <thead className="bg-surface-2/60 text-left text-muted font-black uppercase tracking-widest text-[9px]">
-              <tr>
-                <th className="px-4 py-3">Paid Date</th>
-                <th className="px-4 py-3">Method</th>
-                <th className="px-4 py-3">Reference</th>
-                <th className="px-4 py-3 text-center">Bills</th>
-                <th className="px-4 py-3 text-right">Amount</th>
-                <th className="px-4 py-3"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line bg-surface">
-              {visiblePayments.map((p) => (
-                <tr key={p.id} className="hover:bg-surface-2/50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-fg whitespace-nowrap">
-                    {p.paymentDate ? formatDate(p.paymentDate) : formatDateTime(p.createdISO)}
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="px-2 py-0.5 rounded-full text-[10px] bg-surface-2 text-muted font-bold uppercase">
-                      {METHOD_LABELS[p.paidMethod] || p.paidMethod || "-"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-muted truncate max-w-[120px]">
-                    {p.reference || "-"}
-                  </td>
-                  <td className="px-4 py-3 text-center text-muted tabular-nums">
-                    {p.allocations?.length || 0}
-                  </td>
-                  <td className="px-4 py-3 text-right font-black text-fg">
-                    {fmtRM(p.total ?? p.totalPaid)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => setSelectedPayment(p)}
-                      className="text-brand hover:text-brand font-bold text-xs"
-                    >
-                      View
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-            <tfoot className="bg-surface-2/60 border-t-2 border-line">
-              <tr>
-                <td colSpan={4} className="px-4 py-3 font-black text-[10px] uppercase tracking-widest text-subtle">
-                  Total Payments
-                </td>
-                <td className="px-4 py-3 text-right font-black text-brand text-base">
-                  {fmtRM(paymentsTotal)}
-                </td>
-                <td></td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+        <RowList
+          loading={isLoading}
+          rows={visiblePayments}
+          empty={{ icon: Wallet, title: "No payments", description: month ? `Nothing in ${monthLabel(month)}.` : "Payments to this vendor show here." }}
+        >
+          {visiblePayments.map((p) => (
+            <Row
+              key={p.id}
+              title={niceDate(p.paymentDate || p.createdISO)}
+              sub={[METHOD_LABELS[p.paidMethod] || p.paidMethod, p.reference, `${p.allocations?.length || 0} bill${p.allocations?.length === 1 ? "" : "s"}`].filter(Boolean).join(" · ")}
+              amount={fmtRM(p.total ?? p.totalPaid)}
+              onClick={() => setSelectedPayment(p)}
+            />
+          ))}
+        </RowList>
       )}
 
-      {selectedBill && (
-        <ViewBillModal
-          isOpen={!!selectedBill}
-          onClose={() => setSelectedBill(null)}
-          bill={selectedBill}
-        />
-      )}
-
+      {selectedBill && <ViewBillModal isOpen={!!selectedBill} onClose={() => setSelectedBill(null)} bill={selectedBill} />}
       {selectedPayment && (
-        <PaymentDetailsModal
-          open={!!selectedPayment}
-          onClose={() => setSelectedPayment(null)}
-          payment={selectedPayment}
-          companyId={companyId}
-          branchId={branchId}
-        />
+        <PaymentDetailsModal open={!!selectedPayment} onClose={() => setSelectedPayment(null)} payment={selectedPayment} companyId={companyId} branchId={branchId} />
       )}
     </div>
   );
