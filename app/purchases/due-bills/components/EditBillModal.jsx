@@ -261,6 +261,7 @@ export default function EditBillModal ({ isOpen, onClose, bill, onSave, isLoadin
     if (!dueDate)                     return 'Due date is required.'
     if (dueDate < invoiceDate)        return 'Due date cannot be before invoice date.'
     if (!total || Number(total) <= 0) return 'Total must be greater than 0.'
+    if (Number(total) < Number(bill?.paid || 0)) return `Total can't be less than the ${Number(bill.paid).toFixed(2)} already paid on this bill.`
     return null
   }
 

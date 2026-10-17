@@ -10,12 +10,14 @@ import { useGetVendorsQuery } from "@/lib/redux/api/vendorsApiSlice";
 import {
   useAddVendorBillMutation,
   useGetVendorBillsQuery,
+  useLazyGetVendorBillsQuery,
 } from "@/lib/redux/api/vendorBillsApiSlice";
 import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
 import { uploadInvoiceFile } from "@/utils/storage/uploadInvoice";
 // payVendorBills not needed here — payment happens via Due Bills page
 import useCurrency from "@/app/hooks/useCurrency";
-import { toast } from "@/app/components/ui/notify";
+import { toast, confirmDialog } from "@/app/components/ui/notify";
+import { stampOf } from "@/lib/people";
 import { formatMoney } from "@/lib/region/currency";
 import { Button, CountUp, DatePicker, Field, Input, Select, Skeleton, Textarea } from "@/app/components/ui";
 import MoneyInput from "@/app/components/entry/MoneyInput";
@@ -96,6 +98,7 @@ export default function NewBillPage() {
   const lastSubmitHashRef = useRef(""); // prevents ultra-fast duplicate clicks
 
   const [addVendorBill, { isLoading: saving }] = useAddVendorBillMutation();
+  const [findVendorBills] = useLazyGetVendorBillsQuery();
 
   const selectedVendor = useMemo(
     () => vendors.find((v) => v.id === vendorId),
@@ -245,6 +248,28 @@ export default function NewBillPage() {
     if (lastSubmitHashRef.current === submitHash) return;
     lastSubmitHashRef.current = submitHash;
 
+    // The same invoice saved twice would make the vendor owed twice. Check
+    // this vendor's bills here for the number first (any status).
+    try {
+      const key = (v) => String(v || "").trim().toLowerCase().replace(/\s+/g, "");
+      const theirs = await findVendorBills({ companyId, branchId, vendorId }).unwrap();
+      const same = (theirs || []).find((b) => key(b.invoiceNo) && key(b.invoiceNo) === key(invoiceNo));
+      if (same) {
+        const ok = await confirmDialog({
+          title: `${nonEmpty(invoiceNo)} is already saved`,
+          message: `${selectedVendor?.name || "This vendor"} already has invoice ${same.invoiceNo} for ${money(same.total)}, dated ${day(same.invoiceDate)}${same.status === "paid" ? " (paid)" : ""}. Saving it again means they are owed for it twice.`,
+          confirmLabel: "Save it again",
+          danger: true,
+        });
+        if (!ok) {
+          lastSubmitHashRef.current = "";
+          return;
+        }
+      }
+    } catch (e) {
+      console.warn("[new-bill] duplicate check skipped:", e);
+    }
+
     try {
       setSubmitting(true);
 
@@ -271,7 +296,7 @@ export default function NewBillPage() {
         total: Number(normalizedTotal),
         note: nonEmpty(note),
         attachments: [url],
-        createdBy: user || {},
+        createdBy: stampOf(user || {}),
       };
 
       await addVendorBill({
