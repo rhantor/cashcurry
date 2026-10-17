@@ -24,13 +24,22 @@ import {
 } from '@/lib/redux/api/attendanceApiSlice'
 import { shiftsEnabled } from '@/lib/attendance/shifts'
 import { calcPayroll, fmtAmt, toPeriodKey, periodLabel } from '@/utils/payrollCalculations'
-import { exportPayrollToPDF, exportPayrollToExcel, exportPayslipToPDF } from '@/utils/export/exportPayroll'
+import { exportPayrollToPDF, exportPayrollToExcel } from '@/utils/export/exportPayroll'
 import { computeAttendance } from '@/lib/attendance/computeHours'
 import { startOfMonth, endOfMonth, addDays, subDays, format } from 'date-fns'
 import { skipToken } from '@reduxjs/toolkit/query'
 import PayrollPrintView from './components/PayrollPrintView'
 import { getSessionUser } from '@/lib/session'
-import { confirmDialog } from "@/app/components/ui/notify";
+import { confirmDialog, toast } from "@/app/components/ui/notify";
+import { Banknote, Building2, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock, FileSpreadsheet, FileText, Lock, MoreHorizontal, Printer, Save, Search, Trash2, Undo2, Users, Wallet } from 'lucide-react'
+import { Button, Card, DatePicker, EmptyState, Field, Input, Menu, Sheet, Skeleton, cn } from '@/app/components/ui'
+import { Chip } from '@/app/components/entry/Choices'
+import StatTiles from '@/app/components/purchases/StatTiles'
+import StatusScreen from '@/app/components/common/StatusScreen'
+import useCurrency from '@/app/hooks/useCurrency'
+import { formatMoney } from '@/lib/region/currency'
+import SlipCard from './components/SlipCard'
+
 import { salaryMonth } from '@/lib/payroll/salaryMonth'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -60,303 +69,6 @@ function buildDefaultInputs () {
   }
 }
 
-// ─── Sub-components ────────────────────────────────────────────────────────────
-
-const Badge = ({ status }) => {
-  const cls = {
-    draft:     'bg-yellow-100 text-yellow-700',
-    finalized: 'bg-blue-100 text-blue-700',
-    paid:      'bg-green-100 text-green-700',
-  }[status] || 'bg-gray-100 text-gray-500'
-  return (
-    <span className={`px-2 py-0.5 rounded-full text-[11px] font-semibold capitalize ${cls}`}>
-      {status}
-    </span>
-  )
-}
-
-const InputNum = ({ label, value, onChange, placeholder, disabled }) => (
-  <div>
-    <label className='block text-[11px] font-medium text-gray-500 mb-0.5'>{label}</label>
-    <input
-      type='number'
-      min='0'
-      step='0.01'
-      value={value}
-      onChange={e => onChange(e.target.value)}
-      placeholder={placeholder ?? '0'}
-      disabled={disabled}
-      className='w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-1 focus:ring-mint-400 outline-none disabled:opacity-40 disabled:bg-gray-50'
-    />
-  </div>
-)
-
-// ─── Staff slip card ───────────────────────────────────────────────────────────
-
-function StaffSlipCard ({
-  staff,
-  inputs,
-  setInputs,
-  payrollConfig,
-  advanceDed,
-  loanDed,
-  locked,
-  onPrint,
-}) {
-  const mode = staff.salaryMode || payrollConfig?.defaultPayMode || 'hours'
-  const stdHours = parseFloat(staff.standardHours) || parseFloat(payrollConfig?.standardHoursPerMonth) || 208
-  const wrkDays  = parseFloat(staff.workingDays)   || parseFloat(payrollConfig?.workingDaysPerMonth)   || 26
-
-  const effectiveAllowance = inputs.allowanceOverride !== ''
-    ? (parseFloat(inputs.allowanceOverride) || 0)
-    : (parseFloat(staff.allowance) || 0)
-
-  const staffConfig = {
-    basicSalary:      parseFloat(staff.basicSalary)   || 0,
-    allowance:        effectiveAllowance,
-    salaryMode:       mode,
-    standardHours:    stdHours,
-    workingDays:      wrkDays,
-    OTPerHour:        parseFloat(staff.OTPerHour)     || null,
-    otMultiplier:     staff.otMultiplier  ?? payrollConfig?.otMultiplier  ?? 1.5,
-    phMultiplier:     staff.phMultiplier  ?? payrollConfig?.phMultiplier  ?? 2.0,
-    deductionSettings: staff.deductionSettings || {},
-  }
-
-  const effectiveLoan = inputs.loanOverride !== ''
-    ? (parseFloat(inputs.loanOverride) || 0)
-    : loanDed
-
-  const calc = useMemo(() => calcPayroll(
-    staffConfig,
-    {
-      workedHours:      parseFloat(inputs.workedHours)      || 0,
-      workedDays:       parseFloat(inputs.workedDays)       || 0,
-      otHours:          parseFloat(inputs.otHours)          || 0,
-      phHours:          parseFloat(inputs.phHours)          || 0,
-      phDays:           parseFloat(inputs.phDays)           || 0,
-      bonus:            parseFloat(inputs.bonus)            || 0,
-      otherEarnings:    parseFloat(inputs.otherEarnings)    || 0,
-      penalty:          parseFloat(inputs.penalty)          || 0,
-      otherDeductions:  parseFloat(inputs.otherDeductions)  || 0,
-      advanceAmt:       advanceDed,
-      loanAmt:          effectiveLoan,
-    },
-    payrollConfig?.statutoryDeductions || [],
-    {
-      otMultiplier: payrollConfig?.otMultiplier ?? 1.5,
-      phMultiplier: payrollConfig?.phMultiplier ?? 2.0,
-    }
-  ), [inputs, staffConfig, advanceDed, effectiveLoan, payrollConfig])
-
-  const set = (key, val) => setInputs(prev => ({ ...prev, [key]: val }))
-
-  return (
-    <div className='bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden'>
-      {/* Staff header */}
-      <div className='flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100'>
-        <div>
-          <p className='text-sm font-semibold text-gray-800'>{getStaffName(staff)}</p>
-          <p className='text-xs text-gray-400 capitalize mt-0.5'>
-            {staff.role || 'staff'} · {mode} mode · Basic {fmtAmt(staffConfig.basicSalary)}
-          </p>
-        </div>
-        <div className='flex items-center gap-2'>
-          <p className={`text-base font-bold ${calc.netPay > 0 ? 'text-mint-700' : 'text-gray-400'}`}>
-            {fmtAmt(calc.netPay)}
-          </p>
-          <button
-            type='button'
-            onClick={onPrint}
-            title='Print payslip'
-            className='text-gray-400 hover:text-gray-600 text-sm transition-colors'
-          >
-            🖨
-          </button>
-        </div>
-      </div>
-
-      {/* Attendance inputs */}
-      {!locked && (
-        <div className='px-4 py-3 border-b border-gray-100'>
-          <p className='text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2'>Attendance</p>
-          <div className='grid grid-cols-3 gap-2'>
-            {mode === 'hours' ? (
-              <>
-                <InputNum
-                  label={`Hours Worked (std: ${stdHours})`}
-                  value={inputs.workedHours}
-                  onChange={v => set('workedHours', v)}
-                />
-                <InputNum label='OT Hours' value={inputs.otHours} onChange={v => set('otHours', v)} />
-                <InputNum label='PH Hours' value={inputs.phHours} onChange={v => set('phHours', v)} />
-              </>
-            ) : (
-              <>
-                <InputNum
-                  label={`Days Worked (std: ${wrkDays})`}
-                  value={inputs.workedDays}
-                  onChange={v => set('workedDays', v)}
-                />
-                <InputNum label='OT Hours' value={inputs.otHours} onChange={v => set('otHours', v)} />
-                <InputNum label='PH Days' value={inputs.phDays} onChange={v => set('phDays', v)} />
-              </>
-            )}
-          </div>
-          {/* Earnings adjustments */}
-          <p className='text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-2 mb-1'>Earnings</p>
-          <div className='grid grid-cols-3 gap-2'>
-            <InputNum
-              label={`Allowance (default: ${fmtAmt(parseFloat(staff.allowance) || 0)})`}
-              value={inputs.allowanceOverride}
-              onChange={v => set('allowanceOverride', v)}
-              placeholder={String(parseFloat(staff.allowance) || 0)}
-            />
-            <InputNum label='Bonus' value={inputs.bonus} onChange={v => set('bonus', v)} />
-            <InputNum label='Other Earnings' value={inputs.otherEarnings} onChange={v => set('otherEarnings', v)} />
-          </div>
-          {parseFloat(inputs.bonus) > 0 && (
-            <input type='text' placeholder='Bonus note…' value={inputs.bonusNote}
-              onChange={e => set('bonusNote', e.target.value)}
-              className='mt-1.5 w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-mint-400 outline-none' />
-          )}
-          {parseFloat(inputs.otherEarnings) > 0 && (
-            <input type='text' placeholder='Other earnings note…' value={inputs.otherEarningsNote}
-              onChange={e => set('otherEarningsNote', e.target.value)}
-              className='mt-1.5 w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-mint-400 outline-none' />
-          )}
-
-          {/* Deduction adjustments */}
-          <p className='text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-3 mb-1'>Deductions</p>
-          <div className='grid grid-cols-2 sm:grid-cols-4 gap-2'>
-            <InputNum label='Penalty' value={inputs.penalty} onChange={v => set('penalty', v)} />
-            <InputNum label='Other Deductions' value={inputs.otherDeductions} onChange={v => set('otherDeductions', v)} />
-            <InputNum
-              label={`Loan Deduction (auto: ${fmtAmt(loanDed)})`}
-              value={inputs.loanOverride}
-              onChange={v => set('loanOverride', v)}
-              placeholder={String(loanDed || 0)}
-            />
-            <div className='opacity-70'>
-              <InputNum
-                label={`Advance Deduction (auto)`}
-                value={advanceDed}
-                onChange={() => {}}
-                disabled={true}
-              />
-            </div>
-          </div>
-          {parseFloat(inputs.penalty) > 0 && (
-            <input type='text' placeholder='Penalty note…' value={inputs.penaltyNote}
-              onChange={e => set('penaltyNote', e.target.value)}
-              className='mt-1.5 w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-mint-400 outline-none' />
-          )}
-          {parseFloat(inputs.otherDeductions) > 0 && (
-            <input type='text' placeholder='Other deductions note…' value={inputs.otherDeductionsNote}
-              onChange={e => set('otherDeductionsNote', e.target.value)}
-              className='mt-1.5 w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-mint-400 outline-none' />
-          )}
-          {inputs.loanOverride !== '' && (
-            <input type='text' placeholder='Loan override note…' value={inputs.loanNote}
-              onChange={e => set('loanNote', e.target.value)}
-              className='mt-1.5 w-full border border-gray-200 rounded-lg px-2 py-1.5 text-xs focus:ring-1 focus:ring-mint-400 outline-none' />
-          )}
-          
-          <p className='text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-3 mb-1'>Remarks / Extra Note</p>
-          <input type='text' placeholder='Any general remarks for this payslip…' value={inputs.extraNote || ''}
-            onChange={e => set('extraNote', e.target.value)}
-            className='w-full border border-gray-200 rounded-lg px-3 py-2 text-xs focus:ring-1 focus:ring-mint-400 outline-none' />
-        </div>
-      )}
-
-      {/* Breakdown summary */}
-      <div className='px-4 py-3 space-y-1 text-xs'>
-        <div className='flex justify-between text-gray-600'>
-          <span>Base Pay</span>
-          <span className='font-medium'>{fmtAmt(calc.basePay)}</span>
-        </div>
-        {calc.allowance > 0 && (
-          <div className='flex justify-between text-gray-600'>
-            <span>Allowance</span>
-            <span className='font-medium'>{fmtAmt(calc.allowance)}</span>
-          </div>
-        )}
-        {calc.otPay > 0 && (
-          <div className='flex justify-between text-gray-600'>
-            <span>OT Pay</span>
-            <span className='font-medium'>{fmtAmt(calc.otPay)}</span>
-          </div>
-        )}
-        {calc.phPay > 0 && (
-          <div className='flex justify-between text-gray-600'>
-            <span>PH Pay</span>
-            <span className='font-medium'>{fmtAmt(calc.phPay)}</span>
-          </div>
-        )}
-        {calc.bonus > 0 && (
-          <div className='flex justify-between text-green-600'>
-            <span>Bonus{inputs.bonusNote ? ` (${inputs.bonusNote})` : ''}</span>
-            <span className='font-medium'>+ {fmtAmt(calc.bonus)}</span>
-          </div>
-        )}
-        {calc.otherEarnings > 0 && (
-          <div className='flex justify-between text-gray-600'>
-            <span>Other Earnings{inputs.otherEarningsNote ? ` (${inputs.otherEarningsNote})` : ''}</span>
-            <span className='font-medium'>{fmtAmt(calc.otherEarnings)}</span>
-          </div>
-        )}
-        <div className='flex justify-between font-semibold text-gray-800 border-t border-gray-100 pt-1 mt-1'>
-          <span>Gross</span>
-          <span>{fmtAmt(calc.grossEarnings)}</span>
-        </div>
-
-        {/* Statutory deductions */}
-        {calc.statutory.map(s => (
-          <div key={s.key} className='flex justify-between text-red-600'>
-            <span>{s.name} (emp)</span>
-            <span>- {fmtAmt(s.employeeAmt)}</span>
-          </div>
-        ))}
-        {calc.advanceAmt > 0 && (
-          <div className='flex justify-between text-red-600'>
-            <span>Advance</span>
-            <span>- {fmtAmt(calc.advanceAmt)}</span>
-          </div>
-        )}
-        {calc.loanAmt > 0 && (
-          <div className='flex justify-between text-red-600'>
-            <span>Loan EMI{inputs.loanNote ? ` (${inputs.loanNote})` : ''}{inputs.loanOverride !== '' ? ' ✎' : ''}</span>
-            <span>- {fmtAmt(calc.loanAmt)}</span>
-          </div>
-        )}
-        {calc.penalty > 0 && (
-          <div className='flex justify-between text-red-600'>
-            <span>Penalty{inputs.penaltyNote ? ` (${inputs.penaltyNote})` : ''}</span>
-            <span>- {fmtAmt(calc.penalty)}</span>
-          </div>
-        )}
-        {calc.otherDeductions > 0 && (
-          <div className='flex justify-between text-red-600'>
-            <span>Other Deductions{inputs.otherDeductionsNote ? ` (${inputs.otherDeductionsNote})` : ''}</span>
-            <span>- {fmtAmt(calc.otherDeductions)}</span>
-          </div>
-        )}
-
-        <div className='flex justify-between font-bold text-mint-700 border-t border-gray-100 pt-1 mt-1 text-sm'>
-          <span>Net Pay</span>
-          <span>{fmtAmt(calc.netPay)}</span>
-        </div>
-        {calc.totalStatutoryEmployer > 0 && (
-          <div className='flex justify-between text-gray-400 text-[11px]'>
-            <span>Employer contributions</span>
-            <span>{fmtAmt(calc.totalStatutoryEmployer)}</span>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
 // ─── Main PayrollBuilder ───────────────────────────────────────────────────────
 
 export default function PayrollBuilder () {
@@ -365,6 +77,9 @@ export default function PayrollBuilder () {
   const [currentUser, setCurrentUser] = useState({})
   const [role, setRole]             = useState(null)
   const [authReady, setAuthReady]   = useState(false)
+
+  const currency = useCurrency()
+  const money = n => formatMoney(Number(n) || 0, currency)
 
   const [year,  setYear]  = useState(currentYear)
   const [month, setMonth] = useState(currentMonth)
@@ -375,8 +90,6 @@ export default function PayrollBuilder () {
   const [searchTerm, setSearchTerm] = useState('')
 
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
   const [showPaidModal, setShowPaidModal] = useState(false)
   const [paidForm, setPaidForm] = useState({ method: '', reference: '', paidAt: '' })
   const [printTarget, setPrintTarget] = useState(null) // { mode: 'single'|'all', slip? }
@@ -387,6 +100,11 @@ export default function PayrollBuilder () {
     setBranchId(u.branchId  || null)
     setCurrentUser(u)
     setRole(u.role || null)
+    const asked = new URLSearchParams(window.location.search).get('period')
+    if (/^\d{4}-(0[1-9]|1[0-2])$/.test(asked || '')) {
+      setYear(Number(asked.slice(0, 4)))
+      setMonth(Number(asked.slice(5, 7)))
+    }
     setAuthReady(true)
   }, [])
 
@@ -558,9 +276,8 @@ export default function PayrollBuilder () {
   }, [staffList, slipInputs, advanceByStaff, loanByStaff, payrollConfig])
 
   function flash (type, msg) {
-    if (type === 'error') setError(msg)
-    else setSuccess(msg)
-    setTimeout(() => { setError(''); setSuccess('') }, 5000)
+    if (type === 'error') toast.error(msg)
+    else toast.success(msg)
   }
 
   // ── Build slips array from current inputs ─────────────────────────────────
@@ -695,7 +412,7 @@ export default function PayrollBuilder () {
       }))
     ) return
 
-    setBusy(true); setError('')
+    setBusy(true)
     try {
       const mStart = startOfMonth(new Date(year, month - 1, 1))
       const mEnd = endOfMonth(mStart)
@@ -778,7 +495,7 @@ export default function PayrollBuilder () {
 
   async function handleSaveDraft () {
     if (!isAdminOrManager) return
-    setBusy(true); setError('')
+    setBusy(true)
     try {
       let activeRunId = runId
       if (!activeRunId) {
@@ -802,7 +519,7 @@ export default function PayrollBuilder () {
 
   async function handleFinalize () {
     if (!runId) return
-    setBusy(true); setError('')
+    setBusy(true)
     try {
       // Save latest inputs first, then finalize
       await saveDraftSlips({ companyId, branchId, runId, period, slips: buildSlips(), user: currentUser }).unwrap()
@@ -823,7 +540,7 @@ export default function PayrollBuilder () {
       danger: true,
       confirmLabel: 'Revert',
     }))) return
-    setBusy(true); setError('')
+    setBusy(true)
     try {
       await revert({ companyId, branchId, runId, user: currentUser }).unwrap()
       flash('ok', 'Reverted to draft. Installments restored.')
@@ -836,7 +553,7 @@ export default function PayrollBuilder () {
 
   async function handleMarkPaid () {
     if (!runId) return
-    setBusy(true); setError('')
+    setBusy(true)
     try {
       // Salaries for this month already entered by hand (Salary Entry)? Then
       // marking the run paid would count the month's salaries twice.
@@ -888,267 +605,215 @@ export default function PayrollBuilder () {
     }
   }
 
-  const MONTHS = [
-    'January','February','March','April','May','June',
-    'July','August','September','October','November','December',
-  ]
-  const YEARS = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i)
-
-  if (!authReady) {
-    return (
-      <div className='flex items-center justify-center min-h-[50vh]'>
-        <p className='text-gray-400 text-sm'>Loading…</p>
-      </div>
-    )
-  }
+  if (!authReady) return <Skeleton className='m-6 h-64' rounded='rounded-2xl' />
 
   if (!isAdminOrManager) {
     return (
-      <div className='flex items-center justify-center min-h-[50vh]'>
-        <p className='text-gray-500 font-semibold'>Access restricted to branchAdmin and manager.</p>
-      </div>
+      <StatusScreen
+        full={false}
+        icon={Lock}
+        tone='warning'
+        title='Payroll is for branch admins and managers'
+        message='Ask your branch admin if a payslip needs changing.'
+        actions={[{ label: 'Go home', href: '/', primary: true }]}
+      />
     )
   }
 
+  const status = existingRun?.status || 'none'
+  const stage = { none: 0, draft: 1, finalized: 2, paid: 3 }[status] ?? 0
+  const STEPS = [
+    { label: 'Fill in', note: 'hours, extras' },
+    { label: 'Draft saved', note: 'still editable' },
+    { label: 'Finalized', note: 'loans & advances taken' },
+    { label: 'Paid', note: 'counted as salary' },
+  ]
+  const shiftMonth = d => {
+    const m = month + d
+    if (m < 1) { setYear(year - 1); setMonth(12) } else if (m > 12) { setYear(year + 1); setMonth(1) } else setMonth(m)
+  }
+  const hasStaff = staffList.length > 0
+
+  // the one next step for where this month's payroll is
+  const primary = !runId || status === 'draft'
+    ? status === 'draft'
+      ? { label: 'Finalize payroll', icon: CheckCircle2, onClick: handleFinalize }
+      : { label: 'Save draft', icon: Save, onClick: handleSaveDraft, disabled: !hasStaff }
+    : status === 'finalized'
+      ? { label: 'Mark as paid', icon: Wallet, onClick: () => setShowPaidModal(true) }
+      : null
+
+  const moreItems = [
+    hasStaff && { label: 'Print all payslips', icon: Printer, onSelect: () => setPrintTarget({ mode: 'all' }) },
+    hasStaff && { label: 'PDF', icon: FileText, onSelect: () => exportPayrollToPDF(buildAllSlipsForPrint(), branchName, period, existingRun, companyName) },
+    hasStaff && { label: 'Excel', icon: FileSpreadsheet, onSelect: () => exportPayrollToExcel(buildAllSlipsForPrint(), branchName, period, existingRun, companyName) },
+    status === 'draft' && 'divider',
+    status === 'draft' && { label: 'Save changes to the draft', icon: Save, onSelect: handleSaveDraft },
+    status === 'finalized' && 'divider',
+    status === 'finalized' && { label: 'Back to draft', icon: Undo2, onSelect: handleRevert },
+    status === 'draft' && { label: 'Delete the draft', icon: Trash2, danger: true, onSelect: handleDelete },
+  ].filter(Boolean)
+
   return (
-    <div className='min-h-screen bg-[var(--color-background)] p-4 md:p-8 pb-16'>
-      <div className='max-w-5xl mx-auto space-y-6'>
-
-        {/* ── Header ─────────────────────────────────────────────────────── */}
-        <div className='flex flex-wrap items-start justify-between gap-4'>
-          <div>
-            <h1 className='text-2xl font-bold text-gray-900'>Run Payroll</h1>
-            <p className='text-sm text-gray-500 mt-0.5'>Build, calculate, finalize, and pay staff for a period.</p>
-          </div>
-
-          {/* Period selector */}
-          <div className='flex items-center gap-2'>
-            <select
-              value={month}
-              onChange={e => setMonth(Number(e.target.value))}
-              className='border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium text-gray-700 bg-white focus:ring-2 focus:ring-mint-400 outline-none'
-            >
-              {MONTHS.map((m, i) => (
-                <option key={i + 1} value={i + 1}>{m}</option>
-              ))}
-            </select>
-            <select
-              value={year}
-              onChange={e => setYear(Number(e.target.value))}
-              className='border border-gray-200 rounded-xl px-3 py-2 text-sm font-medium text-gray-700 bg-white focus:ring-2 focus:ring-mint-400 outline-none'
-            >
-              {YEARS.map(y => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
-          </div>
+    <div className='mx-auto max-w-5xl space-y-4 px-4 py-5 pb-28'>
+      {/* ── month and where its payroll is ─────────────────────────────── */}
+      <div className='flex flex-wrap items-end justify-between gap-3'>
+        <div>
+          <h1 className='text-2xl font-bold tracking-tight text-fg'>Payroll</h1>
+          <p className='text-sm text-muted'>Fill in each payslip, save a draft, finalize, then mark it paid.</p>
         </div>
-
-        {/* Search and filter */}
-        <div className='flex items-center gap-3 bg-white rounded-2xl border border-gray-100 shadow-sm px-4 py-2'>
-          <span className='text-gray-400'>🔍</span>
-          <input
-            type='text'
-            placeholder='Search staff by name…'
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className='flex-1 bg-transparent border-none outline-none text-sm text-gray-700 placeholder:text-gray-300'
-          />
-          {searchTerm && (
-            <button onClick={() => setSearchTerm('')} className='text-gray-300 hover:text-gray-500 text-xs font-bold'>✕</button>
-          )}
+        <div className='flex items-center gap-1 rounded-xl border border-line bg-surface p-1 shadow-card'>
+          <Button size='icon' variant='ghost' className='size-9' aria-label='Previous month' onClick={() => shiftMonth(-1)}>
+            <ChevronLeft className='size-4' />
+          </Button>
+          <span className='min-w-[8.5rem] text-center text-sm font-semibold text-fg'>{periodLabel(period)}</span>
+          <Button size='icon' variant='ghost' className='size-9' aria-label='Next month' onClick={() => shiftMonth(1)}>
+            <ChevronRight className='size-4' />
+          </Button>
         </div>
+      </div>
 
-        {/* Run status banner */}
+      <Card className='p-3 sm:p-4'>
+        <ol className='grid grid-cols-4 gap-1'>
+          {STEPS.map((st, i) => {
+            const done = i < stage || (i === 3 && stage === 3)
+            const now = i === stage && stage < 3
+            return (
+              <li key={st.label} className='min-w-0'>
+                <div className={cn('h-1.5 rounded-full', done ? 'bg-brand' : now ? 'bg-brand/40' : 'bg-surface-2')} />
+                <p className={cn('mt-2 flex items-center gap-1 truncate text-xs font-semibold', done || now ? 'text-fg' : 'text-subtle')}>
+                  {done && <Check className='size-3 shrink-0 text-brand' />}
+                  {st.label}
+                </p>
+                <p className='hidden truncate text-[11px] text-subtle sm:block'>{st.note}</p>
+              </li>
+            )
+          })}
+        </ol>
         {existingRun && (
-          <div className='flex items-center justify-between bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-3'>
-            <div className='flex items-center gap-3'>
-              <Badge status={existingRun.status} />
-              <span className='text-sm text-gray-600'>
-                {periodLabel(period)} payroll · {existingRun.staffCount || 0} staff
-              </span>
-            </div>
-            <div className='flex items-center gap-3 text-sm'>
-              <span className='text-gray-500'>Gross: <strong>{fmtAmt(existingRun.totalGross)}</strong></span>
-              <span className='text-gray-500'>Net: <strong className='text-mint-700'>{fmtAmt(existingRun.totalNet)}</strong></span>
-            </div>
-          </div>
-        )}
-
-        {/* Totals summary */}
-        {!existingRun && staffList.length > 0 && (
-          <div className='grid grid-cols-3 gap-4'>
-            {[
-              { label: 'Total Gross',     val: totals.gross,   color: 'text-gray-800' },
-              { label: 'Total Net Pay',   val: totals.net,     color: 'text-mint-700' },
-              { label: 'Employer Cost',   val: totals.empCost, color: 'text-blue-700' },
-            ].map(t => (
-              <div key={t.label} className='bg-white rounded-2xl border border-gray-100 shadow-sm px-5 py-4 text-center'>
-                <p className='text-xs font-medium text-gray-400 uppercase tracking-wide'>{t.label}</p>
-                <p className={`text-xl font-bold mt-1 ${t.color}`}>{fmtAmt(t.val)}</p>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Alerts */}
-        {error   && <div className='bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3'>{error}</div>}
-        {success && <div className='bg-green-50 border border-green-200 text-green-700 text-sm rounded-xl px-4 py-3'>{success}</div>}
-
-        {/* Action buttons */}
-        <div className='flex flex-wrap gap-2'>
-          {staffList.length > 0 && (
-            <>
-              <button
-                onClick={() => setPrintTarget({ mode: 'all' })}
-                className='px-5 py-2.5 rounded-xl border border-gray-200 text-gray-700 text-sm font-medium hover:bg-gray-50 transition-colors'
-              >
-                🖨 Print Payroll
-              </button>
-              <button
-                onClick={() => exportPayrollToPDF(buildAllSlipsForPrint(), branchName, period, existingRun, companyName)}
-                className='px-5 py-2.5 rounded-xl border border-red-200 text-red-700 text-sm font-medium hover:bg-red-50 transition-colors'
-              >
-                PDF
-              </button>
-              <button
-                onClick={() => exportPayrollToExcel(buildAllSlipsForPrint(), branchName, period, existingRun, companyName)}
-                className='px-5 py-2.5 rounded-xl border border-green-200 text-green-700 text-sm font-medium hover:bg-green-50 transition-colors'
-              >
-                Excel
-              </button>
-            </>
-          )}
-          {!locked && staffList.length > 0 && (
-            <button
-              onClick={handleImportAttendance}
-              disabled={busy}
-              title='Fill Hours/Days & OT from kiosk attendance for this month'
-              className='px-5 py-2.5 rounded-xl border border-indigo-200 text-indigo-700 text-sm font-medium hover:bg-indigo-50 disabled:opacity-50 transition-colors'
-            >
-              ⏱ Import from Attendance
-            </button>
-          )}
-          {!locked && (
-            <button
-              onClick={handleSaveDraft}
-              disabled={busy || staffList.length === 0}
-              className='px-5 py-2.5 rounded-xl bg-mint-500 hover:bg-mint-600 text-white text-sm font-semibold disabled:opacity-50 transition-colors'
-            >
-              {busy ? 'Saving…' : runId ? 'Update Draft' : 'Save Draft'}
-            </button>
-          )}
-          {runId && existingRun?.status === 'draft' && (
-            <button
-              onClick={handleFinalize}
-              disabled={busy}
-              className='px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold disabled:opacity-50 transition-colors'
-            >
-              Finalize Payroll
-            </button>
-          )}
-          {runId && existingRun?.status === 'finalized' && (
-            <>
-              <button
-                onClick={() => setShowPaidModal(true)}
-                disabled={busy}
-                className='px-5 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50 transition-colors'
-              >
-                Mark as Paid
-              </button>
-              <button
-                onClick={handleRevert}
-                disabled={busy}
-                className='px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium hover:bg-gray-50 hover:border-gray-300 disabled:opacity-50 transition-colors'
-              >
-                Revert to Draft
-              </button>
-            </>
-          )}
-          {runId && existingRun?.status === 'draft' && (
-            <button
-              onClick={handleDelete}
-              disabled={busy}
-              className='px-5 py-2.5 rounded-xl border border-red-200 text-red-600 text-sm font-medium hover:bg-red-50 disabled:opacity-50 transition-colors'
-            >
-              Delete Draft
-            </button>
-          )}
-        </div>
-
-        {/* Staff cards */}
-        {filteredStaff.length === 0 ? (
-          <p className='text-sm text-gray-400 text-center py-12'>
-            {searchTerm ? `No staff matching "${searchTerm}"` : 'No staff found for this branch.'}
+          <p className='mt-3 text-xs text-muted'>
+            {existingRun.staffCount || 0} staff saved
+            {existingRun.status === 'paid' && existingRun.paymentMethod ? ` · paid by ${existingRun.paymentMethod}` : ''}
+            {existingRun.status === 'paid' && existingRun.paymentReference ? ` (${existingRun.paymentReference})` : ''}
+            {locked ? ' · payslips are locked' : ''}
           </p>
-        ) : (
-          <div className='grid md:grid-cols-2 gap-4'>
-            {filteredStaff.map(staff => (
-              <StaffSlipCard
-                key={staff.id}
-                staff={staff}
-                inputs={slipInputs[staff.id] || buildDefaultInputs()}
-                setInputs={inp => setSlipInputs(prev => ({ ...prev, [staff.id]: inp(prev[staff.id] || buildDefaultInputs()) }))}
-                payrollConfig={payrollConfig}
-                advanceDed={(advanceByStaff[staff.id] || []).reduce((s, a) => s + a.amount, 0)}
-                loanDed={(loanByStaff[staff.id] || []).reduce((s, a) => s + a.amount, 0)}
-                locked={locked}
-                onPrint={() => setPrintTarget({ mode: 'single', slip: buildSingleSlipForPrint(staff) })}
-                onExportPDF={() => {
-                  const slip = buildSingleSlipForPrint(staff)
-                  if (slip) exportPayslipToPDF(slip, branchName, period, companyName)
-                }}
-              />
-            ))}
+        )}
+      </Card>
+
+      <StatTiles
+        tiles={[
+          { label: 'Net pay', value: money(totals.net), note: `To ${staffList.length} staff`, icon: Wallet, tone: 'bg-brand-soft text-brand' },
+          { label: 'Gross', value: money(totals.gross), note: 'Before deductions', icon: Banknote, tone: 'bg-surface-2 text-muted' },
+          { label: 'Employer cost', value: money(totals.empCost), note: 'Gross + employer shares', icon: Building2, tone: 'bg-info-soft text-info' },
+        ]}
+      />
+
+      {/* ── tools ─────────────────────────────────────────────────────── */}
+      <div className='flex flex-wrap items-center gap-2'>
+        {hasStaff && staffList.length > 4 && (
+          <div className='relative min-w-0 flex-1 basis-56'>
+            <Search className='pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-subtle' />
+            <Input value={searchTerm} onChange={e => setSearchTerm(e.target.value)} placeholder='Find a staff member…' className='pl-10' aria-label='Find a staff member' />
           </div>
+        )}
+        {!locked && hasStaff && (
+          <Button variant='secondary' icon={Clock} loading={busy} onClick={handleImportAttendance}>
+            Fill from attendance
+          </Button>
+        )}
+        {moreItems.length > 0 && (
+          <Menu
+            align='end'
+            width={240}
+            trigger={p => (
+              <Button {...p} variant='secondary' icon={MoreHorizontal}>
+                More
+              </Button>
+            )}
+            items={moreItems}
+          />
         )}
       </div>
 
-      {/* ── Mark Paid Modal ──────────────────────────────────────────────── */}
-      {showPaidModal && (
-        <div className='fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4' onClick={() => setShowPaidModal(false)}>
-          <div className='bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 space-y-4' onClick={e => e.stopPropagation()}>
-            <h2 className='text-base font-bold text-gray-800'>Mark Payroll as Paid</h2>
-            <div>
-              <label className='block text-sm font-medium text-gray-700 mb-1'>Payment Method</label>
-              <input
-                type='text'
-                placeholder='e.g. Bank Transfer, Cash…'
-                value={paidForm.method}
-                onChange={e => setPaidForm(f => ({ ...f, method: e.target.value }))}
-                className='w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-mint-400'
-              />
+      {/* ── payslips ──────────────────────────────────────────────────── */}
+      {filteredStaff.length === 0 ? (
+        <Card>
+          <EmptyState
+            icon={Users}
+            title={searchTerm ? 'No one by that name' : 'No staff in this branch yet'}
+            description={searchTerm ? `Nothing matches “${searchTerm}”.` : 'Add staff in Staff management, with their basic salary, then come back.'}
+          />
+        </Card>
+      ) : (
+        <div className='grid gap-3 lg:grid-cols-2 lg:items-start'>
+          {filteredStaff.map(staff => (
+            <SlipCard
+              key={staff.id}
+              staff={staff}
+              name={getStaffName(staff)}
+              money={money}
+              inputs={slipInputs[staff.id] || buildDefaultInputs()}
+              setInputs={inp => setSlipInputs(prev => ({ ...prev, [staff.id]: inp(prev[staff.id] || buildDefaultInputs()) }))}
+              payrollConfig={payrollConfig}
+              advanceDed={(advanceByStaff[staff.id] || []).reduce((s, a) => s + a.amount, 0)}
+              loanDed={(loanByStaff[staff.id] || []).reduce((s, a) => s + a.amount, 0)}
+              locked={locked}
+              onPrint={() => setPrintTarget({ mode: 'single', slip: buildSingleSlipForPrint(staff) })}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* ── the next step, always in reach ─────────────────────────────── */}
+      {primary && hasStaff && (
+        <div className='fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 mx-auto max-w-2xl lg:bottom-5 lg:left-[calc(16rem+1.5rem)]'>
+          <div className='flex items-center gap-3 rounded-2xl border border-line bg-surface/95 p-3 pl-4 shadow-float backdrop-blur'>
+            <div className='min-w-0 flex-1'>
+              <p className='truncate text-[11px] font-semibold uppercase tracking-wider text-subtle'>{periodLabel(period)} · net pay</p>
+              <p className='truncate text-lg font-bold tabular-nums text-fg'>{money(totals.net)}</p>
             </div>
-            <div>
-              <label className='block text-sm font-medium text-gray-700 mb-1'>Reference <span className='text-gray-400 font-normal'>(optional)</span></label>
-              <input
-                type='text'
-                placeholder='Transaction ID or note…'
-                value={paidForm.reference}
-                onChange={e => setPaidForm(f => ({ ...f, reference: e.target.value }))}
-                className='w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-mint-400'
-              />
-            </div>
-            <div>
-              <label className='block text-sm font-medium text-gray-700 mb-1'>Paid Date <span className='text-gray-400 font-normal'>(optional)</span></label>
-              <input
-                type='date'
-                value={paidForm.paidAt}
-                onChange={e => setPaidForm(f => ({ ...f, paidAt: e.target.value }))}
-                className='w-full border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-mint-400'
-              />
-            </div>
-            <div className='flex justify-end gap-2 pt-2'>
-              <button onClick={() => setShowPaidModal(false)} className='px-4 py-2 rounded-xl border border-gray-200 text-gray-600 text-sm hover:bg-gray-50'>Cancel</button>
-              <button onClick={handleMarkPaid} disabled={busy} className='px-5 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50'>
-                {busy ? 'Saving…' : 'Confirm Paid'}
-              </button>
-            </div>
+            <Button size='lg' icon={primary.icon} loading={busy} disabled={primary.disabled} onClick={primary.onClick}>
+              {primary.label}
+            </Button>
           </div>
         </div>
       )}
 
-      {/* ── Print Modal ──────────────────────────────────────────────────── */}
+      {/* ── mark paid ─────────────────────────────────────────────────── */}
+      <Sheet
+        open={showPaidModal}
+        onClose={() => setShowPaidModal(false)}
+        title={`Mark ${periodLabel(period)} as paid`}
+        description={`${money(totals.net)} net pay to ${staffList.length} staff. Each slip is then counted as salary.`}
+        footer={
+          <div className='flex justify-end gap-2'>
+            <Button variant='ghost' onClick={() => setShowPaidModal(false)}>Cancel</Button>
+            <Button icon={Wallet} loading={busy} onClick={handleMarkPaid}>Mark paid</Button>
+          </div>
+        }
+      >
+        <div className='space-y-4'>
+          <Field label='Paid by'>
+            {() => (
+              <div>
+                <div className='mb-2 flex flex-wrap gap-1.5'>
+                  {['Bank transfer', 'Cash', 'Cheque'].map(m => (
+                    <Chip key={m} on={paidForm.method === m} onClick={() => setPaidForm(f => ({ ...f, method: m }))}>{m}</Chip>
+                  ))}
+                </div>
+                <Input value={paidForm.method} onChange={e => setPaidForm(f => ({ ...f, method: e.target.value }))} placeholder='Or type how it was paid' />
+              </div>
+            )}
+          </Field>
+          <Field label='Reference' hint='Optional'>
+            {({ id }) => <Input id={id} value={paidForm.reference} onChange={e => setPaidForm(f => ({ ...f, reference: e.target.value }))} placeholder='Transfer ID or a note' />}
+          </Field>
+          <Field label='Paid on' hint='Blank = today'>
+            {() => <DatePicker value={paidForm.paidAt} onChange={v => setPaidForm(f => ({ ...f, paidAt: v }))} />}
+          </Field>
+        </div>
+      </Sheet>
+
       {printTarget && (
         <PayrollPrintView
           mode={printTarget.mode}
