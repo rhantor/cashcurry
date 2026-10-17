@@ -1,211 +1,169 @@
 "use client";
-import React, { useMemo, useState } from "react";
-import { format } from "date-fns";
+import { useMemo, useState } from "react";
+import { format, isValid, parseISO } from "date-fns";
+import { skipToken } from "@reduxjs/toolkit/query";
+import { AlertTriangle, FileText } from "lucide-react";
 import { useGetSalaryEntriesQuery } from "@/lib/redux/api/salaryApiSlice";
 import ReportPage from "@/app/components/common/ReportPage";
 import ReportErrorState from "@/app/components/common/ReportErrorState";
 import useReportData from "@/app/hooks/useReportData";
-import SalaryReportModal from "./SalaryReportModal";
-import EditSalaryModal from "./EditSalaryModal"; // Import the new modal
-import {
-  exportSalariesToExcel,
-  exportSalariesToPDF,
-} from "@/utils/export/exportSalary";
+import { exportSalariesToExcel, exportSalariesToPDF } from "@/utils/export/exportSalary";
+import { splitSalaryMonth } from "@/lib/payroll/splitSalaryMonth";
+import { COLOR, ChartCard, RankedBars } from "@/app/components/dashboard/charts/kit";
 import useCurrency from "@/app/hooks/useCurrency";
+import { formatMoney } from "@/lib/region/currency";
 import { hasRole, ALLOWED_EDIT_ROLES } from "@/lib/authz/roles";
 import { getSessionUser } from "@/lib/session";
-import { Calendar, Banknote, Pencil, FileText } from "lucide-react";
+import { Badge, Skeleton, Tabs } from "@/app/components/ui";
+import { SalaryEditSheet, SalaryRecord, amountOf, fromPayroll, monthText, useDeleteSalary } from "./SalarySheets";
 
+const day = (v) => {
+  const d = v ? parseISO(v) : null;
+  return d && isValid(d) ? format(d, "d MMM yyyy") : "—";
+};
+
+/**
+ * Salary report: salaries over a period, counted either by the month they are
+ * for or by the day they were paid. Payroll writes one record per staff member;
+ * salaries entered by hand are one total for the month. Shows the months side
+ * by side, warns when a month has both (counted twice), and opens each record
+ * as a slip — payroll ones with their pay breakdown.
+ */
 export default function SalaryReport() {
-  const [dateMode, setDateMode] = useState("salary");
-  const [editingItem, setEditingItem] = useState(null);
+  const [mode, setMode] = useState("salary"); // "salary" (month it is for) | "payment" (day paid)
+  const [editing, setEditing] = useState(null);
   const currency = useCurrency();
-
+  const money = (v) => formatMoney(v, currency);
   const { ready, args: baseArgs, setFetchArgs, branchData, companyId, branchId } = useReportData();
   const canEdit = hasRole(getSessionUser(), ALLOWED_EDIT_ROLES);
+  const remove = useDeleteSalary({ companyId, branchId, money });
 
-  const args = { ...baseArgs, dateField: dateMode === "salary" ? "month" : "paymentDate" };
+  const args = baseArgs === skipToken ? skipToken : { ...baseArgs, dateField: mode === "salary" ? "month" : "paymentDate" };
+  const { data: entries = [], isLoading, error } = useGetSalaryEntriesQuery(args);
 
-  const { data: entries = [], isLoading, error: salaryError } = useGetSalaryEntriesQuery(args);
+  // The day each record counts on in this view. By month, a month that starts
+  // before the period (e.g. "7 days" inside it) is placed on the period's first day.
+  const from = baseArgs === skipToken ? "" : baseArgs.startDate || "";
+  const rows = useMemo(
+    () =>
+      entries.map((e) => {
+        const monthDay = e.month ? `${e.month.slice(0, 7)}-01` : e.monthStart || "";
+        return { ...e, dateForFilter: mode === "salary" ? (from && monthDay && monthDay < from ? from : monthDay) : e.paymentDate || "" };
+      }),
+    [entries, mode, from]
+  );
 
-  // Prepare data: inject dateForFilter based on dateMode
-  const prepared = useMemo(() => {
-    return (entries || []).map((e) => {
-      const salaryDateISO = e.month ? `${e.month}-01` : e.monthStart || "";
-      const paymentISO = e.paymentDate || "";
-      return {
-        ...e,
-        dateForFilter: dateMode === "salary" ? salaryDateISO : paymentISO,
-      };
-    });
-  }, [entries, dateMode]);
+  if (error) return <ReportErrorState error={error} title="Couldn't load the salaries" />;
+  if (!ready) return <Skeleton className="m-6 h-64" rounded="rounded-2xl" />;
 
-  if (salaryError) return <ReportErrorState error={salaryError} title="Failed to load salary data" />;
-  if (!ready) return <p className="p-4">Preparing…</p>;
-
-  // Define Columns
-  const columns = [
-    {
-      key: "staffName",
-      label: "Staff / Type",
-      render: (val, row) => (
-        <div className="flex flex-col">
-          <span className="font-medium text-gray-800">{val || "Branch Total"}</span>
-          <span className="text-[10px] text-gray-400 uppercase tracking-tight">
-            {row.source === 'payroll' ? 'Individual' : 'Manual Entry'}
-          </span>
-        </div>
-      ),
-    },
-    {
-      key: "month",
-      label: "Salary Period",
-      render: (val) => (
-        <div className="flex items-center gap-2 font-medium text-gray-700">
-           <div className="p-1.5 bg-blue-50 text-blue-600 rounded-md"><Calendar size={12}/></div>
-           {val ? format(new Date(`${val}-01`), "MMM yyyy") : "—"}
-        </div>
-      ),
-    },
-    {
-      key: "paymentDate",
-      label: "Paid Date",
-      render: (val) => val ? <span className="text-gray-600">{format(new Date(val), "dd MMM yyyy")}</span> : "—",
-    },
-    {
-      key: "totalSalary",
-      label: `Total (${currency})`,
-      render: (val) => (
-        <span className="font-bold text-gray-800">
-          {parseFloat(val || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-        </span>
-      ),
-    },
-    {
-      key: "pdfUrl",
-      label: "Sheet",
-      render: (val) =>
-        val ? (
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              window.open(val, "_blank");
-            }}
-            className="flex items-center gap-1 text-xs font-semibold px-2 py-1 bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors border border-red-100"
-          >
-            <FileText size="1em" /> View
-          </button>
-        ) : (
-          <span className="text-gray-300 text-xs italic">No PDF</span>
-        ),
-    },
-    {
-      key: "createdBy",
-      label: "Created By",
-      render: (val) => (
-        <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded-full">
-          {val?.username || "Unknown"}
-        </span>
-      ),
-    },
-  ];
-
-  // If user has permission, add Actions column
-  if (canEdit) {
-    columns.push({
-      key: "actions",
-      label: "Actions",
-      render: (_, row) => (
-        <button
-          onClick={(e) => {
-            e.stopPropagation(); // Prevent opening the view modal
-            setEditingItem(row);
-          }}
-          className="p-2 text-gray-400 hover:text-mint-600 hover:bg-mint-50 rounded-full transition-all"
-          title="Edit Entry"
-        >
-          <Pencil size="1em" />
-        </button>
-      ),
-    });
-  }
-
-  if (!ready) return <div className="p-8 text-center text-gray-500 animate-pulse">Initializing...</div>;
+  const byMonth = (list) => {
+    const m = new Map();
+    for (const s of list) if (s.month) m.set(s.month.slice(0, 7), [...(m.get(s.month.slice(0, 7)) || []), s]);
+    return [...m].sort(([a], [b]) => b.localeCompare(a));
+  };
 
   return (
-    <div className="p-4 sm:p-6 space-y-4">
-      
-      {/* Header & Filter Toggle */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
-        <div>
-           <h1 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-             <Banknote size="1em" className="text-green-500"/> Salary Report
-           </h1>
-           <p className="text-sm text-gray-400 mt-0.5">Manage and track staff payroll</p>
-        </div>
-
-        <div className="flex items-center bg-gray-100 p-1 rounded-lg">
-          <button
-            onClick={() => setDateMode("salary")}
-            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-              dateMode === "salary"
-                ? "bg-white text-mint-600 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            By Period
-          </button>
-          <button
-            onClick={() => setDateMode("payment")}
-            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-              dateMode === "payment"
-                ? "bg-white text-mint-600 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            By Payment Date
-          </button>
-        </div>
-      </div>
-
-      {/* Main Report Table */}
+    <>
       <ReportPage
-        title="" // Empty because we have a custom header above
-        data={prepared}
+        title="Salary Report"
+        data={rows}
         isLoading={isLoading}
         branchData={branchData}
-        onDateSync={(newDates) => setFetchArgs(newDates)}
-        columns={columns}
-        filterConfig={{
-          dateField: "dateForFilter",
-          searchFields: ["staffName", "createdBy.username", "notes"], // Added notes to search
-        }}
-        exportFunctions={{
-          exportPDF: (data, branch, type, range, month, q) =>
-            exportSalariesToPDF(data, branch, { dateMode, filterType: type, range, selectedMonth: month, q }),
-          exportExcel: (data, branch, type, range, month, q) =>
-            exportSalariesToExcel(data, branch, { dateMode, filterType: type, range, selectedMonth: month, q }),
-        }}
-        modalContentRenderer={(item, branchData, closeModal) => (
-          <SalaryReportModal
-            item={item}
-            branchData={branchData}
-            onClose={closeModal}
+        onDateSync={(d) => setFetchArgs(d)}
+        toolbar={
+          <Tabs
+            value={mode}
+            onChange={setMode}
+            tabs={[
+              { value: "salary", label: "By salary month" },
+              { value: "payment", label: "By day paid" },
+            ]}
           />
-        )}
+        }
+        chartConfig={{ enabled: mode === "payment", type: "bar", valueField: "totalSalary", theme: "cost" }}
+        columns={[
+          {
+            key: "staffName",
+            label: "Who",
+            primary: true,
+            render: (v, s) => (
+              <span className="block max-w-[16rem]">
+                <span className="block font-medium">{fromPayroll(s) ? v || "Staff" : v || "Salaries"}</span>
+                <span className="block truncate text-xs text-muted">{fromPayroll(s) ? "Payroll" : ["Entered by hand", s.notes].filter(Boolean).join(" · ")}</span>
+              </span>
+            ),
+          },
+          { key: "month", label: "Salary month", render: (v) => <Badge tone="brand">{monthText(v, "MMM yyyy") || "—"}</Badge> },
+          { key: "paymentDate", label: "Paid on", render: (v) => <span className="text-muted">{day(v)}</span> },
+          {
+            key: "pdfUrl",
+            label: "Sheet",
+            hideOnMobile: true,
+            render: (v) =>
+              v ? (
+                <span className="inline-flex items-center gap-1 text-xs font-semibold text-danger">
+                  <FileText className="size-3.5" /> PDF
+                </span>
+              ) : (
+                <span className="text-xs text-subtle">—</span>
+              ),
+          },
+          { key: "totalSalary", label: "Amount", align: "right", aside: true, sortValue: amountOf, render: (_v, s) => <span className="font-semibold">{money(amountOf(s))}</span> },
+        ]}
+        filterConfig={{ dateField: "dateForFilter", searchFields: ["staffName", "notes", "createdBy.username"] }}
+        exportFunctions={{
+          exportPDF: (data, branch, type, range, month, q) => exportSalariesToPDF(data, branch, { dateMode: mode, filterType: type, range, selectedMonth: month, q }),
+          exportExcel: (data, branch, type, range, month, q) => exportSalariesToExcel(data, branch, { dateMode: mode, filterType: type, range, selectedMonth: month, q }),
+        }}
+        showTotalsFooter
         searchBarShow
-        searchPlaceholder="Search creator or notes..."
+        searchPlaceholder="Search staff or note…"
+        extra={(list) => {
+          const months = byMonth(list);
+          const twice = months.filter(([, l]) => {
+            const s = splitSalaryMonth(l);
+            return s.payroll.count > 0 && s.byHand.length > 0;
+          });
+          return (
+            <>
+              {twice.length > 0 && (
+                <p className="flex gap-2 rounded-2xl border border-warning/40 bg-warning-soft px-4 py-3 text-sm text-fg">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
+                  <span>
+                    <b>{twice.map(([m]) => monthText(m)).join(", ")}</b> {twice.length > 1 ? "have" : "has"} salaries from Payroll <b>and</b> entered by hand — the same
+                    pay may be counted twice. Check and delete the extra entry.
+                  </span>
+                </p>
+              )}
+              <div className="grid gap-4 lg:grid-cols-2">
+                <ChartCard title="By salary month" subtitle="What each month's salaries came to" loading={isLoading}>
+                  <RankedBars
+                    format={money}
+                    color={COLOR.out}
+                    showShare={false}
+                    rows={months.map(([m, l]) => ({ name: monthText(m), value: l.reduce((n, s) => n + amountOf(s), 0) }))}
+                    empty="No salaries in this period"
+                  />
+                </ChartCard>
+                <ChartCard title="Highest paid" subtitle="From payroll, in this period" loading={isLoading}>
+                  <RankedBars
+                    format={money}
+                    color={COLOR.bank}
+                    showShare={false}
+                    rows={Object.entries(list.filter(fromPayroll).reduce((m, s) => ((m[s.staffName || "Staff"] = (m[s.staffName || "Staff"] || 0) + amountOf(s)), m), {})).map(([name, value]) => ({ name, value }))}
+                    empty="No payroll salaries in this period"
+                  />
+                </ChartCard>
+              </div>
+            </>
+          );
+        }}
+        modalContentRenderer={(s, branch, close) => (
+          <SalaryRecord s={s} branch={branch} money={money} canEdit={canEdit} onClose={close} onEdit={() => (close(), setEditing(s))} onDelete={() => remove(s, close)} />
+        )}
       />
 
-      {/* Edit Modal (Rendered only when editingItem is set) */}
-      {editingItem && (
-        <EditSalaryModal 
-          item={editingItem} 
-          companyId={companyId}
-          branchId={branchId}
-          onClose={() => setEditingItem(null)} 
-        />
-      )}
-    </div>
+      {editing && <SalaryEditSheet s={editing} companyId={companyId} branchId={branchId} currency={currency} money={money} onClose={() => setEditing(null)} />}
+    </>
   );
 }
