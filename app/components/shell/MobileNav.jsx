@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, ChevronRight, LayoutGrid, LogOut, Search, X } from "lucide-react";
@@ -61,6 +61,10 @@ export default function MobileNav({ items, sections, activePath, badges = {}, us
 
 function MoreMenu({ sections, hidden, activePath, badges, user, isCompany, branches, activeBranchId, onSwitchBranch, onNavigate, onSignOut }) {
   const [q, setQ] = useState("");
+  const searchBox = useRef(null);
+  // While searching, bring the box to the top of the sheet so the results
+  // show right under it, above the keyboard.
+  const toTop = () => setTimeout(() => searchBox.current?.scrollIntoView({ block: "start" }), 250);
 
   // Every page as a flat list, for the search box.
   const pages = useMemo(
@@ -92,11 +96,16 @@ function MoreMenu({ sections, hidden, activePath, badges, user, isCompany, branc
       )}
 
       {/* search */}
-      <div className="relative">
+      <div ref={searchBox} className="relative scroll-mt-2">
         <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-subtle" />
         <input
           value={q}
-          onChange={(e) => setQ(e.target.value)}
+          onChange={(e) => {
+            setQ(e.target.value);
+            toTop();
+          }}
+          onFocus={toTop}
+          enterKeyHint="search"
           placeholder="Find a page"
           className="h-11 w-full rounded-xl border border-line bg-surface-2 pl-10 pr-10 text-sm text-fg outline-none transition placeholder:text-subtle focus:border-brand focus:bg-surface focus:ring-4 focus:ring-[var(--cc-ring)]"
         />
@@ -108,15 +117,18 @@ function MoreMenu({ sections, hidden, activePath, badges, user, isCompany, branc
       </div>
 
       {q ? (
-        <Card>
-          {found.length ? (
-            found.map((p) => (
-              <Row key={p.path} href={p.path} icon={p.icon} label={p.label} hint={p.hint} active={p.path === activePath} badge={badges[p.path]} onNavigate={onNavigate} />
-            ))
-          ) : (
-            <p className="px-4 py-6 text-center text-sm text-muted">Nothing matches “{q}”</p>
-          )}
-        </Card>
+        // tall enough that the box can always scroll to the top of the sheet
+        <div className="min-h-[70vh]">
+          <Card>
+            {found.length ? (
+              found.map((p) => (
+                <Row key={p.path} href={p.path} icon={p.icon} label={p.label} hint={p.hint} active={p.path === activePath} badge={badges[p.path]} onNavigate={onNavigate} />
+              ))
+            ) : (
+              <p className="px-4 py-6 text-center text-sm text-muted">Nothing matches “{q}”</p>
+            )}
+          </Card>
+        </div>
       ) : (
         shown.map(({ section, items }) => (
           <div key={section}>

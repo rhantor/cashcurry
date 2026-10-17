@@ -1,5 +1,5 @@
 import React from "react";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import ClientLayoutWrapper from "./ClientLayoutWrapper";
 import { Analytics } from "@vercel/analytics/next";
@@ -12,8 +12,16 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
+
+// The logo's wordmark and the sign-in heading (font-[family-name:var(--font-display)]).
+const display = Plus_Jakarta_Sans({
+  variable: "--font-display",
+  subsets: ["latin"],
+  weight: ["800"],
+  display: "swap",
+});
 export const viewport = {
-  themeColor: "#0ea5e9", // ✅ move themeColor here
+  themeColor: "#0b4d40",
 };
 export const metadata = {
   title: "Cash Curry (Restaurant Finance Report)",
@@ -27,11 +35,13 @@ export default function RootLayout({ children }) {
         {/* Link the manifest so the login page can trigger install */}
         <link rel="manifest" href="/manifest.webmanifest" />
         {/* iOS */}
-        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${display.variable} antialiased`}
       >
         <ClientLayoutWrapper>{children}</ClientLayoutWrapper>
         {process.env.NEXT_PUBLIC_USE_EMULATOR === "true" && (

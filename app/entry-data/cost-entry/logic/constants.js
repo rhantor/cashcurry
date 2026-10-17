@@ -17,6 +17,11 @@ export const CATEGORIES = [
   'Other'
 ]
 
+// What a saved category is called on screen. The stored value never changes
+// (old records keep it); only the words people read do.
+const CATEGORY_LABEL = { compund: 'Compounds & fines' }
+export const categoryLabel = c => CATEGORY_LABEL[c] || c
+
 export const BACK_OFFICE_METHODS = [
   { value: 'card', label: 'Card' },
   { value: 'qr', label: 'QR' },

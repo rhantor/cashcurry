@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Building2, LogOut, Search } from "lucide-react";
-import { Avatar, Menu, cn } from "@/app/components/ui";
+import { Avatar, LogoMark, Menu, cn } from "@/app/components/ui";
 import BranchSwitcher from "./BranchSwitcher";
 
 /**
@@ -18,8 +18,8 @@ export default function TopBar({ page, user, isCompany, branches, activeBranchId
     <header className="sticky top-0 z-30 border-b border-line bg-surface/80 backdrop-blur-xl">
       <div className="flex h-14 items-center gap-3 px-4 sm:px-6 lg:h-16">
         {/* phone: the brand mark (the sidebar has it on computers) */}
-        <Link href="/" aria-label="Home" className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-brand text-sm font-black text-brand-fg lg:hidden">
-          C
+        <Link href="/" aria-label="Home" className="shrink-0 lg:hidden">
+          <LogoMark size={32} />
         </Link>
 
         <div className="min-w-0 flex-1">

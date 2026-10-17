@@ -1,47 +1,49 @@
 "use client";
-import React, { useState, useEffect, useMemo } from "react";
-import { motion, AnimatePresence } from "framer-motion";
-import imageCompression from "browser-image-compression";
-import { format } from "date-fns";
+import { useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { parseISO, format, isValid } from "date-fns";
 import { storage } from "@/lib/firebase";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { useUpdateCostEntryMutation } from "@/lib/redux/api/costApiSlice";
 import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
 import useCurrency from "@/app/hooks/useCurrency";
-import { UploadIcon, X } from "lucide-react";
-import { toast } from "@/app/components/ui/notify";
+import { formatMoney } from "@/lib/region/currency";
+import { Button, DatePicker, Field, Input, Sheet, Textarea, toast } from "@/app/components/ui";
+import MoneyInput from "@/app/components/entry/MoneyInput";
+import ProofUpload from "@/app/components/entry/ProofUpload";
+import { Chip, PaidFromChoice } from "@/app/components/entry/Choices";
+import { CATEGORIES, BACK_OFFICE_METHODS, categoryLabel } from "@/app/entry-data/cost-entry/logic/constants";
 
-const CATEGORIES = [
-  'Utilities', 'Inventory', 'Maintenance', 'Staff Cost', 'Rent/Deposit',
-  'Transport/Delivery', 'Office Supplies', 'Operation', 'New Purchases/Assets',
-  'Software/Subscriptions', 'Taxes/License', 'compund', 'Packaging',
-  'Marketing/Ads', 'Bank Charges', 'Other'
-];
+const SHRINK = { maxMB: 0.5, maxSide: 1024 };
+const toDay = (v) => {
+  const d = typeof v === "string" ? parseISO(v) : v ? new Date(v) : new Date();
+  return format(isValid(d) ? d : new Date(), "yyyy-MM-dd");
+};
 
-const BACK_OFFICE_METHODS = [
-  { value: 'card', label: 'Card' },
-  { value: 'qr', label: 'QR' },
-  { value: 'online', label: 'Online' },
-  { value: 'bank_transfer', label: 'Bank Transfer' }
-];
-
+/**
+ * Change a cost from the report: day, amount, till or bank (and how), what
+ * for, note, invoice and payment receipt. Attachments are kept in step the
+ * way the viewers and exports read them (see the comments in save).
+ * Props as before: cost, onClose, onSuccess.
+ */
 export default function EditCostModal({ cost, onClose, onSuccess }) {
   const currency = useCurrency();
+  const money = (v) => formatMoney(v, currency);
   const { companyId, branchId } = useResolvedCompanyBranch();
   const [updateCostEntry, { isLoading: isUpdating }] = useUpdateCostEntryMutation();
 
-  const [date, setDate] = useState(() => {
-    return cost.date ? format(new Date(cost.date), "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd");
-  });
-  const [amount, setAmount] = useState(cost?.amount || "");
-  const [category, setCategory] = useState("");
-  const [customCategory, setCustomCategory] = useState("");
+  const known = CATEGORIES.includes(cost?.category);
+  const [date, setDate] = useState(() => toDay(cost?.date));
+  const [amount, setAmount] = useState(cost?.amount != null ? String(cost.amount) : "");
+  const [category, setCategory] = useState(cost?.category ? (known ? cost.category : "Other") : "");
+  const [customCategory, setCustomCategory] = useState(cost?.category && !known ? cost.category : "");
   const [description, setDescription] = useState(cost?.description || "");
-  
+  const [paidFromOffice, setPaidFromOffice] = useState(cost?.paidFromOffice || "front");
+  const [paidMethod, setPaidMethod] = useState(cost?.paidMethod || "cash");
+
   const [file, setFile] = useState(null);
   const [filePreview, setFilePreview] = useState(cost?.fileURL || null);
   const [uploadProgress, setUploadProgress] = useState(0);
-
   // Optional proof of payment. Only entries that carry an explicit
   // `receiptURL` are treated as having one — a vendor-bill cost stores several
   // invoices in `attachments` with no receipt among them, and guessing at the
@@ -50,115 +52,35 @@ export default function EditCostModal({ cost, onClose, onSuccess }) {
   const [receiptPreview, setReceiptPreview] = useState(cost?.receiptURL || null);
   const [receiptProgress, setReceiptProgress] = useState(0);
   const [receiptRemoved, setReceiptRemoved] = useState(false);
+  const [busy, setBusy] = useState(false);
 
-  const [paidFromOffice, setPaidFromOffice] = useState(cost?.paidFromOffice || "front");
-  const [paidMethod, setPaidMethod] = useState(cost?.paidMethod || "cash");
+  const resolvedCategory = useMemo(() => (category === "Other" ? (customCategory || "Other").trim() : category), [category, customCategory]);
 
-  useEffect(() => {
-    if (cost?.category) {
-      if (CATEGORIES.includes(cost.category)) {
-        setCategory(cost.category);
-      } else {
-        setCategory("Other");
-        setCustomCategory(cost.category);
-      }
-    }
-  }, [cost]);
-
-  // Keep method synced with office choice
-  useEffect(() => {
-    if (paidFromOffice === 'front') {
-      setPaidMethod('cash');
-    } else if (paidFromOffice === 'back' && paidMethod === 'cash') {
-      setPaidMethod(''); 
-    }
-  }, [paidFromOffice]);
-
-  const resolvedCategory = useMemo(() => {
-    return category === 'Other' ? (customCategory || 'Other').trim() : category;
-  }, [category, customCategory]);
-
-  const processPickedFile = async (selectedFile) => {
-    let processedFile = selectedFile;
-    let preview = null;
-    if (selectedFile.type.startsWith('image/')) {
-      const options = { maxSizeMB: 0.5, maxWidthOrHeight: 1024, useWebWorker: true };
-      processedFile = await imageCompression(selectedFile, options);
-      preview = URL.createObjectURL(processedFile);
-    }
-    return { processedFile, preview };
+  const setOffice = (o) => {
+    setPaidFromOffice(o);
+    // keep the method in step with the office
+    if (o === "front") setPaidMethod("cash");
+    else if (paidMethod === "cash") setPaidMethod("");
   };
 
-  const handleFileChange = async (e) => {
-    try {
-      const selectedFile = e.target.files[0];
-      if (!selectedFile) return;
-      const { processedFile, preview } = await processPickedFile(selectedFile);
-      setFilePreview(preview);
-      setFile(processedFile);
-    } catch (err) {
-      console.error('File processing error:', err);
-      toast.error('Failed to process file. Try again.');
-    }
-  };
-
-  const handleReceiptChange = async (e) => {
-    try {
-      const selectedFile = e.target.files[0];
-      if (!selectedFile) return;
-      const { processedFile, preview } = await processPickedFile(selectedFile);
-      setReceiptPreview(preview);
-      setReceiptFile(processedFile);
-      setReceiptRemoved(false);
-    } catch (err) {
-      console.error('Receipt processing error:', err);
-      toast.error('Failed to process receipt. Try again.');
-    }
-  };
-
-  const handleRemoveReceipt = () => {
-    setReceiptFile(null);
-    setReceiptPreview(null);
-    setReceiptRemoved(true);
-    setReceiptProgress(0);
-  };
-
-  const uploadFile = async (target = file, onProgress = setUploadProgress, kind = 'invoice') => {
+  const uploadFile = (target, onProgress, kind = "invoice") => {
     if (!target || !companyId || !branchId) return null;
+    const ext = target.name.split(".").pop();
+    const safeCategory = (resolvedCategory || "uncategorized").replace(/[^\w-]+/g, "_");
+    const officeFolder = paidFromOffice === "front" ? "front" : "back";
+    const kindFolder = kind === "receipt" ? "receipts/" : "";
+    const task = uploadBytesResumable(ref(storage, `costs/${companyId}/${branchId}/${safeCategory}/${officeFolder}/${kindFolder}${Date.now()}.${ext}`), target);
     return new Promise((resolve, reject) => {
-      try {
-        const fileExtension = target.name.split('.').pop();
-        const safeCategory = (resolvedCategory || 'uncategorized').replace(/[^\w-]+/g, '_');
-        const officeFolder = paidFromOffice === 'front' ? 'front' : 'back';
-        const kindFolder = kind === 'receipt' ? 'receipts/' : '';
-        const filePath = `costs/${companyId}/${branchId}/${safeCategory}/${officeFolder}/${kindFolder}${Date.now()}.${fileExtension}`;
-        const storageRef = ref(storage, filePath);
-
-        const uploadTask = uploadBytesResumable(storageRef, target);
-        uploadTask.on('state_changed',
-          snapshot => {
-            const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-            onProgress(progress);
-          },
-          error => {
-            console.error('Upload failed:', error);
-            reject(error);
-          },
-          async () => {
-            const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-            resolve(downloadURL);
-          }
-        );
-      } catch (err) { reject(err); }
+      task.on("state_changed", (s) => onProgress((s.bytesTransferred / s.totalBytes) * 100), reject, async () => resolve(await getDownloadURL(task.snapshot.ref)));
     });
   };
 
   const handleSave = async () => {
-    if (!amount) return toast.warning('Please enter amount.');
-    if (!resolvedCategory) return toast.warning('Please select a category.');
-    if (category === 'Other' && !customCategory.trim()) return toast.warning('Please type a custom category name.');
-    if (paidFromOffice === 'back' && !paidMethod) return toast.warning('Please select a payment method for Back Office.');
-
+    if (!(Number(amount) > 0)) return toast.warning("Enter the amount");
+    if (!resolvedCategory) return toast.warning("Pick what this cost was for");
+    if (category === "Other" && !customCategory.trim()) return toast.warning("Give the category a name");
+    if (paidFromOffice === "back" && !paidMethod) return toast.warning("Pick how it was paid");
+    setBusy(true);
     try {
       // Viewers and exports read `attachments` in preference to `fileURL`, so
       // every change has to be mirrored into the array by identity — otherwise
@@ -166,12 +88,10 @@ export default function EditCostModal({ cost, onClose, onSuccess }) {
       // (a vendor-bill cost carries several invoices here) is left alone.
       let fileURL = cost?.fileURL;
       let receiptURL = cost?.receiptURL || null;
-      let attachments = Array.isArray(cost?.attachments)
-        ? [...cost.attachments]
-        : null;
+      let attachments = Array.isArray(cost?.attachments) ? [...cost.attachments] : null;
 
       if (file) {
-        const newURL = await uploadFile(file, setUploadProgress, 'invoice');
+        const newURL = await uploadFile(file, setUploadProgress, "invoice");
         if (attachments) {
           const i = attachments.indexOf(cost?.fileURL);
           if (i >= 0) attachments[i] = newURL;
@@ -179,9 +99,8 @@ export default function EditCostModal({ cost, onClose, onSuccess }) {
         }
         fileURL = newURL;
       }
-
       if (receiptFile) {
-        const newURL = await uploadFile(receiptFile, setReceiptProgress, 'receipt');
+        const newURL = await uploadFile(receiptFile, setReceiptProgress, "receipt");
         if (attachments) {
           const i = receiptURL ? attachments.indexOf(receiptURL) : -1;
           if (i >= 0) attachments[i] = newURL;
@@ -189,280 +108,138 @@ export default function EditCostModal({ cost, onClose, onSuccess }) {
         }
         receiptURL = newURL;
       } else if (receiptRemoved) {
-        if (attachments && receiptURL) {
-          attachments = attachments.filter((u) => u !== receiptURL);
-        }
+        if (attachments && receiptURL) attachments = attachments.filter((u) => u !== receiptURL);
         receiptURL = null;
       }
-
-      // Entry pre-dates the attachments array — build one now that it holds
-      // more than a single file.
-      if (!attachments && receiptURL) {
-        attachments = [fileURL, receiptURL].filter(Boolean);
-      }
+      // Entry pre-dates the attachments array — build one now that it holds more than a single file.
+      if (!attachments && receiptURL) attachments = [fileURL, receiptURL].filter(Boolean);
 
       const data = {
         date,
         amount: Number(amount),
         category: resolvedCategory,
-        description: description?.trim() || '',
+        description: description?.trim() || "",
         fileURL: fileURL || null,
         receiptURL: receiptURL || null,
         ...(attachments ? { attachments } : {}),
         paidFromOffice,
-        paidMethod: paidFromOffice === 'front' ? 'cash' : paidMethod,
-        isFrontOffice: paidFromOffice === 'front',
-        isBackOffice: paidFromOffice === 'back',
-        updatedAt: new Date().toISOString()
+        paidMethod: paidFromOffice === "front" ? "cash" : paidMethod,
+        isFrontOffice: paidFromOffice === "front",
+        isBackOffice: paidFromOffice === "back",
+        updatedAt: new Date().toISOString(),
       };
-
       await updateCostEntry({ companyId, branchId, costId: cost.id, data }).unwrap();
-      onSuccess();
+      toast.success("Cost updated", { description: `${resolvedCategory} · ${money(amount)}` });
+      onSuccess?.();
     } catch (err) {
-      console.error('Update failed:', err);
-      toast.error('Failed to update cost entry.');
+      console.error("Update failed:", err);
+      toast.error("Couldn't update the cost", { description: "Check your connection and try again." });
+    } finally {
+      setBusy(false);
     }
   };
 
-  const overlayVar = {
-    hidden: { opacity: 0 },
-    visible: { opacity: 1 }
-  };
-
-  const modalVar = {
-    hidden: { opacity: 0, y: 50, scale: 0.95 },
-    visible: { opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 300, damping: 25 } },
-    exit: { opacity: 0, scale: 0.95, y: 20 }
-  };
+  const uploading = (uploadProgress > 0 && uploadProgress < 100) || (receiptProgress > 0 && receiptProgress < 100);
 
   return (
-    <AnimatePresence>
-      <motion.div 
-        variants={overlayVar} 
-        initial="hidden" 
-        animate="visible" 
-        exit="hidden"
-        className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm flex items-end sm:items-center justify-center z-[100] p-0 sm:p-4"
-      >
-        <motion.div 
-          variants={modalVar}
-          initial={{ opacity: 0, y: 100, scale: 1 }}
-          animate={{ opacity: 1, y: 0, scale: 1, transition: { type: "spring", stiffness: 300, damping: 25 } }}
-          exit={{ opacity: 0, y: 100, scale: 0.95 }}
-          className="bg-white rounded-t-3xl sm:rounded-2xl w-full max-w-lg mt-0 sm:mt-auto sm:mb-auto relative flex flex-col max-h-[85vh] sm:max-h-[90vh] shadow-2xl overflow-hidden border border-gray-100 pt-2 sm:pt-0"
-        >
-          {/* Header */}
-          <div className="px-5 sm:px-6 py-4 sm:py-5 border-b border-gray-50 flex justify-between items-center bg-gradient-to-r from-blue-50/50 to-indigo-50/50">
-            <h2 className="text-lg sm:text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-              Update Cost Entry
-            </h2>
-            <button 
-              onClick={onClose} 
-              className="p-2 text-gray-400 hover:text-red-500 bg-white rounded-full hover:bg-red-50 hover:shadow-sm transition-all absolute right-4 top-4"
-            >
-              <X size={16}/>
-            </button>
+    <Sheet
+      open
+      onClose={onClose}
+      title="Change cost"
+      description={cost?.date ? format(parseISO(toDay(cost.date)), "EEE, d MMM yyyy") : undefined}
+      footer={
+        <>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-subtle">{resolvedCategory || "Cost"}</p>
+            <p className="truncate text-lg font-bold tabular-nums text-fg">{money(amount || 0)}</p>
           </div>
+          <Button variant="ghost" size="lg" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button size="lg" onClick={handleSave} loading={(busy || isUpdating) && !uploading} disabled={uploading}>
+            {uploading ? "Uploading…" : "Save"}
+          </Button>
+        </>
+      }
+    >
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Day">{() => <DatePicker size="lg" value={date} onChange={setDate} />}</Field>
+        <Field label="Amount">{({ id }) => <MoneyInput id={id} currency={currency} value={amount} onValueChange={setAmount} />}</Field>
+      </div>
 
-          {/* Form Content */}
-          <div className="p-5 sm:p-6 overflow-y-auto overflow-x-hidden relative styled-scrollbar">
-            <div className="space-y-4 sm:space-y-5">
-              
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">Date</label>
-                  <input type="date" value={date} onChange={e => setDate(e.target.value)} 
-                    className="w-full rounded-xl border border-gray-200 p-2.5 sm:p-3 text-sm text-gray-700 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all shadow-sm" 
-                  />
-                </div>
-                <div>
-                  <label className="block text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">Amount ({currency})</label>
-                  <input type="number" value={amount} onChange={e => setAmount(e.target.value)} placeholder="0.00" 
-                    className="w-full rounded-xl border border-gray-200 p-2.5 sm:p-3 text-sm text-gray-700 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all shadow-sm font-medium" 
-                  />
-                </div>
-              </div>
-
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100">
-                <label className="block text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-gray-500 mb-3">Payment Source</label>
-                <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 text-sm mb-3">
-                  <label className="flex items-center gap-2 cursor-pointer group">
-                    <input type="radio" name="editPaidFrom" value="front" checked={paidFromOffice === 'front'} onChange={() => setPaidFromOffice('front')} 
-                      className="w-4 h-4 text-blue-600 border-gray-300 focus:ring-blue-500"
-                    /> 
-                    <span className="font-medium text-gray-700 group-hover:text-blue-600 transition-colors">Front Office (Cash)</span>
-                  </label>
-                  <label className="flex items-center gap-2 cursor-pointer group">
-                    <input type="radio" name="editPaidFrom" value="back" checked={paidFromOffice === 'back'} onChange={() => setPaidFromOffice('back')} 
-                      className="w-4 h-4 text-indigo-600 border-gray-300 focus:ring-indigo-500"
-                    /> 
-                    <span className="font-medium text-gray-700 group-hover:text-indigo-600 transition-colors">Back Office</span>
-                  </label>
-                </div>
-                {paidFromOffice === 'back' && (
-                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="mt-2 text-sm overflow-hidden">
-                    <select value={paidMethod} onChange={e => setPaidMethod(e.target.value)} 
-                      className="w-full rounded-lg border border-gray-200 p-2.5 bg-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 outline-none transition-all shadow-sm"
-                    >
-                      <option value="" disabled>Select a payment method</option>
-                      {BACK_OFFICE_METHODS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
-                    </select>
-                  </motion.div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">Category</label>
-                <select value={category} onChange={e => setCategory(e.target.value)} 
-                  className="w-full rounded-xl border border-gray-200 p-2.5 sm:p-3 text-sm text-gray-700 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all shadow-sm"
-                >
-                  <option value="" disabled>Select a category</option>
-                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
-                </select>
-                {category === 'Other' && (
-                  <motion.div initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }}>
-                    <input type="text" value={customCategory} onChange={e => setCustomCategory(e.target.value)} placeholder="Type custom category..." 
-                      className="mt-3 w-full rounded-xl border border-gray-200 p-2.5 sm:p-3 text-sm text-gray-700 bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none shadow-sm" 
-                    />
-                  </motion.div>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-gray-500 mb-1.5">Description (Notes)</label>
-                <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} placeholder="Add any additional details..."
-                  className="w-full rounded-xl border border-gray-200 p-2.5 sm:p-3 text-sm text-gray-700 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all shadow-sm resize-none" 
-                />
-              </div>
-
-              <div className="bg-indigo-50/40 p-4 rounded-xl border border-indigo-100 border-dashed">
-                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-3">
-                  <label className="block text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-indigo-700">Invoice / Attachment</label>
-                  <label className="cursor-pointer inline-flex w-full sm:w-auto justify-center items-center gap-2 px-4 py-2 bg-white text-indigo-700 text-xs font-semibold rounded-lg border border-indigo-200 shadow-sm hover:shadow hover:bg-indigo-50 transition-all">
-                    <UploadIcon size="1em" className="text-indigo-500" />
-                    <span>Upload New File</span>
-                    <input type="file" accept=".pdf,image/*" onChange={handleFileChange} className="hidden" />
-                  </label>
-                </div>
-                
-                {filePreview ? (
-                  <div className="mt-3">
-                    <div className="w-full h-40 sm:h-56 border border-indigo-100 rounded-xl overflow-hidden bg-gray-50 flex items-center justify-center p-2 shadow-inner relative">
-                      {filePreview.match(/\.(jpeg|jpg|gif|png|webp|bmp)(?:\?.*)?$/i) || filePreview.startsWith('blob:') ? (
-                        <img 
-                          src={filePreview} 
-                          alt="Preview" 
-                          className="max-w-full max-h-full object-contain rounded-lg"
-                        />
-                      ) : (
-                        <iframe
-                          src={filePreview}
-                          className="w-full h-full rounded-lg"
-                          title="Attached File Preview"
-                        />
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="py-6 flex flex-col items-center justify-center text-indigo-400 bg-white/50 rounded-xl border border-indigo-50">
-                    <span className="text-xs font-medium">No attachment available</span>
-                  </div>
-                )}
-
-                {uploadProgress > 0 && uploadProgress < 100 && (
-                  <div className="w-full bg-gray-200 rounded-full h-1.5 mt-4 overflow-hidden">
-                    <motion.div 
-                      className="bg-indigo-500 h-1.5 rounded-full" 
-                      initial={{ width: 0 }}
-                      animate={{ width: `${uploadProgress}%` }}
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Payment receipt — optional second attachment */}
-              <div className="bg-emerald-50/40 p-4 rounded-xl border border-emerald-100 border-dashed">
-                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 mb-3">
-                  <label className="block text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-emerald-700">
-                    Payment Receipt <span className="text-emerald-500/70 normal-case font-medium">(optional)</span>
-                  </label>
-                  <div className="flex w-full sm:w-auto gap-2">
-                    {receiptPreview && (
-                      <button
-                        type="button"
-                        onClick={handleRemoveReceipt}
-                        className="inline-flex flex-1 sm:flex-none justify-center items-center gap-2 px-3 py-2 bg-white text-red-600 text-xs font-semibold rounded-lg border border-red-200 shadow-sm hover:bg-red-50 transition-all"
-                      >
-                        <X size="1em" />
-                        <span>Remove</span>
-                      </button>
-                    )}
-                    <label className="cursor-pointer inline-flex flex-1 sm:flex-none justify-center items-center gap-2 px-4 py-2 bg-white text-emerald-700 text-xs font-semibold rounded-lg border border-emerald-200 shadow-sm hover:shadow hover:bg-emerald-50 transition-all">
-                      <UploadIcon size="1em" className="text-emerald-500" />
-                      <span>{receiptPreview ? 'Replace Receipt' : 'Upload Receipt'}</span>
-                      <input type="file" accept=".pdf,image/*" onChange={handleReceiptChange} className="hidden" />
-                    </label>
-                  </div>
-                </div>
-
-                {receiptPreview ? (
-                  <div className="mt-3">
-                    <div className="w-full h-40 sm:h-56 border border-emerald-100 rounded-xl overflow-hidden bg-gray-50 flex items-center justify-center p-2 shadow-inner relative">
-                      {receiptPreview.match(/\.(jpeg|jpg|gif|png|webp|bmp)(?:\?.*)?$/i) || receiptPreview.startsWith('blob:') ? (
-                        <img
-                          src={receiptPreview}
-                          alt="Receipt preview"
-                          className="max-w-full max-h-full object-contain rounded-lg"
-                        />
-                      ) : (
-                        <iframe
-                          src={receiptPreview}
-                          className="w-full h-full rounded-lg"
-                          title="Payment Receipt Preview"
-                        />
-                      )}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="py-6 flex flex-col items-center justify-center text-emerald-400 bg-white/50 rounded-xl border border-emerald-50">
-                    <span className="text-xs font-medium">No payment receipt attached</span>
-                  </div>
-                )}
-
-                {receiptProgress > 0 && receiptProgress < 100 && (
-                  <div className="w-full bg-gray-200 rounded-full h-1.5 mt-4 overflow-hidden">
-                    <motion.div
-                      className="bg-emerald-500 h-1.5 rounded-full"
-                      initial={{ width: 0 }}
-                      animate={{ width: `${receiptProgress}%` }}
-                    />
-                  </div>
-                )}
-              </div>
+      <p className="mb-2 mt-5 text-xs font-semibold text-muted">Paid from</p>
+      <PaidFromChoice value={paidFromOffice} onChange={setOffice} bankNote="Card, QR, online, transfer" />
+      <AnimatePresence initial={false}>
+        {paidFromOffice === "back" && (
+          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden">
+            <div className="mt-3 flex flex-wrap gap-2">
+              {BACK_OFFICE_METHODS.map((m) => (
+                <Chip key={m.value} on={paidMethod === m.value} onClick={() => setPaidMethod(m.value)}>
+                  {m.label}
+                </Chip>
+              ))}
             </div>
-          </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-          {/* Footer */}
-          <div className="p-4 sm:px-6 sm:py-4 border-t border-gray-100 bg-gray-50 flex flex-col sm:flex-row justify-end gap-3">
-            <button onClick={onClose} disabled={isUpdating} className="w-full sm:w-auto px-5 py-2.5 sm:py-2.5 rounded-xl font-medium text-gray-600 bg-white border border-gray-200 hover:bg-gray-100 transition-colors shadow-sm text-sm">
-              Cancel
-            </button>
-            <button 
-              onClick={handleSave} 
-              disabled={isUpdating || (uploadProgress > 0 && uploadProgress < 100) || (receiptProgress > 0 && receiptProgress < 100)} 
-              className="w-full sm:w-auto px-6 py-2.5 rounded-xl font-medium text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md hover:shadow-lg active:scale-[0.98] transition-all disabled:opacity-50 text-sm flex items-center justify-center gap-2"
-            >
-              {isUpdating ? (
-                <>
-                  <svg className="animate-spin -ml-1 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                  Saving...
-                </>
-              ) : 'Save Updates'}
-            </button>
-          </div>
-        </motion.div>
-      </motion.div>
-    </AnimatePresence>
+      <p className="mb-2 mt-5 text-xs font-semibold text-muted">What for</p>
+      <div className="flex flex-wrap gap-2">
+        {CATEGORIES.map((c) => (
+          <Chip key={c} on={category === c} onClick={() => setCategory(c)}>
+            {categoryLabel(c)}
+          </Chip>
+        ))}
+      </div>
+      {category === "Other" && (
+        <Field label="Name the category" className="mt-3">
+          {({ id }) => <Input id={id} size="lg" value={customCategory} onChange={(e) => setCustomCategory(e.target.value)} placeholder="e.g. Pest control" />}
+        </Field>
+      )}
+
+      <Field label="Note" className="mt-5">
+        {({ id }) => <Textarea id={id} rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />}
+      </Field>
+
+      <div className="mt-5 grid gap-4 sm:grid-cols-2">
+        <ProofUpload
+          label="Invoice"
+          pdf
+          pageDrop={false}
+          shrink={SHRINK}
+          file={file}
+          preview={filePreview}
+          progress={uploadProgress}
+          onPick={(f, url) => {
+            setFile(f);
+            setFilePreview(url);
+          }}
+          onRemove={() => {
+            setFile(null);
+            setFilePreview(cost?.fileURL || null);
+          }}
+        />
+        <ProofUpload
+          label="Payment receipt"
+          pdf
+          pageDrop={false}
+          shrink={SHRINK}
+          file={receiptFile}
+          preview={receiptPreview}
+          progress={receiptProgress}
+          onPick={(f, url) => {
+            setReceiptFile(f);
+            setReceiptPreview(url);
+            setReceiptRemoved(false);
+          }}
+          onRemove={() => {
+            setReceiptFile(null);
+            setReceiptPreview(null);
+            setReceiptRemoved(true);
+            setReceiptProgress(0);
+          }}
+        />
+      </div>
+    </Sheet>
   );
 }
-

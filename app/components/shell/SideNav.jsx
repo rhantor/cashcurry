@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, LogOut, PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { Avatar, Tooltip, cn, menuIcon } from "@/app/components/ui";
+import { Avatar, LogoMark, Tooltip, cn, menuIcon } from "@/app/components/ui";
 import { spring } from "@/app/components/ui/motion";
 
 const roleName = (r) => ({ owner: "Owner", gm: "General manager", superAdmin: "Super admin", branchAdmin: "Branch admin" })[r] || (r ? r[0].toUpperCase() + r.slice(1) : "");
@@ -19,7 +19,7 @@ export default function SideNav({ sections, activePath, badges = {}, user, compa
       {/* brand */}
       <div className={cn("flex h-16 shrink-0 items-center gap-2.5 border-b border-line", collapsed ? "justify-center px-0" : "px-4")}>
         <Link href="/" className="flex min-w-0 items-center gap-2.5" aria-label="Home">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand text-base font-black text-brand-fg shadow-sm">C</span>
+          <LogoMark size={36} />
           {!collapsed && (
             <span className="min-w-0">
               <span className="block truncate text-sm font-bold leading-tight text-fg">Cash Curry</span>

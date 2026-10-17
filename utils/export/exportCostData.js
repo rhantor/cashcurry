@@ -5,6 +5,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format } from "date-fns";
 import { toast } from "@/app/components/ui/notify";
+import { categoryLabel } from "@/app/entry-data/cost-entry/logic/constants";
 
 /* ----------------------------- Helpers ----------------------------- */
 
@@ -25,7 +26,7 @@ const toDate = (ts) => {
 const safe = (v, fallback = "-") =>
   v === undefined || v === null || v === "" ? fallback : v;
 
-const normCategory = (c) => (c && String(c).trim()) || "Uncategorized";
+const normCategory = (c) => categoryLabel((c && String(c).trim()) || "Uncategorized");
 
 // Legacy-safe derivations for new payment fields
 const derivePaidFrom = (entry) => {

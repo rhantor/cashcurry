@@ -88,6 +88,7 @@ export const sidebarItems = {
         { label: 'Cash to Bank Report', path: '/reports/deposit-report' },
         { label: 'Bank to Cash Report', path: '/reports/withdrawal-report' },
         { label: 'Salaries Report', path: '/reports/salary-report' },
+        { label: 'Staff Loan Report', path: '/reports/staff-loan-report' },
         { label: 'Summary', path: '/reports' },
         { label: 'Yearly Summary', path: '/reports/yearly-summary' }
       ]
@@ -287,6 +288,13 @@ export const sidebarItems = {
       section: 'Reports',
       icon: 'MdOutlineCalendarMonth',
       path: '/reports/advance-report',
+      allowedRoles: ['gm', 'superAdmin', 'owner']
+    },
+    {
+      label: 'Staff Loan Report',
+      section: 'Reports',
+      icon: 'MdAttachMoney',
+      path: '/reports/staff-loan-report',
       allowedRoles: ['gm', 'superAdmin', 'owner']
     },
     {

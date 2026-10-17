@@ -18,7 +18,11 @@ function useOverlay(open, onClose, panelRef) {
     document.body.style.overflow = "hidden";
     document.addEventListener("keydown", onKey);
     // Focus the first control inside, so keyboard users land in the dialog.
+    // Not on touch screens: focusing a field there pops the keyboard up
+    // before the person has asked for it.
+    const touch = window.matchMedia?.("(pointer: coarse)").matches;
     const t = setTimeout(() => {
+      if (touch) return;
       panelRef.current?.querySelector("input, select, textarea, button:not([data-close]), [tabindex]")?.focus();
     }, 50);
     return () => {
@@ -29,6 +33,30 @@ function useOverlay(open, onClose, panelRef) {
     };
   }, [open, onClose, panelRef]);
   return mounted;
+}
+
+/**
+ * How much of the bottom of the window the on-screen keyboard covers (0 when
+ * it is closed), and the height still visible — so a sheet can sit above it.
+ */
+function useKeyboard(open) {
+  const [kb, setKb] = useState({ inset: 0, height: null });
+  useEffect(() => {
+    const vv = typeof window !== "undefined" && window.visualViewport;
+    if (!open || !vv) return;
+    const update = () => {
+      const inset = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
+      setKb({ inset: inset > 80 ? inset : 0, height: vv.height });
+    };
+    update();
+    vv.addEventListener("resize", update);
+    vv.addEventListener("scroll", update);
+    return () => {
+      vv.removeEventListener("resize", update);
+      vv.removeEventListener("scroll", update);
+    };
+  }, [open]);
+  return kb;
 }
 
 const Backdrop = ({ onClick }) => (
@@ -106,11 +134,18 @@ export function Sheet({ open, onClose, title, description, footer, layer = "z-50
   const panel = useRef(null);
   const drag = useDragControls();
   const mounted = useOverlay(open, onClose, panel);
+  const kb = useKeyboard(open);
   if (!mounted) return null;
   return createPortal(
     <AnimatePresence>
       {open && (
-        <div className={cn("fixed inset-0 flex items-end justify-center", layer)} role="dialog" aria-modal="true">
+        <div
+          className={cn("fixed inset-0 flex items-end justify-center", layer)}
+          // with the keyboard up, the sheet sits on top of it instead of under it
+          style={kb.inset ? { bottom: kb.inset } : undefined}
+          role="dialog"
+          aria-modal="true"
+        >
           <Backdrop onClick={onClose} />
           <motion.div
             ref={panel}
@@ -129,6 +164,7 @@ export function Sheet({ open, onClose, title, description, footer, layer = "z-50
               "relative flex max-h-[90vh] w-full flex-col rounded-t-3xl border border-line bg-surface shadow-float",
               size === "lg" ? "max-w-4xl" : "max-w-xl"
             )}
+            style={kb.inset && kb.height ? { maxHeight: kb.height * 0.92 } : undefined}
           >
             <div
               onPointerDown={(e) => drag.start(e)}

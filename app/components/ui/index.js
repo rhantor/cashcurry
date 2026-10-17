@@ -25,5 +25,6 @@ export { DatePicker, DateRangePicker, PickerShell } from "./DatePicker";
 export { default as DataTable } from "./DataTable";
 export { MENU_ICONS, menuIcon } from "./icons";
 export { cn } from "./cn";
+export { default as Logo, LogoMark } from "./Logo";
 export { useMedia, useIsPhone } from "./useMedia";
 export * as motionPresets from "./motion";

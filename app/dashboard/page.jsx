@@ -15,6 +15,7 @@ import DailyNet from "../components/dashboard/charts/DailyNet";
 import MoneyFlow from "../components/dashboard/charts/MoneyFlow";
 import BalanceTrend from "../components/dashboard/charts/BalanceTrend";
 import { COLOR, ChartCard, RankedBars } from "../components/dashboard/charts/kit";
+import { categoryLabel } from "@/app/entry-data/cost-entry/logic/constants";
 
 /** A small heading between groups of charts. */
 function SectionHeader({ title }) {
@@ -152,7 +153,7 @@ export default function DashboardPage() {
         <SectionHeader title="Costs & activity" />
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <ChartCard title="Top costs" subtitle="By category, largest first" loading={firstLoad}>
-            <RankedBars format={fmt} color={COLOR.out} rows={costByCategory} empty="No costs in this period" />
+            <RankedBars format={fmt} color={COLOR.out} rows={costByCategory.map((r) => ({ ...r, name: categoryLabel(r.name) }))} empty="No costs in this period" />
           </ChartCard>
           <RecentActivity rows={recent} />
         </div>

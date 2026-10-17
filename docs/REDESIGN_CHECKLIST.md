@@ -20,16 +20,16 @@ computer, has its own loading look, and its old modals are redone too.
 - ⏸ `/cash-tracker` Daily cash tracker — skipped for now (owner, 17 Oct 2026); comes back with 4.10 pay-outs (daily cash check)
 
 ## 3.4.3 Reports
-- ⬜ `/reports` Summary report
-- ⬜ `/reports/sales-report` Sales report (its day sheet ✅)
-- ⬜ `/reports/cost-report` Cost report (+ edit cost, attachments)
-- ⬜ `/reports/deposit-report` Cash to bank report
-- ⬜ `/reports/withdrawal-report` Bank to cash report
-- ⬜ `/reports/advance-report` Advance report
-- ⬜ `/reports/salary-report` Salary report
-- ⬜ `/reports/staff-loan-report` Staff loan report (not in the menu yet — decide)
-- ⬜ `/reports/yearly-summary` Yearly summary
-- ⬜ `/reports/yearly-summary/[period]` Yearly statement
+- ✅ `/reports` Summary report
+- ✅ `/reports/sales-report` Sales report (+ day sheet, + change sales sheet)
+- ✅ `/reports/cost-report` Cost report (+ edit cost, attachments)
+- ✅ `/reports/deposit-report` Cash to bank report
+- ✅ `/reports/withdrawal-report` Bank to cash report
+- ✅ `/reports/advance-report` Advance report
+- ✅ `/reports/salary-report` Salary report
+- ✅ `/reports/staff-loan-report` Staff loan report (in the Reports menu)
+- ✅ `/reports/yearly-summary` Yearly summary
+- ✅ `/reports/yearly-summary/[period]` Yearly statement
 
 ## 3.4.4 Approvals and loans
 - ⬜ `/requested-panel` Requested panel (advances, staff loans, branch loans, OT)
@@ -65,7 +65,8 @@ computer, has its own loading look, and its old modals are redone too.
 - ⬜ `/branch-settings` Branch settings (owner saw UI problems — 4.1 notes)
 - ⬜ `/branches/branch-management`, `/branches/[branchId]` Branches
 - ⬜ `/audit-log`, `/branch-audit` Audit logs
-- ⬜ `/login`, `/signup`, `/signup/verify`, `/reset-password` Sign-in screens
+- ✅ `/login` Sign in (animated brand side, show/hide password, Caps Lock warning, shake on a wrong try, check before opening)
+- ⬜ `/signup`, `/signup/verify`, `/reset-password` Sign-up and password reset
 - ⬜ `/unauthorized` — **missing page**: middleware sends people here, today they get the 404
 - ⬜ Error and not-found screens (`app/error.jsx`, `app/not-found.jsx`, section `error.js` files)
 - ⬜ `/tools/invoice-generator` Invoice generator

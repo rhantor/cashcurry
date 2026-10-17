@@ -1,23 +1,15 @@
 "use client";
 import React, { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import {
-  ResponsiveContainer,
-  ComposedChart,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  Tooltip,
-  Legend,
-  Bar,
-  Line,
-} from "recharts";
-import Button from "@/app/components/common/Button";
+import { format, parseISO } from "date-fns";
+import { motion } from "framer-motion";
+import { ChevronLeft, ChevronRight, Download, Trophy } from "lucide-react";
 import useCurrency from "@/app/hooks/useCurrency";
-import { formatMoney } from "@/utils/formatMoney";
-import { mkFmt, mkCompact } from "@/utils/dashboard/utils";
+import { formatMoney } from "@/lib/region/currency";
+import { useBusinessToday } from "@/app/hooks/useRegion";
 import { useSummaryReportLogic } from "@/hook/useSummaryReportLogic";
-import { toast } from "@/app/components/ui/notify";
+import { COLOR, ChartCard, Legend, TimeChart } from "@/app/components/dashboard/charts/kit";
+import { Button, Card, CountUp, Skeleton, Tabs, cn, toast } from "@/app/components/ui";
 
 // A month's total outflow, mirroring the monthly statement's definition of
 // expenses: cost entries (front + back), salaries, advances/staff loans, and
@@ -34,26 +26,31 @@ const monthNet = (s) => Number(s.totalSales || 0) - monthExpenses(s);
 const isEmptyMonth = (s) =>
   Number(s.totalSales || 0) === 0 && monthExpenses(s) === 0;
 
-// Chart palette — validated CVD-safe (dataviz skill). Sales/Expenses are the
-// adjacent bars; Net is a line (secondary encoding by mark shape).
-const C_SALES = "#6366f1"; // indigo
-const C_EXPENSES = "#f59e0b"; // amber
-const C_NET = "#10b981"; // emerald
+const SERIES = [
+  { key: "sales", name: "Sales", color: COLOR.in, kind: "bar" },
+  { key: "expenses", name: "Spent", color: COLOR.out, kind: "bar" },
+  { key: "net", name: "Left over", color: COLOR.bank, kind: "line" },
+];
 
+/**
+ * Yearly summary: a year month by month — sales, what was spent (costs,
+ * salaries, advances, loans given) and what was left over — with the best
+ * month, a chart, and each month opening its statement. Figures come from the
+ * daily cash book (useSummaryReportLogic); this page only adds them up by month.
+ */
 export default function YearlySummaryPage() {
   const currency = useCurrency();
   const router = useRouter();
   const formatNum = (v) => formatMoney(v || 0, currency);
-  const safeZero = (v) => (Number(v || 0) === 0 ? "-" : formatNum(v));
+  const safeZero = (v) => (Number(v || 0) === 0 ? "–" : formatNum(v));
+  const [layout, setLayout] = useState("simple");
 
-  // 1. Filtering State
-  const currentYear = new Date().getFullYear();
-  const [selectedYear, setSelectedYear] = useState(currentYear.toString());
-
-  const availableYears = useMemo(() => {
-    // Generate list of 5 recent years
-    return Array.from({ length: 5 }, (_, i) => (currentYear - i).toString());
-  }, [currentYear]);
+  // 1. The year, on the branch's clock
+  const today = useBusinessToday();
+  const currentYear = Number(today.slice(0, 4));
+  const thisMonth = today.slice(0, 7);
+  const [selectedYear, setSelectedYear] = useState(String(currentYear));
+  const firstYear = currentYear - 4;
 
   // 2. Fetch Data using the native summary logic (aggregates completely locally for the requested year)
   // Memoized so the hook's derived date range isn't invalidated every render by
@@ -191,27 +188,20 @@ export default function YearlySummaryPage() {
   // 5c. Chart data — one point per month
   const chartData = useMemo(
     () =>
-      filteredSummaries.map((s) => ({
-        month: new Date(`${s.period}-02`).toLocaleString("default", {
-          month: "short",
-        }),
-        sales: Number(s.totalSales || 0),
-        expenses: monthExpenses(s),
-        net: monthNet(s),
-      })),
-    [filteredSummaries]
+      // months still to come stay empty, so the line stops at this month
+      filteredSummaries.map((s) => {
+        const ahead = s.period > thisMonth;
+        return {
+          month: format(parseISO(`${s.period}-01`), "MMM"),
+          sales: ahead ? null : Number(s.totalSales || 0),
+          expenses: ahead ? null : monthExpenses(s),
+          net: ahead ? null : monthNet(s),
+        };
+      }),
+    [filteredSummaries, thisMonth]
   );
 
-  const monthLabelShort = (s) =>
-    s
-      ? new Date(`${s.period}-02`).toLocaleString("default", {
-          month: "short",
-          year: "2-digit",
-        })
-      : "—";
-
-  const chartFmt = mkFmt(currency);
-  const chartCompact = mkCompact();
+  const monthLabelShort = (s) => (s ? format(parseISO(`${s.period}-01`), "MMMM") : "—");
 
   // 6. Export Excel — styled workbook (xlsx-js-style), lazy-loaded on click.
   const handleExportExcel = async () => {
@@ -381,181 +371,220 @@ export default function YearlySummaryPage() {
     }
   };
 
+  // the months that have happened (all twelve for a past year)
+  const shownMonths = filteredSummaries.filter((s) => s.period <= thisMonth);
+  const maxSales = Math.max(1, ...shownMonths.map((s) => Number(s.totalSales || 0)), ...shownMonths.map(monthExpenses));
+  const year = Number(selectedYear);
+
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row items-center justify-between gap-4 mb-6">
-        <div>
-          <h2 className="text-2xl font-bold capitalize">{branchName || 'Branch'} Yearly Summary</h2>
-          <p className="text-gray-500 text-sm mt-1">Review grand totals dynamically calculated directly from daily transaction records. Click a month to open its full statement.</p>
-        </div>
-
-        <div className="flex items-center gap-3">
-           <div className="flex items-center gap-2 bg-white border rounded shadow-sm px-3 py-1.5">
-             <span className="text-sm text-gray-500 font-medium">Reporting Year:</span>
-             <select
-               value={selectedYear}
-               onChange={(e) => setSelectedYear(e.target.value)}
-               className="bg-transparent text-gray-800 font-bold focus:outline-none cursor-pointer"
-             >
-               {availableYears.map(y => (
-                 <option key={y} value={y}>{y}</option>
-               ))}
-             </select>
-           </div>
-
-           <Button
-            onClick={handleExportExcel}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
-            disabled={filteredSummaries.length === 0}
+    <div className="mx-auto max-w-6xl space-y-4 px-4 py-5 sm:px-6 sm:py-6">
+      {/* the year */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-1 rounded-2xl border border-line bg-surface p-1 shadow-card">
+          <button
+            type="button"
+            onClick={() => setSelectedYear(String(year - 1))}
+            disabled={year <= firstYear}
+            aria-label="Previous year"
+            className="rounded-xl p-2 text-muted transition hover:bg-surface-2 hover:text-fg disabled:opacity-30"
           >
-            Export Excel
-          </Button>
+            <ChevronLeft className="size-4" />
+          </button>
+          <span className="min-w-16 text-center text-base font-bold tabular-nums text-fg">{selectedYear}</span>
+          <button
+            type="button"
+            onClick={() => setSelectedYear(String(year + 1))}
+            disabled={year >= currentYear}
+            aria-label="Next year"
+            className="rounded-xl p-2 text-muted transition hover:bg-surface-2 hover:text-fg disabled:opacity-30"
+          >
+            <ChevronRight className="size-4" />
+          </button>
         </div>
+        <Button variant="secondary" icon={Download} onClick={handleExportExcel} disabled={isLoading || !filteredSummaries.length}>
+          Excel
+        </Button>
       </div>
 
       {isLoading ? (
-        <div className="text-gray-500 mt-4 p-4 text-center bg-white rounded-xl shadow-sm">Calculating from daily records...</div>
+        <>
+          <Skeleton className="h-44" rounded="rounded-3xl" />
+          <Skeleton className="h-72" rounded="rounded-2xl" />
+        </>
       ) : (
         <>
-          {/* KPI cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white border rounded-xl shadow-sm p-4">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Sales</p>
-              <p className="text-2xl font-bold mt-1 text-emerald-600">{formatNum(yearlyTotals.sales)}</p>
-              <p className="text-xs text-gray-500 mt-1">across {selectedYear}</p>
-            </div>
-            <div className="bg-white border rounded-xl shadow-sm p-4">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Expenses</p>
-              <p className="text-2xl font-bold mt-1 text-amber-600">{formatNum(yearlyExpenses)}</p>
-              <p className="text-xs text-gray-500 mt-1">cost, salary, advances &amp; loans given</p>
-            </div>
-            <div className="bg-white border rounded-xl shadow-sm p-4">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Net Income</p>
-              <p className={`text-2xl font-bold mt-1 ${yearlyNet < 0 ? "text-red-600" : "text-gray-800"}`}>{formatNum(yearlyNet)}</p>
-              <p className="text-xs text-gray-500 mt-1">{yearlyMargin.toFixed(1)}% net margin</p>
-            </div>
-            <div className="bg-white border rounded-xl shadow-sm p-4">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Best Month</p>
-              <p className="text-2xl font-bold mt-1 text-indigo-600">{monthLabelShort(bestMonth)}</p>
-              <p className="text-xs text-gray-500 mt-1">
-                {bestMonth ? `Net ${formatNum(monthNet(bestMonth))}` : "No activity"}
-                {worstMonth && worstMonth !== bestMonth
-                  ? ` · Worst ${monthLabelShort(worstMonth)}`
-                  : ""}
-              </p>
-            </div>
-          </div>
-
-          {/* Monthly trend */}
-          <div className="bg-white border rounded-xl shadow-sm p-4 mb-6">
-            <h3 className="text-sm font-semibold text-gray-700 mb-3">Monthly Trend — Sales, Expenses &amp; Net</h3>
-            <div className="w-full h-72">
-              <ResponsiveContainer>
-                <ComposedChart data={chartData} margin={{ top: 8, right: 16, left: 10, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-                  <XAxis
-                    dataKey="month"
-                    tick={{ fontSize: 11, fill: "#94a3b8" }}
-                    tickLine={false}
-                    axisLine={false}
-                  />
-                  <YAxis
-                    tickFormatter={chartCompact}
-                    tick={{ fontSize: 11, fill: "#94a3b8" }}
-                    tickLine={false}
-                    axisLine={false}
-                    width={44}
-                  />
-                  <Tooltip
-                    formatter={(val, key) => {
-                      const labels = { sales: "Sales", expenses: "Expenses", net: "Net Income" };
-                      return [chartFmt(val), labels[key] || key];
-                    }}
-                    contentStyle={{ borderRadius: 10, fontSize: 12, border: "1px solid #e2e8f0" }}
-                  />
-                  <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
-                  <Bar dataKey="sales" name="Sales" fill={C_SALES} radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="expenses" name="Expenses" fill={C_EXPENSES} radius={[4, 4, 0, 0]} />
-                  <Line type="monotone" dataKey="net" name="Net Income" stroke={C_NET} strokeWidth={2.5} dot={false} />
-                </ComposedChart>
-              </ResponsiveContainer>
+          {/* the year in one card */}
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-[#0e5a4a] to-[#052a22] p-5 text-white shadow-card sm:p-6">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-white/70">
+              {year === currentYear ? `${selectedYear} so far` : selectedYear} · sales
+            </p>
+            <CountUp value={yearlyTotals.sales} format={formatNum} className="mt-1 block text-4xl font-bold tabular-nums tracking-tight" />
+            <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+              <div className="rounded-2xl bg-white/10 px-3 py-2.5">
+                <p className="text-[11px] font-semibold text-white/70">Spent</p>
+                <p className="text-lg font-bold tabular-nums">{formatNum(yearlyExpenses)}</p>
+                <p className="text-[11px] text-white/60">Costs, salaries, advances, loans</p>
+              </div>
+              <div className="rounded-2xl bg-white/10 px-3 py-2.5">
+                <p className="text-[11px] font-semibold text-white/70">Left over</p>
+                <p className={cn("text-lg font-bold tabular-nums", yearlyNet < 0 && "text-[#ffd4c7]")}>{formatNum(yearlyNet)}</p>
+                <p className="text-[11px] text-white/60">{yearlyMargin.toFixed(1)}% of sales</p>
+              </div>
+              <div className="col-span-2 rounded-2xl bg-white/10 px-3 py-2.5 sm:col-span-1">
+                <p className="flex items-center gap-1 text-[11px] font-semibold text-white/70">
+                  <Trophy className="size-3" /> Best month
+                </p>
+                <p className="text-lg font-bold">{monthLabelShort(bestMonth)}</p>
+                <p className="text-[11px] text-white/60">
+                  {bestMonth ? `${formatNum(monthNet(bestMonth))} left over` : "No activity yet"}
+                  {worstMonth && worstMonth !== bestMonth ? ` · weakest ${monthLabelShort(worstMonth)}` : ""}
+                </p>
+              </div>
             </div>
           </div>
 
-          {/* Table */}
-          <div className="bg-white border rounded-xl shadow-sm overflow-x-auto">
-          <table className="w-full text-right text-sm">
-            <thead className="bg-gray-50 border-b border-gray-100 text-gray-600">
-              <tr>
-                <th className="py-3 px-3 font-semibold text-left">Month</th>
-                <th className="py-3 px-3 font-semibold">Total Sales</th>
-                <th className="py-3 px-3 font-semibold text-orange-600">Cost (Front)</th>
-                <th className="py-3 px-3 font-semibold text-purple-600">Cost (Back)</th>
-                <th className="py-3 px-3 font-semibold">Salaries</th>
-                <th className="py-3 px-3 font-semibold">Advances</th>
-                <th className="py-3 px-3 font-semibold text-blue-600">Withdrawals</th>
-                <th className="py-3 px-3 font-semibold text-blue-600">Deposits</th>
-                <th className="py-3 px-3 font-semibold text-teal-600">Loan Given</th>
-                <th className="py-3 px-3 font-semibold text-teal-600">Loan Rcvd</th>
-                <th className="py-3 px-3 font-semibold text-indigo-600">Repay In</th>
-                <th className="py-3 px-3 font-semibold text-indigo-600">Repay Out</th>
-                <th className="py-3 px-3 font-semibold">Net Income</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100/60">
-              {filteredSummaries.map((s) => {
-                const net = monthNet(s);
-                const empty = isEmptyMonth(s);
-                return (
-                  <tr
-                    key={s.period}
-                    onClick={() => router.push(`/reports/yearly-summary/${s.period}`)}
-                    className="hover:bg-blue-50/50 transition duration-150 cursor-pointer"
-                    title={`Open ${s.period} statement`}
-                  >
-                    <td className="py-3 px-3 font-medium text-blue-700 hover:underline text-left whitespace-nowrap">
-                      {new Date(`${s.period}-02`).toLocaleString('default', { month: 'short', year: '2-digit' })}
-                    </td>
-                    <td className="py-3 px-3 text-emerald-600 font-bold tracking-wide">{safeZero(s.totalSales)}</td>
-                    <td className="py-3 px-3 text-orange-500 font-bold tracking-wide">{safeZero(s.frontCost)}</td>
-                    <td className="py-3 px-3 text-purple-500 font-bold tracking-wide">{safeZero(s.backCost)}</td>
-                    <td className="py-3 px-3 text-gray-700">{safeZero(s.totalSalaries)}</td>
-                    <td className="py-3 px-3 text-gray-700">{safeZero(s.totalAdvances)}</td>
-                    <td className="py-3 px-3 text-blue-500 font-medium">{safeZero(s.totalWithdrawals)}</td>
-                    <td className="py-3 px-3 text-blue-500 font-medium">{safeZero(s.totalDeposits)}</td>
-                    <td className="py-3 px-3 text-teal-600 font-medium">{safeZero(s.loanGiven)}</td>
-                    <td className="py-3 px-3 text-teal-600 font-medium">{safeZero(s.loanReceived)}</td>
-                    <td className="py-3 px-3 text-indigo-500 font-medium">{safeZero(s.repayIn)}</td>
-                    <td className="py-3 px-3 text-indigo-500 font-medium">{safeZero(s.repayOut)}</td>
-                    <td className={`py-3 px-3 font-bold ${empty ? "text-gray-400" : net < 0 ? "text-red-600" : "text-gray-800"}`}>
-                      {empty ? "-" : formatNum(net)}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            {filteredSummaries.length > 0 && (
-              <tfoot className="bg-gray-50 border-t border-gray-200">
-                <tr>
-                  <td className="py-4 px-3 font-bold text-gray-800 text-left">Yearly Total</td>
-                  <td className="py-4 px-3 font-bold text-emerald-600">{formatNum(yearlyTotals.sales)}</td>
-                  <td className="py-4 px-3 font-bold text-orange-600">{formatNum(yearlyTotals.frontCost)}</td>
-                  <td className="py-4 px-3 font-bold text-purple-600">{formatNum(yearlyTotals.backCost)}</td>
-                  <td className="py-4 px-3 font-bold text-gray-800">{formatNum(yearlyTotals.salaries)}</td>
-                  <td className="py-4 px-3 font-bold text-gray-800">{formatNum(yearlyTotals.advances)}</td>
-                  <td className="py-4 px-3 font-bold text-blue-600">{formatNum(yearlyTotals.withdrawals)}</td>
-                  <td className="py-4 px-3 font-bold text-blue-600">{formatNum(yearlyTotals.deposits)}</td>
-                  <td className="py-4 px-3 font-bold text-teal-600">{formatNum(yearlyTotals.loanGiven)}</td>
-                  <td className="py-4 px-3 font-bold text-teal-600">{formatNum(yearlyTotals.loanReceived)}</td>
-                  <td className="py-4 px-3 font-bold text-indigo-600">{formatNum(yearlyTotals.repayIn)}</td>
-                  <td className="py-4 px-3 font-bold text-indigo-600">{formatNum(yearlyTotals.repayOut)}</td>
-                  <td className={`py-4 px-3 font-bold ${yearlyNet < 0 ? "text-red-600" : "text-gray-900"}`}>{formatNum(yearlyNet)}</td>
-                </tr>
-              </tfoot>
-            )}
-          </table>
+          <ChartCard title="Month by month" subtitle="Sales against what was spent; the line is what was left over" legend={SERIES.map((s) => ({ ...s, kind: s.kind === "line" ? "line" : "bar" }))}>
+            <TimeChart data={chartData} xKey="month" currency={currency} height={260} zeroLine={chartData.some((d) => d.net < 0)} series={SERIES} />
+          </ChartCard>
+
+          {/* the months */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+            <h2 className="text-base font-semibold text-fg">Months</h2>
+            <Tabs
+              size="sm"
+              value={layout}
+              onChange={setLayout}
+              tabs={[
+                { value: "simple", label: "Simple" },
+                { value: "table", label: "Full table" },
+              ]}
+            />
           </div>
+
+          {layout === "simple" ? (
+            <Card className="overflow-hidden p-0">
+              <div className="flex items-center justify-between border-b border-line px-4 py-2">
+                <Legend items={SERIES.slice(0, 2)} />
+                <span className="text-[11px] text-subtle">Tap a month for its statement</span>
+              </div>
+              <ul className="divide-y divide-line">
+                {[...shownMonths].reverse().map((s) => {
+                  const net = monthNet(s);
+                  const empty = isEmptyMonth(s);
+                  return (
+                    <li key={s.period}>
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/reports/yearly-summary/${s.period}`)}
+                        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-surface-2/50"
+                      >
+                        <span className="w-12 shrink-0">
+                          <span className="block text-base font-bold leading-tight text-fg">{format(parseISO(`${s.period}-01`), "MMM")}</span>
+                          {s.period === thisMonth && <span className="block text-[10px] font-semibold uppercase text-brand">Now</span>}
+                        </span>
+                        {empty ? (
+                          <span className="flex-1 text-xs text-subtle">Nothing recorded</span>
+                        ) : (
+                          <span className="min-w-0 flex-1 text-xs sm:hidden">
+                            <span className="block text-brand">Sales {formatNum(s.totalSales)}</span>
+                            <span className="block text-danger">Spent {formatNum(monthExpenses(s))}</span>
+                          </span>
+                        )}
+                        {!empty && (
+                          <span className="hidden min-w-0 flex-1 space-y-1 sm:block">
+                            {[
+                              ["sales", Number(s.totalSales || 0), COLOR.in],
+                              ["spent", monthExpenses(s), COLOR.out],
+                            ].map(([k, v, c]) => (
+                              <span key={k} className="flex items-center gap-2">
+                                <span className="h-2 flex-1 overflow-hidden rounded-full bg-surface-2">
+                                  <motion.span
+                                    className="block h-full rounded-full"
+                                    style={{ background: c }}
+                                    initial={{ width: 0 }}
+                                    animate={{ width: `${(v / maxSales) * 100}%` }}
+                                    transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                                  />
+                                </span>
+                                <span className="w-24 shrink-0 text-right text-xs tabular-nums text-muted">{formatNum(v)}</span>
+                              </span>
+                            ))}
+                          </span>
+                        )}
+                        <span className="w-24 shrink-0 text-right">
+                          <span className="block text-[11px] text-subtle">Left over</span>
+                          <span className={cn("block text-sm font-bold tabular-nums", empty ? "text-subtle" : net < 0 ? "text-danger" : "text-fg")}>{empty ? "–" : formatNum(net)}</span>
+                        </span>
+                        <ChevronRight className="size-4 shrink-0 text-subtle" />
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Card>
+          ) : (
+            <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
+              <div className="overflow-x-auto">
+                <table className="min-w-full whitespace-nowrap text-right text-sm tabular-nums">
+                  <thead className="border-b border-line bg-surface-2 text-[11px] uppercase tracking-wide text-muted">
+                    <tr>
+                      {["Month", "Sales", "Cost (till)", "Cost (bank)", "Salaries", "Advances", "Bank to cash", "Cash to bank", "Loan given", "Loan received", "Repaid in", "Repaid out", "Left over"].map((h, i) => (
+                        <th key={h} className={cn("px-3 py-2.5 font-semibold", i === 0 && "sticky left-0 z-10 bg-surface-2 text-left")}>
+                          {h}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-line">
+                    {filteredSummaries.map((s) => {
+                      const net = monthNet(s);
+                      const empty = isEmptyMonth(s);
+                      return (
+                        <tr key={s.period} onClick={() => router.push(`/reports/yearly-summary/${s.period}`)} className="cursor-pointer transition-colors hover:bg-surface-2/50">
+                          <td className="sticky left-0 z-10 bg-surface px-3 py-2.5 text-left font-semibold text-fg">{format(parseISO(`${s.period}-01`), "MMM yy")}</td>
+                          <td className="px-3 py-2.5 font-semibold text-brand">{safeZero(s.totalSales)}</td>
+                          <td className="px-3 py-2.5 text-danger">{safeZero(s.frontCost)}</td>
+                          <td className="px-3 py-2.5 text-danger">{safeZero(s.backCost)}</td>
+                          <td className="px-3 py-2.5 text-danger">{safeZero(s.totalSalaries)}</td>
+                          <td className="px-3 py-2.5 text-danger">{safeZero(s.totalAdvances)}</td>
+                          <td className="px-3 py-2.5 text-info">{safeZero(s.totalWithdrawals)}</td>
+                          <td className="px-3 py-2.5 text-info">{safeZero(s.totalDeposits)}</td>
+                          <td className="px-3 py-2.5 text-warning">{safeZero(s.loanGiven)}</td>
+                          <td className="px-3 py-2.5 text-warning">{safeZero(s.loanReceived)}</td>
+                          <td className="px-3 py-2.5 text-muted">{safeZero(s.repayIn)}</td>
+                          <td className="px-3 py-2.5 text-muted">{safeZero(s.repayOut)}</td>
+                          <td className={cn("px-3 py-2.5 font-bold", empty ? "text-subtle" : net < 0 ? "text-danger" : "text-fg")}>{empty ? "–" : formatNum(net)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot className="border-t border-line bg-surface-2 font-bold">
+                    <tr>
+                      <td className="sticky left-0 z-10 bg-surface-2 px-3 py-3 text-left text-fg">{selectedYear}</td>
+                      {[
+                        [yearlyTotals.sales, "text-brand"],
+                        [yearlyTotals.frontCost, "text-danger"],
+                        [yearlyTotals.backCost, "text-danger"],
+                        [yearlyTotals.salaries, "text-danger"],
+                        [yearlyTotals.advances, "text-danger"],
+                        [yearlyTotals.withdrawals, "text-info"],
+                        [yearlyTotals.deposits, "text-info"],
+                        [yearlyTotals.loanGiven, "text-warning"],
+                        [yearlyTotals.loanReceived, "text-warning"],
+                        [yearlyTotals.repayIn, "text-muted"],
+                        [yearlyTotals.repayOut, "text-muted"],
+                        [yearlyNet, yearlyNet < 0 ? "text-danger" : "text-fg"],
+                      ].map(([v, c], i) => (
+                        <td key={i} className={cn("px-3 py-3", c)}>
+                          {formatNum(v)}
+                        </td>
+                      ))}
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
