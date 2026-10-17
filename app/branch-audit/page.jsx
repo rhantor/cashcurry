@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useMemo, useEffect } from "react";
+import { normalizeLog } from "@/app/audit-log/normalize";
 import { skipToken } from "@reduxjs/toolkit/query/react";
 import { useGetBranchAuditLogsQuery } from "@/lib/redux/api/auditApiSlice";
 import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
@@ -75,17 +76,17 @@ function convertValue(val) {
 function FormatValue({ val, fieldName }) {
   const converted = convertValue(val);
   if (converted === null || converted === undefined || converted === "") {
-    return <span className="text-gray-400 italic">—</span>;
+    return <span className="text-subtle italic">—</span>;
   }
   
   if (Array.isArray(converted)) {
-    if (converted.length === 0) return <span className="text-gray-400 italic">empty</span>;
+    if (converted.length === 0) return <span className="text-subtle italic">empty</span>;
     if (fieldName === "attachments" || fieldName === "images") {
       return (
         <div className="flex flex-col gap-1 mt-0.5">
           {converted.map((url, i) => (
             typeof url === 'string' && url.startsWith('http') ? (
-              <a key={i} href={url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline text-[11px] truncate block">
+              <a key={i} href={url} target="_blank" rel="noreferrer" className="text-info hover:underline text-[11px] truncate block">
                 [View Attachment {i + 1}]
               </a>
             ) : (
@@ -123,17 +124,17 @@ function FormatValue({ val, fieldName }) {
 // ─── Badge components ─────────────────────────────────────────────────────────
 
 const ACTION_STYLES = {
-  created: "bg-green-100 text-green-700 border border-green-200",
-  updated: "bg-yellow-100 text-yellow-700 border border-yellow-200",
-  deleted: "bg-red-100 text-red-700 border border-red-200",
+  created: "bg-brand-soft text-brand border border-brand/30",
+  updated: "bg-warning-soft text-warning border border-warning/30",
+  deleted: "bg-danger-soft text-danger border border-danger/30",
 };
 
 const COLLECTION_STYLES = {
-  sales: "bg-blue-100 text-blue-700",
-  costs: "bg-orange-100 text-orange-700",
-  salaries: "bg-purple-100 text-purple-700",
-  loans: "bg-cyan-100 text-cyan-700",
-  vendorBills: "bg-gray-100 text-gray-700",
+  sales: "bg-info-soft text-info",
+  costs: "bg-warning-soft text-warning",
+  salaries: "bg-warning-soft text-warning",
+  loans: "bg-info-soft text-info",
+  vendorBills: "bg-surface-2 text-fg",
 };
 
 const COLLECTION_LABELS = {
@@ -142,19 +143,22 @@ const COLLECTION_LABELS = {
   salaries: "Salaries",
   loans: "Loans",
   vendorBills: "Vendor Bills",
+  advances: "Advances",
+  payroll: "Payroll",
+  staff: "Staff",
 };
 
-function ActionBadge({ action }) {
-  const cls = ACTION_STYLES[action] || "bg-gray-100 text-gray-600";
+function ActionBadge({ action, label }) {
+  const cls = ACTION_STYLES[action] || "bg-surface-2 text-muted";
   return (
     <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${cls}`}>
-      {action}
+      {label || action}
     </span>
   );
 }
 
 function CollectionBadge({ name }) {
-  const cls = COLLECTION_STYLES[name] || "bg-gray-100 text-gray-600";
+  const cls = COLLECTION_STYLES[name] || "bg-surface-2 text-muted";
   return (
     <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${cls}`}>
       {COLLECTION_LABELS[name] || name}
@@ -164,9 +168,9 @@ function CollectionBadge({ name }) {
 
 // ─── Diff viewer ──────────────────────────────────────────────────────────────
 
-function DiffViewer({ before, after, action }) {
+function DiffViewer({ before, after, action, details }) {
   if (!before && !after)
-    return <p className="text-gray-400 text-sm">No data captured.</p>;
+    return <p className="text-sm text-fg">{details || <span className="text-subtle">No details were saved with this entry.</span>}</p>;
 
   const allKeys = Array.from(
     new Set([...Object.keys(before || {}), ...Object.keys(after || {})])
@@ -177,8 +181,8 @@ function DiffViewer({ before, after, action }) {
       <div className="space-y-1.5">
         {allKeys.map((k) => (
           <div key={k} className="flex gap-2 text-xs items-start">
-            <span className="w-36 shrink-0 text-gray-500 font-medium pt-0.5">{k}</span>
-            <div className="text-green-800 bg-green-100/50 px-1.5 py-0.5 rounded break-all border border-green-200/50 flex-1">
+            <span className="w-36 shrink-0 text-muted font-medium pt-0.5">{k}</span>
+            <div className="text-brand bg-brand-soft px-1.5 py-0.5 rounded break-all border border-brand/20 flex-1">
               <FormatValue val={after?.[k]} fieldName={k} />
             </div>
           </div>
@@ -192,8 +196,8 @@ function DiffViewer({ before, after, action }) {
       <div className="space-y-1.5">
         {allKeys.map((k) => (
           <div key={k} className="flex gap-2 text-xs items-start">
-            <span className="w-36 shrink-0 text-gray-500 font-medium pt-0.5">{k}</span>
-            <div className="text-red-800 bg-red-100/50 px-1.5 py-0.5 rounded line-through break-all border border-red-200/50 flex-1">
+            <span className="w-36 shrink-0 text-muted font-medium pt-0.5">{k}</span>
+            <div className="text-danger bg-danger-soft px-1.5 py-0.5 rounded line-through break-all border border-danger/20 flex-1">
               <FormatValue val={before?.[k]} fieldName={k} />
             </div>
           </div>
@@ -210,7 +214,7 @@ function DiffViewer({ before, after, action }) {
 
   if (changedKeys.length === 0) {
     return (
-      <p className="text-gray-400 text-xs">No field changes detected.</p>
+      <p className="text-subtle text-xs">No field changes detected.</p>
     );
   }
 
@@ -218,13 +222,13 @@ function DiffViewer({ before, after, action }) {
     <div className="space-y-2.5">
       {changedKeys.map((k) => (
         <div key={k} className="text-xs">
-          <span className="font-medium text-gray-600 block mb-1">{k}</span>
+          <span className="font-medium text-muted block mb-1">{k}</span>
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-            <div className="text-red-800 bg-red-100/50 px-1.5 py-0.5 rounded line-through break-all border border-red-200/50 flex-1">
+            <div className="text-danger bg-danger-soft px-1.5 py-0.5 rounded line-through break-all border border-danger/20 flex-1">
               <FormatValue val={before?.[k]} fieldName={k} />
             </div>
-            <span className="text-gray-400 hidden sm:inline">→</span>
-            <div className="text-green-800 bg-green-100/50 px-1.5 py-0.5 rounded break-all border border-green-200/50 flex-1">
+            <span className="text-subtle hidden sm:inline">→</span>
+            <div className="text-brand bg-brand-soft px-1.5 py-0.5 rounded break-all border border-brand/20 flex-1">
               <FormatValue val={after?.[k]} fieldName={k} />
             </div>
           </div>
@@ -284,7 +288,9 @@ export default function BranchAuditPage() {
       ? { companyId, branchId, startDate, endDate }
       : skipToken;
 
-  const { data: logs = [], isLoading, isError } = useGetBranchAuditLogsQuery(queryArgs);
+  const { data: rawLogs = [], isLoading, isError } = useGetBranchAuditLogsQuery(queryArgs);
+  // record changes and app events, read the same way
+  const logs = useMemo(() => rawLogs.map(normalizeLog), [rawLogs]);
 
   const filtered = useMemo(() => {
     let list = [...logs];
@@ -317,7 +323,7 @@ export default function BranchAuditPage() {
 
   if (user && !isAllowed) {
     return (
-      <div className="flex items-center justify-center h-64 text-gray-500">
+      <div className="flex items-center justify-center h-64 text-muted">
         You do not have permission to view this page.
       </div>
     );
@@ -326,8 +332,8 @@ export default function BranchAuditPage() {
   return (
     <div className="p-4 md:p-6 space-y-5 max-w-7xl mx-auto">
       <div>
-        <h1 className="text-2xl font-bold text-gray-800">Branch Audit Log</h1>
-        <p className="text-sm text-gray-500 mt-0.5">
+        <h1 className="text-2xl font-bold text-fg">Branch Audit Log</h1>
+        <p className="text-sm text-muted mt-0.5">
           {branchData?.name
             ? `All activity for ${branchData.name} — who did what and when.`
             : "All create, update, and delete activity for this branch."}
@@ -335,11 +341,11 @@ export default function BranchAuditPage() {
       </div>
 
       {/* Filter bar */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 flex flex-wrap gap-3 items-center">
+      <div className="bg-surface rounded-xl shadow-sm border border-line p-4 flex flex-wrap gap-3 items-center">
         <select
           value={filterType}
           onChange={(e) => handleFilterType(e.target.value)}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mint-400"
+          className="border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--cc-ring)]"
         >
           <option value="last7days">Last 7 Days</option>
           <option value="monthly">This Month</option>
@@ -355,16 +361,16 @@ export default function BranchAuditPage() {
               onChange={(e) =>
                 setDateRange((p) => ({ ...p, from: e.target.value }))
               }
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
+              className="border border-line rounded-lg px-3 py-2 text-sm"
             />
-            <span className="text-gray-400 text-sm">to</span>
+            <span className="text-subtle text-sm">to</span>
             <input
               type="date"
               value={dateRange.to}
               onChange={(e) =>
                 setDateRange((p) => ({ ...p, to: e.target.value }))
               }
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
+              className="border border-line rounded-lg px-3 py-2 text-sm"
             />
           </>
         )}
@@ -372,7 +378,7 @@ export default function BranchAuditPage() {
         <select
           value={actionFilter}
           onChange={(e) => { setActionFilter(e.target.value); setCurrentPage(1); }}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mint-400"
+          className="border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--cc-ring)]"
         >
           <option value="all">All Actions</option>
           <option value="created">Created</option>
@@ -383,7 +389,7 @@ export default function BranchAuditPage() {
         <select
           value={collectionFilter}
           onChange={(e) => { setCollectionFilter(e.target.value); setCurrentPage(1); }}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-mint-400"
+          className="border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--cc-ring)]"
         >
           <option value="all">All Collections</option>
           <option value="sales">Sales</option>
@@ -398,26 +404,26 @@ export default function BranchAuditPage() {
           placeholder="Search by user…"
           value={actorSearch}
           onChange={(e) => { setActorSearch(e.target.value); setCurrentPage(1); }}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm w-44 focus:outline-none focus:ring-2 focus:ring-mint-400"
+          className="border border-line rounded-lg px-3 py-2 text-sm w-44 focus:outline-none focus:ring-2 focus:ring-[var(--cc-ring)]"
         />
 
-        <span className="ml-auto text-xs text-gray-400">
+        <span className="ml-auto text-xs text-subtle">
           {filtered.length} record{filtered.length !== 1 ? "s" : ""}
         </span>
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="bg-surface rounded-xl shadow-sm border border-line overflow-hidden">
         {isLoading ? (
-          <div className="flex items-center justify-center h-40 text-gray-400">
+          <div className="flex items-center justify-center h-40 text-subtle">
             Loading audit log…
           </div>
         ) : isError ? (
-          <div className="flex items-center justify-center h-40 text-red-400">
+          <div className="flex items-center justify-center h-40 text-danger">
             Failed to load audit log. You may not have permission.
           </div>
         ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-40 text-gray-400 gap-2">
+          <div className="flex flex-col items-center justify-center h-40 text-subtle gap-2">
             <span className="text-3xl">📋</span>
             <p className="text-sm">No audit records found for this filter.</p>
           </div>
@@ -425,7 +431,7 @@ export default function BranchAuditPage() {
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-100 text-left text-xs text-gray-500 uppercase tracking-wide">
+                <tr className="bg-surface-2/60 border-b border-line text-left text-xs text-muted uppercase tracking-wide">
                   <th className="px-4 py-3 font-semibold">Time</th>
                   <th className="px-4 py-3 font-semibold">User</th>
                   <th className="px-4 py-3 font-semibold">Action</th>
@@ -433,22 +439,22 @@ export default function BranchAuditPage() {
                   <th className="px-4 py-3 font-semibold">Details</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-line">
                 {paginated.map((log) => (
                   <React.Fragment key={log.id}>
                     <tr
-                      className={`hover:bg-gray-50 transition-colors ${
-                        expandedId === log.id ? "bg-mint-50" : ""
+                      className={`hover:bg-surface-2 transition-colors ${
+                        expandedId === log.id ? "bg-brand-soft" : ""
                       }`}
                     >
-                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap text-xs">
+                      <td className="px-4 py-3 text-muted whitespace-nowrap text-xs">
                         {fmt(log.timestamp)}
                       </td>
-                      <td className="px-4 py-3 font-medium text-gray-800">
+                      <td className="px-4 py-3 font-medium text-fg">
                         {log.actorName || "unknown"}
                       </td>
                       <td className="px-4 py-3">
-                        <ActionBadge action={log.action} />
+                        <ActionBadge action={log.action} label={log.what} />
                       </td>
                       <td className="px-4 py-3">
                         <CollectionBadge name={log.collection} />
@@ -456,7 +462,7 @@ export default function BranchAuditPage() {
                       <td className="px-4 py-3">
                         <button
                           onClick={() => toggleExpand(log.id)}
-                          className="text-xs text-mint-600 hover:text-mint-800 font-medium underline underline-offset-2"
+                          className="text-xs text-brand hover:text-brand font-medium underline underline-offset-2"
                         >
                           {expandedId === log.id ? "Hide" : "View"}
                         </button>
@@ -467,14 +473,14 @@ export default function BranchAuditPage() {
                       <tr>
                         <td
                           colSpan={5}
-                          className="px-6 py-4 bg-mint-50 border-l-4 border-mint-400"
+                          className="px-6 py-4 bg-brand-soft border-l-4 border-brand"
                         >
                           <div className="flex flex-col gap-2">
                             <div className="flex items-center gap-3 mb-1">
-                              <span className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+                              <span className="text-xs font-semibold text-muted uppercase tracking-wide">
                                 Changes
                               </span>
-                              <span className="text-xs text-gray-400 font-mono">
+                              <span className="text-xs text-subtle font-mono">
                                 {log.docId}
                               </span>
                             </div>
@@ -482,6 +488,7 @@ export default function BranchAuditPage() {
                               before={log.before}
                               after={log.after}
                               action={log.action}
+                              details={log.details}
                             />
                           </div>
                         </td>
