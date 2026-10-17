@@ -15,7 +15,6 @@ export const CITIES = [
   { city: "Tokyo", lat: 35.7, lon: 139.7, currency: "JPY", kept: 412000 },
   { city: "Sydney", lat: -33.9, lon: 151.2, currency: "AUD", kept: 3155.8 },
 ];
-const SIGNS = ["RM", "৳", "S$", "$", "₹", "€", "£", "¥", "₱", "฿", "د.إ", "₩"];
 export const R = 100; // globe radius in the SVG's units
 export const TURN_SECONDS = 48; // one full turn
 const TILT = (-18 * Math.PI) / 180; // the globe leans back a little
@@ -215,24 +214,6 @@ export function Globe({ reduce: reduceProp, className = "absolute left-1/2 top-1
   );
 }
 
-/** Money signs from around the world, drifting by. */
-function Signs({ reduce }) {
-  const row = [...SIGNS, ...SIGNS];
-  return (
-    <div className="relative overflow-hidden [mask-image:linear-gradient(90deg,transparent,black_15%,black_85%,transparent)]" aria-hidden>
-      <motion.div
-        className="flex w-max gap-6 text-lg font-bold text-white/35"
-        animate={reduce ? undefined : { x: ["0%", "-50%"] }}
-        transition={{ duration: 28, repeat: Infinity, ease: "linear" }}
-      >
-        {row.map((s, i) => (
-          <span key={i}>{s}</span>
-        ))}
-      </motion.div>
-    </div>
-  );
-}
-
 /**
  * The sign-in screen's brand side (computers): the world turning, and as
  * each city comes round its restaurant closes the day — the city lights
@@ -265,37 +246,47 @@ export default function BrandPanel() {
         <span className="text-xl font-bold tracking-tight">Cash Curry</span>
       </div>
 
-      <div className="relative flex min-h-0 flex-1 items-center justify-start pb-6">
-        {/* the globe (left), and the ledger it writes into, beside its lower right */}
-        <div className="relative size-[min(36rem,56vh)] shrink-0">
+      <div className="relative flex min-h-0 flex-1 items-center justify-start">
+        {/* The globe on the left, sized to fit between the name and the words
+            (and, on wide screens, to leave room for the ledger on its right). */}
+        <div className="relative shrink-0 size-[min(30rem,calc(100vh_-_26rem),calc(52vw_-_6rem))] xl:size-[min(30rem,calc(100vh_-_26rem),calc(52vw_-_20rem))]">
           <SpinningGlobe onClose={closed} reduce={reduce} />
-          {/* from the bottom middle of the globe down and across to the ledger; dashes flow towards it */}
-          <svg className="absolute left-1/2 top-[91.7%] hidden h-7 w-[7.5rem] overflow-visible xl:block" viewBox="0 0 120 28" fill="none" aria-hidden>
-            <path d="M0 0 V16 Q0 26 10 26 H120" stroke="white" strokeOpacity="0.25" strokeWidth="1.5" />
-            <motion.path
-              d="M0 0 V16 Q0 26 10 26 H120"
-              stroke="#a9e9d1"
-              strokeWidth="1.5"
-              strokeDasharray="4 8"
-              strokeLinecap="round"
-              animate={reduce ? undefined : { strokeDashoffset: [0, -24] }}
-              transition={{ duration: 0.9, repeat: Infinity, ease: "linear" }}
+          {/* from the bottom middle of the globe: down, then across to the ledger, dashes flowing towards it */}
+          <div aria-hidden className="absolute left-1/2 top-[91.7%] hidden xl:block">
+            <span className="absolute -left-[3px] -top-[3px] size-1.5 rounded-full bg-[#a9e9d1]" />
+            <motion.span
+              className="absolute left-0 top-0 h-5 w-px"
+              style={{ backgroundImage: "linear-gradient(#a9e9d1 50%, transparent 50%)", backgroundSize: "1px 8px" }}
+              animate={reduce ? undefined : { backgroundPositionY: ["0px", "8px"] }}
+              transition={{ duration: 0.5, repeat: Infinity, ease: "linear" }}
             />
-            <circle cx="0" cy="0" r="3" fill="#a9e9d1" />
-          </svg>
-          {/* the line meets the ledger low on its left edge; the ledger stays inside the panel */}
-          <div className="absolute left-[calc(50%+7.5rem)] top-[calc(91.7%+26px-6.6rem)] hidden xl:block">
+          </div>
+          <motion.div
+            aria-hidden
+            className="absolute left-1/2 top-[calc(91.7%_+_1.25rem)] hidden h-px w-[calc(50%_+_1.5rem)] xl:block"
+            style={{ backgroundImage: "linear-gradient(90deg, #a9e9d1 50%, transparent 50%)", backgroundSize: "8px 1px" }}
+            animate={reduce ? undefined : { backgroundPositionX: ["0px", "8px"] }}
+            transition={{ duration: 0.5, repeat: Infinity, ease: "linear" }}
+          />
+          {/* the ledger, wholly to the right of the globe; the line meets it low on its left edge */}
+          <div className="absolute left-[calc(100%_+_1.5rem)] top-[calc(91.7%_+_1.25rem_-_6.6rem)] hidden xl:block">
             <Ledger rows={rows} />
           </div>
         </div>
       </div>
 
       <div className="relative max-w-md text-white">
-        <Signs reduce={reduce} />
-        <motion.h2 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="mt-5 text-2xl font-bold leading-tight tracking-tight xl:text-3xl">
-          Every till, every branch, every country — in one place.
+        <motion.h2
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="text-[1.6rem] font-medium leading-[1.25] tracking-[-0.02em] text-white/95 xl:text-[1.85rem]"
+        >
+          Every till, every branch,
+          <br />
+          <span className="font-semibold text-[#a9e9d1]">every country</span> — in one place.
         </motion.h2>
-        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }} className="mt-3 text-sm text-white/75">
+        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }} className="mt-3 max-w-sm text-sm leading-relaxed text-white/70">
           Sales, costs, cash and the bank for all your restaurants, in their own money, the moment the day closes.
         </motion.p>
       </div>
