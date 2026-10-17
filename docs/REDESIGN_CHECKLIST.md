@@ -28,8 +28,8 @@ computer, has its own loading look, and its old modals are redone too.
 - ✅ `/reports/advance-report` Advance report
 - ✅ `/reports/salary-report` Salary report
 - ⬜ `/reports/staff-loan-report` Staff loan report (not in the menu yet — decide)
-- ⬜ `/reports/yearly-summary` Yearly summary
-- ⬜ `/reports/yearly-summary/[period]` Yearly statement
+- ✅ `/reports/yearly-summary` Yearly summary
+- ✅ `/reports/yearly-summary/[period]` Yearly statement
 
 ## 3.4.4 Approvals and loans
 - ⬜ `/requested-panel` Requested panel (advances, staff loans, branch loans, OT)
