@@ -11,7 +11,7 @@ import SalesEditModal from "./SalesEditModal";
 import { exportSalesToExcel, exportSalesToPDF } from "@/utils/export/exportData";
 import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/lib/region/currency";
-import { Avatar, Button, Skeleton } from "@/app/components/ui";
+import { Button, Skeleton } from "@/app/components/ui";
 
 /** Sales report: each day's takings over a period, the Z report beside it; a day opens as its sheet. */
 export default function SalesReport() {
@@ -65,15 +65,7 @@ export default function SalesReport() {
           {
             key: "createdBy",
             label: "Entered by",
-            render: (val) => {
-              const name = val?.username || val?.userName || "Unknown";
-              return (
-                <span className="inline-flex items-center gap-2">
-                  <Avatar name={name} size="sm" />
-                  <span className="truncate">{name}</span>
-                </span>
-              );
-            },
+            render: (val) => <span className="truncate text-muted">{val?.username || val?.userName || "Unknown"}</span>,
           },
           {
             key: "__actions",
