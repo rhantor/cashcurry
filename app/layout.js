@@ -27,7 +27,10 @@ export default function RootLayout({ children }) {
         {/* Link the manifest so the login page can trigger install */}
         <link rel="manifest" href="/manifest.webmanifest" />
         {/* iOS */}
-        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" href="/icons/icon.svg" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+        <meta name="theme-color" content="#0b4d40" />
         <meta name="mobile-web-app-capable" content="yes" />
       </head>
       <body

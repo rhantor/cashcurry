@@ -9,7 +9,7 @@ import { useLoginMutation } from "@/lib/redux/api/authApiSlice";
 import { USE_EMULATOR } from "@/lib/firebase";
 import { signedIn } from "@/lib/session";
 import BrandPanel, { Globe } from "@/app/components/auth/BrandPanel";
-import { Button, cn } from "@/app/components/ui";
+import { Button, Logo, cn } from "@/app/components/ui";
 
 // Local development only. `npm run dev:local` passes the seeded accounts and
 // their shared local password; production builds never set these variables,
@@ -138,8 +138,7 @@ export default function LoginPage() {
           {/* the turning globe, faint, on the right */}
           <Globe className="pointer-events-none absolute -right-14 top-1/2 size-60 -translate-y-1/2 opacity-[0.18]" />
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="relative flex items-center gap-3">
-            <span className="flex size-10 items-center justify-center rounded-2xl bg-white text-base font-black text-[#14806a]">C</span>
-            <span className="text-lg font-bold">Cash Curry</span>
+            <Logo inverse size={38} />
           </motion.div>
           <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }} className="relative mt-6 text-2xl font-bold leading-tight">
             Every till, every branch, every country.

@@ -6,7 +6,7 @@ import {
 } from "lucide-react";
 import {
   Avatar, Badge, Button, Card, CardBody, CardHeader, CountUp, DataTable, DatePicker, DateRangePicker, Dialog, EmptyState,
-  Field, Input, Loader, Menu, Select, Sheet, Skeleton, SkeletonRows, SkeletonStat, Stagger, Switch, Tabs, Textarea,
+  Field, Input, Loader, LogoMark, Menu, Select, Sheet, Skeleton, SkeletonRows, SkeletonStat, Stagger, Switch, Tabs, Textarea,
   Tooltip, TopProgressBar, UIProvider, useTheme, useToast,
 } from "@/app/components/ui";
 import { formatMoney } from "@/lib/region";
@@ -49,7 +49,7 @@ function Gallery() {
       <header className="sticky top-0 z-30 border-b border-line bg-surface/80 backdrop-blur-xl">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3 px-4 py-3 sm:px-6">
           <div className="mr-auto flex items-center gap-2.5">
-            <span className="flex size-8 items-center justify-center rounded-xl bg-brand font-black text-brand-fg">C</span>
+            <LogoMark size={32} />
             <div>
               <p className="text-sm font-bold leading-tight">Cash Curry UI</p>
               <p className="text-xs text-muted">Design system preview · Phase 3.1</p>

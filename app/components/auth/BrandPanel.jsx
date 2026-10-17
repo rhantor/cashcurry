@@ -2,6 +2,7 @@
 import { useRef, useState } from "react";
 import { AnimatePresence, motion, useAnimationFrame, useReducedMotion } from "framer-motion";
 import { CircleCheck } from "lucide-react";
+import { Logo } from "@/app/components/ui";
 import { Plus_Jakarta_Sans } from "next/font/google";
 
 // A heavy, clean sans for the heading — the voice of a modern finance app.
@@ -246,8 +247,7 @@ export default function BrandPanel() {
       />
 
       <div className="relative flex items-center gap-3 text-white">
-        <span className="flex size-11 items-center justify-center rounded-2xl bg-white text-lg font-black text-[#14806a] shadow-lg">C</span>
-        <span className="text-xl font-bold tracking-tight">Cash Curry</span>
+        <Logo inverse size={44} />
       </div>
 
       <div className="relative flex min-h-0 flex-1 items-center justify-start">
