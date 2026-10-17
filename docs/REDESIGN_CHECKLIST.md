@@ -60,10 +60,10 @@ computer, has its own loading look, and its old modals are redone too.
 - ⬜ `/purchases/reports` Purchase report
 
 ## 3.4.8 Settings, admin, sign-in, tools
-- ⬜ `/settings` Settings (company)
-- ⬜ `/settings/user-management` User management
+- ✅ `/settings` Settings (company) — people, branches, appearance (empty sections removed)
+- ✅ `/settings/user-management` User management
 - ✅ `/branch-settings` Branch settings (owner saw UI problems — 4.1 notes; who may edit what is still 4.1)
-- ⬜ `/branches/branch-management`, `/branches/[branchId]` Branches
+- ✅ `/branches/branch-management`, `/branches/[branchId]` Branches (restyled to the tokens)
 - ⬜ `/audit-log`, `/branch-audit` Audit logs
 - ✅ `/login` Sign in (animated brand side, show/hide password, Caps Lock warning, shake on a wrong try, check before opening)
 - ⬜ `/signup`, `/signup/verify`, `/reset-password` Sign-up and password reset

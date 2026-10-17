@@ -207,16 +207,16 @@ const BranchDetailsPage = () => {
 
   if (isLoading)
     return (
-      <div className="flex justify-center items-center h-screen bg-gray-100">
-        <LoaderCircle size="1em" className="animate-spin text-4xl text-blue-600" />
-        <p className="ml-4 text-xl text-gray-700">Loading branch details...</p>
+      <div className="flex justify-center items-center h-screen bg-surface-2">
+        <LoaderCircle size="1em" className="animate-spin text-4xl text-info" />
+        <p className="ml-4 text-xl text-fg">Loading branch details...</p>
       </div>
     );
 
   if (error)
     return (
-      <div className="flex justify-center items-center h-screen bg-gray-100">
-        <p className="text-xl text-red-600">
+      <div className="flex justify-center items-center h-screen bg-surface-2">
+        <p className="text-xl text-danger">
           Error: Could not load branch data.
         </p>
       </div>
@@ -224,8 +224,8 @@ const BranchDetailsPage = () => {
 
   if (!branchData)
     return (
-      <div className="flex justify-center items-center h-screen bg-gray-100">
-        <p className="text-xl text-gray-700">Branch not found.</p>
+      <div className="flex justify-center items-center h-screen bg-surface-2">
+        <p className="text-xl text-fg">Branch not found.</p>
       </div>
     );
 
@@ -236,7 +236,7 @@ const BranchDetailsPage = () => {
     formData.email !== branchData.email;
 
   return (
-    <div className="flex flex-col md:flex-row relative h-screen bg-gray-100 font-sans">
+    <div className="flex flex-col md:flex-row relative h-screen bg-surface-2 font-sans">
       {/* Sidebar */}
       <Sidebar setSelectedPage={setSelectedPage} selectedPage={selectedPage} />
 
@@ -265,7 +265,7 @@ const BranchDetailsPage = () => {
       )}
       {selectedPage === "reports" && (
         <div className="flex-1 p-4 md:p-8 overflow-auto">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-6">
+          <h1 className="text-2xl md:text-3xl font-bold text-fg mb-6">
             Reports
           </h1>{" "}
         </div>

@@ -49,7 +49,7 @@ export default function Settings() {
       <AccessControl />
       <button
         onClick={handleSave}
-        className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+        className="px-4 py-2 bg-brand text-brand-fg rounded hover:brightness-105"
       >
         Save Settings
       </button>

@@ -63,19 +63,19 @@ export default function AddCompanyUserModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md bg-white rounded-xl shadow-2xl p-6 relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-[2px]">
+      <div className="w-full max-w-md bg-surface rounded-xl shadow-2xl p-6 relative">
         <h3 className="text-xl font-bold mb-4">Add Company User</h3>
 
         {(localErr || errorMsg) && (
-          <div className="mb-3 text-sm text-red-600">
+          <div className="mb-3 text-sm text-danger">
             {localErr || errorMsg}
           </div>
         )}
 
         <form onSubmit={submit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-fg">
               Username
             </label>
             <input
@@ -85,13 +85,13 @@ export default function AddCompanyUserModal({
               placeholder="e.g. antor99"
               required
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted mt-1">
               Only letters/numbers; no spaces.
             </p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-fg">
               Email
             </label>
             <input
@@ -105,7 +105,7 @@ export default function AddCompanyUserModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-fg">
               Password
             </label>
             <div className="flex items-center gap-2">
@@ -128,7 +128,7 @@ export default function AddCompanyUserModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-fg">
               Role
             </label>
             <select
@@ -158,7 +158,7 @@ export default function AddCompanyUserModal({
             <button
               type="submit"
               disabled={!canSubmit}
-              className="px-4 py-2 rounded-md bg-gray-900 text-white disabled:opacity-50"
+              className="px-4 py-2 rounded-md bg-brand text-brand-fg disabled:opacity-50"
             >
               {creating ? "Creating..." : "Create user"}
             </button>

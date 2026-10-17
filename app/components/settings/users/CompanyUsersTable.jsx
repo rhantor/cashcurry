@@ -22,12 +22,12 @@ export default function CompanyUsersTable({
   return (
     <>
       {/* Top toolbar */}
-      <div className="bg-white rounded-lg shadow p-3 mb-3 flex items-center justify-between">
-        <div className="font-semibold text-gray-800">Company Users</div>
+      <div className="bg-surface rounded-lg shadow p-3 mb-3 flex items-center justify-between">
+        <div className="font-semibold text-fg">Company Users</div>
         {canManage && (
           <button
             onClick={onAddNew}
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-gray-900 text-white hover:bg-gray-800 text-sm"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-brand text-brand-fg hover:brightness-105 text-sm"
           >
             <UserPlus className="h-4 w-4" />
             Add User
@@ -37,12 +37,12 @@ export default function CompanyUsersTable({
 
       {/* Empty state */}
       {!users.length && (
-        <div className="bg-white rounded-lg shadow p-6 text-gray-500 flex items-center justify-between">
+        <div className="bg-surface rounded-lg shadow p-6 text-muted flex items-center justify-between">
           <span>No company users found.</span>
           {canManage && (
             <button
               onClick={onAddNew}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-gray-900 text-white hover:bg-gray-800 text-sm"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-brand text-brand-fg hover:brightness-105 text-sm"
             >
               <UserPlus className="h-4 w-4" />
               Add User
@@ -54,9 +54,9 @@ export default function CompanyUsersTable({
       {!!users.length && (
         <>
           {/* Desktop table */}
-          <div className="hidden md:block overflow-x-auto bg-white shadow rounded-lg">
-            <table className="w-full text-sm text-left text-gray-600">
-              <thead className="bg-gray-100 text-gray-700 uppercase text-xs">
+          <div className="hidden md:block overflow-x-auto bg-surface shadow rounded-lg">
+            <table className="w-full text-sm text-left text-muted">
+              <thead className="bg-surface-2 text-fg uppercase text-xs">
                 <tr>
                   <th className="px-6 py-3">Username</th>
                   <th className="px-6 py-3">Email</th>
@@ -71,8 +71,8 @@ export default function CompanyUsersTable({
                   const isOwnerRow =
                     String(u.role || "").toLowerCase() === "owner";
                   return (
-                    <tr key={u.id} className="border-t hover:bg-gray-50">
-                      <td className="px-6 py-3 font-medium text-gray-900">
+                    <tr key={u.id} className="border-t hover:bg-surface-2">
+                      <td className="px-6 py-3 font-medium text-fg">
                         {u.userName}
                       </td>
                       <td className="px-6 py-3">{u.email || "-"}</td>
@@ -86,7 +86,7 @@ export default function CompanyUsersTable({
                               onClick={() => onEditUser?.(u)}
                               title="Edit"
                               disabled={isOwnerRow}
-                              className="text-blue-600 hover:text-blue-700"
+                              className="text-info hover:text-info"
                             >
                               <Pencil className="h-4 w-4" />
                             </IconButton>
@@ -94,7 +94,7 @@ export default function CompanyUsersTable({
                               onClick={() => onDeleteUser?.(u)}
                               title="Delete"
                               disabled={isOwnerRow}
-                              className="text-red-600 hover:text-red-700"
+                              className="text-danger hover:text-danger"
                             >
                               <Trash2 className="h-4 w-4" />
                             </IconButton>
@@ -113,15 +113,15 @@ export default function CompanyUsersTable({
             {users.map((u) => {
               const isOwnerRow = String(u.role || "").toLowerCase() === "owner";
               return (
-                <div key={u.id} className="bg-white rounded-lg shadow p-4">
+                <div key={u.id} className="bg-surface rounded-lg shadow p-4">
                   <div className="flex items-center justify-between">
-                    <div className="font-semibold text-gray-900">
+                    <div className="font-semibold text-fg">
                       {u.userName}
                     </div>
                     <RoleBadge role={u.role} />
                   </div>
-                  <div className="text-sm text-gray-600 mt-1">
-                    {u.email || <span className="text-gray-400">No email</span>}
+                  <div className="text-sm text-muted mt-1">
+                    {u.email || <span className="text-subtle">No email</span>}
                   </div>
 
                   {canManage && (
@@ -130,7 +130,7 @@ export default function CompanyUsersTable({
                         onClick={() => onEditUser?.(u)}
                         title="Edit"
                         disabled={isOwnerRow}
-                        className="text-blue-600 hover:text-blue-700"
+                        className="text-info hover:text-info"
                       >
                         <Pencil className="h-4 w-4" />
                       </IconButton>
@@ -138,7 +138,7 @@ export default function CompanyUsersTable({
                         onClick={() => onDeleteUser?.(u)}
                         title="Delete"
                         disabled={isOwnerRow}
-                        className="text-red-600 hover:text-red-700"
+                        className="text-danger hover:text-danger"
                       >
                         <Trash2 className="h-4 w-4" />
                       </IconButton>
