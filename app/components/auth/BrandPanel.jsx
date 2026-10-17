@@ -162,8 +162,8 @@ function Ledger({ rows }) {
         </span>
         Live day close
       </p>
-      <ul className="space-y-1">
-        <AnimatePresence initial={false}>
+      <ul className="h-[6.4rem] space-y-1 overflow-hidden">
+        <AnimatePresence initial={false} mode="popLayout">
           {rows.map((r) => (
             <motion.li
               key={r.id}
@@ -265,15 +265,15 @@ export default function BrandPanel() {
         <span className="text-xl font-bold tracking-tight">Cash Curry</span>
       </div>
 
-      <div className="relative flex min-h-0 flex-1 items-center justify-center pb-24">
-        {/* the globe, and the ledger it writes into */}
-        <div className="relative size-[min(36rem,56vh)]">
+      <div className="relative flex min-h-0 flex-1 items-center justify-start pb-6">
+        {/* the globe (left), and the ledger it writes into, beside its lower right */}
+        <div className="relative size-[min(36rem,56vh)] shrink-0">
           <SpinningGlobe onClose={closed} reduce={reduce} />
           {/* from the bottom middle of the globe down and across to the ledger; dashes flow towards it */}
-          <svg className="absolute left-1/2 top-[91.7%] h-12 w-28 overflow-visible" viewBox="0 0 112 48" fill="none" aria-hidden>
-            <path d="M0 0 V30 Q0 42 12 42 H112" stroke="white" strokeOpacity="0.25" strokeWidth="1.5" />
+          <svg className="absolute left-1/2 top-[91.7%] hidden h-7 w-[7.5rem] overflow-visible xl:block" viewBox="0 0 120 28" fill="none" aria-hidden>
+            <path d="M0 0 V16 Q0 26 10 26 H120" stroke="white" strokeOpacity="0.25" strokeWidth="1.5" />
             <motion.path
-              d="M0 0 V30 Q0 42 12 42 H112"
+              d="M0 0 V16 Q0 26 10 26 H120"
               stroke="#a9e9d1"
               strokeWidth="1.5"
               strokeDasharray="4 8"
@@ -283,7 +283,8 @@ export default function BrandPanel() {
             />
             <circle cx="0" cy="0" r="3" fill="#a9e9d1" />
           </svg>
-          <div className="absolute left-[calc(50%+7rem)] top-[calc(91.7%+42px)] -translate-y-[1.05rem]">
+          {/* the line meets the ledger low on its left edge; the ledger stays inside the panel */}
+          <div className="absolute left-[calc(50%+7.5rem)] top-[calc(91.7%+26px-6.6rem)] hidden xl:block">
             <Ledger rows={rows} />
           </div>
         </div>
