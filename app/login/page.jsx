@@ -146,13 +146,24 @@ export default function LoginPage() {
           </motion.p>
         </div>
 
-        <div className="relative -mt-8 flex flex-1 items-start justify-center rounded-t-3xl bg-bg px-5 pb-10 pt-8 sm:px-8 lg:mt-0 lg:items-center lg:rounded-none">
+        <div className="relative -mt-8 flex flex-1 items-start justify-center overflow-hidden rounded-t-3xl bg-bg px-5 pb-10 pt-8 sm:px-8 lg:mt-0 lg:items-center lg:rounded-none lg:py-12">
+          {/* computers: the same mint light and dots as the brand side, much softer */}
+          <div aria-hidden className="pointer-events-none absolute -right-40 -top-40 hidden size-[34rem] rounded-full bg-[#22a082]/10 blur-3xl lg:block" />
+          <div aria-hidden className="pointer-events-none absolute -bottom-48 left-10 hidden size-[28rem] rounded-full bg-[#75d6b8]/10 blur-3xl lg:block" />
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-0 hidden opacity-[0.35] lg:block"
+            style={{ backgroundImage: "radial-gradient(rgba(34,160,130,0.18) 1px, transparent 1px)", backgroundSize: "22px 22px" }}
+          />
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ type: "spring", stiffness: 180, damping: 22, delay: 0.1 }}
-            className="w-full max-w-sm"
+            className="relative w-full max-w-sm lg:max-w-md lg:rounded-[2rem] lg:border lg:border-line lg:bg-surface/90 lg:p-9 lg:shadow-float lg:backdrop-blur"
           >
+            <p className="mb-4 hidden w-max items-center gap-1.5 rounded-full bg-brand-soft px-3 py-1 text-xs font-semibold text-brand lg:inline-flex">
+              <span className="size-1.5 rounded-full bg-brand" /> Cash Curry
+            </p>
             <h1 className="text-2xl font-bold tracking-tight text-fg sm:text-3xl">Welcome back</h1>
             <p className="mt-1.5 text-sm text-muted">Sign in to see today&apos;s numbers.</p>
 
