@@ -2,6 +2,10 @@
 import { useRef, useState } from "react";
 import { AnimatePresence, motion, useAnimationFrame, useReducedMotion } from "framer-motion";
 import { CircleCheck } from "lucide-react";
+import { Fraunces } from "next/font/google";
+
+// A bold, bookish serif for the heading — the voice of an annual report.
+const display = Fraunces({ subsets: ["latin"], weight: ["700"], display: "swap" });
 
 // Restaurants closing their day around the world — made-up figures for the
 // sign-in screen. lat/lon in degrees; each is shown in its own money.
@@ -249,7 +253,7 @@ export default function BrandPanel() {
       <div className="relative flex min-h-0 flex-1 items-center justify-start">
         {/* The globe on the left, sized to fit between the name and the words
             (and, on wide screens, to leave room for the ledger on its right). */}
-        <div className="relative shrink-0 size-[min(30rem,calc(100vh_-_26rem),calc(52vw_-_6rem))] xl:size-[min(30rem,calc(100vh_-_26rem),calc(52vw_-_20rem))]">
+        <div className="relative shrink-0 size-[min(34rem,calc(100vh_-_22rem),calc(52vw_-_6rem))] xl:size-[min(34rem,calc(100vh_-_22rem),calc(52vw_-_21rem))]">
           <SpinningGlobe onClose={closed} reduce={reduce} />
           {/* from the bottom middle of the globe: down, then across to the ledger, dashes flowing towards it */}
           <div aria-hidden className="absolute left-1/2 top-[91.7%] hidden xl:block">
@@ -263,13 +267,13 @@ export default function BrandPanel() {
           </div>
           <motion.div
             aria-hidden
-            className="absolute left-1/2 top-[calc(91.7%_+_1.25rem)] hidden h-px w-[calc(50%_+_1.5rem)] xl:block"
+            className="absolute left-1/2 top-[calc(91.7%_+_1.25rem)] hidden h-px w-[calc(50%_+_3rem)] xl:block"
             style={{ backgroundImage: "linear-gradient(90deg, #a9e9d1 50%, transparent 50%)", backgroundSize: "8px 1px" }}
             animate={reduce ? undefined : { backgroundPositionX: ["0px", "8px"] }}
             transition={{ duration: 0.5, repeat: Infinity, ease: "linear" }}
           />
           {/* the ledger, wholly to the right of the globe; the line meets it low on its left edge */}
-          <div className="absolute left-[calc(100%_+_1.5rem)] top-[calc(91.7%_+_1.25rem_-_6.6rem)] hidden xl:block">
+          <div className="absolute left-[calc(100%_+_3rem)] top-[calc(91.7%_+_1.25rem_-_6.6rem)] hidden xl:block">
             <Ledger rows={rows} />
           </div>
         </div>
@@ -280,11 +284,11 @@ export default function BrandPanel() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="text-[1.6rem] font-medium leading-[1.25] tracking-[-0.02em] text-white/95 xl:text-[1.85rem]"
+          className={`${display.className} text-[1.75rem] font-bold leading-[1.15] tracking-[-0.01em] text-white xl:text-[2.1rem]`}
         >
           Every till, every branch,
           <br />
-          <span className="font-semibold text-[#a9e9d1]">every country</span> — in one place.
+          <span className="text-[#a9e9d1]">every country</span> — in one place.
         </motion.h2>
         <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }} className="mt-3 max-w-sm text-sm leading-relaxed text-white/70">
           Sales, costs, cash and the bank for all your restaurants, in their own money, the moment the day closes.
