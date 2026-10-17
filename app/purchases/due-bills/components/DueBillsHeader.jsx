@@ -1,75 +1,77 @@
 'use client'
 import React from 'react'
+import { AnimatePresence, motion } from 'framer-motion'
+import { AlertTriangle, CalendarClock, Download, FileSpreadsheet, FileText, Wallet } from 'lucide-react'
+import { Button, Menu } from '@/app/components/ui'
+import StatTiles from '@/app/components/purchases/StatTiles'
 
+/**
+ * The top of Due bills: what is owed in all, what is overdue and what falls
+ * due this week (from the unpaid bills), export, and — once bills are ticked —
+ * a bar at the bottom with their total and Pay.
+ * bills carry `balance` and `__dueInDays` (negative = overdue).
+ */
+const DueBillsHeader = ({ bills = [], selectedCount = 0, totalSelectedBalance, canPay, onPayClick, fmtRM, onExportPDF, onExportExcel, isExporting }) => {
+  const sum = list => list.reduce((n, b) => n + Number(b.balance || 0), 0)
+  const overdue = bills.filter(b => b.__dueInDays < 0)
+  const soon = bills.filter(b => b.__dueInDays >= 0 && b.__dueInDays <= 7)
+  const tiles = [
+    { label: 'Owed to vendors', value: fmtRM(sum(bills)), note: `${bills.length} unpaid bill${bills.length === 1 ? '' : 's'}`, icon: Wallet, tone: 'bg-info-soft text-info' },
+    { label: 'Overdue', value: fmtRM(sum(overdue)), note: overdue.length ? `${overdue.length} bill${overdue.length === 1 ? '' : 's'} past the due date` : 'Nothing overdue', icon: AlertTriangle, tone: overdue.length ? 'bg-danger-soft text-danger' : 'bg-surface-2 text-muted' },
+    { label: 'Due this week', value: fmtRM(sum(soon)), note: `${soon.length} bill${soon.length === 1 ? '' : 's'} in the next 7 days`, icon: CalendarClock, tone: 'bg-warning-soft text-warning' },
+  ]
 
-const DueBillsHeader = ({
-  branchName,
-  totalSelectedBalance,
-  canPay,
-  onPayClick,
-  fmtRM,
-  onExportPDF,
-  onExportExcel,
-  isExporting
-}) => {
   return (
-    <div className='flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6'>
-      <div>
-        <h1 className='text-2xl font-bold text-gray-900'>
-          {branchName ? `${branchName}’s` : ''} Due Bills
-        </h1>
-        <p className='text-sm text-gray-500 mt-1'>
-          Manage your outstanding vendor payments
-        </p>
+    <>
+      <div className='mb-4 flex flex-col-reverse gap-3 sm:flex-row sm:items-start'>
+        <div className='min-w-0 flex-1'>
+          <StatTiles tiles={tiles} />
+        </div>
+        {(onExportPDF || onExportExcel) && (
+          <div className='self-end sm:self-auto'>
+          <Menu
+            align='end'
+            width={190}
+            trigger={p => (
+              <Button {...p} variant='secondary' icon={Download} loading={isExporting}>
+                Export
+              </Button>
+            )}
+            items={[
+              onExportPDF && { label: 'PDF (with invoices)', icon: FileText, onSelect: onExportPDF },
+              onExportExcel && { label: 'Excel', icon: FileSpreadsheet, onSelect: onExportExcel },
+            ].filter(Boolean)}
+          />
+          </div>
+        )}
       </div>
 
-      <div className='flex items-center gap-4 bg-white p-2 pl-4 rounded-xl border shadow-sm'>
-        <div>
-          <span className='text-xs text-gray-500 uppercase'>
-            Selected to Pay
-          </span>
-          <div className='text-lg font-bold'>{fmtRM(totalSelectedBalance)}</div>
-        </div>
-
-        <button
-          disabled={!canPay}
-          onClick={onPayClick}
-          className={`px-5 py-2.5 rounded-lg text-sm font-semibold ${
-            canPay
-              ? 'bg-mint-600 text-white hover:bg-mint-700'
-              : 'bg-gray-100 text-gray-400 cursor-not-allowed'
-          }`}
-        >
-          Pay Selected
-        </button>
-      </div>
-
-      {(onExportPDF || onExportExcel) && (
-        <div className='flex items-center gap-2'>
-          <button 
-            onClick={onExportPDF}
-            disabled={isExporting}
-            className={`px-3 py-2 bg-red-50 text-red-700 rounded-lg text-xs font-semibold hover:bg-red-100 flex items-center gap-1 ${isExporting ? 'opacity-70 cursor-not-allowed' : ''}`}
+      {/* ticked bills: their total and Pay */}
+      <AnimatePresence>
+        {selectedCount > 0 && (
+          <motion.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+            className='fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 mx-auto max-w-2xl lg:bottom-5 lg:left-[calc(16rem+1.5rem)]'
           >
-            {isExporting ? (
-              <>
-                <svg className="animate-spin h-3 w-3 text-red-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Exporting...
-              </>
-            ) : 'Export PDF'}
-          </button>
-          <button 
-            onClick={onExportExcel}
-            className='px-3 py-2 bg-emerald-50 text-emerald-700 rounded-lg text-xs font-semibold hover:bg-emerald-100'
-          >
-            Export Excel
-          </button>
-        </div>
-      )}
-    </div>
+            <div className='flex items-center gap-3 rounded-2xl border border-line bg-surface/95 p-3 pl-4 shadow-float backdrop-blur'>
+              <div className='min-w-0 flex-1'>
+                <p className='text-[11px] font-semibold uppercase tracking-wider text-subtle'>
+                  {selectedCount} bill{selectedCount === 1 ? '' : 's'} to pay
+                </p>
+                <p className='truncate text-lg font-bold tabular-nums text-fg'>{fmtRM(totalSelectedBalance)}</p>
+                {!canPay && <p className='text-[11px] font-medium text-warning'>Pick bills from one vendor at a time</p>}
+              </div>
+              <Button size='lg' icon={Wallet} disabled={!canPay} onClick={onPayClick}>
+                Pay
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </>
   )
 }
 

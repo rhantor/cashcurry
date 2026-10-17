@@ -25,7 +25,7 @@ export default function BillMetaFields({
     <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
       {/* Vendor */}
       <div className="md:col-span-1">
-        <label htmlFor="vendor" className="text-sm text-gray-600">
+        <label htmlFor="vendor" className="text-sm text-muted">
           Vendor
         </label>
         <div className="mt-1">
@@ -34,7 +34,7 @@ export default function BillMetaFields({
             value={vendorId}
             disabled={loading || error}
             onChange={(e) => setVendorId(e.target.value)}
-            className={`w-full border rounded-lg p-2 bg-white ${
+            className={`w-full border rounded-lg p-2 bg-surface ${
               loading || error ? "opacity-75 cursor-not-allowed" : ""
             }`}
           >
@@ -57,7 +57,7 @@ export default function BillMetaFields({
           </select>
 
           {error && (
-            <div className="mt-1 text-xs text-red-600">
+            <div className="mt-1 text-xs text-danger">
               Couldn’t load vendors.
               {onRetry && (
                 <>
@@ -65,7 +65,7 @@ export default function BillMetaFields({
                   <button
                     type="button"
                     onClick={onRetry}
-                    className="underline text-red-700"
+                    className="underline text-danger"
                   >
                     Try again
                   </button>
@@ -78,7 +78,7 @@ export default function BillMetaFields({
 
       {/* Invoice No */}
       <div className="md:col-span-1">
-        <label htmlFor="invoiceNo" className="text-sm text-gray-600">
+        <label htmlFor="invoiceNo" className="text-sm text-muted">
           Invoice No
         </label>
         <input
@@ -94,7 +94,7 @@ export default function BillMetaFields({
 
       {/* Invoice Date */}
       <div className="md:col-span-1">
-        <label htmlFor="invoiceDate" className="text-sm text-gray-600">
+        <label htmlFor="invoiceDate" className="text-sm text-muted">
           Invoice Date
         </label>
         <input
@@ -108,7 +108,7 @@ export default function BillMetaFields({
 
       {/* Due Date */}
       <div className="md:col-span-1">
-        <label htmlFor="dueDate" className="text-sm text-gray-600">
+        <label htmlFor="dueDate" className="text-sm text-muted">
           Due Date
         </label>
         <input
@@ -122,7 +122,7 @@ export default function BillMetaFields({
 
       {/* Bill Total */}
       <div className="md:col-span-1">
-        <label htmlFor="billTotal" className="text-sm text-gray-600">
+        <label htmlFor="billTotal" className="text-sm text-muted">
           Bill Total ({currency})
         </label>
         <input
@@ -140,7 +140,7 @@ export default function BillMetaFields({
 
       {/* Note */}
       <div className="md:col-span-2">
-        <label htmlFor="note" className="text-sm text-gray-600">
+        <label htmlFor="note" className="text-sm text-muted">
           Note (optional)
         </label>
         <input

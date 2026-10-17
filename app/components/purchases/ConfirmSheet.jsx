@@ -37,7 +37,7 @@ export default function ConfirmSheet({
       ? "bg-red-600 active:bg-red-700"
       : tone === "warn"
       ? "bg-amber-600 active:bg-amber-700"
-      : "bg-mint-600 active:bg-mint-700";
+      : "bg-brand active:brightness-95";
 
   return (
     <Sheet
@@ -49,8 +49,8 @@ export default function ConfirmSheet({
         <div className="flex flex-col-reverse sm:flex-row gap-2.5 sm:justify-end">
           <button
             onClick={onClose}
-            className="min-h-[48px] px-5 rounded-2xl font-semibold text-slate-700 bg-slate-100
-                       active:bg-slate-200 transition-colors"
+            className="min-h-[48px] px-5 rounded-2xl font-semibold text-fg bg-surface-2
+                       active:bg-surface-2 transition-colors"
           >
             {cancelLabel}
           </button>
@@ -65,19 +65,19 @@ export default function ConfirmSheet({
         </div>
       }
     >
-      {message && <p className="text-[15px] leading-relaxed text-slate-600">{message}</p>}
+      {message && <p className="text-[15px] leading-relaxed text-muted">{message}</p>}
 
       {requireReason && (
         <div className="mt-4">
-          <label className="block text-sm font-semibold text-slate-700 mb-1.5">{reasonLabel}</label>
+          <label className="block text-sm font-semibold text-fg mb-1.5">{reasonLabel}</label>
           <textarea
             rows={3}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             placeholder={reasonPlaceholder}
             autoFocus
-            className="w-full p-3 text-[15px] border border-slate-200 rounded-2xl bg-slate-50
-                       focus:bg-white focus:border-mint-500 focus:ring-2 focus:ring-mint-500/20
+            className="w-full p-3 text-[15px] border border-line rounded-2xl bg-surface-2/60
+                       focus:bg-surface focus:border-brand focus:ring-2 focus:ring-[var(--cc-ring)]/20
                        outline-none transition-colors"
           />
         </div>

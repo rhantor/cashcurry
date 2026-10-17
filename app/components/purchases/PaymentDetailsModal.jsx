@@ -1,13 +1,17 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import { format, parseISO } from "date-fns";
+import { ExternalLink, FileText, ReceiptText } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import useCurrency from "@/app/hooks/useCurrency";
-import Modal from "@/app/components/common/Modal";
+import { formatMoney } from "@/lib/region/currency";
+import { dayKey } from "@/lib/finance/rules";
+import { personName } from "@/lib/people";
+import { Badge, Sheet, Skeleton } from "@/app/components/ui";
 
-function makeFormatRM(currency) {
-  return (n) => `${currency} ${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-}
+const METHOD_LABEL = { cash: "Cash", card: "Card", qr: "QR", online: "Online", bank_transfer: "Bank transfer" };
+const nice = (k) => (/^\d{4}-\d{2}-\d{2}$/.test(k || "") ? format(parseISO(k), "d MMM yyyy") : k || "—");
 
 /**
  * Fetches invoiceNo and invoiceDate for each billId in the allocations.
@@ -66,61 +70,25 @@ async function loadBillInfos({ companyId, branchId, allocations }) {
   return out;
 }
 
-function formatDate(iso) {
-  if (!iso) return "-";
-  try {
-    const d = new Date(iso);
-    return d.toLocaleDateString(undefined, { 
-      year: 'numeric', 
-      month: 'short', 
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  } catch {
-    return iso;
-  }
-}
+const Line = ({ label, children }) => (
+  <div className="flex items-start justify-between gap-3 py-2 text-sm">
+    <span className="text-muted">{label}</span>
+    <span className="text-right font-medium text-fg">{children}</span>
+  </div>
+);
 
-export default function PaymentDetailsModal({
-  open,
-  onClose,
-  payment,
-  companyId,
-  branchId,
-}) {
+const FileLink = ({ href, children }) => (
+  <a href={href} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-semibold text-brand hover:underline">
+    {children} <ExternalLink className="size-3" />
+  </a>
+);
+
+/** One vendor payment: how much, from where, and the bills it paid (with their invoices). */
+export default function PaymentDetailsModal({ open, onClose, payment, companyId, branchId }) {
   const currency = useCurrency();
-  const formatRM = makeFormatRM(currency);
+  const money = (v) => formatMoney(Number(v ?? 0), currency);
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState(null);
-  const [hasAutoPreviewed, setHasAutoPreviewed] = useState(false);
-
-  const allocations = payment?.allocations || [];
-
-  useEffect(() => {
-    if (!open) {
-      setPreviewUrl(null);
-      setHasAutoPreviewed(false);
-    }
-  }, [open]);
-
-  useEffect(() => {
-    if (!open || hasAutoPreviewed) return;
-    if (payment?.receiptURL) {
-      setPreviewUrl(payment.receiptURL);
-      setHasAutoPreviewed(true);
-    }
-  }, [open, payment, hasAutoPreviewed]);
-
-  useEffect(() => {
-    if (!open || !rows.length || hasAutoPreviewed) return;
-    const firstWithAttachment = rows.find(r => r.attachments && r.attachments.length > 0);
-    if (firstWithAttachment) {
-      setPreviewUrl(firstWithAttachment.attachments[0]);
-    }
-    setHasAutoPreviewed(true);
-  }, [open, rows, hasAutoPreviewed]);
 
   useEffect(() => {
     let active = true;
@@ -128,11 +96,7 @@ export default function PaymentDetailsModal({
       if (!open || !payment || !companyId || !branchId) return;
       setLoading(true);
       try {
-        const details = await loadBillInfos({
-          companyId,
-          branchId,
-          allocations,
-        });
+        const details = await loadBillInfos({ companyId, branchId, allocations: payment.allocations || [] });
         if (active) setRows(details);
       } finally {
         if (active) setLoading(false);
@@ -143,188 +107,86 @@ export default function PaymentDetailsModal({
     };
   }, [open, payment, companyId, branchId]);
 
-  if (!open) return null;
+  const p = payment || {};
+  const day = p.paymentDate || dayKey(p.createdISO || p.createdAt);
+  const front = p.paidFromOffice === "front";
+  const files = [...new Set([p.receiptURL, ...(p.attachments || [])].filter(Boolean))];
 
   return (
-    <Modal
-      title="Payment Details"
-      maxWidth={previewUrl ? "max-w-6xl" : "max-w-3xl"}
-      onClose={onClose}
-    >
-      <div className={`grid grid-cols-1 ${previewUrl ? "lg:grid-cols-2 gap-6" : ""}`}>
-        {/* Left Panel: Details and table */}
-        <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-2xl">
-            <div className="space-y-1">
-              <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">Vendor</span>
-              <div className="font-bold text-gray-900">{payment?.vendorName || "-"}</div>
-            </div>
-            <div className="space-y-1">
-              <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">Paid Date</span>
-              <div className="font-bold text-gray-900">{formatDate(payment?.createdISO)}</div>
-            </div>
-            <div className="space-y-1">
-              <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">Office / Method</span>
-              <div className="flex items-center gap-2">
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${payment?.paidFromOffice === 'front' ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-100 text-indigo-700'}`}>
-                  {payment?.paidFromOffice || '-'}
-                </span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] bg-gray-200 text-gray-700 font-bold uppercase">
-                  {payment?.paidMethod || "-"}
-                </span>
-              </div>
-            </div>
-            <div className="space-y-1">
-              <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">Reference / Receipt</span>
-              <div className="flex items-center gap-3">
-                <span className="font-mono text-sm text-gray-600">{payment?.reference || "-"}</span>
-                {payment?.receiptURL && (
-                  <div className="flex items-center gap-2 text-xs font-sans">
-                    <button
-                      onClick={() => setPreviewUrl(payment.receiptURL)}
-                      type="button"
-                      className="text-blue-600 hover:underline font-bold focus:outline-none"
-                    >
-                      View Receipt
-                    </button>
-                    <span className="text-gray-300">|</span>
-                    <a
-                      href={payment.receiptURL}
-                      download
-                      className="text-emerald-600 hover:underline font-bold"
-                    >
-                      Download
-                    </a>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="overflow-hidden border border-gray-100 rounded-2xl shadow-sm">
-            <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 text-left text-gray-500 font-black uppercase tracking-widest text-[9px]">
-                <tr>
-                  <th className="px-4 py-3">Invoice #</th>
-                  <th className="px-4 py-3">Inv. Date</th>
-                  <th className="px-4 py-3">Due Date</th>
-                  <th className="px-4 py-3 text-right">Bill Total</th>
-                  <th className="px-4 py-3 text-right">Paid Here</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {loading ? (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-gray-400 animate-pulse font-medium">
-                      Fetching bill details...
-                    </td>
-                  </tr>
-                ) : rows.length ? (
-                  rows.map((r) => (
-                    <tr key={r.billId} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="px-4 py-3 font-bold text-gray-900 uppercase font-mono">
-                        <div className="flex flex-col">
-                          <span>{r.invoiceNo}</span>
-                          {r.attachments && r.attachments.length > 0 && (
-                            <div className="flex flex-col gap-1 mt-1 font-sans text-[11px] font-normal normal-case text-gray-500">
-                              {r.attachments.map((url, i) => {
-                                const label = r.attachments.length > 1 ? `Invoice #${i + 1}` : "Invoice";
-                                return (
-                                  <div key={i} className="flex items-center gap-1.5">
-                                    <span className="font-semibold text-gray-700">{label}:</span>
-                                    <button
-                                      onClick={() => setPreviewUrl(url)}
-                                      type="button"
-                                      className="text-blue-600 hover:underline font-bold focus:outline-none"
-                                    >
-                                      View
-                                    </button>
-                                    <span className="text-gray-300">|</span>
-                                    <a
-                                      href={url}
-                                      download
-                                      className="text-emerald-600 hover:underline font-bold"
-                                    >
-                                      Download
-                                    </a>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-gray-600">{r.invoiceDate}</td>
-                      <td className="px-4 py-3 text-gray-600">{r.dueDate}</td>
-                      <td className="px-4 py-3 text-right text-gray-500">{formatRM(r.total)}</td>
-                      <td className="px-4 py-3 text-right font-black text-gray-900">{formatRM(r.amount)}</td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-gray-400 italic">
-                      No allocations recorded.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-              {!loading && rows.length > 0 && (
-                <tfoot className="bg-gray-50 border-t-2 border-gray-100">
-                  <tr>
-                    <td colSpan={4} className="px-4 py-3 font-black text-[10px] uppercase tracking-widest text-gray-400">
-                      Total Payment Applied
-                    </td>
-                    <td className="px-4 py-3 text-right font-black text-mint-600 text-base">
-                      {formatRM(rows.reduce((s, x) => s + Number(x.amount || 0), 0))}
-                    </td>
-                  </tr>
-                </tfoot>
-              )}
-            </table>
-          </div>
+    <Sheet open={open} onClose={onClose} title="Vendor payment" description={p.vendorName || ""}>
+      <div className="space-y-5">
+        <div className="rounded-2xl bg-surface-2/60 p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em] text-subtle">Paid</p>
+          <p className="mt-1 text-3xl font-bold tracking-tight tabular-nums text-fg">{money(p.total ?? p.totalPaid)}</p>
+          <p className="mt-0.5 text-xs text-muted">
+            on {nice(day)}
+            {p.createdBy && personName(p.createdBy) ? ` · by ${personName(p.createdBy)}` : ""}
+          </p>
         </div>
 
-        {/* Right Panel: Document Previewer */}
-        {previewUrl && (
-          <div className="flex flex-col border border-gray-200 rounded-2xl overflow-hidden bg-gray-50 p-4 h-full">
-            <div className="flex items-center justify-between pb-3 border-b mb-3">
-              <span className="text-[10px] uppercase font-black tracking-widest text-gray-500">Document Preview</span>
-              <div className="flex items-center gap-2">
-                <a
-                  href={previewUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-bold transition-all"
-                >
-                  Open in tab
-                </a>
-                <button
-                  onClick={() => setPreviewUrl(null)}
-                  type="button"
-                  className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl text-xs font-bold transition-all focus:outline-none"
-                >
-                  Close Preview
-                </button>
-              </div>
+        <div className="divide-y divide-line">
+          <Line label="From">
+            <Badge tone={front ? "warning" : "info"}>{front ? "Front office" : "Back office"}</Badge>
+          </Line>
+          <Line label="Method">{METHOD_LABEL[p.paidMethod] || p.paidMethod || "—"}</Line>
+          <Line label="Reference">{p.reference || <span className="text-subtle">—</span>}</Line>
+          <Line label="Receipt">
+            {files.length ? (
+              <span className="flex flex-wrap justify-end gap-3">
+                {files.map((u, i) => (
+                  <FileLink key={u} href={u}>
+                    {files.length > 1 ? `File ${i + 1}` : "Open"}
+                  </FileLink>
+                ))}
+              </span>
+            ) : (
+              <span className="text-subtle">None attached</span>
+            )}
+          </Line>
+        </div>
+
+        <div>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-subtle">
+            Bills it paid {rows.length ? `(${rows.length})` : ""}
+          </p>
+          {loading ? (
+            <div className="space-y-2">
+              <Skeleton className="h-14" rounded="rounded-xl" />
+              <Skeleton className="h-14" rounded="rounded-xl" />
             </div>
-            <div className="flex-1 bg-white rounded-xl border flex items-center justify-center p-2 min-h-[300px] lg:h-[55vh]">
-              {previewUrl.match(/\.(pdf)(\?|$)/i) ? (
-                <iframe
-                  src={previewUrl}
-                  className="w-full h-full border-0 rounded-lg"
-                  title="PDF Preview"
-                />
-              ) : (
-                <img
-                  src={previewUrl}
-                  alt="Document Preview"
-                  className="max-w-full max-h-full object-contain rounded-lg shadow-sm bg-white"
-                />
-              )}
-            </div>
-          </div>
-        )}
+          ) : rows.length ? (
+            <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line">
+              {rows.map((r) => (
+                <li key={r.billId} className="flex items-start gap-3 p-3">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-surface-2 text-muted">
+                    <FileText className="size-4" />
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-fg">{r.invoiceNo}</p>
+                    <p className="text-[11px] text-muted">
+                      Dated {nice(r.invoiceDate)} · due {nice(r.dueDate)} · bill {money(r.total)}
+                    </p>
+                    {r.attachments?.length > 0 && (
+                      <span className="mt-1 flex flex-wrap gap-3">
+                        {r.attachments.map((u, i) => (
+                          <FileLink key={u} href={u}>
+                            {r.attachments.length > 1 ? `Invoice ${i + 1}` : "Invoice"}
+                          </FileLink>
+                        ))}
+                      </span>
+                    )}
+                  </div>
+                  <span className="shrink-0 text-sm font-bold tabular-nums text-fg">{money(r.amount)}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="flex items-center gap-2 rounded-xl bg-surface-2/60 px-3 py-3 text-xs text-muted">
+              <ReceiptText className="size-4" /> No bills recorded on this payment.
+            </p>
+          )}
+        </div>
       </div>
-    </Modal>
+    </Sheet>
   );
 }

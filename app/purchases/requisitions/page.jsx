@@ -25,9 +25,9 @@ export default function RequisitionsRedirectPage() {
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
-      <div className="bg-white rounded-3xl border border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.02)] py-16 text-center">
-        <h1 className="text-lg font-bold text-slate-700">Requisitions have moved</h1>
-        <p className="text-slate-500 mt-1">Taking you to Purchase Orders…</p>
+      <div className="bg-surface rounded-3xl border border-line shadow-[0_2px_12px_rgba(0,0,0,0.02)] py-16 text-center">
+        <h1 className="text-lg font-bold text-fg">Requisitions have moved</h1>
+        <p className="text-muted mt-1">Taking you to Purchase Orders…</p>
       </div>
     </div>
   );

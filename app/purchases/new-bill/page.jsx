@@ -2,8 +2,9 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
 import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
-import UploadInvoice from "@/app/components/purchases/UploadInvoice";
-import BillMetaFields from "@/app/components/purchases/BillMetaFields";
+import Link from "next/link";
+import { format, parseISO } from "date-fns";
+import { AlertTriangle, ReceiptText, Store } from "lucide-react";
 // BillPaidSection removed — bills are always created as credit/unpaid
 import { useGetVendorsQuery } from "@/lib/redux/api/vendorsApiSlice";
 import {
@@ -15,6 +16,11 @@ import { uploadInvoiceFile } from "@/utils/storage/uploadInvoice";
 // payVendorBills not needed here — payment happens via Due Bills page
 import useCurrency from "@/app/hooks/useCurrency";
 import { toast } from "@/app/components/ui/notify";
+import { formatMoney } from "@/lib/region/currency";
+import { Button, CountUp, DatePicker, Field, Input, Select, Skeleton, Textarea } from "@/app/components/ui";
+import MoneyInput from "@/app/components/entry/MoneyInput";
+import ProofUpload from "@/app/components/entry/ProofUpload";
+import { EntryLayout, EntrySection, SummaryLine } from "@/app/components/entry/EntryLayout";
 
 /* ----------------------- tiny helpers ----------------------- */
 const todayISO = () => {
@@ -34,11 +40,6 @@ function addDaysISO(iso, days) {
   const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
   const dd = String(dt.getUTCDate()).padStart(2, "0");
   return `${yy}-${mm}-${dd}`;
-}
-function possessive(name) {
-  if (!name) return "New Bill";
-  const endsWithS = /s$/i.test(name.trim());
-  return `${name.trim()}${endsWithS ? "’" : "’s"} New Bill`;
 }
 const clampMoney = (v) => {
   const n = Number(v);
@@ -66,13 +67,12 @@ export default function NewBillPage() {
   const bArgs =
     ready && companyId && branchId ? { companyId, branchId } : skipToken;
   const {
-    data: branchData,
+    data: _branchData,
     isLoading: branchLoading,
     isError: branchIsError,
     error: branchError,
   } = useGetSingleBranchQuery(bArgs);
 
-  const title = possessive(branchData?.name || "");
 
   // Form state
   const [vendorId, setVendorId] = useState("");
@@ -86,6 +86,7 @@ export default function NewBillPage() {
 
   const [file, setFile] = useState(null);
   const [uploadPct, setUploadPct] = useState(0);
+  const [preview, setPreview] = useState(null);
 
 
 
@@ -172,7 +173,7 @@ export default function NewBillPage() {
     vendorId ||
     invoiceNo ||
     (invoiceDate && invoiceDate !== todayISO()) ||
-    dueDate ||
+    userEditedDueDate ||
     total ||
     note ||
     file ||
@@ -212,6 +213,7 @@ export default function NewBillPage() {
     setTotal("");
     setNote("");
     setFile(null);
+    setPreview(null);
     setUploadPct(0);
 
     setErrText("");
@@ -297,189 +299,152 @@ export default function NewBillPage() {
   };
 
   /* ----------------------- guards ----------------------- */
-  if (!ready) {
-    return (
-      <div className="p-3 sm:p-4">
-        <h1 className="text-lg sm:text-xl font-bold text-mint-500">
-          New Bill
-        </h1>
-        <div className="bg-white rounded-xl shadow p-4 text-sm text-gray-500">
-          Resolving company & branch…
-        </div>
-      </div>
-    );
-  }
+  const money = (v) => formatMoney(v, currency);
+  const day = (iso) => (iso ? format(parseISO(iso), "EEE, d MMM yyyy") : "—");
 
-  if (!companyId || !branchId) {
-    return (
-      <div className="p-3 sm:p-4">
-        <h1 className="text-lg sm:text-xl font-bold text-mint-500">
-          New Bill
-        </h1>
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3">
-          Couldn’t resolve company/branch. Please check your access.
-        </div>
-      </div>
-    );
-  }
+  if (!ready) return <Skeleton className="m-6 h-64" rounded="rounded-2xl" />;
+  if (!companyId || !branchId) return <p className="p-6 text-sm text-danger">Couldn&apos;t tell which branch this is. Check your access.</p>;
+
+  const save = (
+    <Button size="lg" className="w-full" loading={saving || (submitting && !isUploading)} disabled={saveDisabled} onClick={handleSave}>
+      {isUploading ? `Uploading… ${Math.floor(uploadPct)}%` : "Save bill"}
+    </Button>
+  );
 
   /* ----------------------- page ----------------------- */
   return (
-    <div className="p-3 sm:p-4">
-      <div className="mb-3 sm:mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <h1 className="text-lg sm:text-xl font-bold text-mint-500">
-          {branchLoading ? "Loading…" : branchData?.name ? title : "New Bill"}
-        </h1>
-
-        {(saving || submitting || isUploading) && (
-          <div
-            className="text-xs px-2 py-1 rounded bg-mint-50 text-mint-700 border border-mint-200"
-            aria-live="polite"
-          >
-            {isUploading ? `Uploading… ${Math.floor(uploadPct)}%` : "Saving…"}
+    <EntryLayout
+      aside={
+        <div className="space-y-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-subtle">Bill total</p>
+            <CountUp value={Number(total) || 0} format={money} className="mt-1 block text-3xl font-bold tracking-tight text-fg" />
+            <p className="mt-0.5 text-xs text-muted">{selectedVendor?.name || "Pick the vendor"}</p>
           </div>
-        )}
-      </div>
-
+          <div className="space-y-2 border-t border-line pt-3">
+            <SummaryLine label="Invoice" value={invoiceNo || "—"} muted={!invoiceNo} />
+            <SummaryLine label="Dated" value={day(invoiceDate)} />
+            <SummaryLine label="Due" value={day(dueDate)} muted={!dueDate} />
+            <SummaryLine label="Invoice file" value={file ? "Attached" : "Needed"} muted={!file} />
+          </div>
+          {errText && <p className="rounded-xl bg-danger-soft px-3 py-2 text-xs font-medium text-danger">{errText}</p>}
+          {save}
+          <p className="text-[11px] text-muted">
+            Saved as owed to the vendor. Pay it from{" "}
+            <Link href="/purchases/due-bills" className="font-semibold text-brand hover:underline">
+              Due bills
+            </Link>
+            .
+          </p>
+        </div>
+      }
+      bar={
+        <div className="flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-subtle">{selectedVendor?.name || "New bill"}</p>
+            <CountUp value={Number(total) || 0} format={money} className="block truncate text-lg font-bold tracking-tight text-fg" />
+          </div>
+          <div className="w-40 shrink-0">{save}</div>
+        </div>
+      }
+    >
       {(vendorsIsError || branchIsError) && (
-        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-red-700">
-          <strong>Couldn’t load required data.</strong>{" "}
-          <span className="text-sm">
-            {(vendorsError &&
-              (vendorsError.data?.message ||
-                vendorsError.error ||
-                vendorsError.message)) ||
-              (branchError &&
-                (branchError.data?.message ||
-                  branchError.error ||
-                  branchError.message)) ||
-              "Unknown error"}
-          </span>
-          <div className="mt-2">
-            <button
-              onClick={() => {
-                refetchVendors?.();
-              }}
-              className="text-sm text-mint-600 underline"
-            >
-              Try again
-            </button>
-          </div>
+        <div className="rounded-2xl bg-danger-soft p-4 text-sm text-danger">
+          <b>Couldn&apos;t load the vendors.</b> {vendorsError?.data?.message || vendorsError?.message || branchError?.message || ""}
+          <button type="button" onClick={() => refetchVendors?.()} className="ml-2 font-semibold underline">
+            Try again
+          </button>
         </div>
       )}
 
-      {showMaxWarning && (
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 mb-3">
-          <strong>Credit limit reached:</strong> {selectedVendor?.name} allows
-          max {maxOpen} open credit bill{Number(maxOpen) === 1 ? "" : "s"}. You
-          currently have{" "}
-          {openUnpaidLoading || openPartialLoading ? "…" : currentOpen}. Paying
-          this bill now will bypass the limit; creating it as credit will exceed
-          it.
-        </div>
-      )}
-
-      <form
-        className="bg-white rounded-xl shadow p-3 sm:p-4 space-y-5"
-        onSubmit={(e) => {
-          e.preventDefault();
-          if (!saveDisabled) handleSave();
-        }}
-        aria-busy={saving || submitting}
-      >
-        <BillMetaFields
-          vendors={vendors}
-          loading={vendorsLoading}
-          error={vendorsIsError}
-          onRetry={() => refetchVendors?.()}
-          vendorId={vendorId}
-          setVendorId={(v) => {
-            setVendorId(v);
-            // keep user's manual due date if already set
-          }}
-          invoiceNo={invoiceNo}
-          setInvoiceNo={(v) => setInvoiceNo(v)}
-          invoiceDate={invoiceDate}
-          setInvoiceDate={(v) => setInvoiceDate(v)} // auto-fill handled in effect
-          dueDate={dueDate}
-          setDueDate={(v) => {
-            setUserEditedDueDate(true);
-            setDueDate(v);
-            setAutoFilledHint("");
-          }}
-          total={total}
-          setTotal={(v) => {
-            // live sanitize: keep digits & dot, prevent negative
-            const cleaned = String(v).replace(/[^\d.]/g, "");
-            setTotal(cleaned);
-          }}
-          note={note}
-          setNote={(v) => setNote(v)}
-        />
-
-        {autoFilledHint && !userEditedDueDate && (
-          <p className="text-xs text-emerald-600 -mt-3">{autoFilledHint}</p>
+      <EntrySection title="Who it's from">
+        <Field label="Vendor">
+          {({ id }) =>
+            vendorsLoading ? (
+              <Skeleton className="h-12" rounded="rounded-xl" />
+            ) : (
+              <Select id={id} className="h-12" value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
+                <option value="">Choose a vendor…</option>
+                {vendors.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.name}
+                  </option>
+                ))}
+              </Select>
+            )
+          }
+        </Field>
+        {selectedVendor && (
+          <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted">
+            <span className="inline-flex items-center gap-1">
+              <Store className="size-3.5" /> Pays in {vendorDueDays || 0} day{Number(vendorDueDays) === 1 ? "" : "s"}
+            </span>
+            {maxOpen != null && (
+              <span>
+                · {openUnpaidLoading || openPartialLoading ? "…" : currentOpen} of {maxOpen} open bills
+              </span>
+            )}
+          </p>
         )}
+        {showMaxWarning && (
+          <p className="mt-3 flex gap-2 rounded-xl bg-warning-soft px-3 py-2.5 text-xs text-fg">
+            <AlertTriangle className="mt-0.5 size-3.5 shrink-0 text-warning" />
+            <span>
+              <b>{selectedVendor?.name}</b> allows {maxOpen} unpaid bill{Number(maxOpen) === 1 ? "" : "s"} at a time and already has {currentOpen}. Saving this one goes over that.
+            </span>
+          </p>
+        )}
+        {!vendorsLoading && !vendors.length && (
+          <p className="mt-2 text-xs text-muted">
+            No vendors yet —{" "}
+            <Link href="/purchases/vendors" className="font-semibold text-brand hover:underline">
+              add one
+            </Link>
+            .
+          </p>
+        )}
+      </EntrySection>
 
-        <div className="space-y-2">
-          <UploadInvoice
-            file={file}
-            onChange={setFile}
-            progress={uploadPct} // ← optional
-            maxFileSizeMB={5} // ← optional override
-            compressMaxSizeMB={0.6} // ← optional override
-            compressMaxWidthOrHeight={1600} // ← optional override
-            allowCamera={true} // ← optional (default true)
-          />
-          {isUploading && (
-            <div className="w-full bg-gray-200 rounded-full h-2" aria-hidden>
-              <div
-                className="h-2 rounded-full bg-mint-500 transition-[width] duration-200"
-                style={{ width: `${uploadPct}%` }}
+      <EntrySection title="The invoice">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Invoice number">{({ id }) => <Input id={id} size="lg" value={invoiceNo} onChange={(e) => setInvoiceNo(e.target.value)} placeholder="e.g. INV-1023" />}</Field>
+          <Field label="Bill total">{({ id }) => <MoneyInput id={id} currency={currency} value={total} onValueChange={setTotal} />}</Field>
+          <Field label="Invoice date">{() => <DatePicker size="lg" value={invoiceDate} onChange={setInvoiceDate} />}</Field>
+          <Field label="Due" hint={autoFilledHint && !userEditedDueDate ? autoFilledHint : undefined}>
+            {() => (
+              <DatePicker
+                size="lg"
+                value={dueDate}
+                onChange={(v) => {
+                  setUserEditedDueDate(true);
+                  setDueDate(v);
+                  setAutoFilledHint("");
+                }}
               />
-            </div>
-          )}
+            )}
+          </Field>
         </div>
-
-
-
-        {errText && (
-          <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-2">
-            {errText}
-          </div>
-        )}
-
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2">
-          <button
-            type="button"
-            className="px-4 py-2 rounded-lg bg-gray-100"
-            onClick={resetForm}
-            disabled={saving || submitting || isUploading}
-          >
-            Clear
-          </button>
-
-          <button
-            type="submit"
-            onClick={(e) => {
-              e.preventDefault();
-              if (!saveDisabled) handleSave();
-            }}
-            disabled={saveDisabled}
-            className={`px-4 py-2 rounded-lg ${
-              saveDisabled
-                ? "bg-gray-300 text-gray-500"
-                : "bg-mint-500 text-white hover:bg-mint-600 active:scale-[0.99]"
-            }`}
-          >
-            {isUploading
-              ? `Uploading… ${Math.floor(uploadPct)}%`
-              : saving || submitting
-              ? "Saving…"
-              : "Save Bill"}
-          </button>
+        <Field label="Note" hint="Optional" className="mt-4">
+          {({ id }) => <Textarea id={id} rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. delivered by Ali, PO-55" />}
+        </Field>
+        <div className="mt-5">
+          <ProofUpload
+            label="Invoice photo or PDF"
+            pdf
+            required
+            shrink={{ maxMB: 0.6, maxSide: 1600 }}
+            file={file}
+            preview={preview}
+            progress={uploadPct}
+            onPick={(f, url) => (setFile(f), setPreview(url))}
+            onRemove={() => (setFile(null), setPreview(null), setUploadPct(0))}
+          />
         </div>
-      </form>
-    </div>
+      </EntrySection>
+
+      <p className="flex items-center gap-1.5 px-1 text-xs text-subtle">
+        <ReceiptText className="size-3.5" /> Every bill keeps its invoice — it&apos;s what the vendor is paid against.
+      </p>
+    </EntryLayout>
   );
 }

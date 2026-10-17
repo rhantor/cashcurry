@@ -145,6 +145,15 @@
 /* Standard Reset & Utility defaults
 */
 @layer base {
+  /* Tailwind 4 draws a bare `border` in the text colour; older screens were
+     written for Tailwind 3's light grey. Give every border the app's line
+     colour unless a class says otherwise. */
+  *,
+  ::before,
+  ::after,
+  ::backdrop {
+    border-color: var(--cc-line);
+  }
   body {
     background-color: var(--cc-bg);
     color: var(--color-mint-900); /* existing screens; new ones use text-fg */

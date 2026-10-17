@@ -49,15 +49,15 @@ computer, has its own loading look, and its old modals are redone too.
 - ⬜ `/payroll/history` Payroll history
 
 ## 3.4.7 Purchases
-- ⬜ `/purchases/order-guides` Order guides
-- ⬜ `/purchases/purchase-orders` Purchase orders
-- ⬜ `/purchases/requisitions` Requisitions
-- ⬜ `/purchases/new-bill` New vendor bill
-- ⬜ `/purchases/due-bills` Due bills (+ pay bills, edit bill, export)
-- ⬜ `/purchases/payments` Payments
-- ⬜ `/purchases/vendors` Vendors
-- ⬜ `/purchases/items` Items catalog
-- ⬜ `/purchases/reports` Purchase report
+- ✅ `/purchases/order-guides` Order guides — money format, kit select, names on orders
+- ✅ `/purchases/purchase-orders` Purchase orders — money format, date picker, "1 item", d MMM dates, names
+- ✅ `/purchases/requisitions` Requisitions — retired, redirects to Purchase orders
+- ✅ `/purchases/new-bill` New vendor bill
+- ✅ `/purchases/due-bills` Due bills (+ pay bills, edit bill, export)
+- ✅ `/purchases/payments` Payments — totals by office, date/vendor/method filters (the date filter now works), details sheet
+- ✅ `/purchases/vendors` Vendors — owed/paid tiles, list, add/edit sheet, vendor sheet (owed · paid · details), export menu; recount only for owners and refuses a partial count
+- ✅ `/purchases/items` Items catalog — prices in the money format, supplier names, Excel import/template in one menu
+- ✅ `/purchases/reports` Purchase report — date range picker, kit selects/buttons, money format
 
 ## 3.4.8 Settings, admin, sign-in, tools
 - ✅ `/settings` Settings (company) — people, branches, appearance (empty sections removed)

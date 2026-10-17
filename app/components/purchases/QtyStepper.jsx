@@ -35,10 +35,10 @@ export default function QtyStepper({
 
   const ring =
     tone === "warn"
-      ? "border-amber-300 bg-amber-50 text-amber-900"
+      ? "border-warning/30 bg-warning-soft text-warning"
       : isSet
-      ? "border-mint-300 bg-mint-50 text-mint-900"
-      : "border-slate-200 bg-white text-slate-800";
+      ? "border-brand/30 bg-brand-soft text-brand"
+      : "border-line bg-surface text-fg";
 
   return (
     <div className="flex items-stretch gap-1.5 select-none">
@@ -47,9 +47,9 @@ export default function QtyStepper({
         onClick={() => bump(-step)}
         disabled={num <= min}
         aria-label="Decrease"
-        className={`${btn} shrink-0 flex items-center justify-center rounded-xl border border-slate-200
-                    bg-slate-50 text-slate-600 active:bg-slate-200 disabled:opacity-40
-                    disabled:active:bg-slate-50 transition-colors`}
+        className={`${btn} shrink-0 flex items-center justify-center rounded-xl border border-line
+                    bg-surface-2/60 text-muted active:bg-surface-2 disabled:opacity-40
+                    disabled:active:bg-surface-2/60 transition-colors`}
       >
         <Minus className="w-5 h-5" />
       </button>
@@ -67,11 +67,11 @@ export default function QtyStepper({
           }}
           placeholder="0"
           className={`w-full ${field} ${ring} border rounded-xl text-center font-bold tabular-nums
-                      focus:border-mint-500 focus:ring-2 focus:ring-mint-500/20 outline-none transition-colors
+                      focus:border-brand focus:ring-2 focus:ring-[var(--cc-ring)]/20 outline-none transition-colors
                       ${unit ? "pr-9" : ""}`}
         />
         {unit && (
-          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-400 pointer-events-none">
+          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs font-medium text-subtle pointer-events-none">
             {unit}
           </span>
         )}
@@ -81,8 +81,8 @@ export default function QtyStepper({
         type="button"
         onClick={() => bump(step)}
         aria-label="Increase"
-        className={`${btn} shrink-0 flex items-center justify-center rounded-xl border border-mint-200
-                    bg-mint-50 text-mint-700 active:bg-mint-200 transition-colors`}
+        className={`${btn} shrink-0 flex items-center justify-center rounded-xl border border-brand/30
+                    bg-brand-soft text-brand active:bg-brand-soft transition-colors`}
       >
         <Plus className="w-5 h-5" />
       </button>

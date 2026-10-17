@@ -1,10 +1,11 @@
 'use client'
 
 import { businessToday } from "@/lib/region";
+import { formatMoney } from '@/lib/region/currency'
 import React, { useMemo, useState } from 'react'
 import { skipToken } from '@reduxjs/toolkit/query'
 import { useRouter } from 'next/navigation'
-import { Edit3, AlertCircle, Trash2, Eye, Paperclip } from 'lucide-react'
+import { Edit3, AlertCircle, Trash2, Eye, Paperclip, ChevronRight, PartyPopper } from 'lucide-react'
 
 import useResolvedCompanyBranch from '@/utils/useResolvedCompanyBranch'
 import { useGetSingleBranchQuery } from '@/lib/redux/api/branchApiSlice'
@@ -30,6 +31,8 @@ import autoTable from "jspdf-autotable"
 import * as XLSX from "xlsx"
 import { PDFDocument } from 'pdf-lib'
 import { toast, confirmDialog } from "@/app/components/ui/notify";
+import { Badge, DataTable } from '@/app/components/ui'
+import { format } from 'date-fns'
 
 // --- Helper Functions ---
 function daysBetween (aISO, bISO) {
@@ -40,13 +43,11 @@ function daysBetween (aISO, bISO) {
   return Math.round((a - b) / 86400000)
 }
 
-const makeFmtRM = (currency) => v =>
-  `${currency} ${Number(v ?? 0).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  })}`
+// the branch's money, written the way the rest of the app writes it
+const makeFmtRM = (currency) => v => formatMoney(Number(v ?? 0), currency)
 
 const addAttachmentToPdf = async (doc, url, vendorName, refLabel, attachmentIndex) => {
+  // eslint-disable-next-line no-async-promise-executor -- resolves from image callbacks below
   return new Promise(async (resolve) => {
     const isPdf = url.toLowerCase().split('?')[0].endsWith('.pdf');
     const pdfWidth = doc.internal.pageSize.getWidth();
@@ -123,6 +124,7 @@ export default function DueBillsPage () {
   const { ready, user, companyId, branchId } = useResolvedCompanyBranch()
   const currency = useCurrency()
   const fmtRM = makeFmtRM(currency)
+  const pdfRM = v => formatMoney(Number(v ?? 0), currency, { plain: true }) // PDF fonts have no ৳ or ₹
 
   // --- State ---
   const [searchTerm, setSearchTerm] = useState('')
@@ -258,6 +260,7 @@ export default function DueBillsPage () {
       return {
         ...v,
         code,
+        reasons: emergencyReason,
         isEmergency: emergencyReason.length > 0 ? '! ' + emergencyReason.join(' + ') : '-',
         emergencyLevel: emergencyReason.length
       };
@@ -462,7 +465,7 @@ const handleSaveEdit = async (billId, formData) => {
         v.name,
         v.billsCount,
         v.lastPurchaseTimestamp ? new Date(v.lastPurchaseTimestamp).toLocaleDateString() : "-",
-        fmtRM(v.totalPending),
+        pdfRM(v.totalPending),
         v.isEmergency
       ]);
 
@@ -501,7 +504,7 @@ const handleSaveEdit = async (billId, formData) => {
     doc.text("Total Outstanding Balance:", 155, finalY + 18, { align: 'right' });
     
     doc.setTextColor(46, 204, 113);
-    doc.text(`${fmtRM(totalPending)}`, 195, finalY + 18, { align: 'right' });
+    doc.text(`${pdfRM(totalPending)}`, 195, finalY + 18, { align: 'right' });
     
     doc.save(`Vendors_Summary_${Date.now()}.pdf`);
   };
@@ -562,8 +565,8 @@ const handleSaveEdit = async (billId, formData) => {
       b.invoiceNo || b.reference || "-",
       b.createdAt?.seconds ? new Date(b.createdAt.seconds * 1000).toLocaleDateString() : "-",
       b.dueDate || "-",
-      fmtRM(b.total),
-      fmtRM(b.balance)
+      pdfRM(b.total),
+      pdfRM(b.balance)
     ]);
 
     autoTable(doc, {
@@ -593,7 +596,7 @@ const handleSaveEdit = async (billId, formData) => {
     doc.text("Total Outstanding Balance:", 155, finalY + 18, { align: 'right' });
     
     doc.setTextColor(46, 204, 113);
-    doc.text(`${fmtRM(totalPending)}`, 195, finalY + 18, { align: 'right' });
+    doc.text(`${pdfRM(totalPending)}`, 195, finalY + 18, { align: 'right' });
 
     const pdfsToMerge = [];
     for (const bill of vendorBills) {
@@ -730,22 +733,23 @@ const handleSaveEdit = async (billId, formData) => {
   // --- Render Guards ---
   if (!ready)
     return (
-      <div className='p-8 text-center text-gray-500 animate-pulse'>
+      <div className='p-8 text-center text-muted animate-pulse'>
         Loading workspace...
       </div>
     )
   if (!companyId)
     return (
-      <div className='p-8 text-center text-red-500'>
+      <div className='p-8 text-center text-danger'>
         Access Denied: No Company Resolved
       </div>
     )
 
   return (
-    <div className='min-h-screen bg-gray-50/50 p-4 md:p-6'>
+    <div className='mx-auto max-w-7xl px-4 py-5 pb-28 sm:px-6 sm:py-6'>
       {/* Header Section */}
       <DueBillsHeader
-        branchName={branchData?.name}
+        bills={allBills}
+        selectedCount={selectedBills.length}
         canPay={canPay}
         totalSelectedBalance={totalSelectedBalance}
         onPayClick={() => setPayOpen(true)}
@@ -766,92 +770,71 @@ const handleSaveEdit = async (billId, formData) => {
 
       {/* Main Content Area */}
       {(err1 || err2) && (
-        <div className='mb-6 p-4 bg-red-50 border border-red-100 rounded-xl text-red-600 text-sm flex items-center gap-2'>
+        <div className='mb-6 p-4 bg-danger-soft border border-danger/30 rounded-xl text-danger text-sm flex items-center gap-2'>
           <AlertCircle className='w-4 h-4' /> Error loading bills. Please
           refresh.
         </div>
       )}
 
-      <div className='bg-white border rounded-xl shadow-sm overflow-hidden'>
+      <div className='bg-surface border rounded-xl shadow-sm overflow-hidden'>
         {!selectedVendor ? (
-          <div className='overflow-x-auto'>
-            <table className='w-full text-left text-sm'>
-              <thead className='bg-gray-50 border-b'>
-                <tr>
-                  <th className='px-6 py-4 font-semibold text-gray-900'>Vendor Name</th>
-                  <th className='px-6 py-4 font-semibold text-gray-900 text-center'>Pending Bills</th>
-                  <th className='px-6 py-4 font-semibold text-gray-900 text-center'>Last Purchase</th>
-                  <th className='px-6 py-4 font-semibold text-gray-900 text-right'>Total Pending</th>
-                  <th className='px-6 py-4 font-semibold text-gray-900 text-center'>Remarks</th>
-                  <th className='px-6 py-4 font-semibold text-gray-900 text-center'>Action</th>
-                </tr>
-              </thead>
-              <tbody className='divide-y divide-gray-100'>
-                {vendorSummaryData.length === 0 ? (
-                  <tr>
-                    <td colSpan='6' className='px-6 py-12 text-center text-gray-500'>
-                      No vendors with outstanding bills found.
-                    </td>
-                  </tr>
-                ) : (
-                  vendorSummaryData.map(v => (
-                    <tr key={v.id} className='group hover:bg-gray-50 transition-colors cursor-pointer' onClick={() => setSelectedVendor(v.id)}>
-                      <td className='px-6 py-4'>
-                        <div className="font-medium text-gray-900">{v.name}</div>
-                        {v.code ? (
-                          <div className="text-[11px] text-gray-500 font-mono tracking-wide mt-0.5 uppercase">
-                            Code: <span className="font-bold text-gray-700">{v.code}</span>
-                          </div>
-                        ) : (
-                          <div className="text-[10px] text-gray-400 italic mt-0.5">No Code</div>
-                        )}
-                      </td>
-                      <td className='px-6 py-4 text-center text-gray-600'>
-                        {v.billsCount}
-                      </td>
-                      <td className='px-6 py-4 text-center text-gray-500'>
-                        {v.lastPurchaseTimestamp ? new Date(v.lastPurchaseTimestamp).toLocaleDateString() : "-"}
-                      </td>
-                      <td className='px-6 py-4 text-right font-bold text-gray-900'>
-                        {fmtRM(v.totalPending)}
-                      </td>
-                      <td className='px-6 py-4 text-center'>
-                        {v.isEmergency !== '-' ? (
-                          <span className='inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800'>
-                            {v.isEmergency}
-                          </span>
-                        ) : (
-                          <span className='text-gray-400'>-</span>
-                        )}
-                      </td>
-                      <td className='px-6 py-4 text-center'>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setSelectedVendor(v.id);
-                          }}
-                          className='px-3 py-1.5 text-xs font-medium bg-mint-50 text-mint-700 hover:bg-mint-100 rounded-lg transition-colors'
-                        >
-                          View Bills
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+          <DataTable
+            className='rounded-none border-0'
+            rows={vendorSummaryData}
+            onRowClick={v => setSelectedVendor(v.id)}
+            pageSize={0}
+            empty={{ icon: PartyPopper, title: 'Nothing owed', description: searchTerm ? 'No unpaid bill matches the search.' : 'Every vendor bill is paid.' }}
+            columns={[
+              {
+                key: 'name',
+                label: 'Vendor',
+                primary: true,
+                sortable: true,
+                render: v => (
+                  <div className='min-w-0'>
+                    <p className='truncate font-semibold text-fg'>{v.name}</p>
+                    {v.code && <p className='text-[11px] font-normal text-muted'>{v.code}</p>}
+                  </div>
+                )
+              },
+              { key: 'billsCount', label: 'Unpaid bills', sortable: true, render: v => v.billsCount },
+              {
+                key: 'last',
+                label: 'Last bill',
+                sortValue: v => v.lastPurchaseTimestamp,
+                render: v => (v.lastPurchaseTimestamp ? format(new Date(v.lastPurchaseTimestamp), 'd MMM yyyy') : '—')
+              },
+              {
+                key: 'reasons',
+                label: 'Needs',
+                render: v =>
+                  v.reasons.length ? (
+                    <span className='inline-flex flex-wrap gap-1'>
+                      {v.reasons.map(r => (
+                        <Badge key={r} tone={r === 'Overdue' ? 'danger' : 'warning'}>
+                          {r === 'Overdue' ? 'Overdue' : 'At bill limit'}
+                        </Badge>
+                      ))}
+                    </span>
+                  ) : (
+                    <span className='text-subtle'>—</span>
+                  )
+              },
+              { key: 'totalPending', label: 'Owed', align: 'right', aside: true, sortable: true, render: v => <span className='font-semibold'>{fmtRM(v.totalPending)}</span> },
+              { key: 'go', label: '', align: 'right', hideOnMobile: true, render: () => <ChevronRight className='ml-auto size-4 text-subtle' /> }
+            ]}
+          />
         ) : (
           <>
         {/* Desktop Table View */}
         <div className='hidden md:block overflow-x-auto'>
           <table className='w-full text-left text-sm'>
-            <thead className='bg-gray-50 border-b'>
+            <thead className='bg-surface-2/60 border-b'>
               <tr>
                 <th className='w-12 px-6 py-4'>
                   <input
                     type='checkbox'
-                    className='rounded border-gray-300 text-mint-600 focus:ring-mint-500'
+                    className='rounded border-line text-brand focus:ring-[var(--cc-ring)]'
                     onChange={toggleAll}
                     checked={
                       filteredBills.length > 0 &&
@@ -859,29 +842,29 @@ const handleSaveEdit = async (billId, formData) => {
                     }
                   />
                 </th>
-                <th className='px-6 py-4 font-semibold text-gray-900'>
+                <th className='px-6 py-4 font-semibold text-fg'>
                   Vendor & Bill Info
                 </th>
-                <th className='px-6 py-4 font-semibold text-gray-900'>
+                <th className='px-6 py-4 font-semibold text-fg'>
                   Status
                 </th>
-                <th className='px-6 py-4 font-semibold text-gray-900 text-right'>
+                <th className='px-6 py-4 font-semibold text-fg text-right'>
                   Amount
                 </th>
-                <th className='px-6 py-4 font-semibold text-gray-900 text-right'>
+                <th className='px-6 py-4 font-semibold text-fg text-right'>
                   Due Date
                 </th>
-                <th className='px-6 py-4 font-semibold text-gray-900 text-center'>
+                <th className='px-6 py-4 font-semibold text-fg text-center'>
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className='divide-y divide-gray-100'>
+            <tbody className='divide-y divide-line'>
               {filteredBills.length === 0 ? (
                 <tr>
                   <td
                     colSpan='6'
-                    className='px-6 py-12 text-center text-gray-500'
+                    className='px-6 py-12 text-center text-muted'
                   >
                     No bills found matching your criteria.
                   </td>
@@ -890,23 +873,23 @@ const handleSaveEdit = async (billId, formData) => {
                 filteredBills.map(bill => (
                   <tr
                     key={bill.id}
-                    className={`group hover:bg-gray-50 transition-colors ${
-                      selectedIds.includes(bill.id) ? 'bg-mint-50/50' : ''
+                    className={`group hover:bg-surface-2 transition-colors ${
+                      selectedIds.includes(bill.id) ? 'bg-brand-soft/50' : ''
                     }`}
                   >
                     <td className='px-6 py-4'>
                       <input
                         type='checkbox'
-                        className='rounded border-gray-300 text-mint-600 focus:ring-mint-500 cursor-pointer'
+                        className='rounded border-line text-brand focus:ring-[var(--cc-ring)] cursor-pointer'
                         checked={selectedIds.includes(bill.id)}
                         onChange={() => toggleOne(bill.id)}
                       />
                     </td>
                     <td className='px-6 py-4'>
-                      <div className='font-medium text-gray-900'>
+                      <div className='font-medium text-fg'>
                         {bill.vendorName}
                       </div>
-                      <div className='text-xs text-gray-500 mt-0.5'>
+                      <div className='text-xs text-muted mt-0.5'>
                         Ref: {bill.invoiceNo || bill.reference || 'N/A'}
                       </div>
                     </td>
@@ -914,14 +897,14 @@ const handleSaveEdit = async (billId, formData) => {
                       <StatusBadge dueDays={bill.__dueInDays} />
                     </td>
                     <td className='px-6 py-4 text-right'>
-                      <div className='font-bold text-gray-900'>
+                      <div className='font-bold text-fg'>
                         {fmtRM(bill.balance)}
                       </div>
-                      <div className='text-xs text-gray-400'>
+                      <div className='text-xs text-subtle'>
                         Total: {fmtRM(bill.total)}
                       </div>
                     </td>
-                    <td className='px-6 py-4 text-right text-gray-600'>
+                    <td className='px-6 py-4 text-right text-muted'>
                       {bill.dueDate || '-'}
                     </td>
                     <td className='px-6 py-4 text-center'>
@@ -929,20 +912,20 @@ const handleSaveEdit = async (billId, formData) => {
                         <button
                           onClick={() => handleViewClick(bill)}
                           title='View Details'
-                          className='p-2 hover:bg-gray-200 rounded-full text-gray-500 hover:text-blue-600 transition-all'
+                          className='p-2 hover:bg-surface-2 rounded-full text-muted hover:text-info transition-all'
                         >
                           <Eye className='w-4 h-4' />
                         </button>
                         <button
                           onClick={() => handleEditClick(bill)}
-                          className='p-2 hover:bg-gray-200 rounded-full text-gray-500 hover:text-mint-600 transition-all'
+                          className='p-2 hover:bg-surface-2 rounded-full text-muted hover:text-brand transition-all'
                           title='Edit Details'
                         >
                           <Edit3 className='w-4 h-4' />
                         </button>
                         <button
                           onClick={() => handleDeleteClick(bill.id)}
-                          className='p-2 hover:bg-red-100 rounded-full text-gray-400 hover:text-red-600 transition-all'
+                          className='p-2 hover:bg-danger-soft rounded-full text-subtle hover:text-danger transition-all'
                           title='Delete Bill'
                         >
                           <Trash2 className='w-4 h-4' />
@@ -957,18 +940,18 @@ const handleSaveEdit = async (billId, formData) => {
         </div>
 
  {/* Mobile Card View */}
-        <div className='md:hidden divide-y divide-gray-100'>
+        <div className='md:hidden divide-y divide-line'>
           {filteredBills.map(bill => (
             <div
               key={bill.id}
               className={`p-4 transition-colors ${
-                selectedIds.includes(bill.id) ? 'bg-mint-50/30' : ''
+                selectedIds.includes(bill.id) ? 'bg-brand-soft/30' : ''
               }`}
             >
               <div className='flex items-start gap-3'>
                 <input
                   type='checkbox'
-                  className='mt-1 rounded border-gray-300 text-mint-600 focus:ring-mint-500'
+                  className='mt-1 rounded border-line text-brand focus:ring-[var(--cc-ring)]'
                   checked={selectedIds.includes(bill.id)}
                   onChange={() => toggleOne(bill.id)}
                 />
@@ -976,27 +959,27 @@ const handleSaveEdit = async (billId, formData) => {
 
                   {/* Top row: vendor name + action buttons */}
                   <div className='flex justify-between items-start mb-1 gap-2'>
-                    <span className='font-semibold text-gray-900 truncate leading-tight'>
+                    <span className='font-semibold text-fg truncate leading-tight'>
                       {bill.vendorName}
                     </span>
                     <div className='flex items-center gap-0.5 flex-shrink-0'>
                       <button
                         onClick={() => handleViewClick(bill)}
-                        className='text-gray-400 hover:text-blue-600 p-1.5 hover:bg-blue-50 rounded-full transition-colors'
+                        className='text-subtle hover:text-info p-1.5 hover:bg-info-soft rounded-full transition-colors'
                         title='View Details'
                       >
                         <Eye className='w-4 h-4' />
                       </button>
                       <button
                         onClick={() => handleEditClick(bill)}
-                        className='text-gray-400 hover:text-mint-600 p-1.5 hover:bg-mint-50 rounded-full transition-colors'
+                        className='text-subtle hover:text-brand p-1.5 hover:bg-brand-soft rounded-full transition-colors'
                         title='Edit Bill'
                       >
                         <Edit3 className='w-4 h-4' />
                       </button>
                       <button
                         onClick={() => handleDeleteClick(bill.id)}
-                        className='text-gray-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-full transition-colors'
+                        className='text-subtle hover:text-danger p-1.5 hover:bg-danger-soft rounded-full transition-colors'
                         title='Delete Bill'
                       >
                         <Trash2 className='w-4 h-4' />
@@ -1005,7 +988,7 @@ const handleSaveEdit = async (billId, formData) => {
                   </div>
 
                   {/* Reference */}
-                  <div className='text-xs text-gray-500 mb-3'>
+                  <div className='text-xs text-muted mb-3'>
                     Ref: {bill.invoiceNo || bill.reference || 'N/A'}
                   </div>
 
@@ -1013,15 +996,15 @@ const handleSaveEdit = async (billId, formData) => {
                   <div className='flex justify-between items-end'>
                     <div className='space-y-1'>
                       <StatusBadge dueDays={bill.__dueInDays} />
-                      <div className='text-xs text-gray-400'>
+                      <div className='text-xs text-subtle'>
                         Due: {bill.dueDate || '—'}
                       </div>
                     </div>
                     <div className='text-right'>
-                      <div className='font-bold text-gray-900 text-lg tabular-nums'>
+                      <div className='font-bold text-fg text-lg tabular-nums'>
                         {fmtRM(bill.balance)}
                       </div>
-                      <div className='text-xs text-gray-400'>
+                      <div className='text-xs text-subtle'>
                         of {fmtRM(bill.total)}
                       </div>
                     </div>
@@ -1029,7 +1012,7 @@ const handleSaveEdit = async (billId, formData) => {
 
                   {/* Attachment indicator */}
                   {bill.attachments?.length > 0 && (
-                    <div className='mt-2.5 flex items-center gap-1 text-xs text-gray-400'>
+                    <div className='mt-2.5 flex items-center gap-1 text-xs text-subtle'>
                       <Paperclip className='w-3 h-3' />
                       {bill.attachments.length} attachment{bill.attachments.length > 1 ? 's' : ''}
                     </div>
@@ -1041,7 +1024,7 @@ const handleSaveEdit = async (billId, formData) => {
           ))}
 
           {filteredBills.length === 0 && (
-            <div className='p-8 text-center text-gray-500 text-sm'>
+            <div className='p-8 text-center text-muted text-sm'>
               No bills found.
             </div>
           )}
@@ -1051,7 +1034,7 @@ const handleSaveEdit = async (billId, formData) => {
       </div>
 
       {/* Footer Info */}
-      <div className='mt-4 text-center text-xs text-gray-400'>
+      <div className='mt-4 text-center text-xs text-subtle'>
         {!selectedVendor ? `Showing ${vendorSummaryData.length} vendors` : `Showing ${filteredBills.length} bills`}
       </div>
 
