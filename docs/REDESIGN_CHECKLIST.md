@@ -65,7 +65,8 @@ computer, has its own loading look, and its old modals are redone too.
 - ⬜ `/branch-settings` Branch settings (owner saw UI problems — 4.1 notes)
 - ⬜ `/branches/branch-management`, `/branches/[branchId]` Branches
 - ⬜ `/audit-log`, `/branch-audit` Audit logs
-- ⬜ `/login`, `/signup`, `/signup/verify`, `/reset-password` Sign-in screens
+- ✅ `/login` Sign in (animated brand side, show/hide password, Caps Lock warning, shake on a wrong try, check before opening)
+- ⬜ `/signup`, `/signup/verify`, `/reset-password` Sign-up and password reset
 - ⬜ `/unauthorized` — **missing page**: middleware sends people here, today they get the 404
 - ⬜ Error and not-found screens (`app/error.jsx`, `app/not-found.jsx`, section `error.js` files)
 - ⬜ `/tools/invoice-generator` Invoice generator
