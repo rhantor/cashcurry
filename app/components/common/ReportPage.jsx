@@ -34,7 +34,8 @@ const pick = (obj, path) => path.split(".").reduce((o, k) => (o == null ? o : o[
  * filterConfig { dateField, searchFields, customFilters }, exportFunctions { exportPDF, exportExcel },
  * modalContentRenderer(item, branchData, close, monthTotal), searchBarShow, searchPlaceholder,
  * onDateSync({ startDate, endDate }), chartConfig { enabled, type, valueField, theme }, showTotalsFooter, isLoading.
- * `title` is shown by the top bar now; `toolbar` adds controls next to the period.
+ * `title` is shown by the top bar now; `toolbar` adds controls next to the period;
+ * `extra(rows)` draws more under the figures (rows = the filtered records).
  */
 export default function ReportPage({
   data = [],
@@ -50,6 +51,7 @@ export default function ReportPage({
   showTotalsFooter,
   isLoading = false,
   toolbar,
+  extra,
 }) {
   const currency = useCurrency();
   const money = (v) => formatMoney(v, currency);
@@ -122,6 +124,7 @@ export default function ReportPage({
       primary: c.primary || (i === 0 && !columns.some((x) => x.primary)),
       aside: c.aside || (!anyAside && c.key === valueField),
       hideOnMobile: c.hideOnMobile || c.key === "__actions",
+      sortValue: c.sortValue,
       render: (r) => (c.render ? c.render(r[c.key], r) : r[c.key]),
     }));
   }, [columns, valueField]);
@@ -168,6 +171,8 @@ export default function ReportPage({
           ))}
         </div>
       )}
+
+      {extra?.(filteredData)}
 
       {/* the trend */}
       {chartConfig?.enabled && valueField && (

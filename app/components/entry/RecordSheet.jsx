@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { format, isValid, parseISO } from "date-fns";
 import { motion } from "framer-motion";
-import { Building2, ExternalLink, FileSpreadsheet, FileText, MoreHorizontal, Pencil, Share2 } from "lucide-react";
+import { Building2, ExternalLink, FileSpreadsheet, FileText, Info, MoreHorizontal, Pencil, Share2, Trash2 } from "lucide-react";
 import { Button, CountUp, Menu, Sheet, Skeleton } from "@/app/components/ui";
 
 const when = (v) => {
@@ -17,7 +17,7 @@ const TONE = {
   out: "from-[#eb6834] to-[#a8431d]",
 };
 
-/** One attachment: the photo itself, or a file card for a PDF. */
+/** One attachment: the photo itself, or a file card for a PDF (opens in a new tab). */
 function Attachment({ url, i }) {
   const [loading, setLoading] = useState(true);
   if (isPdfUrl(url)) {
@@ -46,9 +46,10 @@ function Attachment({ url, i }) {
  *   title, branch, amount, money, tone ("bank" | "brand" | "out"), amountLabel
  *   rows: [{ label, value }] (empty values are left out)
  *   files: [url]; by; at (createdAt)
- *   share / pdf / excel: functions (each optional); onEdit
+ *   share / pdf / excel: functions (each optional); onEdit; onDelete (red, asks first in the caller)
+ *   note: a line above the details (e.g. why it can't be changed here)
  */
-export default function RecordSheet({ open = true, onClose, title, branch, amount, money, amountLabel = "Amount", tone = "brand", rows = [], files = [], by, at, share, pdf, excel, onEdit }) {
+export default function RecordSheet({ open = true, onClose, title, branch, amount, money, amountLabel = "Amount", tone = "brand", rows = [], files = [], by, at, share, pdf, excel, onEdit, onDelete, note, children }) {
   const created = when(at);
   const menu = [
     share && { label: "Share", icon: Share2, onSelect: share },
@@ -69,8 +70,13 @@ export default function RecordSheet({ open = true, onClose, title, branch, amoun
         ) : undefined
       }
       footer={
-        (menu.length > 0 || onEdit) && (
+        (menu.length > 0 || onEdit || onDelete) && (
           <>
+            {onDelete && (
+              <Button variant="secondary" size="lg" icon={Trash2} onClick={onDelete} aria-label="Delete" className="shrink-0 px-3.5 text-danger sm:px-4">
+                <span className="hidden sm:inline">Delete</span>
+              </Button>
+            )}
             {onEdit && (
               <Button variant="secondary" size="lg" icon={Pencil} onClick={onEdit} className="flex-1">
                 Edit
@@ -97,6 +103,13 @@ export default function RecordSheet({ open = true, onClose, title, branch, amoun
         <CountUp value={Number(amount) || 0} format={money} className="mt-0.5 block text-3xl font-bold tracking-tight" />
       </div>
 
+      {note && (
+        <p className="mt-3 flex gap-2 rounded-xl bg-info-soft px-3 py-2.5 text-xs text-fg">
+          <Info className="mt-px size-3.5 shrink-0 text-info" />
+          <span>{note}</span>
+        </p>
+      )}
+
       <dl className="mt-4 divide-y divide-line">
         {rows
           .filter((r) => r.value !== undefined && r.value !== null && r.value !== "")
@@ -113,6 +126,8 @@ export default function RecordSheet({ open = true, onClose, title, branch, amoun
             </motion.div>
           ))}
       </dl>
+
+      {children}
 
       {files.length > 0 ? (
         <div className="mt-4 space-y-2">
