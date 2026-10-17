@@ -391,6 +391,8 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
     branchName,
     companyName,
     computed,
+    // the cash book itself, for pages that lay out its days (display only)
+    ledger,
     tenderDefs,
     finalSummary,
     filterBadgeText,
