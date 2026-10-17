@@ -40,14 +40,14 @@ export default function UserModal({
 
   return (
     <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-      <div className="bg-white p-6 rounded-lg shadow-lg w-full max-w-md">
+      <div className="bg-surface p-6 rounded-lg shadow-lg w-full max-w-md">
         <div className="flex justify-between items-center mb-4">
           <h2 className="text-xl font-bold">
             {mode === "edit" ? "Edit User" : "Add New User"}
           </h2>
           <button
             onClick={onClose}
-            className="text-gray-500 hover:text-gray-800"
+            className="text-muted hover:text-fg"
           >
             <X size="1em" />
           </button>
@@ -100,7 +100,7 @@ export default function UserModal({
 
           <button
             type="submit"
-            className="w-full bg-mint-500 text-white py-2 rounded-lg hover:bg-mint-600 transition"
+            className="w-full bg-brand text-brand-fg py-2 rounded-lg hover:bg-brand transition"
           >
             {mode === "edit" ? "Update User" : "Add User"}
           </button>

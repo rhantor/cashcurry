@@ -17,10 +17,10 @@ const BranchForm = ({
     <div>
       <form
         onSubmit={handleCreateBranch}
-        className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-white p-4 rounded-lg shadow"
+        className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-surface p-4 rounded-lg shadow"
       >
         <div>
-          <label className="block text-sm font-medium text-gray-700">
+          <label className="block text-sm font-medium text-fg">
             Branch Name
           </label>
           <input
@@ -36,7 +36,7 @@ const BranchForm = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">
+          <label className="block text-sm font-medium text-fg">
             Contact Number
           </label>
           <input
@@ -52,7 +52,7 @@ const BranchForm = ({
         </div>
 
         <div className="md:col-span-2">
-          <label className="block text-sm font-medium text-gray-700">
+          <label className="block text-sm font-medium text-fg">
             Address
           </label>
           <input
@@ -68,7 +68,7 @@ const BranchForm = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">
+          <label className="block text-sm font-medium text-fg">
             Email
           </label>
           <input
@@ -83,7 +83,7 @@ const BranchForm = ({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700">
+          <label className="block text-sm font-medium text-fg">
             Note (Optional)
           </label>
           <input
@@ -102,8 +102,8 @@ const BranchForm = ({
             type="submit"
             className={`px-6 py-2 rounded text-white ${
               disableForm || isMaxBranches
-                ? "bg-gray-400 cursor-not-allowed"
-                : "bg-mint-600 hover:bg-mint-700"
+                ? "bg-surface-2 text-subtle cursor-not-allowed"
+                : "bg-brand hover:brightness-105"
             }`}
             disabled={disableForm || isMaxBranches || isAddingBranch}
           >
@@ -112,11 +112,11 @@ const BranchForm = ({
         </div>
 
         {errorMsg && (
-          <p className="text-red-600 text-sm md:col-span-2">{errorMsg}</p>
+          <p className="text-danger text-sm md:col-span-2">{errorMsg}</p>
         )}
 
         {isMaxBranches && (
-          <p className="text-red-500 text-sm md:col-span-2">
+          <p className="text-danger text-sm md:col-span-2">
             ⚠️ Maximum 5 branches allowed per company.
           </p>
         )}

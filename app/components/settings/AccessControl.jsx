@@ -18,7 +18,7 @@ const AccessControl = ({ users, setUsers }) => {
       {users?.map((u, i) => (
         <div
           key={i}
-          className="p-2 border rounded bg-gray-50 flex justify-between"
+          className="p-2 border rounded bg-surface-2/60 flex justify-between"
         >
           <span>
             {u.name} - {u.role}
@@ -45,7 +45,7 @@ const AccessControl = ({ users, setUsers }) => {
 
       <button
         onClick={addUser}
-        className="px-4 py-2 bg-green-500 text-white rounded"
+        className="px-4 py-2 bg-brand text-white rounded"
       >
         Add User
       </button>

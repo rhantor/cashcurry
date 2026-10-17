@@ -136,7 +136,7 @@ export default function useBranchSettingsForm() {
   const saving = savingBranch || savingSettings;
 
   const save = async () => {
-    if (!form) return;
+    if (!form) return false;
     setSaveError("");
 
     // 1) Split updates: what goes to branch vs settings
@@ -185,12 +185,16 @@ export default function useBranchSettingsForm() {
       setSaveError(
         e?.message || e?.error?.message || "Could not save settings."
       );
-      return;
+      return false;
     }
 
     // Reset dirty state on successful save
     setInitialFormText(JSON.stringify({ ...form, basic: { ...form.basic, ...branchUpdates } }));
+    return true;
   };
+
+  // Put the form back as it was last saved.
+  const discard = () => initialFormText && setForm(JSON.parse(initialFormText));
 
   return {
     companyId,
@@ -201,6 +205,7 @@ export default function useBranchSettingsForm() {
     form,
     setForm,
     save,
+    discard,
     saving,
     saveError,
     loadError: branchError || settingsError,
