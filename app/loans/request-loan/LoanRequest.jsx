@@ -1,60 +1,52 @@
 "use client";
 import React, { useMemo, useState } from "react";
+import Link from "next/link";
+import { ArrowRight, Building2, Send } from "lucide-react";
+import { serverTimestamp } from "firebase/firestore";
 import { useAddLoanEntryMutation } from "@/lib/redux/api/loanApiSlice";
 import { useGetBranchesBasicQuery } from "@/lib/redux/api/branchApiSlice";
-import { serverTimestamp } from "firebase/firestore";
 import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
-import { toast } from "@/app/components/ui/notify";
+import useCurrency from "@/app/hooks/useCurrency";
+import { formatMoney } from "@/lib/region/currency";
+import { Button, CountUp, Field, Input, Skeleton, cn, toast } from "@/app/components/ui";
+import MoneyInput from "@/app/components/entry/MoneyInput";
+import { EntryLayout, EntrySection, SummaryLine } from "@/app/components/entry/EntryLayout";
 
+/**
+ * Ask another branch for a loan: which branch, how much, why. It reaches that
+ * branch's Requested panel; once they approve and send it, it shows under
+ * Loan updates and in the cash book.
+ */
 const LoanRequestForm = () => {
   const { ready, companyId, branchId, user } = useResolvedCompanyBranch();
+  const currency = useCurrency();
+  const money = (v) => formatMoney(v, currency);
 
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
   const [toBranchId, setToBranchId] = useState("");
+  const [errors, setErrors] = useState({});
 
-  const [touched, setTouched] = useState({ amount: false, toBranchId: false });
-
-  const {
-    data: branches,
-    isLoading: branchesLoading,
-    isError: branchesError,
-    error: branchesErrorDetail,
-    refetch: refetchBranches,
-  } = useGetBranchesBasicQuery(companyId, { skip: !companyId, refetchOnMountOrArgChange: true });
-
+  const { data: branches, isLoading: branchesLoading, isError: branchesError, refetch: refetchBranches } = useGetBranchesBasicQuery(companyId, {
+    skip: !companyId,
+    refetchOnMountOrArgChange: true,
+  });
   const getBranchName = (id) => branches?.find((b) => b.id === id)?.name || id;
+  const [addLoanEntry, { isLoading }] = useAddLoanEntryMutation();
 
-  const [addLoanEntry, { isLoading, isError, error, isSuccess }] =
-    useAddLoanEntryMutation();
+  const fromBranchName = useMemo(() => branches?.find((x) => x.id === branchId)?.name ?? "", [branches, branchId]);
+  const otherBranches = useMemo(() => (branches || []).filter((b) => b.id !== branchId), [branches, branchId]);
 
-  const fromBranchName = useMemo(() => {
-    if (!branches || !branchId) return "";
-    const b = branches.find((x) => x.id === branchId);
-    return b?.name ?? "";
-  }, [branches, branchId]);
-
-  const otherBranches = useMemo(() => {
-    if (!branches || !branchId) return [];
-    return branches.filter((b) => b.id !== branchId);
-  }, [branches, branchId]);
-
-  // --- Validation ---
   const numericAmount = Number(amount);
-  const amountValid = Number.isFinite(numericAmount) && numericAmount > 0;
-  const toBranchValid = !!toBranchId && toBranchId !== branchId;
-  const formValid =
-    amountValid && toBranchValid && !!companyId && !!branchId && !!user;
 
-  // Branch directory
+  const handleSubmit = async () => {
+    const e = {};
+    if (!toBranchId || toBranchId === branchId) e.to = "Pick the branch to ask";
+    if (!(Number.isFinite(numericAmount) && numericAmount > 0)) e.amount = "Enter how much";
+    setErrors(e);
+    if (Object.keys(e).length || !companyId || !branchId || !user) return;
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!formValid) return;
-
-    // IMPORTANT: If your RTK mutation runs on a server (Node) that writes to Firestore,
-    // you should set timestamps on the server side instead of sending `serverTimestamp()` from the client.
-    // If your mutation writes directly via client SDK inside the hook, `serverTimestamp()` is fine.
+    const who = { uid: user?.uid ?? null, username: user?.username ?? "", email: user?.email ?? "", role: user?.role ?? "" };
     const payload = {
       requestFromBranchId: branchId,
       requestedToBranchId: toBranchId,
@@ -62,182 +54,128 @@ const LoanRequestForm = () => {
       requestedTo: getBranchName(toBranchId),
       amount: numericAmount,
       reason: reason?.trim() || "",
-      createdBy: {
-        uid: user?.uid ?? null,
-        username: user?.username ?? "",
-        email: user?.email ?? "",
-        role: user?.role ?? "",
-      },
-      requestedBy: {
-        uid: user?.uid ?? null,
-        username: user?.username ?? "",
-        email: user?.email ?? "",
-        role: user?.role ?? "",
-      },
+      createdBy: who,
+      requestedBy: who,
       status: "pending",
       createdAt: serverTimestamp(),
     };
-
     try {
       await addLoanEntry({ companyId, data: payload }).unwrap();
+      toast.success("Loan request sent", { description: `${money(numericAmount)} from ${getBranchName(toBranchId)}` });
       setAmount("");
       setReason("");
       setToBranchId("");
-      setTouched({ amount: false, toBranchId: false });
-      toast.success("Loan request sent!");
     } catch (err) {
       console.error(err);
+      toast.error("Couldn't send the request", { description: err?.data?.message || "Check your connection and try again." });
     }
   };
 
-  if (!ready) return <p className="p-4">Syncing session...</p>;
-  if (!companyId || !branchId) return <p className="p-4">Please log in to a branch to request loans.</p>;
+  if (!ready) return <Skeleton className="m-6 h-64" rounded="rounded-2xl" />;
+  if (!companyId || !branchId) return <p className="p-6 text-sm text-muted">Sign in to a branch to ask for a loan.</p>;
+
+  const target = toBranchId ? getBranchName(toBranchId) : "";
+  const send = (
+    <Button size="lg" icon={Send} className="w-full" loading={isLoading} onClick={handleSubmit}>
+      Send request
+    </Button>
+  );
 
   return (
-    <div className="bg-white rounded-2xl shadow p-4 sm:p-6 max-w-md mx-auto">
-      <h2 className="text-lg sm:text-xl font-bold mb-4 text-black">
-        Request Loan
-      </h2>
+    <EntryLayout
+      aside={
+        <div className="space-y-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-subtle">Asking for</p>
+            <CountUp value={numericAmount || 0} format={money} className="mt-1 block text-3xl font-bold tracking-tight text-fg" />
+          </div>
+          <div className="space-y-2 border-t border-line pt-3">
+            <SummaryLine label="From" value={target || "Pick a branch"} muted={!target} />
+            <SummaryLine label="To" value={fromBranchName || "This branch"} />
+            <SummaryLine label="Asked by" value={user?.username || "—"} />
+          </div>
+          {send}
+          <p className="text-[11px] text-muted">Nothing moves until {target || "that branch"} approves and sends it.</p>
+        </div>
+      }
+      bar={
+        <div className="flex items-center gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold uppercase tracking-wider text-subtle">Loan request</p>
+            <CountUp value={numericAmount || 0} format={money} className="block truncate text-lg font-bold tracking-tight text-fg" />
+          </div>
+          <div className="w-40 shrink-0">{send}</div>
+        </div>
+      }
+    >
+      {/* who lends to whom */}
+      <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3 text-sm">
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-info-soft text-info">
+          <Building2 className="size-4" />
+        </span>
+        <ArrowRight className="size-4 shrink-0 text-subtle" />
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-brand-soft text-brand">
+          <Building2 className="size-4" />
+        </span>
+        <p className="min-w-0 text-xs text-muted">
+          Money from <b className="text-fg">{target || "another branch"}</b> to <b className="text-fg">{fromBranchName || "this branch"}</b>, paid back later. See how it stands in{" "}
+          <Link href="/loans/loan-summary" className="font-semibold text-brand hover:underline">
+            Loan summary
+          </Link>
+          .
+        </p>
+      </div>
 
-      {branchesError && (
-        <div className="mb-3 flex items-center gap-2">
-          <p className="text-sm text-red-500 font-medium">
-            Failed to load branches
-            {branchesErrorDetail?.code ? ` (${branchesErrorDetail.code})` : ""}.
+      <EntrySection title="Which branch to ask">
+        {branchesError ? (
+          <p className="flex items-center gap-2 text-sm text-danger">
+            Couldn&apos;t load the branches.
+            <button type="button" onClick={refetchBranches} className="font-semibold underline">
+              Try again
+            </button>
           </p>
-          <button
-            type="button"
-            onClick={refetchBranches}
-            className="text-xs text-blue-600 underline hover:text-blue-800"
-          >
-            Retry
-          </button>
-        </div>
-      )}
-
-      {isError && (
-        <p className="mb-3 text-sm text-mint-500 font-medium">
-          {error?.data?.message || "Failed to send request."}
-        </p>
-      )}
-      {isSuccess && (
-        <p className="mb-3 text-sm text-green-600 font-medium">
-          Request submitted successfully.
-        </p>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-4">
-        {/* From Branch (read-only) */}
-        <div>
-          <label className="block mb-1 font-semibold text-black">
-            From Branch
-          </label>
-          <input
-            type="text"
-            value={fromBranchName || "Loading..."}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 bg-gray-100 text-black"
-            readOnly
-          />
-        </div>
-
-        {/* To Branch */}
-        <div>
-          <label className="block mb-1 font-semibold text-black">
-            To Branch
-          </label>
-          <select
-            value={toBranchId}
-            onChange={(e) => setToBranchId(e.target.value)}
-            onBlur={() => setTouched((t) => ({ ...t, toBranchId: true }))}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-black"
-            required
-            disabled={branchesLoading || otherBranches.length === 0}
-          >
-            <option value="">Select branch</option>
+        ) : branchesLoading ? (
+          <Skeleton className="h-14" rounded="rounded-2xl" />
+        ) : otherBranches.length === 0 ? (
+          <p className="text-sm text-muted">There&apos;s no other branch to ask.</p>
+        ) : (
+          <div className="grid gap-2 sm:grid-cols-2">
             {otherBranches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
+              <button
+                key={b.id}
+                type="button"
+                onClick={() => {
+                  setToBranchId(b.id);
+                  setErrors((x) => ({ ...x, to: undefined }));
+                }}
+                aria-pressed={toBranchId === b.id}
+                className={cn(
+                  "flex items-center gap-3 rounded-2xl border px-4 py-3 text-left transition",
+                  toBranchId === b.id ? "border-brand bg-brand-soft/60 ring-4 ring-[var(--cc-ring)]" : "border-line bg-surface hover:border-brand/40"
+                )}
+              >
+                <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-xl", toBranchId === b.id ? "bg-surface text-brand" : "bg-surface-2 text-muted")}>
+                  <Building2 className="size-4" />
+                </span>
+                <span className="truncate text-sm font-semibold text-fg">{b.name}</span>
+              </button>
             ))}
-          </select>
-          {!toBranchValid && touched.toBranchId && (
-            <p className="mt-1 text-xs text-mint-600">
-              Please choose a different branch.
-            </p>
-          )}
-        </div>
-
-        {/* Amount */}
-        <div>
-          <label className="block mb-1 font-semibold text-black">
-            Amount (RM)
-          </label>
-          <input
-            type="number"
-            inputMode="decimal"
-            min="1"
-            step="0.01"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            onBlur={() => setTouched((t) => ({ ...t, amount: true }))}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-black"
-            placeholder="5000"
-            required
-          />
-          {!amountValid && touched.amount && (
-            <p className="mt-1 text-xs text-mint-600">
-              Enter a valid positive amount.
-            </p>
-          )}
-        </div>
-
-        {/* Reason */}
-        <div>
-          <label className="block mb-1 font-semibold text-black">Reason</label>
-          <input
-            type="text"
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-black"
-            placeholder="Salary shortfall"
-          />
-          <p className="mt-1 text-xs text-gray-500">
-            Optional, but recommended.
-          </p>
-        </div>
-
-        {/* Requested By Info */}
-        {user && (
-          <div className="bg-mint-100 border border-mint-300 rounded-lg p-3">
-            <p className="text-sm font-semibold text-black">
-              Requested By:
-              <span className="ml-1 text-green-700">
-                {user.username || "Unknown"}
-              </span>
-            </p>
-            <p className="text-xs text-black">
-              Role:{" "}
-              <span className="font-medium text-green-600">
-                {user.role || "N/A"}
-              </span>
-            </p>
           </div>
         )}
+        {errors.to && <p className="mt-2 text-xs font-medium text-danger">{errors.to}</p>}
+      </EntrySection>
 
-        {/* Submit Button */}
-        <button
-          type="submit"
-          disabled={isLoading || !formValid}
-          className={`w-full rounded-lg py-2 font-semibold transition ${
-            isLoading || !formValid
-              ? "bg-gray-300 text-gray-600 cursor-not-allowed"
-              : "bg-green-600 hover:bg-green-700 text-white"
-          }`}
-        >
-          {isLoading ? "Submitting..." : "Send Loan Request"}
-        </button>
-      </form>
-    </div>
+      <EntrySection title="How much, and why">
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Amount" error={errors.amount}>
+            {({ id, invalid }) => <MoneyInput id={id} currency={currency} value={amount} invalid={invalid} onValueChange={(v) => (setAmount(v), setErrors((x) => ({ ...x, amount: undefined })))} />}
+          </Field>
+          <Field label="Why" hint="Optional, but it helps them decide">
+            {({ id }) => <Input id={id} size="lg" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="e.g. Short for salaries this month" />}
+          </Field>
+        </div>
+      </EntrySection>
+    </EntryLayout>
   );
 };
 

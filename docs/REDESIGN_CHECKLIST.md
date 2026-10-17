@@ -35,7 +35,7 @@ computer, has its own loading look, and its old modals are redone too.
 - ✅ `/requested-panel` Requested panel (advances, staff loans, branch loans, OT)
 - ✅ `/supervisor-panel` My requests (supervisor)
 - ✅ `/staff-loans` Staff loan tracker
-- ⬜ `/loans/request-loan` Request a branch loan
+- ✅ `/loans/request-loan` Request a branch loan
 - ⬜ `/loans/loan-updates` Loan updates
 - ⬜ `/loans/loan-summary` Loan summary
 
