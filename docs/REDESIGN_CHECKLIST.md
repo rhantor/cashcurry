@@ -69,9 +69,9 @@ computer, has its own loading look, and its old modals are redone too.
 - ✅ `/signup`, `/signup/verify`, `/reset-password` Sign-up and password reset
 - ✅ `/unauthorized` — made (was missing: people sent here got the 404)
 - ✅ Error and not-found screens (`app/error.jsx`, `app/not-found.jsx`, section `error.js` files)
-- ⬜ `/tools/invoice-generator` Invoice generator
+- ✅ `/tools/invoice-generator` Invoice generator (form restyled; the invoice itself stays white)
 - ⬜ `/tools/appointment-letter` Appointment letter (2.7k lines — 3.5)
-- ⬜ `/support` Support
+- ✅ `/support` Support (help page; NEXT_PUBLIC_SUPPORT_EMAIL shows the email button)
 - ⬜ `/branch-chat`, `/feeds` Branch chat and feeds (replaced later by 4.4)
 
 ## Staff app (Phase 4.6 rebuilds these; restyle only if needed before)
