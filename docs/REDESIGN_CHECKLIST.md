@@ -67,8 +67,8 @@ computer, has its own loading look, and its old modals are redone too.
 - ⬜ `/audit-log`, `/branch-audit` Audit logs
 - ✅ `/login` Sign in (animated brand side, show/hide password, Caps Lock warning, shake on a wrong try, check before opening)
 - ⬜ `/signup`, `/signup/verify`, `/reset-password` Sign-up and password reset
-- ⬜ `/unauthorized` — **missing page**: middleware sends people here, today they get the 404
-- ⬜ Error and not-found screens (`app/error.jsx`, `app/not-found.jsx`, section `error.js` files)
+- ✅ `/unauthorized` — made (was missing: people sent here got the 404)
+- ✅ Error and not-found screens (`app/error.jsx`, `app/not-found.jsx`, section `error.js` files)
 - ⬜ `/tools/invoice-generator` Invoice generator
 - ⬜ `/tools/appointment-letter` Appointment letter (2.7k lines — 3.5)
 - ⬜ `/support` Support
