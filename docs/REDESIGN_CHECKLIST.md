@@ -45,8 +45,8 @@ computer, has its own loading look, and its old modals are redone too.
 - ⬜ `/kiosk`, `/kiosk/[branchId]` Kiosk (replaced later by 4.8)
 
 ## 3.4.6 Payroll
-- ⬜ `/payroll` Run payroll
-- ⬜ `/payroll/history` Payroll history
+- ✅ `/payroll` Run payroll — month stepper, draft → finalized → paid steps, tap-to-open payslip cards, next step in a bottom bar, mark-paid sheet, opens on ?period=
+- ✅ `/payroll/history` Payroll history — year paid / waiting / drafts, tabs with counts, runs open to their payslips; "Carry on" opens that month
 
 ## 3.4.7 Purchases
 - ✅ `/purchases/order-guides` Order guides — money format, kit select, names on orders
