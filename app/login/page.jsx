@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useAnimationControls } from "framer-motion";
 import { ArrowRight, Eye, EyeOff, FlaskConical, KeyRound, Lock, ShieldCheck, UserRound } from "lucide-react";
 import { useLoginMutation } from "@/lib/redux/api/authApiSlice";
 import { USE_EMULATOR } from "@/lib/firebase";
@@ -26,7 +26,7 @@ const LOCAL_ACCOUNTS = (() => {
 /** Firebase's wording → something a person can act on. */
 const friendly = (message = "") => {
   const m = message.toLowerCase();
-  if (/wrong-password|invalid-credential|invalid-login|user-not-found|not found|invalid password|incorrect/.test(m)) return "That username or password isn't right.";
+  if (/wrong-password|invalid-credential|invalid-login|user-not-found|not found|invalid username|invalid password|incorrect/.test(m)) return "That username or password isn't right.";
   if (/too-many-requests/.test(m)) return "Too many tries. Wait a minute, then try again.";
   if (/network|offline|unavailable/.test(m)) return "Can't reach the server. Check the internet connection.";
   return message || "Couldn't sign in. Try again.";
@@ -91,10 +91,14 @@ export default function LoginPage() {
   const [show, setShow] = useState(false);
   const [caps, setCaps] = useState(false);
   const [error, setError] = useState("");
-  const [tries, setTries] = useState(0); // shakes the form on each failed try
   const [done, setDone] = useState(false);
   const [login, { isLoading }] = useLoginMutation();
   const router = useRouter();
+  const shake = useAnimationControls(); // the form shakes on each failed try
+  const fail = (message) => {
+    setError(message);
+    shake.start({ x: [0, -10, 10, -6, 6, -2, 0], transition: { duration: 0.45 } });
+  };
 
   useEffect(() => {
     router.prefetch?.("/");
@@ -110,16 +114,14 @@ export default function LoginPage() {
       setDone(true);
       setTimeout(() => router.replace("/"), 650);
     } catch (err) {
-      setError(friendly(err.message));
-      setTries((t) => t + 1);
+      fail(friendly(err.message));
     }
   };
 
   const submit = (e) => {
     e.preventDefault();
     if (!usernameOrEmail.trim() || !password) {
-      setError("Enter your username or email and your password.");
-      setTries((t) => t + 1);
+      fail("Enter your username or email and your password.");
       return;
     }
     signIn(usernameOrEmail.trim(), password);
@@ -167,10 +169,8 @@ export default function LoginPage() {
             <p className="mt-1.5 text-sm text-muted">Sign in to see today&apos;s numbers.</p>
 
             <motion.form
-              key={tries}
               onSubmit={submit}
-              animate={tries ? { x: [0, -10, 10, -6, 6, -2, 0] } : undefined}
-              transition={{ duration: 0.45 }}
+              animate={shake}
               className="mt-8 space-y-4"
               noValidate
             >
@@ -236,14 +236,15 @@ export default function LoginPage() {
                 </AnimatePresence>
               </div>
 
-              <AnimatePresence>
+              <AnimatePresence mode="wait" initial={false}>
                 {error && (
                   <motion.p
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
+                    key={error}
+                    initial={{ opacity: 0, y: -4 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, transition: { duration: 0.1 } }}
                     role="alert"
-                    className="overflow-hidden rounded-xl bg-danger-soft px-3.5 py-2.5 text-sm font-medium text-danger"
+                    className="rounded-xl bg-danger-soft px-3.5 py-2.5 text-sm font-medium text-danger"
                   >
                     {error}
                   </motion.p>
