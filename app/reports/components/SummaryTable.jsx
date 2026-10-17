@@ -1,316 +1,293 @@
-import React from "react";
+"use client";
 import { format, parseISO } from "date-fns";
+import { NotebookPen } from "lucide-react";
 import useCurrency from "@/app/hooks/useCurrency";
+import { formatMoney } from "@/lib/region/currency";
+import { cn } from "@/app/components/ui";
 
-// --- 1. Static Utils (Pure Functions) ---
-const fmt = (v) => {
-  const n = Number(v);
-  return isFinite(n) && Math.abs(n) >= 1e-9
-    ? n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    : "-";
-};
-const fmtRM = (v, currency) => {
-  const s = fmt(v);
-  return s === "-" ? "-" : `${currency || 'RM'} ${s}`;
-};
-const renderDate = (d) => {
+// --- figures ---------------------------------------------------------------
+const nonZero = (v) => isFinite(Number(v)) && Math.abs(Number(v)) >= 1e-9;
+const plain = (v) => (nonZero(v) ? Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "–");
+const dayText = (d, f = "dd MMM") => {
   if (!d) return "—";
   const dt = typeof d === "string" ? parseISO(d) : d;
-  return !dt || isNaN(dt) ? "—" : format(dt, "dd-MMM");
-};
-const nonZero = (v) => isFinite(Number(v)) && Math.abs(Number(v)) >= 1e-9;
-
-// --- 2. Shared Sub-Components ---
-const Badge = ({ children, color = "slate" }) => (
-  <span className={`inline-flex items-center text-[11px] px-2 py-0.5 rounded-full border ml-2 bg-${color}-50 border-${color}-200 text-${color}-700`}>
-    {children}
-  </span>
-);
-
-const SalesNotes = ({ text, details }) => {
-  if (!text) return <span className="text-slate-400">—</span>;
-  return (
-    <div className="flex items-start gap-2 text-xs text-slate-700 text-left">
-      <span title={text}>📝</span>
-      <div>
-        <div className="max-w-[12rem] truncate" title={text}>{text}</div>
-        <details className="mt-1">
-          <summary className="cursor-pointer text-emerald-700 hover:underline">View</summary>
-          <div className="mt-1 rounded border bg-amber-50 p-2 text-amber-900 shadow-sm min-w-[200px] z-50 relative">
-            {Object.entries(details || {}).map(([k, arr]) => (
-              <div key={k} className="mb-1">
-                <strong className="capitalize">{k}:</strong> {arr.join(", ")}
-              </div>
-            ))}
-          </div>
-        </details>
-      </div>
-    </div>
-  );
+  return !dt || isNaN(dt) ? "—" : format(dt, f);
 };
 
-// --- 3. Desktop Sub-Components ---
-const TH = ({ children, className = "" }) => (
-  <th className={`p-2 border whitespace-nowrap ${className}`}>{children}</th>
-);
+// colour by what the money does: in, out, bank, loans
+const INK = { in: "text-brand", out: "text-danger", bank: "text-info", loan: "text-warning", none: "text-fg" };
+// a thin bar on the left marks the kind of line
+const MARK = {
+  balance: "before:bg-subtle",
+  loan: "before:bg-warning",
+  repayment: "before:bg-info",
+  deposit: "before:bg-info",
+  withdraw: "before:bg-danger",
+  staffAdvance: "before:bg-danger",
+  staffLoan: "before:bg-warning",
+  total: "before:bg-brand",
+};
+
+// --- the values on one line (shared by the table and the phone cards) --------
+const advanceOf = (row) => row.advance ?? (row.type === "staffAdvance" ? row.amount : null);
+const loanGivenOf = (row) =>
+  row.type === "daily" || row.type === "total"
+    ? (row.loanGiven || 0) + (row.staffLoanGiven || 0) || null
+    : row.type === "loan" && row.role === "lender"
+      ? row.amount
+      : row.type === "staffLoan"
+        ? row.amount
+        : null;
+const loanRecvOf = (row) => row.loanReceived ?? (row.type === "loan" && row.role === "borrower" ? row.amount : null);
+// the engine's line names, in the words the app uses
+const labelOf = (row) => (row.type === "deposit" ? "Cash to bank" : row.type === "withdraw" ? "Bank to cash" : row.label || row.type);
+const depositOf = (row) => row.deposit ?? (row.type === "deposit" ? row.amount : null);
+const withdrawalOf = (row) => row.withdrawal ?? (row.type === "withdraw" ? row.amount : null);
+
+// --- computers: one wide table --------------------------------------------
+const TH = ({ children, className = "" }) => <th className={cn("whitespace-nowrap px-3 py-2.5 text-right font-semibold", className)}>{children}</th>;
 const TD = ({ children, className = "", colSpan }) => (
-  <td colSpan={colSpan} className={`p-2 border whitespace-nowrap text-xs ${className}`}>{children}</td>
+  <td colSpan={colSpan} className={cn("whitespace-nowrap px-3 py-2 text-right tabular-nums", className)}>
+    {children}
+  </td>
 );
+const Val = ({ v, ink = "none" }) => <span className={nonZero(v) ? INK[ink] : "text-subtle"}>{plain(v)}</span>;
 
-const DesktopHeader = ({ ctx }) => {
+function Header({ ctx }) {
   const { tenderDefs, hiddenCols, showRepayCash, showRepayBank, costCols, showBankBalance } = ctx;
+  const group = "bg-surface-2 text-[11px] uppercase tracking-wide text-muted";
   return (
-    <tr className="text-[11px] uppercase tracking-wide">
-      <TH className="sticky left-0 z-20 bg-slate-100 text-slate-600">Date</TH>
-      {tenderDefs.map(t => (!hiddenCols.cash || t.key !== 'cash'
-        ? <TH key={t.key} className="bg-emerald-50 text-emerald-800">{t.label || t.key}</TH>
-        : null))}
-      <TH className="bg-rose-50 text-rose-800">Advance</TH>
-      {costCols.map(c => <TH key={c} className="bg-rose-50 text-rose-800">Cost ({c === 'cash' ? 'Cash' : 'Bank'})</TH>)}
-      <TH className="bg-rose-50 text-rose-800">Salary</TH>
-      <TH className="hidden md:table-cell bg-amber-50 text-amber-800">Loan Given</TH>
-      <TH className="hidden md:table-cell bg-amber-50 text-amber-800">Loan Recv</TH>
-      {showRepayCash && <>
-        <TH className="hidden md:table-cell bg-amber-50 text-amber-800">Repay In (Cash)</TH>
-        <TH className="hidden md:table-cell bg-amber-50 text-amber-800">Repay Out (Cash)</TH>
-      </>}
-      {showRepayBank && <>
-        <TH className="hidden md:table-cell bg-amber-50 text-amber-800">Repay In (Bank)</TH>
-        <TH className="hidden md:table-cell bg-amber-50 text-amber-800">Repay Out (Bank)</TH>
-      </>}
-      <TH className="bg-blue-50 text-blue-800">Cash to Bank</TH>
-      <TH className="bg-blue-50 text-blue-800">Bank to Cash</TH>
-      <TH className="bg-slate-100 text-slate-800 font-bold">Total Sales</TH>
-      {!hiddenCols.cashInHand && <TH className="bg-emerald-100 text-emerald-900 font-bold">Cash in Hand</TH>}
-      {showBankBalance && <TH className="bg-blue-100 text-blue-900 font-bold">Bank Balance</TH>}
-      <TH className="bg-slate-50 text-slate-500 text-left normal-case tracking-normal">Notes</TH>
+    <tr className={group}>
+      <TH className="sticky left-0 z-20 bg-surface-2 text-left">Day</TH>
+      {tenderDefs.map((t) => (!hiddenCols.cash || t.key !== "cash" ? <TH key={t.key}>{t.label || t.key}</TH> : null))}
+      <TH>Advance</TH>
+      {costCols.map((c) => (
+        <TH key={c}>Cost ({c === "cash" ? "cash" : "bank"})</TH>
+      ))}
+      <TH>Salary</TH>
+      <TH>Loan given</TH>
+      <TH>Loan received</TH>
+      {showRepayCash && (
+        <>
+          <TH>Repaid in (cash)</TH>
+          <TH>Repaid out (cash)</TH>
+        </>
+      )}
+      {showRepayBank && (
+        <>
+          <TH>Repaid in (bank)</TH>
+          <TH>Repaid out (bank)</TH>
+        </>
+      )}
+      <TH>Cash to bank</TH>
+      <TH>Bank to cash</TH>
+      <TH className="text-fg">Total sales</TH>
+      {!hiddenCols.cashInHand && <TH className="text-brand">Cash in hand</TH>}
+      {showBankBalance && <TH className="text-info">Bank balance</TH>}
+      <TH className="text-left normal-case tracking-normal">Notes</TH>
     </tr>
   );
-};
+}
 
-// Left border color per row type for quick visual scanning
-const ROW_TYPE_BORDER = {
-  balance:     "border-l-4 border-l-slate-400",
-  loan:        "border-l-4 border-l-amber-400",
-  repayment:   "border-l-4 border-l-blue-400",
-  deposit:     "border-l-4 border-l-emerald-400",
-  withdraw:    "border-l-4 border-l-rose-400",
-  total:       "border-l-4 border-l-blue-600",
-  staffAdvance:"border-l-4 border-l-rose-400",
-  staffLoan:   "border-l-4 border-l-amber-500",
-};
+function Row({ row, ctx, isTotal }) {
+  const { tenderDefs, hiddenCols, showRepayCash, showRepayBank, costCols, showBankBalance, money } = ctx;
+  const first = cn(
+    "sticky left-0 z-10 text-left relative before:absolute before:inset-y-1 before:left-0 before:w-[3px] before:rounded-full",
+    MARK[isTotal ? "total" : row.type] || "before:bg-transparent"
+  );
 
-const DesktopRow = ({ row, ctx, isBalance, isTotal }) => {
-  const { tenderDefs, hiddenCols, showRepayCash, showRepayBank, costCols, showBankBalance } = ctx;
-
-  if (row.type === 'salesNote') {
+  if (row.type === "salesNote") {
     return (
-      <tr className="bg-amber-50">
-        <TD colSpan={100} className="text-left text-amber-900">
-          <div className="font-semibold flex gap-2"><span>📝</span> {row.label}</div>
-          <div className="whitespace-pre-wrap pl-6">{row.notesText}</div>
+      <tr className="bg-warning-soft/60">
+        <TD colSpan={100} className="text-left text-fg">
+          <span className="inline-flex items-start gap-2 whitespace-pre-wrap text-xs">
+            <NotebookPen className="mt-0.5 size-3.5 shrink-0 text-warning" />
+            <span>
+              <b className="font-semibold">{row.label}</b> · {row.notesText}
+            </span>
+          </span>
         </TD>
       </tr>
     );
   }
 
-  // Balance row: condensed — only show label + running balances, no empty cells
-  if (isBalance) {
-    let midCols = 0;
-    tenderDefs.forEach(t => { if (!hiddenCols.cash || t.key !== 'cash') midCols++; });
-    // Advance(1) + Costs + Salary(1) + LoanGiven(1) + LoanRecv(1) + Deposit(1) + Withdrawal(1) + TotalSales(1)
-    midCols += 7 + costCols.length;
-    if (showRepayCash) midCols += 2;
-    if (showRepayBank) midCols += 2;
+  if (row.type === "balance") {
+    let mid = 0;
+    tenderDefs.forEach((t) => {
+      if (!hiddenCols.cash || t.key !== "cash") mid++;
+    });
+    mid += 7 + costCols.length + (showRepayCash ? 2 : 0) + (showRepayBank ? 2 : 0);
     return (
-      <tr className="bg-slate-50 border-y-2 border-slate-200">
-        <TD className={`sticky left-0 z-10 bg-slate-50 font-bold text-slate-700 py-3 ${ROW_TYPE_BORDER.balance}`}>
-          {row.label}
+      <tr className="bg-surface-2/60">
+        <TD className={cn(first, "bg-surface-2 font-semibold text-fg")}>Brought forward</TD>
+        <TD colSpan={mid} className="text-center text-xs italic text-subtle">
+          from before {dayText(row.date, "d MMM yyyy")}
         </TD>
-        <TD colSpan={midCols} className="text-center text-slate-400 italic text-[11px] bg-slate-50">
-          — prior period —
-        </TD>
-        {!hiddenCols.cashInHand && (
-          <TD className="font-bold text-emerald-700 bg-emerald-50">
-            {fmtRM(row.runningCash, ctx.currency)}
-          </TD>
-        )}
-        {showBankBalance && (
-          <TD className="font-bold text-blue-700 bg-blue-50">
-            {fmtRM(row.runningBank, ctx.currency)}
-          </TD>
-        )}
-        <TD className="bg-slate-50" />
+        {!hiddenCols.cashInHand && <TD className="font-semibold text-brand">{money(row.runningCash)}</TD>}
+        {showBankBalance && <TD className="font-semibold text-info">{money(row.runningBank)}</TD>}
+        <TD />
       </tr>
     );
   }
 
-  const bg = isTotal
-    ? "bg-blue-50 font-bold"
-    : row.type === 'repayment'    ? "bg-blue-50"
-    : row.type === 'loan'         ? "bg-amber-50"
-    : row.type === 'deposit'      ? "bg-emerald-50"
-    : row.type === 'withdraw'     ? "bg-rose-50"
-    : row.type === 'staffAdvance' ? "bg-rose-50"
-    : row.type === 'staffLoan'    ? "bg-amber-50"
-    : "bg-white";
-
-  const borderClass = ROW_TYPE_BORDER[row.type] || "";
-
-  const Val = ({ v, rm }) => <span>{rm ? fmtRM(v, ctx.currency) : fmt(v)}</span>;
-
+  const daily = row.type === "daily";
+  const bg = isTotal ? "bg-surface-2" : daily ? "bg-surface" : "bg-surface-2/30";
   return (
-    <tr className={`${bg} text-center`}>
-      {/* Date / Label — left border indicates row type */}
-      <TD className={`sticky left-0 z-10 text-left ${bg} ${borderClass}`}>
-        {isTotal || row.type !== 'daily' ? row.label || row.type : renderDate(row.date)}
-        {row.method && <Badge>{row.method}</Badge>}
+    <tr className={cn(bg, isTotal ? "font-bold" : daily ? "" : "text-xs")}>
+      <TD className={cn(first, bg, daily || isTotal ? "font-semibold text-fg" : "pl-6 text-muted")}>
+        {isTotal ? "Period total" : daily ? dayText(row.date, "EEE dd MMM") : labelOf(row)}
+        {row.method && <span className="ml-2 rounded-full bg-surface-2 px-1.5 py-0.5 text-[10px] font-semibold text-muted">{row.method}</span>}
       </TD>
-
-      {/* Tenders (green = inflow) */}
-      {tenderDefs.map(t => {
-        if (hiddenCols.cash && t.key === 'cash') return null;
-        const v = row.tenders?.[t.key] ?? (isTotal ? row[t.key] : null);
-        return <TD key={t.key} className="text-emerald-700"><Val v={v} /></TD>;
+      {tenderDefs.map((t) => {
+        if (hiddenCols.cash && t.key === "cash") return null;
+        return (
+          <TD key={t.key}>
+            <Val v={row.tenders?.[t.key] ?? (isTotal ? row[t.key] : null)} ink="in" />
+          </TD>
+        );
       })}
-
-      {/* Expenses (red = outflow) */}
-      <TD className="text-rose-600">
-        <Val v={row.advance ?? (row.type === 'staffAdvance' ? row.amount : null)} />
-      </TD>
-      {costCols.map(c => <TD key={c} className="text-rose-600"><Val v={c === 'cash' ? row.costCash : row.costBank} /></TD>)}
-      <TD className="text-rose-700"><Val v={row.salaryCash} /></TD>
-
-      {/* Loans — inter-branch + staff loans both show here */}
-      <TD className="hidden md:table-cell text-amber-700">
-        <Val v={
-          row.type === 'daily' || isTotal
-            ? ((row.loanGiven || 0) + (row.staffLoanGiven || 0)) || null
-            : row.type === 'loan'      && row.role === 'lender' ? row.amount
-            : row.type === 'staffLoan' ? row.amount
-            : null
-        } rm />
-      </TD>
-      <TD className="hidden md:table-cell text-amber-600">
-        <Val v={row.loanReceived ?? (row.type === 'loan' && row.role === 'borrower' ? row.amount : null)} rm />
-      </TD>
-
-      {/* Repayments */}
-      {showRepayCash && <>
-        <TD className="hidden md:table-cell text-emerald-700"><Val v={row.repayCashIn} rm /></TD>
-        <TD className="hidden md:table-cell text-rose-600"><Val v={row.repayCashOut} rm /></TD>
-      </>}
-      {showRepayBank && <>
-        <TD className="hidden md:table-cell text-emerald-700"><Val v={row.repayBankIn} rm /></TD>
-        <TD className="hidden md:table-cell text-rose-600"><Val v={row.repayBankOut} rm /></TD>
-      </>}
-
-      {/* Bank movements */}
-      <TD className="text-blue-700"><Val v={row.deposit ?? (row.type === 'deposit' ? row.amount : null)} rm /></TD>
-      <TD className="text-rose-600"><Val v={row.withdrawal ?? (row.type === 'withdraw' ? row.amount : null)} rm /></TD>
-
-      {/* Totals */}
-      <TD className="font-semibold"><Val v={row.totalSales} /></TD>
-      {!hiddenCols.cashInHand && <TD className="font-semibold text-emerald-700"><Val v={row.runningCash} /></TD>}
-      {showBankBalance && <TD className="font-semibold text-blue-700"><Val v={row.runningBank} rm={isTotal} /></TD>}
-
       <TD>
-        {row.type === 'daily' && <SalesNotes text={row.salesNotesText} details={row.salesNotesByTender} />}
+        <Val v={advanceOf(row)} ink="out" />
+      </TD>
+      {costCols.map((c) => (
+        <TD key={c}>
+          <Val v={c === "cash" ? row.costCash : row.costBank} ink="out" />
+        </TD>
+      ))}
+      <TD>
+        <Val v={row.salaryCash} ink="out" />
+      </TD>
+      <TD>
+        <Val v={loanGivenOf(row)} ink="loan" />
+      </TD>
+      <TD>
+        <Val v={loanRecvOf(row)} ink="loan" />
+      </TD>
+      {showRepayCash && (
+        <>
+          <TD>
+            <Val v={row.repayCashIn} ink="in" />
+          </TD>
+          <TD>
+            <Val v={row.repayCashOut} ink="out" />
+          </TD>
+        </>
+      )}
+      {showRepayBank && (
+        <>
+          <TD>
+            <Val v={row.repayBankIn} ink="in" />
+          </TD>
+          <TD>
+            <Val v={row.repayBankOut} ink="out" />
+          </TD>
+        </>
+      )}
+      <TD>
+        <Val v={depositOf(row)} ink="bank" />
+      </TD>
+      <TD>
+        <Val v={withdrawalOf(row)} ink="out" />
+      </TD>
+      <TD className="font-semibold">
+        <Val v={row.totalSales} />
+      </TD>
+      {!hiddenCols.cashInHand && <TD className="font-semibold text-brand">{row.runningCash !== undefined ? plain(row.runningCash) : ""}</TD>}
+      {showBankBalance && <TD className="font-semibold text-info">{row.runningBank !== undefined ? plain(row.runningBank) : ""}</TD>}
+      <TD className="max-w-[14rem] truncate text-left text-xs text-muted" title={row.salesNotesText || undefined}>
+        {daily && row.salesNotesText ? row.salesNotesText : ""}
       </TD>
     </tr>
   );
-};
+}
 
-// --- 4. Mobile Sub-Components ---
-const MobileLine = ({ label, value, ctx, tone = "neutral", rm = true }) => {
-  if (!nonZero(value) && value !== '-') return null;
-  const colors = { neutral: "text-slate-800", in: "text-green-700", out: "text-red-700" };
+// --- phones: a card per day, the day's other movements inside it ------------
+function Line({ label, value, ink = "none", money }) {
+  if (!nonZero(value)) return null;
   return (
-    <div className="flex justify-between">
-      <span className="text-slate-600">{label}</span>
-      <span className={`font-medium ${colors[tone]}`}>{rm ? fmtRM(value, ctx?.currency) : fmt(value)}</span>
+    <div className="flex items-baseline justify-between gap-3 py-0.5">
+      <span className="text-muted">{label}</span>
+      <span className={cn("font-medium tabular-nums", INK[ink])}>{money(value)}</span>
     </div>
   );
-};
+}
 
-const MOBILE_CARD_STYLE = {
-  balance:   "border-l-4 border-l-slate-400 bg-slate-50",
-  total:     "border-l-4 border-l-blue-600 bg-blue-50 font-bold",
-  loan:      "border-l-4 border-l-amber-400 bg-amber-50",
-  repayment: "border-l-4 border-l-blue-400 bg-blue-50",
-  deposit:   "border-l-4 border-l-emerald-400 bg-emerald-50",
-  withdraw:  "border-l-4 border-l-rose-400 bg-rose-50",
-};
-
-const MobileCard = ({ row, ctx }) => {
-  const { tenderDefs, costCols, hiddenCols } = ctx;
-  const isNote = row.type === 'salesNote';
-  const isDaily = row.type === 'daily';
-  const isBal = row.type === 'balance';
-
-  if (isNote) return (
-    <div className="rounded-lg border bg-amber-50 p-3 shadow-sm text-amber-900">
-      <div className="font-semibold flex gap-2">📝 {row.label}</div>
-      <div className="mt-1 text-sm whitespace-pre-wrap">{row.notesText}</div>
-    </div>
-  );
-
-  const cardStyle = MOBILE_CARD_STYLE[row.type] || "bg-white";
-
+function DayCard({ row, events, ctx }) {
+  const { tenderDefs, hiddenCols, costCols, showRepayCash, showRepayBank, showBankBalance, money } = ctx;
+  const isTotal = row.type === "total";
   return (
-    <div className={`rounded-lg border p-3 shadow-sm ${cardStyle}`}>
-      <div className="flex justify-between items-center mb-2">
-        <div className="font-semibold capitalize">
-          {isDaily ? renderDate(row.date) : row.label || row.type}
-          {row.method && <Badge>{row.method}</Badge>}
+    <div className={cn("rounded-2xl border border-line p-4", isTotal ? "bg-surface-2" : "bg-surface")}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <p className="text-sm font-bold text-fg">{isTotal ? "Period total" : dayText(row.date, "EEE, d MMM")}</p>
+          {nonZero(row.totalSales) && <p className="text-xs text-muted">Sales {money(row.totalSales)}</p>}
         </div>
-        <div className="flex gap-3">
+        <div className="text-right text-xs">
           {!hiddenCols.cashInHand && row.runningCash !== undefined && (
-            <div className="text-xs text-slate-500">Cash: <span className="font-medium text-emerald-700">{fmtRM(row.runningCash, ctx.currency)}</span></div>
+            <p className="text-muted">
+              Cash <b className="font-semibold tabular-nums text-brand">{money(row.runningCash)}</b>
+            </p>
           )}
-          {ctx.showBankBalance && row.runningBank !== undefined && (
-            <div className="text-xs text-slate-500">Bank: <span className="font-medium text-blue-700">{fmtRM(row.runningBank, ctx.currency)}</span></div>
+          {showBankBalance && row.runningBank !== undefined && (
+            <p className="text-muted">
+              Bank <b className="font-semibold tabular-nums text-info">{money(row.runningBank)}</b>
+            </p>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
-        {row.totalSales > 0 && <MobileLine ctx={ctx} label="Total Sales" value={row.totalSales} rm={false} />}
-        <MobileLine ctx={ctx} label="Cash to bank" value={row.deposit} tone="in" />
-        <MobileLine ctx={ctx} label="Bank to cash" value={row.withdrawal} tone="out" />
-        <MobileLine ctx={ctx} label="Advance" value={row.advance ?? (row.type === 'staffAdvance' ? row.amount : null)} tone="out" />
-        {costCols.map(c => <MobileLine key={c} ctx={ctx} label={`Cost (${c})`} value={c==='cash'?row.costCash:row.costBank} tone="out" />)}
-        <MobileLine ctx={ctx} label="Salary" value={row.salaryCash} tone="out" />
-
-        <MobileLine ctx={ctx} label="Loan Given"
-          value={row.type === 'daily' || row.type === 'total'
-            ? ((row.loanGiven || 0) + (row.staffLoanGiven || 0)) || null
-            : row.type === 'staffLoan' ? row.amount
-            : row.loanGiven}
-          tone="out" />
-        <MobileLine ctx={ctx} label="Loan Recv" value={row.loanReceived} tone="in" />
-        
-        {ctx.showRepayCash && <><MobileLine ctx={ctx} label="Repay In (Cash)" value={row.repayCashIn} tone="in" /><MobileLine ctx={ctx} label="Repay Out (Cash)" value={row.repayCashOut} tone="out" /></>}
-        {ctx.showRepayBank && <><MobileLine ctx={ctx} label="Repay In (Bank)" value={row.repayBankIn} tone="in" /><MobileLine ctx={ctx} label="Repay Out (Bank)" value={row.repayBankOut} tone="out" /></>}
-        
-        {!isDaily && !isBal && <MobileLine ctx={ctx} label="Amount" value={row.amount} tone={row.direction === 'out' || row.role==='lender' ? 'out' : 'in'} />}
+      <div className="mt-2 border-t border-line pt-2 text-sm">
+        {tenderDefs.map((t) => (!hiddenCols.cash || t.key !== "cash" ? <Line key={t.key} label={t.label || t.key} value={row.tenders?.[t.key] ?? (isTotal ? row[t.key] : null)} ink="in" money={money} /> : null))}
+        <Line label="Advance" value={advanceOf(row)} ink="out" money={money} />
+        {costCols.map((c) => (
+          <Line key={c} label={`Cost (${c})`} value={c === "cash" ? row.costCash : row.costBank} ink="out" money={money} />
+        ))}
+        <Line label="Salary" value={row.salaryCash} ink="out" money={money} />
+        <Line label="Loan given" value={loanGivenOf(row)} ink="loan" money={money} />
+        <Line label="Loan received" value={row.loanReceived} ink="loan" money={money} />
+        {showRepayCash && (
+          <>
+            <Line label="Repaid in (cash)" value={row.repayCashIn} ink="in" money={money} />
+            <Line label="Repaid out (cash)" value={row.repayCashOut} ink="out" money={money} />
+          </>
+        )}
+        {showRepayBank && (
+          <>
+            <Line label="Repaid in (bank)" value={row.repayBankIn} ink="in" money={money} />
+            <Line label="Repaid out (bank)" value={row.repayBankOut} ink="out" money={money} />
+          </>
+        )}
+        <Line label="Cash to bank" value={row.deposit} ink="bank" money={money} />
+        <Line label="Bank to cash" value={row.withdrawal} ink="out" money={money} />
       </div>
 
-      {isDaily && (
-        <details className="mt-2 text-xs">
-          <summary className="cursor-pointer text-slate-500">Tender breakdown</summary>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            {tenderDefs.map(t => (!hiddenCols.cash || t.key !== 'cash') && (
-               <MobileLine key={t.key} ctx={ctx} label={t.label} value={row.tenders?.[t.key]} rm={false} />
-            ))}
-          </div>
-        </details>
+      {events.length > 0 && (
+        <ul className="mt-2 space-y-1 border-t border-line pt-2 text-xs">
+          {events.map((e, i) =>
+            e.type === "salesNote" ? (
+              <li key={i} className="flex gap-1.5 rounded-lg bg-warning-soft/60 px-2 py-1.5 text-fg">
+                <NotebookPen className="mt-0.5 size-3.5 shrink-0 text-warning" />
+                <span className="whitespace-pre-wrap">{e.notesText}</span>
+              </li>
+            ) : (
+              <li key={i} className="flex justify-between gap-3 text-muted">
+                <span className="truncate">{labelOf(e)}</span>
+                <span className="shrink-0 font-medium tabular-nums text-fg">{money(e.amount)}</span>
+              </li>
+            )
+          )}
+        </ul>
       )}
     </div>
   );
-};
+}
 
-// --- 5. Main Component ---
+/**
+ * The day-by-day cash book: each day's sales by payment type, money out, loans,
+ * moves between till and bank, and the running cash and bank. On computers a
+ * wide table (the day column stays put while it scrolls); on phones a card a
+ * day. The figures are the ledger's — this only lays them out.
+ */
 export default function SummaryTable({
   tenderDefs = [],
   summaryRows = [],
@@ -328,55 +305,87 @@ export default function SummaryTable({
   const ctx = {
     tenderDefs,
     hiddenCols,
-    currency,
+    money: (v) => formatMoney(v, currency),
     showRepayCash: showRepayCashCols,
     showRepayBank: showRepayBankCols,
     costCols: mode === "front" ? ["cash"] : mode === "back" ? ["bank"] : ["cash", "bank"],
     showBankBalance: mode !== "front",
   };
-  const dailyRows = summaryRows.filter(r => r.type === 'daily');
+  const dailyRows = summaryRows.filter((r) => r.type === "daily");
   const sumField = (key) => dailyRows.reduce((s, r) => s + Number(r[key] || 0), 0);
-  const lastDailyRow = dailyRows[dailyRows.length - 1];
+  const last = dailyRows[dailyRows.length - 1];
 
-  const periodTotalsRow = {
-    type: 'total',
-    label: 'Period Totals',
+  const totalRow = {
+    type: "total",
+    label: "Period Totals",
     ...periodTotals,
-    advance:         sumField('advance'),
-    staffLoanGiven:  sumField('staffLoanGiven'),
-    costCash:        sumField('costCash'),
-    costBank:        sumField('costBank'),
-    salaryCash:      sumField('salaryCash'),
-    loanGiven:       sumField('loanGiven'),
-    loanReceived:    sumField('loanReceived'),
-    deposit:      periodDeposits,
-    withdrawal:   periodWithdrawals,
-    repayCashIn:  periodRepaySums.cashIn,
+    advance: sumField("advance"),
+    staffLoanGiven: sumField("staffLoanGiven"),
+    costCash: sumField("costCash"),
+    costBank: sumField("costBank"),
+    salaryCash: sumField("salaryCash"),
+    loanGiven: sumField("loanGiven"),
+    loanReceived: sumField("loanReceived"),
+    deposit: periodDeposits,
+    withdrawal: periodWithdrawals,
+    repayCashIn: periodRepaySums.cashIn,
     repayCashOut: periodRepaySums.cashOut,
-    repayBankIn:  periodRepaySums.bankIn,
+    repayBankIn: periodRepaySums.bankIn,
     repayBankOut: periodRepaySums.bankOut,
-    totalSales:   periodTotalSales || sumField('totalSales'),
-    runningCash:  lastDailyRow?.runningCash,
-    runningBank:  lastDailyRow?.runningBank,
+    totalSales: periodTotalSales || sumField("totalSales"),
+    runningCash: last?.runningCash,
+    runningBank: last?.runningBank,
   };
+
+  // phones: each day with the lines that follow it (loans, deposits, notes…)
+  const days = [];
+  for (const r of summaryRows) {
+    if (r.type === "daily") days.push({ row: r, events: [] });
+    // a day's deposits and withdrawals are already its "Cash to bank" / "Bank to cash" lines
+    else if (r.type !== "balance" && r.type !== "deposit" && r.type !== "withdraw" && days.length) days[days.length - 1].events.push(r);
+  }
+  const opening = summaryRows.find((r) => r.type === "balance");
 
   return (
     <>
-      <div className="hidden md:block overflow-x-auto bg-white rounded-lg shadow">
-        <table className="min-w-full border-collapse text-xs sm:text-sm">
-          <thead><DesktopHeader ctx={ctx} /></thead>
-          <tbody>
-            {summaryRows.map((row, i) => (
-              <DesktopRow key={i} row={row} ctx={ctx} isBalance={row.type === 'balance'} />
-            ))}
-            <DesktopRow row={periodTotalsRow} ctx={ctx} isTotal />
-          </tbody>
-        </table>
+      <div className="hidden overflow-hidden rounded-2xl border border-line bg-surface shadow-card md:block">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-sm">
+            <thead className="border-b border-line">
+              <Header ctx={ctx} />
+            </thead>
+            <tbody className="divide-y divide-line">
+              {summaryRows.map((row, i) => (
+                <Row key={i} row={row} ctx={ctx} />
+              ))}
+              <Row row={totalRow} ctx={ctx} isTotal />
+            </tbody>
+          </table>
+        </div>
       </div>
 
-      <div className="md:hidden space-y-2">
-        {summaryRows.map((row, i) => <MobileCard key={i} row={row} ctx={ctx} />)}
-        <MobileCard row={periodTotalsRow} ctx={ctx} />
+      <div className="space-y-3 md:hidden">
+        {opening && (
+          <div className="flex items-center justify-between rounded-2xl border border-dashed border-line px-4 py-3 text-xs">
+            <span className="font-semibold text-muted">Brought forward</span>
+            <span className="space-x-3 text-right">
+              {!hiddenCols.cashInHand && (
+                <span className="text-muted">
+                  Cash <b className="tabular-nums text-brand">{ctx.money(opening.runningCash)}</b>
+                </span>
+              )}
+              {ctx.showBankBalance && (
+                <span className="text-muted">
+                  Bank <b className="tabular-nums text-info">{ctx.money(opening.runningBank)}</b>
+                </span>
+              )}
+            </span>
+          </div>
+        )}
+        {[...days].reverse().map((d) => (
+          <DayCard key={d.row.date} row={d.row} events={d.events} ctx={ctx} />
+        ))}
+        <DayCard row={totalRow} events={[]} ctx={ctx} />
       </div>
     </>
   );

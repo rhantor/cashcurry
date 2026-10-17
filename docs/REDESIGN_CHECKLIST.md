@@ -20,7 +20,7 @@ computer, has its own loading look, and its old modals are redone too.
 - ⏸ `/cash-tracker` Daily cash tracker — skipped for now (owner, 17 Oct 2026); comes back with 4.10 pay-outs (daily cash check)
 
 ## 3.4.3 Reports
-- ⬜ `/reports` Summary report
+- ✅ `/reports` Summary report
 - ✅ `/reports/sales-report` Sales report (+ day sheet, + change sales sheet)
 - ✅ `/reports/cost-report` Cost report (+ edit cost, attachments)
 - ✅ `/reports/deposit-report` Cash to bank report

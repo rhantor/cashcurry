@@ -1,155 +1,140 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import { useMemo, useState } from "react";
+import { Download, FileSpreadsheet, FileText } from "lucide-react";
 import { exportSummaryToExcel, exportSummaryToPDF } from "@/utils/export/exportSummary";
-import FilterBar from "@/app/components/common/FilterBar";
-import SummaryModeSwitch from "./components/SummaryModeSwitch";
+import { useSummaryReportLogic } from "@/hook/useSummaryReportLogic";
+import PeriodBar from "@/app/components/dashboard/PeriodBar";
+import { dayKeyOfFilter, presetFilter } from "@/utils/dashboard/dateFilters";
+import { useBusinessToday } from "@/app/hooks/useRegion";
+import { COLOR, ChartCard, TimeChart } from "@/app/components/dashboard/charts/kit";
+import { Chip } from "@/app/components/entry/Choices";
+import useCurrency from "@/app/hooks/useCurrency";
+import { formatMoney } from "@/lib/region/currency";
+import { Button, Menu, Skeleton, Tabs } from "@/app/components/ui";
 import KpiCards from "./components/KpiCards";
 import SummaryTable from "./components/SummaryTable";
-import { useSummaryReportLogic } from "@/hook/useSummaryReportLogic";
 
-const SUMMARY_MODES = [
-  { id: "front", label: "Front Office" },
-  { id: "back", label: "Back Office" },
-  { id: "all", label: "All" },
+const MODES = [
+  { value: "front", label: "Till (cash)", word: "Front Office" },
+  { value: "back", label: "Bank", word: "Back Office" },
+  { value: "all", label: "Both", word: "All" },
 ];
 
+/**
+ * Summary report: the branch's cash book over a period — what came in, what
+ * went out and where the money stands, for the till, the bank or both. The
+ * figures come from the finance engine (useSummaryReportLogic → buildLedger);
+ * this page only lays them out: the end figures, how the balance moved, and
+ * every day (with its loans, deposits and notes when details are on).
+ */
 export default function SummaryReport() {
-  // 1. UI State
-  const [filterState, setFilterState] = useState({
-    filterType: "last7days",
-    dateRange: { from: "", to: "" },
-    selectedMonth: "",
-  });
-  const [summaryMode, setSummaryMode] = useState("front");
-  const [showDetails, setShowDetails] = useState(true);
+  const today = useBusinessToday();
+  const [filter, setFilter] = useState(() => presetFilter("month", new Date(), today));
+  const [mode, setMode] = useState("front");
+  const [details, setDetails] = useState(true);
+  const currency = useCurrency();
+  const money = (v) => formatMoney(v, currency);
 
-  // 2. Logic & Data (Abstracted away)
-  const {
-    ready,
-    branchName,
+  // the dashboard's period as the hook's filter
+  const { from, to } = dayKeyOfFilter(filter);
+  const filterState = useMemo(() => ({ filterType: "range", dateRange: { from, to }, selectedMonth: "" }), [from, to]);
+  const { ready, isLoading, branchName, companyName, computed, tenderDefs, commonMeta } = useSummaryReportLogic(filterState, mode);
+
+  const rows = useMemo(() => (details ? computed.rows : computed.rows.filter((r) => r.type === "balance" || r.type === "daily")), [computed.rows, details]);
+  const opening = computed.rows.find((r) => r.type === "balance");
+  // "Loans given" counts loans to staff too, the same as the table's column
+  const kpis = useMemo(() => {
+    const toStaff = computed.rows.reduce((n, r) => n + (r.type === "daily" ? Number(r.staffLoanGiven) || 0 : 0), 0);
+    return { ...computed.kpis, totalLoanGiven: (Number(computed.kpis.totalLoanGiven) || 0) + toStaff };
+  }, [computed]);
+  const trend = useMemo(
+    () => computed.rows.filter((r) => r.type === "daily").map((r) => ({ date: r.date, cash: r.runningCash, bank: r.runningBank })),
+    [computed.rows]
+  );
+
+  const hiddenCols = mode === "back" ? { cash: true, cashInHand: true } : { cash: false, cashInHand: false };
+  const modeWord = MODES.find((m) => m.value === mode)?.word;
+  const meta = {
+    ...commonMeta,
+    title: `${branchName} Summary`,
     companyName,
-    computed,
-    tenderDefs,
-    filterBadgeText,
-    commonMeta,
-  } = useSummaryReportLogic(filterState, summaryMode);
+    branchName,
+    modeLabel: modeWord,
+    hiddenCols,
+    showRepayCashCols: mode !== "back",
+    showRepayBankCols: mode !== "front",
+  };
+  const exportArgs = [computed.rows, computed.kpis, computed.periodTotals, computed.periodTotalSales, computed.periodDeposits, computed.periodWithdrawals, computed.periodRepaySums, computed.tenderDefs, meta];
 
-  // 3. View-specific prep
-  const modeLabel = SUMMARY_MODES.find((m) => m.id === summaryMode)?.label;
+  const series = [
+    mode !== "back" && { key: "cash", name: "Cash in hand", color: COLOR.in, kind: "area" },
+    mode !== "front" && { key: "bank", name: "Bank balance", color: COLOR.bank, kind: "line" },
+  ].filter(Boolean);
 
-  // Filter rows for the table based on "Show Details" toggle
-  const rowsForTable = useMemo(() => {
-    if (showDetails) return computed.rows;
-    return computed.rows.filter((r) => r.type === "balance" || r.type === "daily");
-  }, [computed.rows, showDetails]);
-
-  // Column visibility
-  const hiddenCols = summaryMode === "back" ? { cash: true, cashInHand: true } : { cash: false, cashInHand: false };
-
-  if (!ready) return <div className="p-6">Preparing…</div>;
+  if (!ready) return <Skeleton className="m-6 h-64" rounded="rounded-2xl" />;
 
   return (
-    <div className="p-6">
-      {/* --- HEADER --- */}
-      <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
-        <h2 className="text-2xl font-bold capitalize">{branchName} Summary Report</h2>
-        <div className="flex items-center gap-3">
-          <SummaryModeSwitch
-            modes={SUMMARY_MODES}
-            value={summaryMode}
-            onChange={setSummaryMode}
-          />
-          <DetailToggle showDetails={showDetails} setShowDetails={setShowDetails} />
+    <div className="mx-auto max-w-7xl space-y-4 px-4 py-5 sm:px-6 sm:py-6">
+      {/* the period, and which money to look at */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="w-full min-w-0 sm:w-auto sm:flex-1">
+          <PeriodBar filter={filter} setFilter={setFilter} busy={isLoading && computed.rows.length > 1} />
         </div>
+        <Tabs value={mode} onChange={setMode} tabs={MODES} />
       </div>
 
-      {/* --- CONTROLS & EXPORTS --- */}
-      <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
-        <div className="flex items-center gap-3">
-          <FilterBar
-            filterType={filterState.filterType}
-            dateRange={filterState.dateRange}
-            selectedMonth={filterState.selectedMonth}
-            onFilterChange={(update) => setFilterState((prev) => ({ ...prev, ...update }))}
-            searchBarShow={false}
-          />
-          <Badge text={filterBadgeText} />
-        </div>
+      <KpiCards mode={mode} kpis={kpis} opening={{ cash: opening?.runningCash, bank: opening?.runningBank }} money={money} loading={isLoading} />
 
-        <ExportButtons
-          computed={computed}
-          commonMeta={{
-            ...commonMeta,
-            title: `${branchName} Summary`,
-            companyName,
-            branchName,
-            modeLabel,
-            hiddenCols,
-            showRepayCashCols: summaryMode !== "back",
-            showRepayBankCols: summaryMode !== "front",
-          }}
+      <ChartCard
+        title={mode === "front" ? "Cash in hand, day by day" : mode === "back" ? "Bank balance, day by day" : "Cash and bank, day by day"}
+        subtitle="At the end of each day"
+        legend={series.length > 1 ? series.map((s) => ({ name: s.name, color: s.color, kind: "line" })) : undefined}
+        loading={isLoading}
+      >
+        <TimeChart data={trend} currency={currency} height={220} zeroLine={trend.some((d) => d.cash < 0 || d.bank < 0)} series={series} />
+      </ChartCard>
+
+      {/* the cash book */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-semibold text-fg">Day by day</h2>
+          <Chip on={details} onClick={() => setDetails((v) => !v)}>
+            Show loans, deposits & notes
+          </Chip>
+        </div>
+        <Menu
+          align="end"
+          width={190}
+          trigger={(p) => (
+            <Button {...p} variant="secondary" icon={Download} disabled={isLoading}>
+              Export
+            </Button>
+          )}
+          items={[
+            { label: "PDF", icon: FileText, onSelect: () => exportSummaryToPDF(...exportArgs) },
+            { label: "Excel", icon: FileSpreadsheet, onSelect: () => exportSummaryToExcel(...exportArgs) },
+          ]}
         />
       </div>
 
-      {/* --- KPIS --- */}
-      <KpiCards
-        mode={summaryMode}
-        kpis={computed.kpis}
-      />
-
-      {/* --- TABLE --- */}
-      <SummaryTable
-        tenderDefs={tenderDefs}
-        summaryRows={rowsForTable}
-        mode={summaryMode}
-        periodTotals={computed.periodTotals}
-        periodTotalSales={computed.periodTotalSales}
-        periodDeposits={computed.periodDeposits}
-        periodWithdrawals={computed.periodWithdrawals}
-        periodRepaySums={computed.periodRepaySums}
-        hiddenCols={hiddenCols}
-        showRepayCashCols={summaryMode !== "back"}
-        showRepayBankCols={summaryMode !== "front"}
-      />
+      {isLoading ? (
+        <Skeleton className="h-72" rounded="rounded-2xl" />
+      ) : (
+        <SummaryTable
+          tenderDefs={tenderDefs}
+          summaryRows={rows}
+          mode={mode}
+          periodTotals={computed.periodTotals}
+          periodTotalSales={computed.periodTotalSales}
+          periodDeposits={computed.periodDeposits}
+          periodWithdrawals={computed.periodWithdrawals}
+          periodRepaySums={computed.periodRepaySums}
+          hiddenCols={hiddenCols}
+          showRepayCashCols={mode !== "back"}
+          showRepayBankCols={mode !== "front"}
+        />
+      )}
     </div>
   );
 }
-
-// --- Tiny sub-components to clean up JSX ---
-
-const DetailToggle = ({ showDetails, setShowDetails }) => (
-  <button
-    type="button"
-    onClick={() => setShowDetails((v) => !v)}
-    className={`relative inline-flex items-center rounded-full px-3 py-1.5 text-sm font-medium transition ${
-      showDetails ? "bg-emerald-600 text-white shadow-sm" : "bg-slate-200 text-slate-700"
-    }`}
-  >
-    <span className={`mr-2 h-2.5 w-2.5 rounded-full border ${showDetails ? "bg-white border-white" : "bg-slate-500 border-slate-500"}`} />
-    {showDetails ? "Details On" : "Details Off"}
-  </button>
-);
-
-const Badge = ({ text }) => (
-  <span className="px-2 py-1 rounded-full bg-slate-100 text-slate-700 border border-slate-200 text-xs">
-    {text}
-  </span>
-);
-
-const ExportButtons = ({ computed, commonMeta }) => (
-  <div className="flex items-center gap-3">
-    <button
-      onClick={() => exportSummaryToExcel(computed.rows, computed.kpis, computed.periodTotals, computed.periodTotalSales, computed.periodDeposits, computed.periodWithdrawals, computed.periodRepaySums, computed.tenderDefs, commonMeta)}
-      className="px-3 py-1.5 text-sm rounded bg-emerald-600 text-white"
-    >
-      Export Excel
-    </button>
-    <button
-      onClick={() => exportSummaryToPDF(computed.rows, computed.kpis, computed.periodTotals, computed.periodTotalSales, computed.periodDeposits, computed.periodWithdrawals, computed.periodRepaySums, computed.tenderDefs, commonMeta)}
-      className="px-3 py-1.5 text-sm rounded bg-blue-600 text-white"
-    >
-      Export PDF
-    </button>
-  </div>
-);
