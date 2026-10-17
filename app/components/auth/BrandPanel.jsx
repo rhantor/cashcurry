@@ -2,10 +2,10 @@
 import { useRef, useState } from "react";
 import { AnimatePresence, motion, useAnimationFrame, useReducedMotion } from "framer-motion";
 import { CircleCheck } from "lucide-react";
-import { Fraunces } from "next/font/google";
+import { Plus_Jakarta_Sans } from "next/font/google";
 
-// A bold, bookish serif for the heading — the voice of an annual report.
-const display = Fraunces({ subsets: ["latin"], weight: ["700"], display: "swap" });
+// A heavy, clean sans for the heading — the voice of a modern finance app.
+const display = Plus_Jakarta_Sans({ subsets: ["latin"], weight: ["800"], display: "swap" });
 
 // Restaurants closing their day around the world — made-up figures for the
 // sign-in screen. lat/lon in degrees; each is shown in its own money.
@@ -279,16 +279,18 @@ export default function BrandPanel() {
         </div>
       </div>
 
-      <div className="relative max-w-md text-white">
+      <div className="relative max-w-xl text-white">
         <motion.h2
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className={`${display.className} text-[1.75rem] font-bold leading-[1.15] tracking-[-0.01em] text-white xl:text-[2.1rem]`}
+          className={`${display.className} text-[1.45rem] font-extrabold leading-[1.15] tracking-[-0.025em] text-white xl:text-[1.9rem]`}
         >
-          Every till, every branch,
-          <br />
-          <span className="text-[#a9e9d1]">every country</span> — in one place.
+          {/* two lines, always: each one kept whole */}
+          <span className="block whitespace-nowrap">Every till, every branch,</span>
+          <span className="block whitespace-nowrap">
+            <span className="text-[#a9e9d1]">every country</span> — in one place.
+          </span>
         </motion.h2>
         <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }} className="mt-3 max-w-sm text-sm leading-relaxed text-white/70">
           Sales, costs, cash and the bank for all your restaurants, in their own money, the moment the day closes.
