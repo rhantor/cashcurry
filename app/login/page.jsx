@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowRight, Eye, EyeOff, FlaskConical, KeyRound, Landmark, Lock, ShieldCheck, TrendingUp, UserRound, Wallet } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ArrowRight, Eye, EyeOff, FlaskConical, KeyRound, Lock, ShieldCheck, UserRound } from "lucide-react";
 import { useLoginMutation } from "@/lib/redux/api/authApiSlice";
 import { USE_EMULATOR } from "@/lib/firebase";
 import { signedIn } from "@/lib/session";
+import BrandPanel from "@/app/components/auth/BrandPanel";
 import { Button, cn } from "@/app/components/ui";
 
 // Local development only. `npm run dev:local` passes the seeded accounts and
@@ -30,128 +31,6 @@ const friendly = (message = "") => {
   if (/network|offline|unavailable/.test(m)) return "Can't reach the server. Check the internet connection.";
   return message || "Couldn't sign in. Try again.";
 };
-
-/* ── the brand side: a calm, moving picture of what the app does ─────────── */
-
-function FloatingCard({ icon: Icon, label, value, note, tone, className, delay = 0, drift = 10 }) {
-  const reduce = useReducedMotion();
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 24, scale: 0.94 }}
-      animate={{ opacity: 1, y: 0, scale: 1 }}
-      transition={{ delay, type: "spring", stiffness: 160, damping: 20 }}
-      className={cn("absolute", className)}
-    >
-      <motion.div
-        animate={reduce ? undefined : { y: [0, -drift, 0] }}
-        transition={{ duration: 6 + delay * 2, repeat: Infinity, ease: "easeInOut" }}
-        className="flex items-center gap-3 rounded-2xl border border-white/20 bg-white/15 px-4 py-3 text-white shadow-[0_20px_50px_-20px_rgba(0,0,0,0.45)] backdrop-blur-md"
-      >
-        <span className={cn("flex size-10 items-center justify-center rounded-xl", tone)}>
-          <Icon className="size-5" />
-        </span>
-        <span>
-          <span className="block text-[11px] font-semibold uppercase tracking-wider text-white/70">{label}</span>
-          <span className="block text-lg font-bold tabular-nums leading-tight">{value}</span>
-          {note && <span className="block text-[11px] font-semibold text-[#a9e9d1]">{note}</span>}
-        </span>
-      </motion.div>
-    </motion.div>
-  );
-}
-
-/** A sales line that draws itself, then breathes. */
-function Sparkline() {
-  const reduce = useReducedMotion();
-  const d = "M0 70 C 30 66, 45 40, 75 46 S 120 72, 150 50 S 200 18, 230 30 S 280 8, 320 12";
-  return (
-    <svg viewBox="0 0 320 90" className="h-[clamp(3.5rem,10vh,6rem)] w-full" fill="none" aria-hidden>
-      <defs>
-        <linearGradient id="lg-fill" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#ffffff" stopOpacity="0.35" />
-          <stop offset="100%" stopColor="#ffffff" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <motion.path
-        d={`${d} L 320 90 L 0 90 Z`}
-        fill="url(#lg-fill)"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1.2, duration: 1 }}
-      />
-      <motion.path
-        d={d}
-        stroke="#ffffff"
-        strokeWidth="3"
-        strokeLinecap="round"
-        initial={{ pathLength: reduce ? 1 : 0 }}
-        animate={{ pathLength: 1 }}
-        transition={{ delay: 0.4, duration: 1.6, ease: "easeInOut" }}
-      />
-      <motion.circle
-        cx="320"
-        cy="12"
-        r="5"
-        fill="#ffffff"
-        initial={{ scale: 0 }}
-        animate={reduce ? { scale: 1 } : { scale: [0, 1.4, 1] }}
-        transition={{ delay: 2, duration: 0.6 }}
-      />
-    </svg>
-  );
-}
-
-function BrandPanel() {
-  const reduce = useReducedMotion();
-  return (
-    <div className="relative hidden overflow-hidden bg-gradient-to-br from-[#1f9a7c] via-[#14806a] to-[#0b4d40] lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-[52%] lg:flex-col lg:justify-between lg:gap-6 lg:p-10 xl:p-12">
-      {/* soft moving light */}
-      <motion.div
-        aria-hidden
-        className="absolute -left-32 -top-32 size-[28rem] rounded-full bg-[#75d6b8]/25 blur-3xl"
-        animate={reduce ? undefined : { x: [0, 60, 0], y: [0, 40, 0] }}
-        transition={{ duration: 16, repeat: Infinity, ease: "easeInOut" }}
-      />
-      <motion.div
-        aria-hidden
-        className="absolute -bottom-40 right-0 size-[32rem] rounded-full bg-white/10 blur-3xl"
-        animate={reduce ? undefined : { x: [0, -50, 0], y: [0, -30, 0] }}
-        transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
-      />
-      {/* faint dots */}
-      <div
-        aria-hidden
-        className="absolute inset-0 opacity-[0.12]"
-        style={{ backgroundImage: "radial-gradient(#ffffff 1px, transparent 1px)", backgroundSize: "22px 22px" }}
-      />
-
-      <div className="relative flex items-center gap-3 text-white">
-        <span className="flex size-11 items-center justify-center rounded-2xl bg-white text-lg font-black text-[#14806a] shadow-lg">C</span>
-        <span className="text-xl font-bold tracking-tight">Cash Curry</span>
-      </div>
-
-      <div className="relative">
-        <div className="relative mx-auto h-[clamp(11rem,34vh,19rem)] max-w-md">
-          <FloatingCard icon={TrendingUp} label="Today's sales" value="RM 2,250.50" note="▲ 12% vs last week" tone="bg-white/20" className="left-0 top-2" delay={0.2} />
-          <FloatingCard icon={Wallet} label="Cash in hand" value="RM 2,050.00" tone="bg-[#a9e9d1]/30" className="right-0 top-24" delay={0.45} drift={8} />
-          <FloatingCard icon={Landmark} label="Bank" value="+ RM 3,900.00" tone="bg-[#9cc3ff]/30" className="bottom-0 left-10" delay={0.7} drift={12} />
-        </div>
-        <div className="mt-4 max-w-md">
-          <Sparkline />
-        </div>
-      </div>
-
-      <div className="relative max-w-md text-white">
-        <motion.h2 initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.3 }} className="text-2xl font-bold leading-tight tracking-tight xl:text-3xl">
-          Every ringgit, every branch — in one place.
-        </motion.h2>
-        <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.6 }} className="mt-3 text-sm text-white/75">
-          Sales, costs, cash and the bank for all your restaurants, the moment they happen.
-        </motion.p>
-      </div>
-    </div>
-  );
-}
 
 /* ── the form ─────────────────────────────────────────────────────────────── */
 
@@ -200,7 +79,8 @@ function LocalAccounts({ onPick, disabled }) {
 }
 
 /**
- * Sign in. The brand side tells, at a glance, what Cash Curry is for; the
+ * Sign in. The brand side (a receipt printing a day's close around the
+ * world) tells, at a glance, what Cash Curry is for; the
  * form takes a username or email and a password (show/hide, Caps Lock
  * warning), shakes with a clear message when they're wrong and draws a check
  * before opening the app when they're right.
@@ -260,7 +140,7 @@ export default function LoginPage() {
             <span className="text-lg font-bold">Cash Curry</span>
           </motion.div>
           <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }} className="relative mt-6 text-2xl font-bold leading-tight">
-            Every ringgit, every branch.
+            Every till, every branch, every country.
           </motion.p>
         </div>
 
