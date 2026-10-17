@@ -27,7 +27,7 @@ computer, has its own loading look, and its old modals are redone too.
 - ✅ `/reports/withdrawal-report` Bank to cash report
 - ✅ `/reports/advance-report` Advance report
 - ✅ `/reports/salary-report` Salary report
-- ⬜ `/reports/staff-loan-report` Staff loan report (not in the menu yet — decide)
+- ✅ `/reports/staff-loan-report` Staff loan report (in the Reports menu)
 - ✅ `/reports/yearly-summary` Yearly summary
 - ✅ `/reports/yearly-summary/[period]` Yearly statement
 
