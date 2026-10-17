@@ -81,11 +81,13 @@ function Receipt({ day, reduce }) {
   );
 }
 
-/** A slowly turning wire globe. */
-function Globe({ reduce }) {
+/** A slowly turning wire globe. `className` places and sizes it. */
+export function Globe({ reduce: reduceProp, className = "absolute left-1/2 top-1/2 size-[30rem] -translate-x-1/2 -translate-y-1/2 opacity-25" }) {
+  const reduceMotion = useReducedMotion();
+  const reduce = reduceProp ?? reduceMotion;
   const meridians = [0, 1, 2, 3];
   return (
-    <svg viewBox="-110 -110 220 220" className="absolute left-1/2 top-1/2 size-[30rem] -translate-x-1/2 -translate-y-1/2 opacity-25" aria-hidden>
+    <svg viewBox="-110 -110 220 220" className={className} aria-hidden>
       <circle r="100" fill="none" stroke="white" strokeWidth="1" />
       {[-60, -30, 0, 30, 60].map((lat) => {
         const y = (lat / 90) * 100;

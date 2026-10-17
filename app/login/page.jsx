@@ -8,7 +8,7 @@ import { ArrowRight, Eye, EyeOff, FlaskConical, KeyRound, Lock, ShieldCheck, Use
 import { useLoginMutation } from "@/lib/redux/api/authApiSlice";
 import { USE_EMULATOR } from "@/lib/firebase";
 import { signedIn } from "@/lib/session";
-import BrandPanel from "@/app/components/auth/BrandPanel";
+import BrandPanel, { Globe } from "@/app/components/auth/BrandPanel";
 import { Button, cn } from "@/app/components/ui";
 
 // Local development only. `npm run dev:local` passes the seeded accounts and
@@ -135,6 +135,8 @@ export default function LoginPage() {
         {/* phones: the brand on top */}
         <div className="relative overflow-hidden bg-gradient-to-br from-[#1f9a7c] to-[#0b4d40] px-6 pb-16 pt-10 text-white lg:hidden">
           <div aria-hidden className="absolute -right-16 -top-16 size-56 rounded-full bg-white/10 blur-2xl" />
+          {/* the turning globe, faint, on the right */}
+          <Globe className="pointer-events-none absolute -right-14 top-1/2 size-60 -translate-y-1/2 opacity-[0.18]" />
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="relative flex items-center gap-3">
             <span className="flex size-10 items-center justify-center rounded-2xl bg-white text-base font-black text-[#14806a]">C</span>
             <span className="text-lg font-bold">Cash Curry</span>
