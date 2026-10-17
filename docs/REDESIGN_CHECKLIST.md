@@ -32,7 +32,7 @@ computer, has its own loading look, and its old modals are redone too.
 - ✅ `/reports/yearly-summary/[period]` Yearly statement
 
 ## 3.4.4 Approvals and loans
-- ⬜ `/requested-panel` Requested panel (advances, staff loans, branch loans, OT)
+- ✅ `/requested-panel` Requested panel (advances, staff loans, branch loans, OT)
 - ⬜ `/supervisor-panel` My requests (supervisor)
 - ⬜ `/staff-loans` Staff loan tracker
 - ⬜ `/loans/request-loan` Request a branch loan

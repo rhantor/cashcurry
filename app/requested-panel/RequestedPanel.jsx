@@ -28,7 +28,17 @@ import LoanRequests from "./LoanRequests";
 import OtRequests from "./OtRequests";
 import { getSessionUser } from "@/lib/session";
 import { confirmDialog, promptDialog } from "@/app/components/ui/notify";
+import { Skeleton, Tabs } from "@/app/components/ui";
+import { CountBadge } from "@/app/components/shell/SideNav";
 
+// Rejecting can't be taken back from here, so it asks first.
+const sureToReject = (what) => confirmDialog({ title: `Reject this ${what}?`, message: "The person who asked will see it as rejected.", confirmLabel: "Reject", danger: true });
+
+/**
+ * Requests waiting for a decision at this branch: advances, staff loans and
+ * leave (with what's approved but not yet handed over on top), loans asked by
+ * other branches and repayments sent back, and early overtime from the kiosk.
+ */
 export default function RequestedPanel() {
   const [companyId, setCompanyId] = useState(null);
   const [branchId, setBranchId] = useState(null);
@@ -145,6 +155,7 @@ export default function RequestedPanel() {
   const handleAdvanceAction = async (req, action) => {
     setAdvErrorMsg("");
     if (!["approved", "rejected"].includes(action)) return;
+    if (action === "rejected" && !(await sureToReject(req.kind === "staffLoan" ? "staff loan" : "request"))) return;
     setAdvWorkingId(req.id);
     try {
       const update = req.kind === "staffLoan" ? updateStaffLoan : updateAdvance;
@@ -215,6 +226,7 @@ export default function RequestedPanel() {
           }).unwrap();
         }
       } else {
+        if (action === "rejected" && !(await sureToReject("loan request"))) return;
         // loan approval/rejection path (unchanged)
         await updateLoan({
           companyId,
@@ -243,6 +255,7 @@ export default function RequestedPanel() {
   const handleOtAction = async (req, action) => {
     setOtErrorMsg("");
     if (!["approved", "rejected"].includes(action)) return;
+    if (action === "rejected" && !(await sureToReject("early overtime"))) return;
     setOtWorkingId(req.id);
     try {
       await updateOtRequest({
@@ -270,73 +283,31 @@ export default function RequestedPanel() {
   // The OT tab disappears if shifts get turned off while it's open.
   const currentTab = activeTab === "ot" && !otTabEnabled ? "advance" : activeTab;
 
-  if (!companyId || !branchId) return <p className="p-6">Loading...</p>;
+  if (!companyId || !branchId) return <Skeleton className="m-6 h-64" rounded="rounded-2xl" />;
+
+  const tab = (label, count) => (
+    <>
+      {label}
+      <CountBadge count={count} className="h-4 min-w-4 px-1 text-[10px]" />
+    </>
+  );
 
   return (
-    <div className="p-6">
-      <h1 className="text-2xl font-bold mb-6 text-mint-600">
-        Requested Panel
-      </h1>
-
-      {/* Tabs */}
-      <div className="flex gap-4 mb-6">
-        <button
-          className={`relative px-4 py-2 rounded-lg font-medium ${
-            currentTab === "advance"
-              ? "bg-mint-600 text-white"
-              : "bg-mint-200 text-black"
-          }`}
-          onClick={() => setActiveTab("advance")}
-        >
-          Advance Requests
-          {pendingAdvances.length > 0 && (
-            <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full">
-              {pendingAdvances.length}
-            </span>
-          )}
-        </button>
-
-        <button
-          className={`relative px-4 py-2 rounded-lg font-medium ${
-            currentTab === "loan"
-              ? "bg-mint-600 text-white"
-              : "bg-mint-200 text-black"
-          }`}
-          onClick={() => setActiveTab("loan")}
-        >
-          Loan Requests
-          {pendingLoans.length > 0 && (
-            <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full">
-              {pendingLoans.length}
-            </span>
-          )}
-        </button>
-
-        {otTabEnabled && (
-          <button
-            className={`relative px-4 py-2 rounded-lg font-medium ${
-              currentTab === "ot"
-                ? "bg-mint-600 text-white"
-                : "bg-mint-200 text-black"
-            }`}
-            onClick={() => setActiveTab("ot")}
-          >
-            OT Approvals
-            {pendingOt.length > 0 && (
-              <span className="absolute -top-2 -right-2 bg-red-600 text-white text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full">
-                {pendingOt.length}
-              </span>
-            )}
-          </button>
-        )}
+    <div className="mx-auto max-w-5xl space-y-4 px-4 py-5 sm:px-6 sm:py-6">
+      <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
+        <Tabs
+          value={currentTab}
+          onChange={setActiveTab}
+          tabs={[
+            { value: "advance", label: tab("Advances & staff loans", pendingAdvances.length) },
+            { value: "loan", label: tab("Branch loans", pendingLoans.length) },
+            ...(otTabEnabled ? [{ value: "ot", label: tab("Early OT", pendingOt.length) }] : []),
+          ]}
+        />
       </div>
 
       {/* Panels */}
-      {currentTab === "advance" && (
-        <div className="mb-6">
-          <PayOutQueue companyId={companyId} branchId={branchId} user={user} />
-        </div>
-      )}
+      {currentTab === "advance" && <PayOutQueue companyId={companyId} branchId={branchId} user={user} />}
       {currentTab === "advance" && (
         <AdvanceRequests
           loading={advLoading}
