@@ -233,10 +233,10 @@ export default function BrandPanel() {
   const closed = (c) => setRows((r) => [{ ...c, id: next.current++ }, ...r].slice(0, 3));
 
   return (
-    <div className="relative hidden overflow-hidden bg-gradient-to-br from-[#1f9a7c] via-[#14806a] to-[#0b4d40] shadow-[20px_0_60px_-30px_rgba(11,77,64,0.6)] lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-[52%] lg:flex-col lg:justify-between lg:gap-6 lg:rounded-r-[2.5rem] lg:p-10 xl:p-12">
+    <div className="relative hidden overflow-hidden bg-gradient-to-br from-[#0e5a4a] via-[#0a4639] to-[#052a22] shadow-[20px_0_60px_-30px_rgba(5,42,34,0.7)] lg:sticky lg:top-0 lg:flex lg:h-screen lg:w-[52%] lg:flex-col lg:justify-between lg:gap-6 lg:rounded-r-[2.5rem] lg:p-10 xl:p-12">
       <motion.div
         aria-hidden
-        className="absolute -left-32 -top-32 size-[28rem] rounded-full bg-[#75d6b8]/25 blur-3xl"
+        className="absolute -left-32 -top-32 size-[28rem] rounded-full bg-[#75d6b8]/10 blur-3xl"
         animate={reduce ? undefined : { x: [0, 60, 0], y: [0, 40, 0] }}
         transition={{ duration: 16, repeat: Infinity, ease: "easeInOut" }}
       />
@@ -247,7 +247,7 @@ export default function BrandPanel() {
       />
 
       <div className="relative flex items-center gap-3 text-white">
-        <Logo inverse size={44} />
+        <Logo inverse size={48} />
       </div>
 
       <div className="relative flex min-h-0 flex-1 items-center justify-start">

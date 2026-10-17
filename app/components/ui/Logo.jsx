@@ -9,10 +9,12 @@ const word = Plus_Jakarta_Sans({ subsets: ["latin"], weight: ["800"], display: "
 export function LogoMark({ size = 36, inverse = false, className, title = "Cash Curry" }) {
   const base = inverse ? "#ffffff" : "#0b4d40";
   const c = inverse ? "#0b4d40" : "#ffffff";
+  // on a dark background the mint half goes brighter so the square stands out
+  const mint = inverse ? "#3cc9a2" : "#22a082";
   return (
     <svg width={size} height={size} viewBox="0 0 80 80" className={cn("shrink-0", className)} role="img" aria-label={title}>
       <rect width="80" height="80" rx="20" fill={base} />
-      <path d="M74.142 5.858A20 20 0 0 1 80 20V60A20 20 0 0 1 60 80H20A20 20 0 0 1 5.858 74.142Z" fill="#22a082" />
+      <path d="M74.142 5.858A20 20 0 0 1 80 20V60A20 20 0 0 1 60 80H20A20 20 0 0 1 5.858 74.142Z" fill={mint} />
       <path d="M54 26A20 20 0 1 0 54 54" fill="none" stroke={c} strokeWidth="9" strokeLinecap="round" />
     </svg>
   );

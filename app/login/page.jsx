@@ -133,12 +133,12 @@ export default function LoginPage() {
 
       <div className="relative flex w-full flex-col lg:w-[48%]">
         {/* phones: the brand on top */}
-        <div className="relative overflow-hidden bg-gradient-to-br from-[#1f9a7c] to-[#0b4d40] px-6 pb-16 pt-10 text-white lg:hidden">
+        <div className="relative overflow-hidden bg-gradient-to-br from-[#0e5a4a] to-[#052a22] px-6 pb-16 pt-10 text-white lg:hidden">
           <div aria-hidden className="absolute -right-16 -top-16 size-56 rounded-full bg-white/10 blur-2xl" />
           {/* the turning globe, faint, on the right */}
           <Globe className="pointer-events-none absolute -right-14 top-1/2 size-60 -translate-y-1/2 opacity-[0.18]" />
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="relative flex items-center gap-3">
-            <Logo inverse size={38} />
+            <Logo inverse size={40} />
           </motion.div>
           <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }} className="relative mt-6 text-2xl font-bold leading-tight">
             Every till, every branch, every country.
