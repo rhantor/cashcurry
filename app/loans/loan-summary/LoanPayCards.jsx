@@ -1,384 +1,209 @@
-// /* eslint-disable no-unused-vars */
 "use client";
 
 import React, { useMemo, useState } from "react";
+import { Banknote, Building2, Landmark, Send } from "lucide-react";
+import { storage } from "@/lib/firebase";
+import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { useAddRepaymentEntryMutation } from "@/lib/redux/api/loanApiSlice";
 import { useGetBranchesBasicQuery } from "@/lib/redux/api/branchApiSlice";
 import useCurrency from "@/app/hooks/useCurrency";
-import { storage } from "@/lib/firebase";
-import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
-import { toast } from "@/app/components/ui/notify";
+import { formatMoney } from "@/lib/region/currency";
+import { Button, Card, Field, Input, toast } from "@/app/components/ui";
+import MoneyInput from "@/app/components/entry/MoneyInput";
+import ProofUpload from "@/app/components/entry/ProofUpload";
+import { Chip, ChoiceCards } from "@/app/components/entry/Choices";
 
-export default function LoanPayCards({ summary = {} }) {
-  const currency = useCurrency();
-  const { ready, companyId, branchId, user } = useResolvedCompanyBranch();
+const METHODS = [
+  { value: "cash", title: "Cash", note: "With a voucher", icon: Banknote, tone: "brand" },
+  { value: "online", title: "Bank transfer", note: "Online, with the receipt", icon: Landmark, tone: "info" },
+];
 
-  const { data: branches = [] } = useGetBranchesBasicQuery(companyId, {
-    skip: !companyId,
-  });
-  const nameOf = (id) => branches.find((b) => b.id === id)?.name || id;
+/** Pay back one branch: how much, how, the proof. Goes to that branch to approve. */
+function PayCard({ otherId, outstanding, durationDays, lastActivity, nameOf, money, currency, companyId, branchId, user }) {
+  const [amount, setAmount] = useState("");
+  const [method, setMethod] = useState("cash");
+  const [voucherNo, setVoucherNo] = useState("");
+  const [bankName, setBankName] = useState("");
+  const [referenceNo, setReferenceNo] = useState("");
+  const [note, setNote] = useState("");
+  const [file, setFile] = useState(null);
+  const [preview, setPreview] = useState(null);
+  const [progress, setProgress] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [addRepayment] = useAddRepaymentEntryMutation();
 
-  const [addRepayment, { isLoading: saving }] = useAddRepaymentEntryMutation();
+  const last = (() => {
+    const d = lastActivity?.seconds ? new Date(lastActivity.seconds * 1000) : lastActivity ? new Date(lastActivity) : null;
+    return d && !isNaN(d.getTime()) ? d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" }) : "";
+  })();
 
-  const myOwedList = useMemo(() => {
-    if (!branchId || !summary?.[branchId]) return [];
-    const rels = summary[branchId].relations || {};
-    return Object.entries(rels)
-      .filter(([, rel]) => Number(rel.net) > 0.000001)
-      .map(([otherId, rel]) => ({ otherId, ...rel }));
-  }, [summary, branchId]);
-
-  const [amounts, setAmounts] = useState({});
-  const [notes, setNotes] = useState({});
-  const [method, setMethod] = useState({});
-  const [voucherNo, setVoucherNo] = useState({});
-  const [bankName, setBankName] = useState({});
-  const [referenceNo, setReferenceNo] = useState({});
-  const [uploads, setUploads] = useState({}); // { [otherId]: { uploading, progress, url, name, mime, error } }
-
-  const quickSet = (otherId, net, pct) => {
-    setAmounts((a) => ({ ...a, [otherId]: (Number(net) * pct).toFixed(2) }));
+  // the same path as before: loanRepayments/<company>/<payer>_to_<receiver>/<time>_<name>
+  const upload = () => {
+    const task = uploadBytesResumable(ref(storage, `loanRepayments/${companyId}/${branchId}_to_${otherId}/${Date.now()}_${file.name}`), file);
+    return new Promise((resolve, reject) => {
+      task.on("state_changed", (s) => setProgress(Math.round((s.bytesTransferred / s.totalBytes) * 100)), reject, async () => resolve(await getDownloadURL(task.snapshot.ref)));
+    });
   };
 
-  const onFileChange = (otherId, file) => {
-    if (!file || !companyId || !branchId) return;
-
-    const okTypes = [
-      "image/png",
-      "image/jpeg",
-      "image/webp",
-      "application/pdf",
-    ];
-    if (!okTypes.includes(file.type)) {
-      setUploads((u) => ({
-        ...u,
-        [otherId]: {
-          ...u[otherId],
-          error: "Please upload JPG/PNG/WebP or PDF.",
-        },
-      }));
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      setUploads((u) => ({
-        ...u,
-        [otherId]: { ...u[otherId], error: "Max file size is 10MB." },
-      }));
-      return;
-    }
-
-    const path = `loanRepayments/${companyId}/${branchId}_to_${otherId}/${Date.now()}_${
-      file.name
-    }`;
-    const storageRef = ref(storage, path);
-    const task = uploadBytesResumable(storageRef, file);
-
-    setUploads((u) => ({
-      ...u,
-      [otherId]: {
-        uploading: true,
-        progress: 0,
-        url: "",
-        name: file.name,
-        mime: file.type,
-        error: "",
-      },
-    }));
-
-    task.on(
-      "state_changed",
-      (snap) => {
-        const pct = Math.round((snap.bytesTransferred / snap.totalBytes) * 100);
-        setUploads((u) => ({
-          ...u,
-          [otherId]: { ...u[otherId], progress: pct },
-        }));
-      },
-      (err) => {
-        setUploads((u) => ({
-          ...u,
-          [otherId]: { ...u[otherId], uploading: false, error: err.message },
-        }));
-      },
-      async () => {
-        const url = await getDownloadURL(task.snapshot.ref);
-        setUploads((u) => ({
-          ...u,
-          [otherId]: { ...u[otherId], uploading: false, url },
-        }));
-      }
-    );
-  };
-
-  const pay = async (otherId, outstanding) => {
+  const pay = async () => {
     if (!companyId || !branchId || !user) return;
-
-    const amt = Number(amounts[otherId] || 0);
-    if (!amt || amt <= 0) return toast.warning("Enter a valid amount");
-    if (amt > Number(outstanding) + 0.0001)
-      return toast.warning("Amount cannot exceed outstanding");
-
-    const m = method[otherId] || "cash";
-    const up = uploads[otherId] || {};
-    const hasProof = !!up.url;
-    if (!hasProof)
-      return toast.warning("Please upload proof (voucher/receipt) before paying.");
-
-    if (m === "cash") {
-      if (!voucherNo[otherId]) return toast.warning("Please enter voucher no.");
-    } else {
-      if (!bankName[otherId]) return toast.warning("Please enter bank name");
-      if (!referenceNo[otherId])
-        return toast.warning("Please enter transaction/reference no.");
-    }
-
+    const amt = Number(amount || 0);
+    if (!(amt > 0)) return toast.warning("Enter how much you're paying");
+    if (amt > Number(outstanding) + 0.0001) return toast.warning(`That's more than the ${money(outstanding)} owed`);
+    if (method === "cash" && !voucherNo.trim()) return toast.warning("Enter the voucher number");
+    if (method === "online" && (!bankName.trim() || !referenceNo.trim())) return toast.warning("Enter the bank and the reference number");
+    if (!file) return toast.warning(method === "cash" ? "Add a photo of the voucher" : "Add the transfer receipt");
+    setBusy(true);
     try {
+      const proofUrl = await upload();
       await addRepayment({
         companyId,
         fromBranchId: branchId, // borrower (payer)
         toBranchId: otherId, // lender (receiver)
         amount: amt,
-        note: notes[otherId] || "",
-        requestedBy: {
-          uid: user?.uid || "",
-          username: user?.username || "",
-          role: user?.role || "",
-          email: user?.email || "",
-        },
-        paymentMethod: m,
-        proofUrl: up.url,
-        proofMime: up.mime || null,
-        voucherNo: voucherNo[otherId] || null,
-        bankName: bankName[otherId] || null,
-        referenceNo: referenceNo[otherId] || null,
-        autoApprove: false, // receiver will approve
+        note: note.trim(),
+        requestedBy: { uid: user?.uid || "", username: user?.username || "", role: user?.role || "", email: user?.email || "" },
+        paymentMethod: method,
+        proofUrl,
+        proofMime: file.type || null,
+        voucherNo: method === "cash" ? voucherNo.trim() : null,
+        bankName: method === "online" ? bankName.trim() : null,
+        referenceNo: method === "online" ? referenceNo.trim() : null,
+        autoApprove: false, // the receiver approves
       }).unwrap();
-
-      setAmounts((a) => ({ ...a, [otherId]: "" }));
-      setNotes((n) => ({ ...n, [otherId]: "" }));
-      setVoucherNo((s) => ({ ...s, [otherId]: "" }));
-      setBankName((s) => ({ ...s, [otherId]: "" }));
-      setReferenceNo((s) => ({ ...s, [otherId]: "" }));
-      setUploads((u) => ({
-        ...u,
-        [otherId]: {
-          uploading: false,
-          progress: 0,
-          url: "",
-          name: "",
-          mime: "",
-          error: "",
-        },
-      }));
-      toast.success("Repayment submitted for approval");
+      toast.success("Repayment sent", { description: `${money(amt)} to ${nameOf(otherId)} — waiting for them to approve` });
+      setAmount("");
+      setVoucherNo("");
+      setBankName("");
+      setReferenceNo("");
+      setNote("");
+      setFile(null);
+      setPreview(null);
+      setProgress(0);
     } catch (err) {
       console.error(err);
-      toast.error("Failed to submit repayment");
+      toast.error("Couldn't send the repayment", { description: "Check your connection and try again." });
+    } finally {
+      setBusy(false);
     }
   };
 
-  if (!ready) return <p className="p-4 text-sm text-gray-500">Syncing session...</p>;
-  if (!branchId) return null;
+  const uploading = progress > 0 && progress < 100;
+  return (
+    <Card className="p-4">
+      <div className="flex items-start gap-3">
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-warning-soft text-warning">
+          <Building2 className="size-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-semibold uppercase tracking-wider text-subtle">Pay back</p>
+          <p className="truncate text-base font-bold text-fg">{nameOf(otherId)}</p>
+          <p className="text-[11px] text-subtle">
+            {typeof durationDays === "number" ? `${durationDays} days` : ""}
+            {last ? `${typeof durationDays === "number" ? " · " : ""}last ${last}` : ""}
+          </p>
+        </div>
+        <span className="shrink-0 text-right">
+          <span className="block text-[11px] text-subtle">Owed</span>
+          <span className="block text-base font-bold tabular-nums text-warning">{money(outstanding)}</span>
+        </span>
+      </div>
+
+      <div className="mt-4 space-y-4">
+        <Field label="Paying now">
+          {({ id }) => (
+            <>
+              <MoneyInput id={id} currency={currency} value={amount} onValueChange={setAmount} />
+              <div className="mt-2 flex gap-1.5">
+                <Chip on={Number(amount) === Number(outstanding)} onClick={() => setAmount(Number(outstanding).toFixed(2))}>
+                  All of it
+                </Chip>
+                <Chip on={Number(amount) === Number((outstanding / 2).toFixed(2))} onClick={() => setAmount((Number(outstanding) / 2).toFixed(2))}>
+                  Half
+                </Chip>
+              </div>
+            </>
+          )}
+        </Field>
+
+        <ChoiceCards options={METHODS} value={method} onChange={setMethod} />
+
+        {method === "cash" ? (
+          <Field label="Voucher number">{({ id }) => <Input id={id} size="lg" value={voucherNo} onChange={(e) => setVoucherNo(e.target.value)} />}</Field>
+        ) : (
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Bank">{({ id }) => <Input id={id} size="lg" value={bankName} onChange={(e) => setBankName(e.target.value)} placeholder="e.g. Maybank" />}</Field>
+            <Field label="Reference number">{({ id }) => <Input id={id} size="lg" value={referenceNo} onChange={(e) => setReferenceNo(e.target.value)} />}</Field>
+          </div>
+        )}
+
+        <ProofUpload
+          label={method === "cash" ? "Voucher photo" : "Transfer receipt"}
+          pdf
+          required
+          pageDrop={false}
+          file={file}
+          preview={preview}
+          progress={progress}
+          onPick={(f, url) => (setFile(f), setPreview(url))}
+          onRemove={() => (setFile(null), setPreview(null), setProgress(0))}
+        />
+
+        <Field label="Note" hint="Optional">
+          {({ id }) => <Input id={id} size="lg" value={note} onChange={(e) => setNote(e.target.value)} />}
+        </Field>
+
+        <Button size="lg" icon={Send} className="w-full" loading={busy && !uploading} disabled={uploading} onClick={pay}>
+          {uploading ? `Uploading… ${progress}%` : `Send ${amount ? money(amount) : "repayment"}`}
+        </Button>
+        <p className="text-center text-[11px] text-subtle">{nameOf(otherId)} approves it before it counts.</p>
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * Paying back other branches: a card for each branch this one owes, with
+ * the amount (all, half or any), cash with a voucher or a transfer with the
+ * receipt, and the proof. The receiving branch approves it.
+ */
+export default function LoanPayCards({ summary = {} }) {
+  const currency = useCurrency();
+  const money = (v) => formatMoney(v, currency);
+  const { ready, companyId, branchId, user } = useResolvedCompanyBranch();
+  const { data: branches = [] } = useGetBranchesBasicQuery(companyId, { skip: !companyId });
+  const nameOf = (id) => branches.find((b) => b.id === id)?.name || id;
+
+  const owed = useMemo(() => {
+    if (!branchId || !summary?.[branchId]) return [];
+    return Object.entries(summary[branchId].relations || {})
+      .filter(([, rel]) => Number(rel.net) > 0.000001)
+      .map(([otherId, rel]) => ({ otherId, ...rel }));
+  }, [summary, branchId]);
+
+  if (!ready || !branchId || !owed.length) return null;
 
   return (
-    <div className="mt-6">
-      <h3 className="text-lg font-semibold mb-3">
-        Settle Outstanding to Other Branches
-      </h3>
-
-      {myOwedList.length === 0 ? (
-        <div className="text-sm text-gray-500">No outstanding to settle 🎉</div>
-      ) : (
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {myOwedList.map(({ otherId, net, durationDays, lastActivity }) => {
-            const outstanding = Number(net || 0);
-            const val = amounts[otherId] ?? "";
-            const note = notes[otherId] ?? "";
-            const m = method[otherId] || "cash";
-            const up = uploads[otherId] || {};
-            const isUploading = !!up.uploading;
-
-            let lastText = "";
-            if (lastActivity) {
-              try {
-                const dt = lastActivity?.seconds
-                  ? new Date(lastActivity.seconds * 1000)
-                  : new Date(lastActivity);
-                if (!isNaN(dt.getTime())) lastText = dt.toLocaleDateString();
-              } catch (e) {
-                console.error("Error parsing date:", e);
-              }
-            }
-
-            return (
-              <div
-                key={otherId}
-                className="border rounded-2xl p-4 bg-white shadow-sm"
-              >
-                <div className="text-sm text-gray-500 mb-1">Pay to</div>
-                <div className="text-base font-semibold mb-2">
-                  {nameOf(otherId)}
-                </div>
-
-                <div className="text-sm mb-2">
-                  Outstanding: <b>{currency} {outstanding.toFixed(2)}</b>
-                  {typeof durationDays === "number" && (
-                    <span className="ml-2 text-gray-500">
-                      • {durationDays} days
-                    </span>
-                  )}
-                </div>
-
-                {lastText && (
-                  <div className="text-xs text-gray-400 mb-2">
-                    Last activity: {lastText}
-                  </div>
-                )}
-
-                {/* Amount + quick buttons */}
-                <div className="flex items-center gap-2 mb-2">
-                  <input
-                    value={val}
-                    onChange={(e) =>
-                      setAmounts((a) => ({ ...a, [otherId]: e.target.value }))
-                    }
-                    placeholder={`Amount (${currency})`}
-                    inputMode="decimal"
-                    className="w-36 border rounded px-2 py-2 text-sm"
-                  />
-                  <button
-                    className="px-2 py-1 text-xs rounded bg-gray-100"
-                    type="button"
-                    onClick={() => quickSet(otherId, outstanding, 1)}
-                  >
-                    Full
-                  </button>
-                  <button
-                    className="px-2 py-1 text-xs rounded bg-gray-100"
-                    type="button"
-                    onClick={() => quickSet(otherId, outstanding, 0.5)}
-                  >
-                    50%
-                  </button>
-                </div>
-
-                {/* Method */}
-                <div className="mb-2 flex items-center gap-4">
-                  <label className="text-sm flex items-center gap-1">
-                    <input
-                      type="radio"
-                      checked={m === "cash"}
-                      onChange={() =>
-                        setMethod((s) => ({ ...s, [otherId]: "cash" }))
-                      }
-                    />
-                    Cash (voucher)
-                  </label>
-                  <label className="text-sm flex items-center gap-1">
-                    <input
-                      type="radio"
-                      checked={m === "online"}
-                      onChange={() =>
-                        setMethod((s) => ({ ...s, [otherId]: "online" }))
-                      }
-                    />
-                    Online transfer
-                  </label>
-                </div>
-
-                {/* Method-specific fields */}
-                {m === "cash" ? (
-                  <input
-                    value={voucherNo[otherId] ?? ""}
-                    onChange={(e) =>
-                      setVoucherNo((s) => ({ ...s, [otherId]: e.target.value }))
-                    }
-                    placeholder="Voucher No."
-                    className="w-full border rounded px-2 py-2 text-sm mb-2"
-                  />
-                ) : (
-                  <div className="grid grid-cols-1 gap-2 mb-2">
-                    <input
-                      value={bankName[otherId] ?? ""}
-                      onChange={(e) =>
-                        setBankName((s) => ({
-                          ...s,
-                          [otherId]: e.target.value,
-                        }))
-                      }
-                      placeholder="Bank name (e.g., Maybank)"
-                      className="w-full border rounded px-2 py-2 text-sm"
-                    />
-                    <input
-                      value={referenceNo[otherId] ?? ""}
-                      onChange={(e) =>
-                        setReferenceNo((s) => ({
-                          ...s,
-                          [otherId]: e.target.value,
-                        }))
-                      }
-                      placeholder="Reference / Transaction No."
-                      className="w-full border rounded px-2 py-2 text-sm"
-                    />
-                  </div>
-                )}
-
-                {/* Proof upload */}
-                <div className="mb-2">
-                  <label className="text-sm font-medium block mb-1">
-                    Upload{" "}
-                    {m === "cash" ? "voucher photo" : "receipt (image/PDF)"} *
-                  </label>
-                  <input
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp,application/pdf"
-                    onChange={(e) => onFileChange(otherId, e.target.files?.[0])}
-                    className="text-sm"
-                    disabled={isUploading}
-                  />
-                  {up?.error && (
-                    <div className="text-xs text-red-600 mt-1">{up.error}</div>
-                  )}
-                  {isUploading && (
-                    <div className="text-xs text-gray-600 mt-1">
-                      Uploading… {up.progress || 0}%
-                    </div>
-                  )}
-                  {!isUploading && up?.url && (
-                    <div className="text-xs text-emerald-700 mt-1">
-                      Proof attached ✓ {up?.name ? `(${up.name})` : ""}
-                    </div>
-                  )}
-                </div>
-
-                {/* Note */}
-                <input
-                  value={note}
-                  onChange={(e) =>
-                    setNotes((n) => ({ ...n, [otherId]: e.target.value }))
-                  }
-                  placeholder="Reference / note (optional)"
-                  className="w-full border rounded px-2 py-2 text-sm mb-3"
-                />
-
-                {/* Submit */}
-                <button
-                  disabled={saving || isUploading}
-                  onClick={() => pay(otherId, outstanding)}
-                  className={`w-full px-3 py-2 rounded text-sm text-white ${
-                    saving || isUploading
-                      ? "bg-gray-400 cursor-not-allowed"
-                      : "bg-black"
-                  }`}
-                >
-                  {saving || isUploading ? "Saving..." : "Pay Now"}
-                </button>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
+    <section className="space-y-3">
+      <h2 className="text-base font-semibold text-fg">Pay back</h2>
+      <div className="grid gap-3 md:grid-cols-2">
+        {owed.map(({ otherId, net, durationDays, lastActivity }) => (
+          <PayCard
+            key={otherId}
+            otherId={otherId}
+            outstanding={Number(net || 0)}
+            durationDays={durationDays}
+            lastActivity={lastActivity}
+            nameOf={nameOf}
+            money={money}
+            currency={currency}
+            companyId={companyId}
+            branchId={branchId}
+            user={user}
+          />
+        ))}
+      </div>
+    </section>
   );
 }

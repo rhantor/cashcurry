@@ -1,9 +1,13 @@
 "use client";
 import React, { useMemo, useState } from "react";
+import { ArrowLeftRight, ArrowRight, ExternalLink, HandCoins } from "lucide-react";
 import { useGetLoanActivitiesQuery } from "@/lib/redux/api/loanApiSlice";
+import { useGetBranchesBasicQuery } from "@/lib/redux/api/branchApiSlice";
 import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
 import useCurrency from "@/app/hooks/useCurrency";
-import { HandCoins, Clock, ArrowLeftRight } from "lucide-react";
+import { formatMoney } from "@/lib/region/currency";
+import { Badge, Card, EmptyState, Skeleton, Tabs, cn } from "@/app/components/ui";
+import { Chip } from "@/app/components/entry/Choices";
 
 const tsToMs = (v) => {
   if (!v) return null;
@@ -12,298 +16,205 @@ const tsToMs = (v) => {
   const ms = Date.parse(v);
   return Number.isNaN(ms) ? null : ms;
 };
-
 const fmtDateTime = (v) => {
   const ms = tsToMs(v);
-  if (!ms) return "-";
-  const d = new Date(ms);
-  if (isNaN(d.getTime())) return "-";
-  return d.toLocaleString(undefined, {
-    year: "numeric", month: "short", day: "2-digit",
-    hour: "2-digit", minute: "2-digit",
-  });
+  return ms ? new Date(ms).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "";
+};
+const STATUS = {
+  approved: { label: "Approved", tone: "brand" },
+  rejected: { label: "Rejected", tone: "danger" },
+  pending: { label: "Waiting", tone: "warning" },
 };
 
-const STATUS_STYLE = {
-  approved: "bg-emerald-100 text-emerald-700 border-emerald-200",
-  rejected:  "bg-rose-100   text-rose-700   border-rose-200",
-  pending:   "bg-amber-100  text-amber-700  border-amber-200",
-};
-
-/* ─── single card ─── */
-function LoanCard({ item, branchId, currency }) {
-  const isRepayment = item.type === "repayment";
-  const status      = item.status || "pending";
-  const amount      = Number(item.amount || 0).toFixed(2);
-
-  // _fromBranchId = BORROWER (the branch that requested money)
-  // _toBranchId   = LENDER   (the branch being asked to provide money)
-  const borrowerName = item.requestFrom || item._fromBranchId || "—";
-  const lenderName   = item.requestedTo || item._toBranchId   || "—";
-
-  // Our role on this record
+/* one loan or repayment */
+function LoanCard({ item, branchId, money, nameOf }) {
+  const repay = item.type === "repayment";
+  const st = STATUS[item.status] || STATUS.pending;
+  // _fromBranchId = the borrower (asked for the money); _toBranchId = the lender
+  // repayments carry only the branch ids — the directory names them
+  const borrower = item.requestFrom || nameOf(item._fromBranchId) || "—";
+  const lender = item.requestedTo || nameOf(item._toBranchId) || "—";
   const weBorrowed = item._fromBranchId === branchId;
-  const weLent     = item._toBranchId   === branchId;
-  const ourRole    = weBorrowed ? "We Borrowed" : weLent ? "We Lent" : null;
-
-  const requestedBy =
-    item.requestedBy?.username || item.createdBy?.username ||
-    item.requestedBy?.email    || "-";
-  const approvedBy =
-    item.approvedBy?.name || item.approvedBy?.username || null;
-
-  const created  = fmtDateTime(item.createdAt);
-  const actioned = fmtDateTime(item.updatedAt || item.approvedAt);
+  const weLent = item._toBranchId === branchId;
+  // money goes lender → borrower for a loan, borrower → lender for a repayment
+  const [from, to] = repay ? [borrower, lender] : [lender, borrower];
+  const who = item.requestedBy?.username || item.createdBy?.username || item.requestedBy?.email;
+  const decidedBy = item.approvedBy?.name || item.approvedBy?.username;
+  const decidedAt = fmtDateTime(item.updatedAt || item.approvedAt);
+  const cash = item.paymentMethod === "cash";
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm hover:shadow-md transition-shadow p-5 space-y-3">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* type badge */}
-          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium border ${
-            isRepayment
-              ? "bg-indigo-50 text-indigo-700 border-indigo-200"
-              : "bg-slate-100 text-slate-700 border-slate-200"
-          }`}>
-            {isRepayment ? <ArrowLeftRight className="h-3 w-3" /> : <HandCoins className="h-3 w-3" />}
-            {isRepayment ? "Repayment" : "Loan"}
-          </span>
-
-          {/* our role badge */}
-          {ourRole && (
-            <span className={`px-2.5 py-1 rounded-lg text-xs font-medium border ${
-              weBorrowed
-                ? "bg-orange-50 text-orange-700 border-orange-200"
-                : "bg-teal-50   text-teal-700   border-teal-200"
-            }`}>
-              {ourRole}
-            </span>
-          )}
-
-          {/* status */}
-          <span className={`px-2.5 py-1 rounded-lg text-xs font-medium capitalize border ${STATUS_STYLE[status] || STATUS_STYLE.pending}`}>
-            {status}
-          </span>
-        </div>
-
-        <div className="flex items-center gap-1 text-xs text-slate-400 shrink-0">
-          <Clock className="h-3 w-3" />
-          {created}
-        </div>
-      </div>
-
-      {/* Amount */}
-      <p className="text-2xl font-bold text-slate-800">{currency} {amount}</p>
-
-      {/* Borrower / Lender */}
-      <div className="grid grid-cols-2 gap-3 text-sm">
-        <div className="space-y-0.5">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Borrower</p>
-          <p className="font-medium text-slate-700 truncate">{borrowerName}</p>
-        </div>
-        <div className="space-y-0.5">
-          <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">Lender</p>
-          <p className="font-medium text-slate-700 truncate">{lenderName}</p>
-        </div>
-      </div>
-
-      {/* Details */}
-      <div className="text-xs text-slate-500 space-y-1 pt-2 border-t border-slate-100">
-        {!isRepayment && item.reason && (
-          <p>Reason: <span className="font-medium text-slate-700">{item.reason}</span></p>
-        )}
-
-        <p>
-          Requested by: <span className="font-medium text-slate-700">{requestedBy}</span>
-          {approvedBy && (
-            <> &nbsp;·&nbsp; {status === "rejected" ? "Rejected" : "Approved"} by:{" "}
-              <span className="font-medium text-slate-700">{approvedBy}</span>
-            </>
-          )}
-        </p>
-
-        {isRepayment && (
-          <p>
-            Method: <span className="font-medium text-slate-700">{item.paymentMethod || "-"}</span>
-            {item.paymentMethod === "cash"   && item.voucherNo   && <> &nbsp;·&nbsp; Vch: <span className="font-medium text-slate-700">{item.voucherNo}</span></>}
-            {item.paymentMethod === "online" && item.bankName    && <> &nbsp;·&nbsp; <span className="font-medium text-slate-700">{item.bankName}</span></>}
-            {item.paymentMethod === "online" && item.referenceNo && <> &nbsp;·&nbsp; Ref: <span className="font-medium text-slate-700">{item.referenceNo}</span></>}
-            {item.proofUrl && (
-              <> &nbsp;·&nbsp; <a href={item.proofUrl} target="_blank" rel="noreferrer" className="text-indigo-600 underline underline-offset-2">View proof</a></>
+    <Card className="p-4">
+      <div className="flex items-start gap-3">
+        <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl", repay ? "bg-info-soft text-info" : "bg-warning-soft text-warning")}>
+          {repay ? <ArrowLeftRight className="size-4" /> : <HandCoins className="size-4" />}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="flex flex-wrap items-center gap-1.5">
+            <span className="text-sm font-semibold text-fg">{repay ? "Repayment" : "Loan"}</span>
+            {(weBorrowed || weLent) && (
+              <Badge tone={weBorrowed ? "warning" : "info"} className="px-2 py-px text-[10px]">
+                {weBorrowed ? "We borrowed" : "We lent"}
+              </Badge>
             )}
+            <Badge tone={st.tone} className="px-2 py-px text-[10px]">
+              {st.label}
+            </Badge>
           </p>
-        )}
-
-        {status !== "pending" && actioned !== "-" && (
-          <p>{status === "approved" ? "Approved" : "Rejected"} at: <span className="font-medium text-slate-700">{actioned}</span></p>
-        )}
+          <p className="mt-1 flex min-w-0 items-center gap-1.5 text-xs text-muted">
+            <span className="truncate font-medium text-fg">{from}</span>
+            <ArrowRight className="size-3 shrink-0 text-subtle" />
+            <span className="truncate font-medium text-fg">{to}</span>
+          </p>
+        </div>
+        <span className="shrink-0 text-right">
+          <span className="block text-base font-bold tabular-nums text-fg">{money(item.amount)}</span>
+          <span className="block text-[11px] text-subtle">{fmtDateTime(item.createdAt)}</span>
+        </span>
       </div>
-    </div>
+
+      <dl className="mt-3 flex flex-wrap gap-x-4 gap-y-1 border-t border-line pt-2.5 text-xs">
+        {!repay && item.reason && (
+          <div className="flex gap-1">
+            <dt className="text-subtle">Why</dt>
+            <dd className="text-muted">{item.reason}</dd>
+          </div>
+        )}
+        {who && (
+          <div className="flex gap-1">
+            <dt className="text-subtle">Asked by</dt>
+            <dd className="text-muted">{who}</dd>
+          </div>
+        )}
+        {decidedBy && (
+          <div className="flex gap-1">
+            <dt className="text-subtle">{item.status === "rejected" ? "Rejected by" : "Approved by"}</dt>
+            <dd className="text-muted">
+              {decidedBy}
+              {item.status !== "pending" && decidedAt ? ` · ${decidedAt}` : ""}
+            </dd>
+          </div>
+        )}
+        {repay && (
+          <div className="flex gap-1">
+            <dt className="text-subtle">Paid by</dt>
+            <dd className="text-muted">
+              {item.paymentMethod || "—"}
+              {cash && item.voucherNo ? ` · voucher ${item.voucherNo}` : ""}
+              {!cash && item.bankName ? ` · ${item.bankName}` : ""}
+              {!cash && item.referenceNo ? ` · ref ${item.referenceNo}` : ""}
+            </dd>
+          </div>
+        )}
+        {repay && item.proofUrl && (
+          <a href={item.proofUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 font-semibold text-brand hover:underline">
+            Proof <ExternalLink className="size-3" />
+          </a>
+        )}
+      </dl>
+    </Card>
   );
 }
 
-/* ─── tab button ─── */
-function Tab({ active, onClick, children }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
-        active
-          ? "bg-indigo-600 text-white shadow-sm"
-          : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-      }`}
-    >
-      {children}
-    </button>
-  );
-}
-
-/* ─── stat chip ─── */
-function Chip({ label, value, color }) {
-  const colors = {
-    amber:   "bg-amber-50  text-amber-700  border-amber-200",
-    emerald: "bg-emerald-50 text-emerald-700 border-emerald-200",
-    rose:    "bg-rose-50   text-rose-700   border-rose-200",
-    slate:   "bg-slate-50  text-slate-600  border-slate-200",
-  };
-  return (
-    <span className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border ${colors[color] || colors.slate}`}>
-      {label}: <b>{value}</b>
-    </span>
-  );
-}
-
-/* ─── main ─── */
+/**
+ * Loan updates: every loan and repayment this branch is part of — asked,
+ * approved or rejected — newest first, as borrower or lender, with who
+ * decided and how a repayment was paid.
+ */
 export default function BranchLoanUpdates() {
   const currency = useCurrency();
-  // tab: "all" | "borrowed" (we are borrower) | "lent" (we are lender)
-  const [tab, setTab] = useState("all");
-  const [typeFilter,   setTypeFilter]   = useState("all");
+  const money = (v) => formatMoney(v, currency);
+  const [tab, setTab] = useState("all"); // all | borrowed | lent
+  const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
-
   const { ready, companyId, branchId } = useResolvedCompanyBranch();
 
   const { data: items = [], isLoading, isError } = useGetLoanActivitiesQuery(
-    ready && companyId && branchId
-      ? { companyId, branchId, direction: "all", status: "all", type: "all", pageLimit: 200 }
-      : { skip: true },
+    ready && companyId && branchId ? { companyId, branchId, direction: "all", status: "all", type: "all", pageLimit: 200 } : { skip: true },
     { skip: !ready || !companyId || !branchId, pollingInterval: 30000 }
   );
 
-  const stats = useMemo(() => ({
-    pending:  items.filter((i) => i.status === "pending").length,
-    approved: items.filter((i) => i.status === "approved").length,
-    rejected: items.filter((i) => i.status === "rejected").length,
-  }), [items]);
+  const { data: branches = [] } = useGetBranchesBasicQuery(companyId, { skip: !companyId });
+  const nameOf = (id) => branches.find((b) => b.id === id)?.name || id;
+
+  const counts = useMemo(() => items.reduce((m, i) => ((m[i.status || "pending"] = (m[i.status || "pending"] || 0) + 1), m), {}), [items]);
 
   const displayed = useMemo(() => {
     let list = items;
-
-    // "borrowed" = we are the borrower = _fromBranchId === branchId
-    // "lent"     = we are the lender   = _toBranchId   === branchId
     if (tab === "borrowed") list = list.filter((i) => i._fromBranchId === branchId);
-    if (tab === "lent")     list = list.filter((i) => i._toBranchId   === branchId);
-
-    if (typeFilter   !== "all") list = list.filter((i) => i.type   === typeFilter);
+    if (tab === "lent") list = list.filter((i) => i._toBranchId === branchId);
+    if (typeFilter !== "all") list = list.filter((i) => i.type === typeFilter);
     if (statusFilter !== "all") list = list.filter((i) => i.status === statusFilter);
-
     return [...list].sort((a, b) => (tsToMs(b.createdAt) || 0) - (tsToMs(a.createdAt) || 0));
   }, [items, tab, typeFilter, statusFilter, branchId]);
 
-  /* ── states ── */
-  if (!ready) return <div className="p-8 text-sm text-slate-500 animate-pulse">Syncing session…</div>;
-
-  if (isLoading) return (
-    <div className="p-8 space-y-3">
-      {[1, 2, 3].map((i) => <div key={i} className="h-36 rounded-2xl bg-slate-100 animate-pulse" />)}
-    </div>
-  );
-
-  if (isError) return (
-    <div className="p-8">
-      <div className="rounded-2xl bg-rose-50 border border-rose-200 p-5 text-sm text-rose-700">
-        <p className="font-semibold mb-1">Failed to load loan activity</p>
-        <p className="text-rose-500">Check your connection or Firestore permissions.</p>
-      </div>
-    </div>
-  );
+  const filtered = tab !== "all" || typeFilter !== "all" || statusFilter !== "all";
+  const clear = () => (setTab("all"), setTypeFilter("all"), setStatusFilter("all"));
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-blue-50">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8 space-y-6">
+    <div className="mx-auto max-w-3xl space-y-4 px-4 py-5 sm:px-6 sm:py-6">
+      <div className="flex flex-wrap items-center gap-2">
+        <Tabs
+          value={tab}
+          onChange={setTab}
+          tabs={[
+            { value: "all", label: "All" },
+            { value: "borrowed", label: "We borrowed" },
+            { value: "lent", label: "We lent" },
+          ]}
+        />
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        {[
+          ["all", "Loans & repayments"],
+          ["loan", "Loans"],
+          ["repayment", "Repayments"],
+        ].map(([v, l]) => (
+          <Chip key={v} on={typeFilter === v} onClick={() => setTypeFilter(v)}>
+            {l}
+          </Chip>
+        ))}
+        <span className="mx-1 h-5 w-px bg-line" />
+        {[
+          ["all", "Any status"],
+          ["pending", "Waiting"],
+          ["approved", "Approved"],
+          ["rejected", "Rejected"],
+        ].map(([v, l]) => (
+          <Chip key={v} on={statusFilter === v} onClick={() => setStatusFilter(v)}>
+            {l}
+            {v !== "all" && counts[v] ? <span className="ml-1 tabular-nums opacity-70">{counts[v]}</span> : null}
+          </Chip>
+        ))}
+      </div>
 
-        {/* Header */}
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm px-6 py-5">
-          <h1 className="text-xl font-bold text-slate-800">Loan Activity</h1>
-          <p className="text-sm text-slate-500 mt-0.5">All loan and repayment requests involving this branch</p>
+      {!ready || isLoading ? (
+        <div className="space-y-3">
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} className="h-32" rounded="rounded-2xl" />
+          ))}
         </div>
-
-        {/* Stats */}
-        {items.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            <Chip label="Pending"  value={stats.pending}  color="amber"   />
-            <Chip label="Approved" value={stats.approved} color="emerald" />
-            <Chip label="Rejected" value={stats.rejected} color="rose"    />
-            <Chip label="Total"    value={items.length}   color="slate"   />
-          </div>
-        )}
-
-        {/* Tabs + filters */}
-        <div className="flex flex-wrap items-center gap-2">
-          <Tab active={tab === "all"}      onClick={() => setTab("all")}>All</Tab>
-          <Tab active={tab === "borrowed"} onClick={() => setTab("borrowed")}>We Borrowed</Tab>
-          <Tab active={tab === "lent"}     onClick={() => setTab("lent")}>We Lent</Tab>
-
-          <div className="ml-auto flex gap-2 flex-wrap">
-            <select
-              value={typeFilter}
-              onChange={(e) => setTypeFilter(e.target.value)}
-              className="border border-slate-200 rounded-xl px-3 py-1.5 text-sm bg-white text-slate-700 shadow-sm"
-            >
-              <option value="all">Loan + Repayment</option>
-              <option value="loan">Loans only</option>
-              <option value="repayment">Repayments only</option>
-            </select>
-
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="border border-slate-200 rounded-xl px-3 py-1.5 text-sm bg-white text-slate-700 shadow-sm"
-            >
-              <option value="all">All statuses</option>
-              <option value="pending">Pending</option>
-              <option value="approved">Approved</option>
-              <option value="rejected">Rejected</option>
-            </select>
-          </div>
-        </div>
-
-        {/* Cards */}
-        {displayed.length === 0 ? (
-          <div className="text-center py-20 space-y-2">
-            <p className="text-slate-400 text-sm">
-              {items.length === 0
-                ? "No loan activity yet for this branch."
-                : "No results match the current filters."}
-            </p>
-            {items.length > 0 && (
-              <button
-                onClick={() => { setTab("all"); setTypeFilter("all"); setStatusFilter("all"); }}
-                className="text-indigo-600 text-sm underline underline-offset-2"
-              >
+      ) : isError ? (
+        <p className="rounded-2xl bg-danger-soft px-4 py-3 text-sm text-danger">Couldn&apos;t load the loan updates. Check the connection and refresh.</p>
+      ) : !displayed.length ? (
+        <EmptyState
+          title={items.length ? "Nothing matches" : "No loans yet"}
+          description={items.length ? "No loan or repayment matches these filters." : "Loans with other branches, and their repayments, show up here."}
+          action={
+            filtered ? (
+              <button type="button" onClick={clear} className="text-sm font-semibold text-brand hover:underline">
                 Clear filters
               </button>
-            )}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {displayed.map((item) => (
-              <LoanCard key={item.id} item={item} branchId={branchId} currency={currency} />
-            ))}
-          </div>
-        )}
-      </div>
+            ) : null
+          }
+        />
+      ) : (
+        <div className="space-y-3">
+          {displayed.map((item) => (
+            <LoanCard key={item.id} item={item} branchId={branchId} money={money} nameOf={nameOf} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
