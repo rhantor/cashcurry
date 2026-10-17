@@ -17,6 +17,7 @@
     "summaries:rebuild": "node scripts/summaries-rebuild.mjs",
     "staff:link": "node scripts/link-staff-logins.mjs",
     "face:remove-data": "node scripts/remove-face-data.mjs",
+    "names:backfill": "node scripts/names-backfill.mjs",
     "dev:phone": "node scripts/local/dev.mjs --lan"
   },
   "dependencies": {
