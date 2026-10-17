@@ -259,7 +259,7 @@ export default function BrandPanel() {
           <div aria-hidden className="absolute left-1/2 top-[91.7%] hidden xl:block">
             <span className="absolute -left-[3px] -top-[3px] size-1.5 rounded-full bg-[#a9e9d1]" />
             <motion.span
-              className="absolute left-0 top-0 h-5 w-px"
+              className="absolute left-0 top-0 h-3 w-px"
               style={{ backgroundImage: "linear-gradient(#a9e9d1 50%, transparent 50%)", backgroundSize: "1px 8px" }}
               animate={reduce ? undefined : { backgroundPositionY: ["0px", "8px"] }}
               transition={{ duration: 0.5, repeat: Infinity, ease: "linear" }}
@@ -267,13 +267,13 @@ export default function BrandPanel() {
           </div>
           <motion.div
             aria-hidden
-            className="absolute left-1/2 top-[calc(91.7%_+_1.25rem)] hidden h-px w-[calc(50%_+_3rem)] xl:block"
+            className="absolute left-1/2 top-[calc(91.7%_+_0.75rem)] hidden h-px w-[calc(50%_+_3rem)] xl:block"
             style={{ backgroundImage: "linear-gradient(90deg, #a9e9d1 50%, transparent 50%)", backgroundSize: "8px 1px" }}
             animate={reduce ? undefined : { backgroundPositionX: ["0px", "8px"] }}
             transition={{ duration: 0.5, repeat: Infinity, ease: "linear" }}
           />
           {/* the ledger, wholly to the right of the globe; the line meets it low on its left edge */}
-          <div className="absolute left-[calc(100%_+_3rem)] top-[calc(91.7%_+_1.25rem_-_6.6rem)] hidden xl:block">
+          <div className="absolute left-[calc(100%_+_3rem)] top-[calc(91.7%_+_0.75rem_-_7.6rem)] hidden xl:block">
             <Ledger rows={rows} />
           </div>
         </div>
