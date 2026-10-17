@@ -88,7 +88,7 @@ export default function ExportBillsModal({
               </div>
 
               {/* Body */}
-              <div className='flex-1 overflow-y-auto p-4 md:p-6 bg-surface-2/60/50'>
+              <div className='flex-1 overflow-y-auto p-4 md:p-6 bg-surface-2/60'>
                 <div className='bg-surface rounded-xl border border-line overflow-hidden'>
                   <div className='flex items-center justify-between p-3 border-b border-line bg-surface-2/60'>
                     <span className='text-sm font-semibold text-fg'>

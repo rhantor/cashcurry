@@ -591,7 +591,7 @@ export default function ItemsCatalogPage() {
                   const localDate = branchLastPriceDate(item, branchId);
                   const hasOwnPrice = Number(item.lastPurchaseByBranch?.[branchId]?.price) > 0;
                   return (
-                    <li key={item.id} className={`p-4 ${here ? "" : "bg-surface-2/60/60"}`}>
+                    <li key={item.id} className={`p-4 ${here ? "" : "bg-surface-2/60"}`}>
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">

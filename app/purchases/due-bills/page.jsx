@@ -1,6 +1,7 @@
 'use client'
 
 import { businessToday } from "@/lib/region";
+import { formatMoney } from '@/lib/region/currency'
 import React, { useMemo, useState } from 'react'
 import { skipToken } from '@reduxjs/toolkit/query'
 import { useRouter } from 'next/navigation'
@@ -40,13 +41,11 @@ function daysBetween (aISO, bISO) {
   return Math.round((a - b) / 86400000)
 }
 
-const makeFmtRM = (currency) => v =>
-  `${currency} ${Number(v ?? 0).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  })}`
+// the branch's money, written the way the rest of the app writes it
+const makeFmtRM = (currency) => v => formatMoney(Number(v ?? 0), currency)
 
 const addAttachmentToPdf = async (doc, url, vendorName, refLabel, attachmentIndex) => {
+  // eslint-disable-next-line no-async-promise-executor -- resolves from image callbacks below
   return new Promise(async (resolve) => {
     const isPdf = url.toLowerCase().split('?')[0].endsWith('.pdf');
     const pdfWidth = doc.internal.pageSize.getWidth();
@@ -742,10 +741,11 @@ const handleSaveEdit = async (billId, formData) => {
     )
 
   return (
-    <div className='min-h-screen bg-surface-2/60/50 p-4 md:p-6'>
+    <div className='mx-auto max-w-7xl px-4 py-5 pb-28 sm:px-6 sm:py-6'>
       {/* Header Section */}
       <DueBillsHeader
-        branchName={branchData?.name}
+        bills={allBills}
+        selectedCount={selectedBills.length}
         canPay={canPay}
         totalSelectedBalance={totalSelectedBalance}
         onPayClick={() => setPayOpen(true)}

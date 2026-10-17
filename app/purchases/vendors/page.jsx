@@ -264,7 +264,7 @@ export default function VendorsPage() {
   };
 
   return (
-    <div className="p-4 md:p-8 bg-surface-2/60/50 min-h-screen">
+    <div className="p-4 md:p-8 bg-surface-2/60 min-h-screen">
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-fg tracking-tight">Vendors</h1>
@@ -481,15 +481,15 @@ export default function VendorsPage() {
                       <span className="text-muted block text-[9px] uppercase font-black tracking-widest">Total Billed</span>
                       <span className="font-bold text-white text-sm">{currency} {Number(viewData.totalBilled || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                     </div>
-                    <div className="space-y-1 border-l border-fg pl-4">
+                    <div className="space-y-1 border-l border-line pl-4">
                       <span className="text-muted block text-[9px] uppercase font-black tracking-widest">Total Paid</span>
                       <span className="font-bold text-info text-sm">{currency} {Number(viewData.totalPaid || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                     </div>
-                    <div className="space-y-1 border-l border-fg pl-4">
+                    <div className="space-y-1 border-l border-line pl-4">
                       <span className="text-muted block text-[9px] uppercase font-black tracking-widest">AP Balance</span>
                       <span className={`font-bold text-sm ${Number(viewData.currentBalance || 0) > 0 ? "text-danger" : "text-brand"}`}>{currency} {Number(viewData.currentBalance || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
                     </div>
-                    <div className="space-y-1 border-l border-fg pl-4">
+                    <div className="space-y-1 border-l border-line pl-4">
                       <span className="text-muted block text-[9px] uppercase font-black tracking-widest">Last Payment</span>
                       <span className="text-subtle font-bold text-sm">{viewData.lastPaymentDate ? new Date(viewData.lastPaymentDate).toLocaleDateString() : "-"}</span>
                     </div>

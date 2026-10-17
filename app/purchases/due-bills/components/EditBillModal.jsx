@@ -537,7 +537,7 @@ export default function EditBillModal ({ isOpen, onClose, bill, onSave, isLoadin
       </div>
 
       {/* ── footer ── */}
-      <div className='flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 px-4 md:px-6 py-3 md:py-4 border-t border-line bg-surface-2/60/60 flex-shrink-0'>
+      <div className='flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 px-4 md:px-6 py-3 md:py-4 border-t border-line bg-surface-2/60 flex-shrink-0'>
         <button
           type='button'
           onClick={onClose}

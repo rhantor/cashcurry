@@ -458,7 +458,7 @@ export default function ViewBillModal ({ isOpen, onClose, bill }) {
       </div>
 
       {/* ── Footer ── */}
-      <div className='flex justify-end px-4 md:px-6 py-3 md:py-4 border-t border-line bg-surface-2/60/60 flex-shrink-0'>
+      <div className='flex justify-end px-4 md:px-6 py-3 md:py-4 border-t border-line bg-surface-2/60 flex-shrink-0'>
         <button
           onClick={onClose}
           className='w-full md:w-auto px-5 py-2.5 md:py-2 bg-surface hover:bg-surface-2 border border-line text-fg text-sm font-medium rounded-xl transition-colors'

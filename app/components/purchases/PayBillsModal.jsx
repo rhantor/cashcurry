@@ -189,7 +189,7 @@ export default function PayBillsModal({
 
             <div className="max-h-52 overflow-auto border border-line rounded-xl">
               <table className="min-w-full text-sm">
-                <thead className="text-left sticky top-0 bg-surface-2/60/95 backdrop-blur">
+                <thead className="text-left sticky top-0 bg-surface-2/60 backdrop-blur">
                   <tr>
                     <th className="py-2.5 px-3 text-xs font-semibold text-muted uppercase tracking-wider">Invoice #</th>
                     <th className="py-2.5 px-3 text-right text-xs font-semibold text-muted uppercase tracking-wider">Balance Due</th>
@@ -376,7 +376,7 @@ export default function PayBillsModal({
             <div className={`rounded-xl border-2 border-dashed p-1 transition-all ${
               file
                 ? "border-brand/30 bg-brand-soft/30"
-                : "border-line bg-surface-2/60/50"
+                : "border-line bg-surface-2/60"
             }`}>
               <UploadInvoice file={file} onChange={setFile} allowCamera={true} />
             </div>

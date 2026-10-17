@@ -53,7 +53,7 @@ computer, has its own loading look, and its old modals are redone too.
 - ⬜ `/purchases/purchase-orders` Purchase orders
 - ⬜ `/purchases/requisitions` Requisitions
 - ✅ `/purchases/new-bill` New vendor bill
-- ⬜ `/purchases/due-bills` Due bills (+ pay bills, edit bill, export)
+- ✅ `/purchases/due-bills` Due bills (+ pay bills, edit bill, export)
 - ⬜ `/purchases/payments` Payments
 - ⬜ `/purchases/vendors` Vendors
 - ⬜ `/purchases/items` Items catalog
