@@ -338,7 +338,7 @@ export default function PurchaseReportPage() {
                     </td>
                     <td className="px-4 py-3 text-right tabular-nums text-muted">{r.orders}</td>
                     <td className="px-4 py-3 text-right tabular-nums text-muted">
-                      {localDate(r.lastDate)}
+                      {niceDay(localDate(r.lastDate))}
                     </td>
                   </tr>
                 ))}
@@ -346,7 +346,7 @@ export default function PurchaseReportPage() {
               <tfoot className="bg-surface-2/60 border-t border-line">
                 <tr className="font-bold text-fg">
                   <td className="px-4 py-3">Total</td>
-                  <td className="px-4 py-3 text-right tabular-nums">{shownTotals.qty}</td>
+                  <td className="px-4 py-3 text-right tabular-nums">{new Set(visible.map((r) => r.unit)).size === 1 ? `${shownTotals.qty} ${visible[0]?.unit || ""}` : ""}</td>
                   <td className="px-4 py-3 text-right tabular-nums">
                     {fmtMoney(shownTotals.spend)}
                   </td>
@@ -380,7 +380,7 @@ export default function PurchaseReportPage() {
                   </span>
                   <span>avg {money(r.avgPrice)}</span>
                   <span>{r.orders}× ordered</span>
-                  <span>last {localDate(r.lastDate)}</span>
+                  <span>last {niceDay(localDate(r.lastDate))}</span>
                 </div>
               </button>
             ))}

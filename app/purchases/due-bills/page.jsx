@@ -859,13 +859,13 @@ const handleSaveEdit = async (billId, formData) => {
                   />
                 </th>
                 <th className='px-6 py-4 font-semibold text-fg'>
-                  Vendor & Bill Info
+                  Invoice
                 </th>
                 <th className='px-6 py-4 font-semibold text-fg'>
                   Status
                 </th>
                 <th className='px-6 py-4 font-semibold text-fg text-right'>
-                  Amount
+                  Still owed
                 </th>
                 <th className='px-6 py-4 font-semibold text-fg text-right'>
                   Due Date
@@ -902,11 +902,12 @@ const handleSaveEdit = async (billId, formData) => {
                       />
                     </td>
                     <td className='px-6 py-4'>
-                      <div className='font-medium text-fg'>
-                        {bill.vendorName}
+                      <div className='font-semibold text-fg'>
+                        {bill.invoiceNo || bill.reference || 'No invoice no.'}
                       </div>
                       <div className='text-xs text-muted mt-0.5'>
-                        Ref: {bill.invoiceNo || bill.reference || 'N/A'}
+                        {bill.vendorName}
+                        {bill.invoiceDate ? ` · dated ${format(parseISO(bill.invoiceDate), 'd MMM')}` : ''}
                       </div>
                     </td>
                     <td className='px-6 py-4'>
@@ -916,9 +917,11 @@ const handleSaveEdit = async (billId, formData) => {
                       <div className='font-bold text-fg'>
                         {fmtRM(bill.balance)}
                       </div>
-                      <div className='text-xs text-subtle'>
-                        Total: {fmtRM(bill.total)}
-                      </div>
+                      {Number(bill.paid) > 0 && (
+                        <div className='text-xs text-subtle'>
+                          {fmtRM(bill.paid)} paid of {fmtRM(bill.total)}
+                        </div>
+                      )}
                     </td>
                     <td className='px-6 py-4 text-right text-muted'>
                       {bill.dueDate ? format(parseISO(bill.dueDate), 'd MMM yyyy') : '—'}
@@ -1005,7 +1008,8 @@ const handleSaveEdit = async (billId, formData) => {
 
                   {/* Reference */}
                   <div className='text-xs text-muted mb-3'>
-                    Ref: {bill.invoiceNo || bill.reference || 'N/A'}
+                    {bill.invoiceNo || bill.reference || 'No invoice no.'}
+                    {bill.invoiceDate ? ` · dated ${format(parseISO(bill.invoiceDate), 'd MMM')}` : ''}
                   </div>
 
                   {/* Bottom row: status + due date (left) | amounts (right) */}
@@ -1020,9 +1024,11 @@ const handleSaveEdit = async (billId, formData) => {
                       <div className='font-bold text-fg text-lg tabular-nums'>
                         {fmtRM(bill.balance)}
                       </div>
-                      <div className='text-xs text-subtle'>
-                        of {fmtRM(bill.total)}
-                      </div>
+                      {Number(bill.paid) > 0 && (
+                        <div className='text-xs text-subtle'>
+                          {fmtRM(bill.paid)} paid of {fmtRM(bill.total)}
+                        </div>
+                      )}
                     </div>
                   </div>
 

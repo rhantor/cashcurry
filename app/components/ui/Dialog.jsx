@@ -175,7 +175,7 @@ export function Sheet({ open, onClose, title, description, footer, layer = "z-50
             <Head title={title} description={description} onClose={onClose} />
             <div className="overflow-y-auto px-6 py-5">{children}</div>
             {footer && (
-              <div className="flex gap-2 border-t border-line px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">{footer}</div>
+              <div className="flex gap-2 border-t border-line px-6 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] [&>*:only-child]:flex-1">{footer}</div>
             )}
           </motion.div>
         </div>

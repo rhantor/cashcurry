@@ -23,7 +23,7 @@ import {
 import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
 import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
 import { useGetCompanyDetailsQuery } from "@/lib/redux/api/authApiSlice";
-import UploadInvoice from "@/app/components/purchases/UploadInvoice";
+import ProofUpload from "@/app/components/entry/ProofUpload";
 import Sheet from "@/app/components/purchases/Sheet";
 import QtyStepper from "@/app/components/purchases/QtyStepper";
 import MoneyInput from "@/app/components/purchases/MoneyInput";
@@ -46,7 +46,6 @@ import {
   Paperclip,
   Search,
   RotateCcw,
-  Camera,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 
@@ -112,6 +111,7 @@ export default function PurchaseOrdersPage() {
   const [recordBranchPrice] = useRecordBranchPurchasePriceMutation();
 
   const [invoiceFile, setInvoiceFile] = useState(null);
+  const [invoicePreview, setInvoicePreview] = useState(null);
   const [uploadPct, setUploadPct] = useState(0);
   const [uploading, setUploading] = useState(false);
 
@@ -150,6 +150,7 @@ export default function PurchaseOrdersPage() {
   const handleOpenReceive = (order) => {
     setSelectedOrder(order);
     setInvoiceFile(null);
+    setInvoicePreview(null);
     setUploadPct(0);
     setReceiveData({
       invoiceNo: "",
@@ -246,6 +247,7 @@ export default function PurchaseOrdersPage() {
 
       setOpenReceiveSheet(false);
       setInvoiceFile(null);
+      setInvoicePreview(null);
       toastOk("Goods received. The supplier's bill has been created.");
     } catch (e) {
       console.error(e);
@@ -662,7 +664,7 @@ export default function PurchaseOrdersPage() {
                     <button
                       onClick={() => setPendingAction({ kind: "approve", order })}
                       className="flex-1 min-h-[48px] rounded-2xl bg-info text-white font-bold
-                                 flex items-center justify-center gap-2 active:bg-violet-700 transition-colors"
+                                 flex items-center justify-center gap-2 active:brightness-95 transition-colors"
                     >
                       <CheckCircle className="w-5 h-5" /> Approve
                     </button>
@@ -688,7 +690,7 @@ export default function PurchaseOrdersPage() {
                   <button
                     onClick={() => handleSend(order)}
                     className="w-full min-h-[48px] rounded-2xl bg-info text-white font-bold
-                               flex items-center justify-center gap-2 active:bg-blue-700 transition-colors"
+                               flex items-center justify-center gap-2 active:brightness-95 transition-colors"
                   >
                     <Send className="w-5 h-5" /> Send to Supplier
                   </button>
@@ -958,28 +960,25 @@ export default function PurchaseOrdersPage() {
           </div>
 
           {/* Invoice photo is required, so it leads rather than hides at the bottom. */}
-          <div
-            className={`rounded-2xl border p-3.5 ${
-              invoiceFile ? "border-brand/30 bg-brand-soft/40" : "border-warning/30 bg-warning-soft/60"
-            }`}
-          >
-            <div className="flex items-start gap-2.5 mb-3">
-              <Camera
-                className={`w-5 h-5 shrink-0 mt-0.5 ${invoiceFile ? "text-brand" : "text-warning"}`}
-              />
-              <div>
-                <p className={`font-bold text-[15px] ${invoiceFile ? "text-brand" : "text-warning"}`}>
-                  {invoiceFile ? "Invoice photo attached" : "Photo of the invoice — required"}
-                </p>
-                <p className={`text-xs mt-0.5 ${invoiceFile ? "text-brand" : "text-warning"}`}>
-                  {invoiceFile
-                    ? "It will be saved with the bill."
-                    : "So anyone can check these prices against the supplier's paper later."}
-                </p>
-              </div>
-            </div>
-            <UploadInvoice file={invoiceFile} onChange={setInvoiceFile} progress={uploadPct} />
-          </div>
+          <ProofUpload
+            label="Photo of the invoice"
+            hint="So anyone can check these prices against the supplier's paper later."
+            pdf
+            required
+            pageDrop={false}
+            shrink={{ maxMB: 0.6, maxSide: 1600 }}
+            file={invoiceFile}
+            preview={invoicePreview}
+            progress={uploadPct}
+            onPick={(f, url) => {
+              setInvoiceFile(f);
+              setInvoicePreview(f && !/pdf/i.test(f.type) ? url : null);
+            }}
+            onRemove={() => {
+              setInvoiceFile(null);
+              setInvoicePreview(null);
+            }}
+          />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="block">
