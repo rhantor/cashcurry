@@ -1,5 +1,5 @@
-import { personName } from "@/lib/people";
 'use client'
+import { personName } from "@/lib/people";
 import { useMemo, useState } from 'react'
 import { addMonths, format, parseISO } from 'date-fns'
 import { AnimatePresence, motion } from 'framer-motion'
