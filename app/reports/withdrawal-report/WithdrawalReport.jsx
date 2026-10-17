@@ -11,6 +11,7 @@ import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/lib/region/currency";
 import { Badge, Skeleton } from "@/app/components/ui";
 
+import { personName } from "@/lib/people";
 const filesOf = (w) => (w.receiptUrls?.length ? w.receiptUrls : w.receiptUrl ? [w.receiptUrl] : []);
 const forOf = (w) => (w.category || "").trim() || "Other";
 const sumBy = (rows, keyOf) =>
@@ -68,7 +69,7 @@ export default function WithdrawalReport() {
         },
         { key: "amount", label: "Amount", align: "right", sortValue: (w) => Number(w.amount) || 0, render: (v) => <span className="font-semibold">{money(v)}</span> },
       ]}
-      filterConfig={{ dateField: "date", searchFields: ["category", "method", "reference", "notes", "createdBy.username"] }}
+      filterConfig={{ dateField: "date", searchFields: ["category", "method", "reference", "notes", "createdBy.username", "createdBy.name"] }}
       exportFunctions={{ exportPDF: exportWithdrawalsToPDF, exportExcel: exportWithdrawalsToExcel }}
       showTotalsFooter
       searchBarShow
@@ -99,7 +100,7 @@ export default function WithdrawalReport() {
             { label: "Note", value: w.notes },
           ]}
           files={filesOf(w)}
-          by={w.createdBy?.username || w.createdBy?.userName}
+          by={personName(w.createdBy)}
           at={w.createdAt}
           share={() => shareWithdrawal(w, branch)}
           pdf={() => exportWithdrawalToPDF(w, branch)}

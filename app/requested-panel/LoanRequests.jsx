@@ -5,6 +5,7 @@ import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/lib/region";
 import { RequestCard, RequestList } from "./RequestCard";
 
+import { personName } from "@/lib/people";
 const when = (v) => {
   const ms = v?.seconds ? v.seconds * 1000 : v ? Date.parse(v) : 0;
   return ms ? format(new Date(ms), "EEE, d MMM yyyy") : "";
@@ -31,7 +32,7 @@ export default function LoanRequests({ loading, error, errorMsg, items = [], wor
             facts={[
               { label: "On", value: when(req.createdAt) },
               { label: repay ? "Note" : "Why", value: req.note || req.reason },
-              { label: "Asked by", value: req.requestedBy?.username || req.createdBy?.username },
+              { label: "Asked by", value: personName(req.requestedBy) || personName(req.createdBy) },
               { label: "Paid by", value: repay ? req.paymentMethod : "" },
               { label: cash ? "Voucher" : "Bank", value: repay ? (cash ? req.voucherNo : req.bankName) : "" },
               { label: "Reference", value: repay && !cash ? req.referenceNo : "" },

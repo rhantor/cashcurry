@@ -17,6 +17,7 @@ import { Skeleton } from "@/app/components/ui";
 import HomeHero from "@/app/components/home/HomeHero";
 import { AllPages, Attention, HomeSection, QuickActions } from "@/app/components/home/HomeSections";
 
+import { personName } from "@/lib/people";
 const ROLE = {
   owner: "Owner", gm: "General manager", superAdmin: "Super admin", branchAdmin: "Branch admin",
   manager: "Manager", accountant: "Accountant", cashier: "Cashier", supervisor: "Supervisor",
@@ -84,7 +85,7 @@ function Home({ user, role, companyId, branchId, pages, sections, figures = null
   const { data: company } = useGetCompanyDetailsQuery(companyId ?? skipToken);
   const pending = usePendingRequests({ companyId, branchId, role });
 
-  const name = user?.name || user?.fullName || user?.userName || user?.username || "";
+  const name = user?.name || user?.fullName || personName(user) || "";
   const attention = [
     ...(pending.total > 0
       ? [{

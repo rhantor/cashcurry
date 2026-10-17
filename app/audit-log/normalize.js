@@ -12,13 +12,13 @@ const words = (s) => s.toLowerCase().replace(/_/g, " ");
 export function normalizeLog(log) {
   const raw = String(log.action || "");
   const event = /^[A-Z_]+$/.test(raw);
-  if (!event) return { ...log, actorName: log.actorName || log.username || "unknown" };
+  if (!event) return { ...log, actorName: log.actorName || log.name || log.username || "unknown" };
   const parts = raw.split("_");
   const action = VERB[parts[0]] || "event";
   const thing = parts.slice(1).map((p) => THING[p]).find(Boolean) || THING[parts[parts.length - 1]] || "";
   return {
     ...log,
-    actorName: log.actorName || log.username || "unknown",
+    actorName: log.actorName || log.name || log.username || "unknown",
     action,
     collection: log.collection || thing,
     what: words(raw),

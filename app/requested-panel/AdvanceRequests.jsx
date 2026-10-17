@@ -4,6 +4,7 @@ import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/lib/region";
 import { RequestCard, RequestList } from "./RequestCard";
 
+import { personName } from "@/lib/people";
 // Pending advance and staff-loan requests (and leave asked for the same way).
 // Approving does not pay anything out: approved requests move to "Waiting to
 // be paid" (PayOutQueue) until someone hands the money over.
@@ -33,7 +34,7 @@ export default function AdvanceRequests({ loading, error, errorMsg, items, worki
               { label: "For", value: day(req.date) },
               { label: "Over", value: req.kind === "staffLoan" && req.durationMonths ? `${req.durationMonths} months` : "" },
               { label: "Why", value: req.reason },
-              { label: "Asked by", value: req.createdBy?.username || req.createdBy?.name },
+              { label: "Asked by", value: personName(req.createdBy) },
             ]}
             note={leave ? null : "Approving doesn't pay it out — it then waits under “Waiting to be paid” until the money is handed over."}
             busy={workingId === req.id}

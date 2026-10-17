@@ -4,6 +4,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { toast } from "@/app/components/ui/notify";
 
+import { personName } from "@/lib/people";
 // Fetch image → Base64 (same approach you used)
 const getBase64ImageFromUrl = async (url) => {
   const res = await fetch(url, { mode: "cors" });
@@ -46,7 +47,7 @@ export const exportWithdrawalToExcel = (withdraw, branchData) => {
       ["Receipt", withdraw.receiptUrl || "-"],
       [
         "Added By",
-        withdraw.createdBy?.username || "Unknown",
+        personName(withdraw.createdBy) || "Unknown",
         "Role",
         withdraw.createdBy?.role || "-",
       ],
@@ -101,7 +102,7 @@ export const exportWithdrawalToPDF = async (withdraw, branchData) => {
       ["Receipt", withdraw.receiptUrl ? "See below 👇" : "-", "-"],
       [
         "Added By",
-        withdraw.createdBy?.username || "Unknown",
+        personName(withdraw.createdBy) || "Unknown",
         withdraw.createdBy?.role || "-",
       ],
     ];
@@ -173,7 +174,7 @@ export const shareWithdrawal = async (withdraw, branchData) => {
       ["Receipt", withdraw.receiptUrl ? "See below 👇" : "-", "-"],
       [
         "Added By",
-        withdraw.createdBy?.username || "Unknown",
+        personName(withdraw.createdBy) || "Unknown",
         withdraw.createdBy?.role || "-",
       ],
     ];
@@ -291,7 +292,7 @@ export const exportWithdrawalsToExcel = (
       w.method || "N/A",
       w.reference || "-",
       w.receiptUrl || "-",
-      w.createdBy?.username || "Unknown",
+      personName(w.createdBy) || "Unknown",
       w.createdBy?.email || "-",
       w.createdBy?.role || "-",
       w.createdAt
@@ -411,7 +412,7 @@ export const exportWithdrawalsToPDF = (
       w.method || "N/A",
       w.reference || "-",
       "", // clickable link cell
-      w.createdBy?.username || "Unknown",
+      personName(w.createdBy) || "Unknown",
       w.createdBy?.email || "-",
       w.createdBy?.role || "-",
       w.createdAt

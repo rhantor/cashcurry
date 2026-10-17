@@ -3,6 +3,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { toast } from "@/app/components/ui/notify";
 
+import { personName } from "@/lib/people";
 /* ─── helpers ─── */
 const fmtAmt = (v) =>
   Number(v || 0).toLocaleString(undefined, {
@@ -67,8 +68,8 @@ export const exportLoanSummaryToExcel = ({ visible, nameOf, currency, companyNam
           r.settled ? "Yes" : "No",
           fmtDate(r.createdAt),
           r.durationDays ?? 0,
-          r.requestedBy?.username || "—",
-          r.approvedBy?.name || r.approvedBy?.username || "—",
+          personName(r.requestedBy) || "—",
+          personName(r.approvedBy) || "—",
         ]);
       });
 
@@ -83,8 +84,8 @@ export const exportLoanSummaryToExcel = ({ visible, nameOf, currency, companyNam
           r.settled ? "Yes" : "No",
           fmtDate(r.createdAt),
           r.durationDays ?? 0,
-          r.requestedBy?.username || "—",
-          r.approvedBy?.name || r.approvedBy?.username || "—",
+          personName(r.requestedBy) || "—",
+          personName(r.approvedBy) || "—",
         ]);
       });
     });
@@ -209,7 +210,7 @@ export const exportLoanSummaryToPDF = ({ visible, nameOf, currency, companyName,
           out:  fmtAmt(r.outstanding ?? r.amount),
           stl:  r.settled ? "Yes" : "No",
           dt:   fmtDate(r.createdAt),
-          by:   r.requestedBy?.username || "—",
+          by:   personName(r.requestedBy) || "—",
         })),
         ...taken.map((r) => ({
           dir:  "Taken",
@@ -219,7 +220,7 @@ export const exportLoanSummaryToPDF = ({ visible, nameOf, currency, companyName,
           out:  fmtAmt(r.outstanding ?? r.amount),
           stl:  r.settled ? "Yes" : "No",
           dt:   fmtDate(r.createdAt),
-          by:   r.requestedBy?.username || "—",
+          by:   personName(r.requestedBy) || "—",
         })),
       ];
 

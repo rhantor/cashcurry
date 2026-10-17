@@ -17,6 +17,7 @@ import { formatMoney } from "@/lib/region/currency";
 import { Badge, Button, Field, Sheet, Switch, Textarea, cn } from "@/app/components/ui";
 import MoneyInput from "@/app/components/entry/MoneyInput";
 
+import { personName } from "@/lib/people";
 const monthText = (m) => {
   const d = m ? parseISO(`${m}-01`) : null;
   return d && isValid(d) ? format(d, "MMM yyyy") : m || "";
@@ -155,7 +156,7 @@ export default function LoanTermsModal({ type = "loan", record, onClose, onSave,
           <ul className="space-y-1.5">
             {record.termEdits.map((e, i) => (
               <li key={i} className="rounded-xl bg-surface-2 px-3 py-2 text-xs text-muted">
-                <span className="font-semibold text-fg">{e.editedBy?.username || "Manager"}</span>
+                <span className="font-semibold text-fg">{personName(e.editedBy) || "Manager"}</span>
                 {e.editedAt ? ` · ${new Date(e.editedAt).toLocaleDateString()}` : ""}
                 {e.note && <span className="mt-0.5 block italic">“{e.note}”</span>}
               </li>

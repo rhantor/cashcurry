@@ -10,6 +10,7 @@ import { formatMoney } from "@/lib/region/currency";
 import { getSessionUser } from "@/lib/session";
 import { Avatar, Badge, Button, Card, EmptyState, Input, Skeleton, Tabs, cn, toast } from "@/app/components/ui";
 
+import { personName } from "@/lib/people";
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 function getUser() {
@@ -132,7 +133,7 @@ function LoanCard({ loan, money, onEditTerms, canEdit, flat = false }) {
                   <ul className="space-y-1">
                     {loan.termEdits.map((e, i) => (
                       <li key={i} className="rounded-lg bg-surface px-3 py-1.5 text-[11px] text-muted">
-                        <span className="font-semibold text-fg">{e.editedBy?.username || "Manager"}</span>
+                        <span className="font-semibold text-fg">{personName(e.editedBy) || "Manager"}</span>
                         {e.editedAt ? ` · ${new Date(e.editedAt).toLocaleDateString()}` : ""}
                         {e.note && <span className="block italic">“{e.note}”</span>}
                       </li>
@@ -212,7 +213,7 @@ export default function StaffLoansPage() {
       loanId: editTarget.id,
       changes,
       managerNote: note,
-      editedBy: { uid: user.uid, username: user.username, role: user.role },
+      editedBy: { uid: user.uid, name: personName(user), username: user.username, role: user.role },
     }).unwrap();
     toast.success("Instalments updated", { description: editTarget.staffName });
     setEditTarget(null);

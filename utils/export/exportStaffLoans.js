@@ -7,6 +7,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { toast } from "@/app/components/ui/notify";
 
+import { personName } from "@/lib/people";
 const num = (v) => Number(v) || 0;
 const day = (v) => {
   const d = typeof v === "string" ? parseISO(v) : v ? new Date(v) : null;
@@ -19,7 +20,7 @@ const leftOf = (l) => (l.status === "closed" ? 0 : Math.max(0, num(l.amount) - p
 
 /* the two tables */
 const LOAN_HEAD = ["Date", "Staff", "Amount", "Months", "Monthly", "Paid back", "Still owed", "Reason", "Entered by"];
-const loanRow = (l) => [day(l.date), l.staffName || "-", num(l.amount), num(l.durationMonths) || 1, num(l.emi) || Math.ceil(num(l.amount) / Math.max(1, num(l.durationMonths) || 1)), paidOf(l), leftOf(l), l.reason || "-", l.createdBy?.username || "-"];
+const loanRow = (l) => [day(l.date), l.staffName || "-", num(l.amount), num(l.durationMonths) || 1, num(l.emi) || Math.ceil(num(l.amount) / Math.max(1, num(l.durationMonths) || 1)), paidOf(l), leftOf(l), l.reason || "-", personName(l.createdBy) || "-"];
 const loanFoot = (rows) => ["", "Total", rows.reduce((n, l) => n + num(l.amount), 0), "", "", rows.reduce((n, l) => n + paidOf(l), 0), rows.reduce((n, l) => n + leftOf(l), 0), "", ""];
 
 const STAFF_HEAD = ["Staff", "Loans", "Borrowed", "Paid back", "Still owed", "Last loan"];

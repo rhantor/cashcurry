@@ -13,6 +13,7 @@ import { formatMoney } from "@/lib/region/currency";
 import { Avatar, Skeleton, Tabs } from "@/app/components/ui";
 import { ADVANCE_TYPES, AdvanceEditSheet, AdvanceRecord, AdvanceStatus, StaffSheet, paidBack, useDeleteAdvance } from "./AdvanceSheets";
 
+import { personName } from "@/lib/people";
 const nameOf = (a) => (a.staffName || "Unknown").trim();
 const owedOf = (a) => (a.status === "closed" ? 0 : Math.max(0, (Number(a.amount) || 0) - paidBack(a)));
 const asDate = (v) => {
@@ -89,7 +90,7 @@ export default function AdvanceReport() {
         ),
       },
       { key: "status", label: "Paid back", render: (_v, a) => <AdvanceStatus a={a} /> },
-      { key: "createdBy", label: "By", hideOnMobile: true, render: (v) => <span className="text-muted">{v?.username || v?.userName || "—"}</span> },
+      { key: "createdBy", label: "By", hideOnMobile: true, render: (v) => <span className="text-muted">{personName(v) || "—"}</span> },
       { key: "amount", label: "Amount", align: "right", sortValue: (a) => Number(a.amount) || 0, render: (v) => <span className="font-semibold">{money(v)}</span> },
     ],
     filterConfig: { dateField: "date", searchFields: ["staffName", "reason", "advanceType"], customFilters },

@@ -82,7 +82,7 @@ export default function BranchSettingsPage() {
     <div className="mx-auto max-w-6xl px-4 py-5 pb-32 sm:px-6 sm:py-6">
       <div className="grid gap-6 md:grid-cols-[15rem_1fr]">
         {/* the groups */}
-        <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 md:sticky md:top-20 md:mx-0 md:flex-col md:self-start md:overflow-visible md:px-0">
+        <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:sticky md:top-20 md:mx-0 md:flex-col md:self-start md:overflow-visible md:px-0">
           {TABS.map((t) => {
             const on = activeTab === t.id;
             return (

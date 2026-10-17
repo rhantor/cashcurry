@@ -7,6 +7,7 @@ import { format } from "date-fns";
 import { toast } from "@/app/components/ui/notify";
 import { categoryLabel } from "@/app/entry-data/cost-entry/logic/constants";
 
+import { personName } from "@/lib/people";
 /* ----------------------------- Helpers ----------------------------- */
 
 // Robust Firestore timestamp → Date (supports {seconds,nanoseconds}, ISO strings, Date)
@@ -86,7 +87,7 @@ export const exportCostToExcel = (cost, branchData) => {
       "Description",
       cost.description ? String(cost.description).replace(/\n/g, ", ") : "-",
     ],
-    ["Created By", cost.createdBy?.username || "-"],
+    ["Created By", personName(cost.createdBy) || "-"],
     [],
   ];
 
@@ -160,7 +161,7 @@ export const exportCostToPDF = async (cost, branchData) => {
     ["Paid From", paidFromLabel(from)],
     ["Method", methodLabel(method)],
     ["Description", safe(cost.description)],
-    ["Created By", cost.createdBy?.username || "-"],
+    ["Created By", personName(cost.createdBy) || "-"],
   ];
 
   autoTable(doc, {
@@ -255,7 +256,7 @@ export const handleCostShare = async (cost, branchData) => {
     ["Paid From", paidFromLabel(from)],
     ["Method", methodLabel(method)],
     ["Description", safe(cost.description)],
-    ["Created By", cost.createdBy?.username || "-"],
+    ["Created By", personName(cost.createdBy) || "-"],
   ];
 
   autoTable(doc, {
@@ -427,7 +428,7 @@ export const exportCostsToExcel = (
       paidFromLabel(from),
       methodLabel(method),
       c.description ? String(c.description).replace(/\n/g, ", ") : "-",
-      c.createdBy?.username || "-",
+      personName(c.createdBy) || "-",
       allFiles.length > 0 ? `${allFiles.length} file(s)` : "-",
       invoiceInfo || "-",
       createdAtToStr(c.createdAt),
@@ -813,7 +814,7 @@ export const exportCostsToPDF = (
       paidFromLabel(from),
       methodLabel(method),
       c.description || "-",
-      c.createdBy?.username || "-",
+      personName(c.createdBy) || "-",
       proofText,
       createdAtToStr(c.createdAt),
     ];

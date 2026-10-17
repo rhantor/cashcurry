@@ -9,6 +9,7 @@ import { formatMoney } from "@/lib/region/currency";
 import { Badge, Card, EmptyState, Skeleton, Tabs, cn } from "@/app/components/ui";
 import { Chip } from "@/app/components/entry/Choices";
 
+import { personName } from "@/lib/people";
 const tsToMs = (v) => {
   if (!v) return null;
   if (typeof v === "number") return v;
@@ -38,8 +39,8 @@ function LoanCard({ item, branchId, money, nameOf }) {
   const weLent = item._toBranchId === branchId;
   // money goes lender → borrower for a loan, borrower → lender for a repayment
   const [from, to] = repay ? [borrower, lender] : [lender, borrower];
-  const who = item.requestedBy?.username || item.createdBy?.username || item.requestedBy?.email;
-  const decidedBy = item.approvedBy?.name || item.approvedBy?.username;
+  const who = personName(item.requestedBy) || personName(item.createdBy) || item.requestedBy?.email;
+  const decidedBy = personName(item.approvedBy);
   const decidedAt = fmtDateTime(item.updatedAt || item.approvedAt);
   const cash = item.paymentMethod === "cash";
 

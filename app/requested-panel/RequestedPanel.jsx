@@ -31,6 +31,7 @@ import { confirmDialog, promptDialog } from "@/app/components/ui/notify";
 import { Skeleton, Tabs } from "@/app/components/ui";
 import { CountBadge } from "@/app/components/shell/SideNav";
 
+import { personName } from "@/lib/people";
 // Rejecting can't be taken back from here, so it asks first.
 const sureToReject = (what) => confirmDialog({ title: `Reject this ${what}?`, message: "The person who asked will see it as rejected.", confirmLabel: "Reject", danger: true });
 
@@ -172,7 +173,8 @@ export default function RequestedPanel() {
           paidOut: req.paidOut ?? null,
           approvedBy: {
             id: user?.uid || "",
-            name: user?.username || "Unknown",
+            name: personName(user) || "Unknown",
+            username: user?.username || "",
             role: user?.role || "N/A",
             timestamp: serverTimestamp(),
           },
@@ -199,7 +201,8 @@ export default function RequestedPanel() {
             id: req.id,
             approvedBy: {
               id: user?.uid || "",
-              name: user?.username || "Unknown",
+              name: personName(user) || "Unknown",
+            username: user?.username || "",
               role: user?.role || "N/A",
             },
           }).unwrap();
@@ -220,7 +223,8 @@ export default function RequestedPanel() {
             refundNote: reason || "",
             rejectedBy: {
               id: user?.uid || "",
-              name: user?.username || "Unknown",
+              name: personName(user) || "Unknown",
+            username: user?.username || "",
               role: user?.role || "N/A",
             },
           }).unwrap();
@@ -237,7 +241,8 @@ export default function RequestedPanel() {
             status: action,
             approvedBy: {
               id: user?.uid || "",
-              name: user?.username || "Unknown",
+              name: personName(user) || "Unknown",
+            username: user?.username || "",
               role: user?.role || "N/A",
               timestamp: serverTimestamp(),
             },
@@ -266,7 +271,8 @@ export default function RequestedPanel() {
           status: action,
           approvedBy: {
             id: user?.uid || "",
-            name: user?.username || "Unknown",
+            name: personName(user) || "Unknown",
+            username: user?.username || "",
             role: user?.role || "N/A",
             timestamp: serverTimestamp(),
           },

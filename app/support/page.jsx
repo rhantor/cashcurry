@@ -4,6 +4,7 @@ import { Check, Copy, LifeBuoy, Mail, RefreshCw, ShieldQuestion, Wifi } from "lu
 import useSession from "@/app/hooks/useSession";
 import { Button, Card, cn, toast } from "@/app/components/ui";
 
+import { personName } from "@/lib/people";
 // Set NEXT_PUBLIC_SUPPORT_EMAIL to show a way to write to the Cash Curry team.
 const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "";
 const ROLE = { owner: "Owner", gm: "General manager", superAdmin: "Super admin", branchAdmin: "Branch admin", manager: "Manager", accountant: "Accountant", supervisor: "Supervisor", cashier: "Cashier", staff: "Staff" };
@@ -23,7 +24,7 @@ export default function SupportPage() {
   const [copied, setCopied] = useState(false);
 
   const details = [
-    `User: ${user?.username || user?.userName || "—"}`,
+    `User: ${personName(user) || "—"}`,
     `Role: ${ROLE[user?.role] || user?.role || "—"}`,
     `Branch: ${user?.branchName || user?.branchId || "—"}`,
     `Company: ${user?.companyId || "—"}`,

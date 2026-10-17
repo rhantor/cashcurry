@@ -5,6 +5,7 @@ import { Building2, LogOut, Search } from "lucide-react";
 import { Avatar, LogoMark, Menu, cn } from "@/app/components/ui";
 import BranchSwitcher from "./BranchSwitcher";
 
+import { personName } from "@/lib/people";
 /**
  * The bar above every page: where you are, search (Ctrl+K), the branch, and you.
  * On phones it keeps to the essentials; the rest lives in the bottom bar.
@@ -84,11 +85,11 @@ export default function TopBar({ page, user, isCompany, branches, activeBranchId
           width={230}
           trigger={(p) => (
             <button {...p} type="button" aria-label="Account" className={cn("rounded-full transition hover:ring-4 hover:ring-brand-soft")}>
-              <Avatar name={user?.userName || user?.username || user?.email} size="md" />
+              <Avatar name={personName(user)} size="md" />
             </button>
           )}
           items={[
-            { label: user?.userName || user?.username || "Account", hint: user?.role, disabled: true },
+            { label: personName(user) || "Account", hint: user?.role, disabled: true },
             "divider",
             { label: "Search", icon: Search, hint: "Ctrl K", onSelect: onSearch },
             { label: "Sign out", icon: LogOut, danger: true, onSelect: onSignOut },

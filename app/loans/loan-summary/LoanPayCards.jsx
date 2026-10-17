@@ -14,6 +14,7 @@ import MoneyInput from "@/app/components/entry/MoneyInput";
 import ProofUpload from "@/app/components/entry/ProofUpload";
 import { Chip, ChoiceCards } from "@/app/components/entry/Choices";
 
+import { stampOf } from "@/lib/people";
 const METHODS = [
   { value: "cash", title: "Cash", note: "With a voucher", icon: Banknote, tone: "brand" },
   { value: "online", title: "Bank transfer", note: "Online, with the receipt", icon: Landmark, tone: "info" },
@@ -63,7 +64,7 @@ function PayCard({ otherId, outstanding, durationDays, lastActivity, nameOf, mon
         toBranchId: otherId, // lender (receiver)
         amount: amt,
         note: note.trim(),
-        requestedBy: { uid: user?.uid || "", username: user?.username || "", role: user?.role || "", email: user?.email || "" },
+        requestedBy: stampOf(user),
         paymentMethod: method,
         proofUrl,
         proofMime: file.type || null,

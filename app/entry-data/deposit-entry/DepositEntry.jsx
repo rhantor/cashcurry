@@ -20,6 +20,7 @@ import ProofUpload from "@/app/components/entry/ProofUpload";
 import RecordSheet from "@/app/components/entry/RecordSheet";
 import { EntryLayout, EntrySection, MoneyRoute, RecentEntries, SummaryLine } from "@/app/components/entry/EntryLayout";
 
+import { personName } from "@/lib/people";
 const day = (d) => (d ? format(parseISO(d), "EEE, d MMM") : "");
 
 /**
@@ -238,7 +239,7 @@ export default function DepositEntryPage() {
             { label: "Trace number", value: viewing.traceNo },
           ]}
           files={viewing.fileURL ? [viewing.fileURL] : []}
-          by={viewing.createdBy?.username || viewing.createdBy?.userName}
+          by={personName(viewing.createdBy)}
           at={viewing.createdAt}
           share={() => shareDeposit(viewing, branchData)}
           pdf={() => exportDepositToPDF(viewing, branchData)}

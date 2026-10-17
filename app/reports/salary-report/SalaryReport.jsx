@@ -110,7 +110,7 @@ export default function SalaryReport() {
           },
           { key: "totalSalary", label: "Amount", align: "right", aside: true, sortValue: amountOf, render: (_v, s) => <span className="font-semibold">{money(amountOf(s))}</span> },
         ]}
-        filterConfig={{ dateField: "dateForFilter", searchFields: ["staffName", "notes", "createdBy.username"] }}
+        filterConfig={{ dateField: "dateForFilter", searchFields: ["staffName", "notes", "createdBy.username", "createdBy.name"] }}
         exportFunctions={{
           exportPDF: (data, branch, type, range, month, q) => exportSalariesToPDF(data, branch, { dateMode: mode, filterType: type, range, selectedMonth: month, q }),
           exportExcel: (data, branch, type, range, month, q) => exportSalariesToExcel(data, branch, { dateMode: mode, filterType: type, range, selectedMonth: month, q }),

@@ -6,6 +6,7 @@ import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import { toast } from "@/app/components/ui/notify";
 
+import { personName } from "@/lib/people";
 const branchLabel = (branchData) =>
   Array.isArray(branchData)
     ? branchData.map((b) => b.name).join(", ")
@@ -32,7 +33,7 @@ export function exportSalariesToPDF(list = [], branchData, meta = {}) {
       e.month || "-",
       e.paymentDate || "-",
       toRM(e.totalSalary),
-      e.createdBy?.username || "-",
+      personName(e.createdBy) || "-",
     ]);
 
     autoTable(doc, {
@@ -71,7 +72,7 @@ export function exportSalariesToExcel(list = [], branchData, meta = {}) {
         e.month || "-",
         e.paymentDate || "-",
         toRM(e.totalSalary),
-        e.createdBy?.username || "-",
+        personName(e.createdBy) || "-",
       ]),
     ];
 
@@ -100,7 +101,7 @@ export function exportOneSalaryToPDF(item, branchData) {
       ["Payment Date", item.paymentDate || "-"],
       ["Total (RM)", toRM(item.totalSalary)],
       ["Notes", item.notes || "-"],
-      ["Created By", item.createdBy?.username || "-"],
+      ["Created By", personName(item.createdBy) || "-"],
     ];
 
     autoTable(doc, {
@@ -130,7 +131,7 @@ export function exportOneSalaryToExcel(item, branchData) {
       ["Payment Date", item.paymentDate || "-"],
       ["Total (RM)", toRM(item.totalSalary)],
       ["Notes", item.notes || "-"],
-      ["Created By", item.createdBy?.username || "-"],
+      ["Created By", personName(item.createdBy) || "-"],
     ];
     const ws = XLSX.utils.aoa_to_sheet(wsData);
     const wb = XLSX.utils.book_new();

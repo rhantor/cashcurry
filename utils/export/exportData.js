@@ -6,6 +6,7 @@ import "jspdf-autotable";
 import autoTable from "jspdf-autotable";
 import { toast } from "@/app/components/ui/notify";
 
+import { personName } from "@/lib/people";
 /** ---------- Tender helpers ---------- */
 const DEFAULT_TENDERS = [
   { key: "cash", label: "Cash", includeInTotal: true, order: 1 },
@@ -203,7 +204,7 @@ export const exportToExcel = (sale, branchData, tendersOpt = null) => {
   const total = sale.total ?? (computedTotalCents / 100).toFixed(2);
 
   rows.push(["Total", total]);
-  rows.push(["Added By", sale.createdBy?.username || "Unknown"]);
+  rows.push(["Added By", personName(sale.createdBy) || "Unknown"]);
 
   // 🔹 Add a Z Report link row at the end (images aren’t reliably embeddable with community SheetJS)
   if (sale.zReportUrl) {
@@ -288,7 +289,7 @@ export const exportToPDF = async (
   const pageH = doc.internal.pageSize.getHeight();
   let yPos = Math.min(endY + 6, pageH - 22);
   doc.setFontSize(11);
-  doc.text(`Added By: ${sale.createdBy?.username || "Unknown"}`, 14, yPos);
+  doc.text(`Added By: ${personName(sale.createdBy) || "Unknown"}`, 14, yPos);
   yPos += 8;
 
   // 🔹 Z REPORT section
@@ -402,7 +403,7 @@ export const handleShare = async (
   const pageH = doc.internal.pageSize.getHeight();
   let yPos = Math.min(endY + 6, pageH - 22);
   doc.setFontSize(11);
-  doc.text(`Added By: ${sale.createdBy?.username || "Unknown"}`, 14, yPos);
+  doc.text(`Added By: ${personName(sale.createdBy) || "Unknown"}`, 14, yPos);
   yPos += 8;
 
   // Z REPORT section (same behavior as exportToPDF)
@@ -603,7 +604,7 @@ export const handleShareImage = async (
     // Footer
     setFont(8, "normal");
     ctx.fillStyle = "#9ca3af";
-    ctx.fillText(`Added By: ${sale.createdBy?.username || "Unknown"}`, pad, cy + 8 * scale);
+    ctx.fillText(`Added By: ${personName(sale.createdBy) || "Unknown"}`, pad, cy + 8 * scale);
     cy += 20 * scale;
 
     // Z Report Image
@@ -813,7 +814,7 @@ export const exportSalesToExcel = (
       ...tenderCells,
       s.total ?? "0",
       s.zReportUrl || "-",
-      s.createdBy?.username || "-",
+      personName(s.createdBy) || "-",
       createdAtText,
     ];
   });
@@ -936,7 +937,7 @@ export const exportSalesToPDF = (
       ...tenderCells,
       s.total ?? 0,
       "", // Proof (link drawn in didDrawCell)
-      s.createdBy?.username || "-",
+      personName(s.createdBy) || "-",
       createdAtText,
     ];
   });

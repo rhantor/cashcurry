@@ -8,6 +8,7 @@ import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/lib/region/currency";
 import { Badge, Button, CountUp, Menu, Sheet, Skeleton, cn, toast } from "@/app/components/ui";
 
+import { personName } from "@/lib/people";
 const DEFAULT_TENDERS = [
   { key: "cash", label: "Cash", enabled: true, includeInTotal: true, order: 1 },
   { key: "card", label: "Card", enabled: true, includeInTotal: true, order: 2, banked: true },
@@ -57,7 +58,7 @@ export default function ItemsReportModal({ item, branchData, onClose, monthTotal
   const branchTitle = Array.isArray(branchData) ? branchData.map((b) => b.name).join(", ") : branchData?.name || "Branch";
   const day = when(item.date);
   const created = when(item.createdAt);
-  const by = item.createdBy?.username || item.createdBy?.userName || "Unknown";
+  const by = personName(item.createdBy) || "Unknown";
 
   const doShareImage = async () => {
     setSharing(true);

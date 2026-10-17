@@ -11,6 +11,7 @@ import MoneyInput from "@/app/components/entry/MoneyInput";
 import { Chip } from "@/app/components/entry/Choices";
 import { Avatar, Badge, Button, DatePicker, Field, Input, Sheet, Textarea, confirmDialog, toast } from "@/app/components/ui";
 
+import { personName } from "@/lib/people";
 const STATUS = { pending: "Waiting for approval", approved: "Approved", rejected: "Rejected", closed: "Paid back" };
 const day = (v, f = "EEE, d MMM yyyy") => {
   const d = typeof v === "string" ? parseISO(v) : v ? new Date(v) : null;
@@ -95,7 +96,7 @@ export function LoanRecord({ l, branch, money, onClose, onEdit, onDelete }) {
         { label: "Approval note", value: l.approvalNotes },
       ]}
       files={null}
-      by={l.createdBy?.username || l.createdBy?.userName}
+      by={personName(l.createdBy)}
       at={l.createdAt}
       pdf={() => exportStaffLoansToPDF([l], branch, "range", { from: l.date, to: l.date })}
       excel={() => exportStaffLoansToExcel([l], branch, "range", { from: l.date, to: l.date })}
