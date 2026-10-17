@@ -23,6 +23,9 @@ import ConfirmSheet from "@/app/components/purchases/ConfirmSheet";
 import ItemFilterBar, { filterItems } from "@/app/components/purchases/ItemFilterBar";
 import useToast from "@/app/components/purchases/useToast";
 import * as XLSX from "xlsx";
+import useCurrency from "@/app/hooks/useCurrency";
+import { formatMoney } from "@/lib/region/currency";
+import { Button, Menu } from "@/app/components/ui";
 import {
   Upload,
   FileSpreadsheet,
@@ -172,6 +175,9 @@ export default function ItemsCatalogPage() {
 
   const { data: allItems = [], isLoading, isFetching } = useGetItemsQuery(args);
   const { data: vendors = [] } = useGetVendorsQuery(ready && companyId ? { companyId } : skipToken);
+  const vendorNameById = useMemo(() => new Map(vendors.map((v) => [v.id, v.name])), [vendors]);
+  const currency = useCurrency();
+  const money = (v) => formatMoney(Number(v || 0), currency);
   const { data: branches = [] } = useGetBranchesBasicQuery(ready && companyId ? companyId : skipToken);
 
   const allBranchIds = useMemo(() => branches.map((b) => b.id), [branches]);
@@ -437,10 +443,10 @@ export default function ItemsCatalogPage() {
     }, {});
 
   return (
-    <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-4 pb-24">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div className="mx-auto max-w-7xl space-y-4 px-4 py-5 pb-24">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-fg tracking-tight">Items Catalog</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-fg">Items catalog</h1>
           <p className="text-muted text-sm mt-0.5">The products this branch can order.</p>
         </div>
 
@@ -452,34 +458,22 @@ export default function ItemsCatalogPage() {
             ref={fileInputRef}
             onChange={handleFileUpload}
           />
-
-          <button
-            onClick={downloadTemplate}
-            aria-label="Download Excel template"
-            className="w-12 min-h-[48px] flex items-center justify-center rounded-2xl bg-surface border border-line
-                       text-muted active:bg-surface-2 transition-colors"
-          >
-            <FileSpreadsheet className="w-5 h-5" />
-          </button>
-
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={busy}
-            aria-label="Import from Excel"
-            className="w-12 min-h-[48px] flex items-center justify-center rounded-2xl bg-surface border border-line
-                       text-muted active:bg-surface-2 disabled:opacity-50 transition-colors"
-          >
-            <Upload className="w-5 h-5" />
-          </button>
-
-          <button
-            onClick={() => setOpenAdd(true)}
-            disabled={!companyId || busy}
-            className="flex-1 sm:flex-none min-h-[48px] px-5 rounded-2xl bg-brand text-white font-semibold
-                       flex items-center justify-center gap-2 active:brightness-95 disabled:opacity-50 transition-colors"
-          >
-            <Plus className="w-5 h-5" /> Add Item
-          </button>
+          <Menu
+            align="end"
+            width={240}
+            trigger={(p) => (
+              <Button {...p} variant="secondary" icon={FileSpreadsheet} disabled={busy}>
+                Excel
+              </Button>
+            )}
+            items={[
+              { label: "Import items from Excel", icon: Upload, onSelect: () => fileInputRef.current?.click() },
+              { label: "Download the template", icon: DownloadCloud, onSelect: downloadTemplate },
+            ]}
+          />
+          <Button icon={Plus} className="flex-1 sm:flex-none" disabled={!companyId || busy} onClick={() => setOpenAdd(true)}>
+            Add item
+          </Button>
         </div>
       </div>
 
@@ -616,14 +610,14 @@ export default function ItemsCatalogPage() {
                           </div>
                           <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted mt-1.5">
                             <span>{item.unit}</span>
-                            {item.defaultPrice > 0 && <span>· Est {Number(item.defaultPrice).toFixed(2)}</span>}
+                            {item.defaultPrice > 0 && <span>· about {money(item.defaultPrice)}</span>}
                             {localPrice > 0 && (item.lastPurchasePrice > 0 || hasOwnPrice) && (
                               <span className={hasOwnPrice ? "text-brand font-semibold" : "text-subtle"}>
-                                · {hasOwnPrice ? "Last paid" : "Other branch paid"} {localPrice.toFixed(2)}
+                                · {hasOwnPrice ? "Last paid" : "Other branch paid"} {money(localPrice)}
                                 {localDate ? ` (${localDate})` : ""}
                               </span>
                             )}
-                            {item.vendorIds?.length > 0 && <span>· {item.vendorIds.length} supplier(s)</span>}
+                            {item.vendorIds?.length > 0 && <span className="min-w-0 basis-full truncate">From {item.vendorIds.map((id) => vendorNameById.get(id)).filter(Boolean).join(", ") || `${item.vendorIds.length} supplier${item.vendorIds.length === 1 ? "" : "s"}`}</span>}
                           </div>
                         </div>
 

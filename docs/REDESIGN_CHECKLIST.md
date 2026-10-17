@@ -56,7 +56,7 @@ computer, has its own loading look, and its old modals are redone too.
 - ✅ `/purchases/due-bills` Due bills (+ pay bills, edit bill, export)
 - ✅ `/purchases/payments` Payments — totals by office, date/vendor/method filters (the date filter now works), details sheet
 - ✅ `/purchases/vendors` Vendors — owed/paid tiles, list, add/edit sheet, vendor sheet (owed · paid · details), export menu; recount only for owners and refuses a partial count
-- ⬜ `/purchases/items` Items catalog
+- ✅ `/purchases/items` Items catalog — prices in the money format, supplier names, Excel import/template in one menu
 - ⬜ `/purchases/reports` Purchase report
 
 ## 3.4.8 Settings, admin, sign-in, tools
