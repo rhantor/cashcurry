@@ -300,12 +300,13 @@ export default function DueBillsPage () {
   const handleDeleteClick = async billId => {
     const bill = allBills.find(b => b.id === billId)
     const paidOn = Number(bill?.paid || 0)
+    if (paidOn > 0) {
+      toast.warning(`${fmtRM(paidOn)} has been paid on ${bill?.invoiceNo || 'this bill'}, so it can't be deleted. To close it, edit its total down to ${fmtRM(paidOn)}.`)
+      return
+    }
     const ok = await confirmDialog({
       title: `Delete bill ${bill?.invoiceNo || ''}?`.replace(' ?', '?'),
-      message:
-        paidOn > 0
-          ? `${fmtRM(paidOn)} has already been paid on it. Those payments stay in Payments and the cost report; only the bill and the ${fmtRM(bill?.balance)} still owed go.`
-          : `${bill?.vendorName || 'The vendor'} will no longer be owed ${fmtRM(bill?.total)} for it.`,
+      message: `${bill?.vendorName || 'The vendor'} will no longer be owed ${fmtRM(bill?.total)} for it.`,
       confirmLabel: 'Delete bill',
       danger: true
     })
