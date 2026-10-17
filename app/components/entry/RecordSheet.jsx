@@ -45,7 +45,7 @@ function Attachment({ url, i }) {
  * More; Edit when allowed.
  *   title, branch, amount, money, tone ("bank" | "brand" | "out"), amountLabel
  *   rows: [{ label, value }] (empty values are left out)
- *   files: [url]; by; at (createdAt)
+ *   files: [url] (null = this kind of record never has any); by; at (createdAt)
  *   share / pdf / excel: functions (each optional); onEdit; onDelete (red, asks first in the caller)
  *   note: a line above the details (e.g. why it can't be changed here)
  */
@@ -129,7 +129,7 @@ export default function RecordSheet({ open = true, onClose, title, branch, amoun
 
       {children}
 
-      {files.length > 0 ? (
+      {files === null ? null : files.length > 0 ? (
         <div className="mt-4 space-y-2">
           <p className="text-xs font-semibold text-muted">{files.length > 1 ? `Attachments (${files.length})` : "Attachment"}</p>
           {files.map((u, i) => (

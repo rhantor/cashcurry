@@ -25,7 +25,7 @@ computer, has its own loading look, and its old modals are redone too.
 - ✅ `/reports/cost-report` Cost report (+ edit cost, attachments)
 - ✅ `/reports/deposit-report` Cash to bank report
 - ✅ `/reports/withdrawal-report` Bank to cash report
-- ⬜ `/reports/advance-report` Advance report
+- ✅ `/reports/advance-report` Advance report
 - ⬜ `/reports/salary-report` Salary report
 - ⬜ `/reports/staff-loan-report` Staff loan report (not in the menu yet — decide)
 - ⬜ `/reports/yearly-summary` Yearly summary

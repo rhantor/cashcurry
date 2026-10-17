@@ -145,7 +145,8 @@ export default function ReportPage({
     <div className="mx-auto max-w-7xl space-y-4 px-4 py-5 sm:px-6 sm:py-6">
       {/* the period — the same bar as the dashboards */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="min-w-0 flex-1">
+        {/* on phones the extra controls drop below so the period keeps its width */}
+        <div className="w-full min-w-0 sm:w-auto sm:flex-1">
           <PeriodBar filter={filter} setFilter={setFilter} busy={isLoading && data.length > 0} />
         </div>
         {toolbar}
