@@ -3,10 +3,6 @@ import { useRef, useState } from "react";
 import { AnimatePresence, motion, useAnimationFrame, useReducedMotion } from "framer-motion";
 import { CircleCheck } from "lucide-react";
 import { Logo } from "@/app/components/ui";
-import { Plus_Jakarta_Sans } from "next/font/google";
-
-// A heavy, clean sans for the heading — the voice of a modern finance app.
-const display = Plus_Jakarta_Sans({ subsets: ["latin"], weight: ["800"], display: "swap" });
 
 // Restaurants closing their day around the world — made-up figures for the
 // sign-in screen. lat/lon in degrees; each is shown in its own money.
@@ -284,7 +280,7 @@ export default function BrandPanel() {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className={`${display.className} text-[1.45rem] font-extrabold leading-[1.15] tracking-[-0.025em] text-white xl:text-[1.9rem]`}
+          className={`font-[family-name:var(--font-display)] text-[1.45rem] font-extrabold leading-[1.15] tracking-[-0.025em] text-white xl:text-[1.9rem]`}
         >
           {/* two lines, always: each one kept whole */}
           <span className="block whitespace-nowrap">Every till, every branch,</span>

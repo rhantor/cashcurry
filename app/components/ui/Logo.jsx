@@ -1,7 +1,4 @@
-import { Plus_Jakarta_Sans } from "next/font/google";
 import { cn } from "./cn";
-
-const word = Plus_Jakarta_Sans({ subsets: ["latin"], weight: ["800"], display: "swap" });
 
 // The mark: a square split corner to corner, dark and mint — the two sides of
 // the books — that together make one whole, with the C of Cash Curry in it.
@@ -35,7 +32,7 @@ export default function Logo({ size = 36, inverse = false, compact = false, clas
     <span className={cn("inline-flex items-center", className)} style={{ gap: size * 0.3 }}>
       <LogoMark size={size} inverse={inverse} />
       <span
-        className={cn(word.className, "inline-flex items-center font-extrabold leading-none tracking-[-0.03em]", text)}
+        className={cn("inline-flex font-[family-name:var(--font-display)] items-center font-extrabold leading-none tracking-[-0.03em]", text)}
         style={{ fontSize: size * 0.56 }}
         aria-hidden
       >
