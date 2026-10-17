@@ -47,12 +47,12 @@ import {
 import { useRouter } from "next/navigation";
 
 const STATUS_STYLE = {
-  Pending: "bg-amber-100 text-amber-800",
-  Approved: "bg-violet-100 text-violet-800",
-  Sent: "bg-blue-100 text-blue-800",
-  Received: "bg-emerald-100 text-emerald-800",
-  Rejected: "bg-red-100 text-red-800",
-  Cancelled: "bg-slate-200 text-slate-600",
+  Pending: "bg-warning-soft text-warning",
+  Approved: "bg-violet-100 text-info",
+  Sent: "bg-info-soft text-info",
+  Received: "bg-brand-soft text-brand",
+  Rejected: "bg-danger-soft text-danger",
+  Cancelled: "bg-surface-2 text-muted",
 };
 
 /** Plain-language description of each state, for staff who don't live in this screen. */
@@ -518,19 +518,19 @@ export default function PurchaseOrdersPage() {
 
   /* --------------------------------- render -------------------------------- */
   const iconBtn =
-    "w-11 h-11 flex items-center justify-center rounded-xl text-slate-500 bg-slate-50 active:bg-slate-200 transition-colors";
+    "w-11 h-11 flex items-center justify-center rounded-xl text-muted bg-surface-2/60 active:bg-surface-2 transition-colors";
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-4 pb-24">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Purchase Orders</h1>
-          <p className="text-slate-500 text-sm mt-0.5">Send orders, then receive the goods when they arrive.</p>
+          <h1 className="text-2xl font-bold text-fg tracking-tight">Purchase Orders</h1>
+          <p className="text-muted text-sm mt-0.5">Send orders, then receive the goods when they arrive.</p>
         </div>
         <button
           onClick={() => router.push("/purchases/order-guides")}
-          className="min-h-[48px] px-5 rounded-2xl bg-slate-900 text-white font-semibold
-                     flex items-center justify-center gap-2 active:bg-slate-700 transition-colors"
+          className="min-h-[48px] px-5 rounded-2xl bg-brand text-white font-semibold
+                     flex items-center justify-center gap-2 active:brightness-95 transition-colors"
         >
           <Plus className="w-5 h-5" /> New Order
         </button>
@@ -549,8 +549,8 @@ export default function PurchaseOrdersPage() {
               onClick={() => setStatusFilter(tab.id)}
               className={`flex-1 sm:flex-none sm:px-6 min-h-[44px] rounded-2xl font-semibold text-sm transition-colors ${
                 statusFilter === tab.id
-                  ? "bg-slate-900 text-white"
-                  : "bg-white text-slate-600 border border-slate-200 active:bg-slate-100"
+                  ? "bg-brand text-white"
+                  : "bg-surface text-muted border border-line active:bg-surface-2"
               }`}
             >
               {tab.label}
@@ -559,14 +559,14 @@ export default function PurchaseOrdersPage() {
         </div>
 
         <div className="relative">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <Search className="w-4 h-4 text-subtle absolute left-3.5 top-1/2 -translate-y-1/2" />
           <input
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search supplier, PO number or item…"
-            className="w-full min-h-[48px] pl-10 pr-4 text-[15px] border border-slate-200 rounded-2xl bg-white
-                       focus:border-mint-500 focus:ring-2 focus:ring-mint-500/20 outline-none transition-colors"
+            className="w-full min-h-[48px] pl-10 pr-4 text-[15px] border border-line rounded-2xl bg-surface
+                       focus:border-brand focus:ring-2 focus:ring-[var(--cc-ring)]/20 outline-none transition-colors"
           />
         </div>
       </div>
@@ -578,35 +578,35 @@ export default function PurchaseOrdersPage() {
           return (
             <div
               key={order.id}
-              className="bg-white rounded-3xl border border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] p-5 flex flex-col"
+              className="bg-surface rounded-3xl border border-line shadow-[0_2px_12px_rgba(0,0,0,0.03)] p-5 flex flex-col"
             >
               <div className="flex items-start justify-between gap-2 mb-2">
-                <h3 className="font-bold text-slate-900 text-lg leading-snug min-w-0 truncate">
+                <h3 className="font-bold text-fg text-lg leading-snug min-w-0 truncate">
                   {order.vendorName}
                 </h3>
                 <span
                   className={`px-2.5 py-1 rounded-full text-xs font-bold shrink-0 ${
-                    STATUS_STYLE[status] || "bg-slate-100 text-slate-600"
+                    STATUS_STYLE[status] || "bg-surface-2 text-muted"
                   }`}
                 >
                   {status}
                 </span>
               </div>
 
-              <p className="text-xs text-slate-500 mb-3">{STATUS_HINT[status] || ""}</p>
+              <p className="text-xs text-muted mb-3">{STATUS_HINT[status] || ""}</p>
 
               <div className="flex items-baseline justify-between gap-2 mb-3">
-                <p className="text-2xl font-bold text-slate-900 tabular-nums">
+                <p className="text-2xl font-bold text-fg tabular-nums">
                   {currency} {money(status === "Received" ? order.finalTotal : order.totalEst)}
                 </p>
-                <p className="text-xs text-slate-400 shrink-0">
+                <p className="text-xs text-subtle shrink-0">
                   {status === "Received" ? "billed" : "estimated"}
                 </p>
               </div>
 
-              <div className="text-xs text-slate-500 space-y-1 mb-4">
+              <div className="text-xs text-muted space-y-1 mb-4">
                 <p className="flex justify-between gap-2">
-                  <span className="font-mono text-slate-400">{poReference(order)}</span>
+                  <span className="font-mono text-subtle">{poReference(order)}</span>
                   <span>
                     {order.items?.length || 0} items ·{" "}
                     {order.createdAt ? new Date(order.createdAt.seconds * 1000).toLocaleDateString() : "-"}
@@ -614,10 +614,10 @@ export default function PurchaseOrdersPage() {
                 </p>
 
                 {order.approvedByName && ["Approved", "Sent", "Received"].includes(status) && (
-                  <p className="text-violet-600">
+                  <p className="text-info">
                     Approved by {order.approvedByName}
                     {order.selfApproved && (
-                      <span className="ml-1.5 px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 font-semibold">
+                      <span className="ml-1.5 px-1.5 py-0.5 rounded bg-warning-soft text-warning font-semibold">
                         self
                       </span>
                     )}
@@ -625,14 +625,14 @@ export default function PurchaseOrdersPage() {
                 )}
 
                 {status === "Rejected" && order.rejectionReason && (
-                  <p className="text-red-600">
+                  <p className="text-danger">
                     {order.rejectedByName ? `${order.rejectedByName}: ` : ""}
                     {order.rejectionReason}
                   </p>
                 )}
 
                 {order.lastEditedAt && status !== "Received" && (
-                  <p className="text-slate-400">
+                  <p className="text-subtle">
                     Edited {new Date(order.lastEditedAt).toLocaleDateString()}
                     {order.lastEditedByName ? ` by ${order.lastEditedByName}` : ""}
                   </p>
@@ -643,7 +643,7 @@ export default function PurchaseOrdersPage() {
                     href={order.invoiceAttachment}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 font-semibold text-emerald-700 active:underline"
+                    className="inline-flex items-center gap-1.5 font-semibold text-brand active:underline"
                   >
                     <Paperclip className="w-3.5 h-3.5" />
                     {order.invoiceNo ? `Invoice ${order.invoiceNo}` : "View invoice"}
@@ -657,7 +657,7 @@ export default function PurchaseOrdersPage() {
                   <div className="flex gap-2">
                     <button
                       onClick={() => setPendingAction({ kind: "approve", order })}
-                      className="flex-1 min-h-[48px] rounded-2xl bg-violet-600 text-white font-bold
+                      className="flex-1 min-h-[48px] rounded-2xl bg-info text-white font-bold
                                  flex items-center justify-center gap-2 active:bg-violet-700 transition-colors"
                     >
                       <CheckCircle className="w-5 h-5" /> Approve
@@ -665,8 +665,8 @@ export default function PurchaseOrdersPage() {
                     <button
                       onClick={() => setPendingAction({ kind: "reject", order })}
                       aria-label="Reject"
-                      className="w-12 min-h-[48px] flex items-center justify-center rounded-2xl bg-red-50 text-red-600
-                                 active:bg-red-100 transition-colors"
+                      className="w-12 min-h-[48px] flex items-center justify-center rounded-2xl bg-danger-soft text-danger
+                                 active:bg-danger-soft transition-colors"
                     >
                       <XCircle className="w-5 h-5" />
                     </button>
@@ -674,7 +674,7 @@ export default function PurchaseOrdersPage() {
                 )}
 
                 {showApproval && !canApprove && (
-                  <div className="min-h-[48px] rounded-2xl bg-slate-50 text-slate-500 font-medium text-sm
+                  <div className="min-h-[48px] rounded-2xl bg-surface-2/60 text-muted font-medium text-sm
                                   flex items-center justify-center">
                     Waiting for approval
                   </div>
@@ -693,8 +693,8 @@ export default function PurchaseOrdersPage() {
                 {status === "Sent" && (
                   <button
                     onClick={() => handleOpenReceive(order)}
-                    className="w-full min-h-[48px] rounded-2xl bg-emerald-600 text-white font-bold
-                               flex items-center justify-center gap-2 active:bg-emerald-700 transition-colors"
+                    className="w-full min-h-[48px] rounded-2xl bg-brand text-white font-bold
+                               flex items-center justify-center gap-2 active:brightness-95 transition-colors"
                   >
                     <PackageOpen className="w-5 h-5" /> Goods Arrived
                   </button>
@@ -703,8 +703,8 @@ export default function PurchaseOrdersPage() {
                 {status === "Rejected" && canApprove && (
                   <button
                     onClick={() => setPendingAction({ kind: "reopen", order })}
-                    className="w-full min-h-[48px] rounded-2xl bg-slate-100 text-slate-700 font-bold
-                               flex items-center justify-center gap-2 active:bg-slate-200 transition-colors"
+                    className="w-full min-h-[48px] rounded-2xl bg-surface-2 text-fg font-bold
+                               flex items-center justify-center gap-2 active:bg-surface-2 transition-colors"
                   >
                     <RotateCcw className="w-5 h-5" /> Reopen
                   </button>
@@ -728,7 +728,7 @@ export default function PurchaseOrdersPage() {
                     <button
                       onClick={() => setPendingAction({ kind: "cancel", order })}
                       aria-label="Cancel order"
-                      className={`${iconBtn} ml-auto active:text-red-600 active:bg-red-50`}
+                      className={`${iconBtn} ml-auto active:text-danger active:bg-danger-soft`}
                     >
                       <Ban className="w-4 h-4" />
                     </button>
@@ -740,12 +740,12 @@ export default function PurchaseOrdersPage() {
         })}
 
         {visibleOrders.length === 0 && !ordersLoading && (
-          <div className="col-span-full py-16 px-6 text-center bg-white rounded-3xl border border-slate-100">
-            <PackageOpen className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-            <h3 className="text-lg font-bold text-slate-700">
+          <div className="col-span-full py-16 px-6 text-center bg-surface rounded-3xl border border-line">
+            <PackageOpen className="w-12 h-12 text-subtle mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-fg">
               {orders.length === 0 ? "No orders yet" : "Nothing here"}
             </h3>
-            <p className="text-slate-500 mt-1 text-sm max-w-sm mx-auto">
+            <p className="text-muted mt-1 text-sm max-w-sm mx-auto">
               {orders.length === 0
                 ? "Start an order from one of your order guides."
                 : "Try the All tab, or clear the search."}
@@ -753,7 +753,7 @@ export default function PurchaseOrdersPage() {
             {orders.length === 0 && (
               <button
                 onClick={() => router.push("/purchases/order-guides")}
-                className="mt-5 min-h-[48px] px-6 rounded-2xl bg-mint-600 text-white font-semibold active:bg-mint-700"
+                className="mt-5 min-h-[48px] px-6 rounded-2xl bg-brand text-white font-semibold active:brightness-95"
               >
                 Go to Order Guides
               </button>
@@ -772,34 +772,34 @@ export default function PurchaseOrdersPage() {
         footer={
           <div className="flex items-center gap-3">
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">New total</p>
-              <p className="text-xl font-bold text-slate-900 tabular-nums truncate">
+              <p className="text-xs font-semibold text-subtle uppercase tracking-wide">New total</p>
+              <p className="text-xl font-bold text-fg tabular-nums truncate">
                 {currency} {money(editTotal)}
               </p>
             </div>
             <button
               onClick={handleSaveEdit}
               disabled={busy}
-              className="flex-1 min-h-[52px] rounded-2xl bg-mint-600 text-white font-bold text-base
-                         active:bg-mint-700 disabled:opacity-40 transition-colors"
+              className="flex-1 min-h-[52px] rounded-2xl bg-brand text-white font-bold text-base
+                         active:brightness-95 disabled:opacity-40 transition-colors"
             >
               Save Changes
             </button>
           </div>
         }
       >
-        <p className="text-sm text-slate-500 mb-4">
+        <p className="text-sm text-muted mb-4">
           Change amounts or prices, add items, or remove what you no longer need. Anything left at zero is
           dropped.
         </p>
 
         <div className="space-y-2.5">
           {editData.items.map((item) => (
-            <div key={item.itemId} className="rounded-2xl border border-slate-200 bg-white p-3.5">
+            <div key={item.itemId} className="rounded-2xl border border-line bg-surface p-3.5">
               <div className="flex items-start justify-between gap-3 mb-3">
                 <div className="min-w-0">
-                  <p className="font-semibold text-slate-900 text-[15px] leading-snug">{item.name}</p>
-                  <p className="text-xs text-slate-500 mt-0.5">
+                  <p className="font-semibold text-fg text-[15px] leading-snug">{item.name}</p>
+                  <p className="text-xs text-muted mt-0.5">
                     {item.category ? `${item.category} · ` : ""}
                     {currency} {money(lineTotal(item))} total
                   </p>
@@ -808,7 +808,7 @@ export default function PurchaseOrdersPage() {
                   onClick={() => removeEditRow(item.itemId)}
                   aria-label={`Remove ${item.name}`}
                   className="w-9 h-9 -mt-1 -mr-1 shrink-0 flex items-center justify-center rounded-full
-                             text-slate-300 active:bg-red-50 active:text-red-600 transition-colors"
+                             text-subtle active:bg-danger-soft active:text-danger transition-colors"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -816,7 +816,7 @@ export default function PurchaseOrdersPage() {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 <div>
-                  <p className="text-xs font-medium text-slate-500 mb-1.5">Amount</p>
+                  <p className="text-xs font-medium text-muted mb-1.5">Amount</p>
                   <QtyStepper
                     value={item.requestedQty}
                     onChange={(v) => updateEditRow(item.itemId, "requestedQty", v)}
@@ -836,19 +836,19 @@ export default function PurchaseOrdersPage() {
           ))}
 
           {editData.items.length === 0 && (
-            <p className="py-8 text-center text-slate-500">No items left — add one below.</p>
+            <p className="py-8 text-center text-muted">No items left — add one below.</p>
           )}
         </div>
 
-        <div className="mt-5 pt-5 border-t border-slate-100 space-y-4">
+        <div className="mt-5 pt-5 border-t border-line space-y-4">
           {/* A dropdown of a couple of hundred products is unusable on a phone,
               so adding is a searchable, category-filtered list instead. */}
           <div>
             <button
               onClick={() => setShowPicker((v) => !v)}
               disabled={!addableItems.length}
-              className="w-full min-h-[48px] rounded-2xl border border-dashed border-slate-300 text-slate-700
-                         font-semibold flex items-center justify-center gap-2 active:bg-slate-50
+              className="w-full min-h-[48px] rounded-2xl border border-dashed border-line text-fg
+                         font-semibold flex items-center justify-center gap-2 active:bg-surface-2/60
                          disabled:opacity-40 transition-colors"
             >
               <Plus className="w-5 h-5" />
@@ -870,28 +870,28 @@ export default function PurchaseOrdersPage() {
                   placeholder="Find an item to add…"
                 />
 
-                <div className="max-h-72 overflow-y-auto rounded-2xl border border-slate-200 divide-y divide-slate-100">
+                <div className="max-h-72 overflow-y-auto rounded-2xl border border-line divide-y divide-line">
                   {pickableItems.map((item) => (
                     <button
                       key={item.id}
                       onClick={() => handleAddEditRow(item)}
-                      className="w-full flex items-center gap-3 p-3.5 text-left active:bg-mint-50 transition-colors"
+                      className="w-full flex items-center gap-3 p-3.5 text-left active:bg-brand-soft transition-colors"
                     >
                       <span className="min-w-0 flex-1">
-                        <span className="block font-semibold text-slate-900 text-[15px] truncate">
+                        <span className="block font-semibold text-fg text-[15px] truncate">
                           {item.name}
                         </span>
-                        <span className="block text-xs text-slate-500 mt-0.5">
+                        <span className="block text-xs text-muted mt-0.5">
                           {item.category || "Uncategorized"} · {item.unit}
                         </span>
                       </span>
-                      <span className="w-9 h-9 shrink-0 flex items-center justify-center rounded-full bg-mint-50 text-mint-700">
+                      <span className="w-9 h-9 shrink-0 flex items-center justify-center rounded-full bg-brand-soft text-brand">
                         <Plus className="w-4 h-4" />
                       </span>
                     </button>
                   ))}
                   {pickableItems.length === 0 && (
-                    <p className="py-8 text-center text-sm text-slate-500">Nothing matches that filter.</p>
+                    <p className="py-8 text-center text-sm text-muted">Nothing matches that filter.</p>
                   )}
                 </div>
               </div>
@@ -899,14 +899,14 @@ export default function PurchaseOrdersPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Note for the supplier</label>
+            <label className="block text-sm font-semibold text-fg mb-1.5">Note for the supplier</label>
             <textarea
               rows={2}
               value={editData.notes}
               onChange={(e) => setEditData((p) => ({ ...p, notes: e.target.value }))}
               placeholder="e.g. Please deliver before noon"
-              className="w-full p-3 text-[15px] border border-slate-200 rounded-2xl bg-slate-50
-                         focus:bg-white focus:border-mint-500 focus:ring-2 focus:ring-mint-500/20 outline-none
+              className="w-full p-3 text-[15px] border border-line rounded-2xl bg-surface-2/60
+                         focus:bg-surface focus:border-brand focus:ring-2 focus:ring-[var(--cc-ring)]/20 outline-none
                          transition-colors"
             />
           </div>
@@ -923,16 +923,16 @@ export default function PurchaseOrdersPage() {
         footer={
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Invoice total</p>
-              <p className="text-xl font-bold text-slate-900 tabular-nums">
+              <p className="text-xs font-semibold text-subtle uppercase tracking-wide">Invoice total</p>
+              <p className="text-xl font-bold text-fg tabular-nums">
                 {currency} {money(receiveTotal)}
               </p>
             </div>
             <button
               onClick={handleReceiveOrder}
               disabled={busy || !invoiceFile}
-              className="w-full min-h-[52px] rounded-2xl bg-emerald-600 text-white font-bold text-base
-                         active:bg-emerald-700 disabled:opacity-40 transition-colors"
+              className="w-full min-h-[52px] rounded-2xl bg-brand text-white font-bold text-base
+                         active:brightness-95 disabled:opacity-40 transition-colors"
             >
               {uploading
                 ? `Uploading photo ${Math.round(uploadPct)}%`
@@ -946,8 +946,8 @@ export default function PurchaseOrdersPage() {
         }
       >
         <div className="space-y-4">
-          <div className="rounded-2xl bg-emerald-50 border border-emerald-100 p-3.5">
-            <p className="text-sm text-emerald-900 leading-relaxed">
+          <div className="rounded-2xl bg-brand-soft border border-brand/20 p-3.5">
+            <p className="text-sm text-brand leading-relaxed">
               Check what actually turned up and what the supplier charged. Saving this creates the bill you will
               pay later.
             </p>
@@ -956,18 +956,18 @@ export default function PurchaseOrdersPage() {
           {/* Invoice photo is required, so it leads rather than hides at the bottom. */}
           <div
             className={`rounded-2xl border p-3.5 ${
-              invoiceFile ? "border-emerald-200 bg-emerald-50/40" : "border-amber-200 bg-amber-50/60"
+              invoiceFile ? "border-brand/30 bg-brand-soft/40" : "border-warning/30 bg-warning-soft/60"
             }`}
           >
             <div className="flex items-start gap-2.5 mb-3">
               <Camera
-                className={`w-5 h-5 shrink-0 mt-0.5 ${invoiceFile ? "text-emerald-600" : "text-amber-600"}`}
+                className={`w-5 h-5 shrink-0 mt-0.5 ${invoiceFile ? "text-brand" : "text-warning"}`}
               />
               <div>
-                <p className={`font-bold text-[15px] ${invoiceFile ? "text-emerald-900" : "text-amber-900"}`}>
+                <p className={`font-bold text-[15px] ${invoiceFile ? "text-brand" : "text-warning"}`}>
                   {invoiceFile ? "Invoice photo attached" : "Photo of the invoice — required"}
                 </p>
-                <p className={`text-xs mt-0.5 ${invoiceFile ? "text-emerald-700" : "text-amber-800"}`}>
+                <p className={`text-xs mt-0.5 ${invoiceFile ? "text-brand" : "text-warning"}`}>
                   {invoiceFile
                     ? "It will be saved with the bill."
                     : "So anyone can check these prices against the supplier's paper later."}
@@ -979,24 +979,24 @@ export default function PurchaseOrdersPage() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="block">
-              <span className="block text-sm font-semibold text-slate-700 mb-1.5">Invoice number</span>
+              <span className="block text-sm font-semibold text-fg mb-1.5">Invoice number</span>
               <input
                 value={receiveData.invoiceNo}
                 onChange={(e) => setReceiveData((p) => ({ ...p, invoiceNo: e.target.value }))}
                 placeholder="INV-12345"
-                className="w-full min-h-[48px] px-4 text-[15px] border border-slate-200 rounded-2xl bg-slate-50
-                           focus:bg-white focus:border-mint-500 focus:ring-2 focus:ring-mint-500/20 outline-none
+                className="w-full min-h-[48px] px-4 text-[15px] border border-line rounded-2xl bg-surface-2/60
+                           focus:bg-surface focus:border-brand focus:ring-2 focus:ring-[var(--cc-ring)]/20 outline-none
                            transition-colors"
               />
             </label>
             <label className="block">
-              <span className="block text-sm font-semibold text-slate-700 mb-1.5">Invoice date</span>
+              <span className="block text-sm font-semibold text-fg mb-1.5">Invoice date</span>
               <input
                 type="date"
                 value={receiveData.invoiceDate}
                 onChange={(e) => setReceiveData((p) => ({ ...p, invoiceDate: e.target.value }))}
-                className="w-full min-h-[48px] px-4 text-[15px] border border-slate-200 rounded-2xl bg-slate-50
-                           focus:bg-white focus:border-mint-500 focus:ring-2 focus:ring-mint-500/20 outline-none
+                className="w-full min-h-[48px] px-4 text-[15px] border border-line rounded-2xl bg-surface-2/60
+                           focus:bg-surface focus:border-brand focus:ring-2 focus:ring-[var(--cc-ring)]/20 outline-none
                            transition-colors"
               />
             </label>
@@ -1009,25 +1009,25 @@ export default function PurchaseOrdersPage() {
                 <div
                   key={item.itemId}
                   className={`rounded-2xl border p-3.5 ${
-                    short ? "border-amber-200 bg-amber-50/40" : "border-slate-200 bg-white"
+                    short ? "border-warning/30 bg-warning-soft/40" : "border-line bg-surface"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div className="min-w-0">
-                      <p className="font-semibold text-slate-900 text-[15px] leading-snug">{item.name}</p>
-                      <p className="text-xs text-slate-500 mt-0.5">
+                      <p className="font-semibold text-fg text-[15px] leading-snug">{item.name}</p>
+                      <p className="text-xs text-muted mt-0.5">
                         Ordered {item.requestedQty} {item.unit}
-                        {short && <span className="text-amber-700 font-semibold ml-1.5">· amount differs</span>}
+                        {short && <span className="text-warning font-semibold ml-1.5">· amount differs</span>}
                       </p>
                     </div>
-                    <p className="text-base font-bold text-slate-900 tabular-nums shrink-0">
+                    <p className="text-base font-bold text-fg tabular-nums shrink-0">
                       {currency} {money(lineTotal(item, "receivedQty", "finalPrice"))}
                     </p>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                     <div>
-                      <p className="text-xs font-medium text-slate-500 mb-1.5">Actually received</p>
+                      <p className="text-xs font-medium text-muted mb-1.5">Actually received</p>
                       <QtyStepper
                         value={item.receivedQty}
                         onChange={(v) => updateReceiveRow(item.itemId, "receivedQty", v)}

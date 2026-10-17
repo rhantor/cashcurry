@@ -197,23 +197,23 @@ export default function VendorPaidBills({ companyId, branchId, vendorId }) {
     <div className="space-y-4">
       {/* View switch + period filters */}
       <div className="flex flex-wrap items-center gap-2 justify-between px-1">
-        <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden">
+        <div className="inline-flex rounded-lg border border-line overflow-hidden">
           <button
             onClick={() => setView("bills")}
             className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all ${
               view === "bills"
-                ? "bg-mint-500 text-white"
-                : "bg-white text-gray-500 hover:bg-gray-50"
+                ? "bg-brand text-white"
+                : "bg-surface text-muted hover:bg-surface-2"
             }`}
           >
             Bills
           </button>
           <button
             onClick={() => setView("payments")}
-            className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all border-l border-gray-200 ${
+            className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-widest transition-all border-l border-line ${
               view === "payments"
-                ? "bg-mint-500 text-white"
-                : "bg-white text-gray-500 hover:bg-gray-50"
+                ? "bg-brand text-white"
+                : "bg-surface text-muted hover:bg-surface-2"
             }`}
           >
             Payments
@@ -225,8 +225,8 @@ export default function VendorPaidBills({ companyId, branchId, vendorId }) {
             onClick={() => setMonth(monthKey(-1))}
             className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all ${
               month === monthKey(-1)
-                ? "bg-mint-50 text-mint-700 border-mint-200"
-                : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                ? "bg-brand-soft text-brand border-brand/30"
+                : "bg-surface text-muted border-line hover:bg-surface-2"
             }`}
           >
             Last Month
@@ -235,8 +235,8 @@ export default function VendorPaidBills({ companyId, branchId, vendorId }) {
             onClick={() => setMonth(monthKey(0))}
             className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border transition-all ${
               month === monthKey(0)
-                ? "bg-mint-50 text-mint-700 border-mint-200"
-                : "bg-white text-gray-500 border-gray-200 hover:bg-gray-50"
+                ? "bg-brand-soft text-brand border-brand/30"
+                : "bg-surface text-muted border-line hover:bg-surface-2"
             }`}
           >
             This Month
@@ -245,12 +245,12 @@ export default function VendorPaidBills({ companyId, branchId, vendorId }) {
             type="month"
             value={month}
             onChange={(e) => setMonth(e.target.value)}
-            className="px-2 py-1.5 rounded-lg border border-gray-200 text-xs text-gray-700 focus:outline-none focus:ring-2 focus:ring-mint-200"
+            className="px-2 py-1.5 rounded-lg border border-line text-xs text-fg focus:outline-none focus:ring-2 focus:ring-[var(--cc-ring)]"
           />
           {month && (
             <button
               onClick={() => setMonth("")}
-              className="px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border border-gray-200 bg-white text-gray-500 hover:bg-gray-50"
+              className="px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest border border-line bg-surface text-muted hover:bg-surface-2"
             >
               All Time
             </button>
@@ -258,7 +258,7 @@ export default function VendorPaidBills({ companyId, branchId, vendorId }) {
           <button
             onClick={handleExportPDF}
             disabled={!rowCount}
-            className="flex items-center gap-2 px-3 py-1.5 bg-mint-50 text-mint-700 hover:bg-mint-100 disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-xs font-bold transition-all border border-mint-200"
+            className="flex items-center gap-2 px-3 py-1.5 bg-brand-soft text-brand hover:bg-brand-soft disabled:opacity-40 disabled:cursor-not-allowed rounded-lg text-xs font-bold transition-all border border-brand/30"
           >
             <Download className="w-3.5 h-3.5" />
             Export PDF
@@ -267,32 +267,32 @@ export default function VendorPaidBills({ companyId, branchId, vendorId }) {
       </div>
 
       {/* Summary strip */}
-      <div className="flex flex-wrap items-center gap-4 px-4 py-3 rounded-xl bg-gray-50 border border-gray-100">
+      <div className="flex flex-wrap items-center gap-4 px-4 py-3 rounded-xl bg-surface-2/60 border border-line">
         <div>
-          <span className="block text-[9px] uppercase font-black tracking-widest text-gray-400">
+          <span className="block text-[9px] uppercase font-black tracking-widest text-subtle">
             {view === "bills" ? "Bills" : "Payments"}
           </span>
-          <span className="text-lg font-black text-gray-900 tabular-nums">{rowCount}</span>
+          <span className="text-lg font-black text-fg tabular-nums">{rowCount}</span>
         </div>
-        <div className="h-8 w-px bg-gray-200" />
+        <div className="h-8 w-px bg-surface-2" />
         <div>
-          <span className="block text-[9px] uppercase font-black tracking-widest text-gray-400">
+          <span className="block text-[9px] uppercase font-black tracking-widest text-subtle">
             {view === "bills" ? "Billed Amount" : "Paid Amount"}
           </span>
-          <span className="text-lg font-black text-mint-600 tabular-nums">
+          <span className="text-lg font-black text-brand tabular-nums">
             {fmtRM(view === "bills" ? billsTotal : paymentsTotal)}
           </span>
         </div>
-        <div className="h-8 w-px bg-gray-200" />
+        <div className="h-8 w-px bg-surface-2" />
         <div>
-          <span className="block text-[9px] uppercase font-black tracking-widest text-gray-400">
+          <span className="block text-[9px] uppercase font-black tracking-widest text-subtle">
             Period
           </span>
-          <span className="text-sm font-bold text-gray-700">{monthLabel(month)}</span>
+          <span className="text-sm font-bold text-fg">{monthLabel(month)}</span>
         </div>
         {view === "bills" && month && (
           <div className="ml-auto flex items-center gap-1">
-            <span className="text-[9px] uppercase font-black tracking-widest text-gray-400 mr-1">
+            <span className="text-[9px] uppercase font-black tracking-widest text-subtle mr-1">
               Match on
             </span>
             {["invoice", "paid"].map((b) => (
@@ -301,8 +301,8 @@ export default function VendorPaidBills({ companyId, branchId, vendorId }) {
                 onClick={() => setBasis(b)}
                 className={`px-2 py-1 rounded-md text-[10px] font-black uppercase tracking-widest transition-all ${
                   basis === b
-                    ? "bg-white text-mint-700 border border-mint-200"
-                    : "text-gray-400 hover:text-gray-600"
+                    ? "bg-surface text-brand border border-brand/30"
+                    : "text-subtle hover:text-muted"
                 }`}
               >
                 {b === "invoice" ? "Invoice Date" : "Paid Date"}
@@ -313,31 +313,31 @@ export default function VendorPaidBills({ companyId, branchId, vendorId }) {
       </div>
 
       {isLoading ? (
-        <div className="py-8 text-center text-gray-500 animate-pulse">
+        <div className="py-8 text-center text-muted animate-pulse">
           {view === "bills" ? "Loading paid bills..." : "Loading payment history..."}
         </div>
       ) : !rowCount ? (
-        <div className="py-12 text-center bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-          <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 text-gray-400">
+        <div className="py-12 text-center bg-surface-2/60 rounded-2xl border-2 border-dashed border-line">
+          <div className="w-12 h-12 bg-surface-2 rounded-full flex items-center justify-center mx-auto mb-3 text-subtle">
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
           </div>
-          <p className="text-gray-500 font-medium">
+          <p className="text-muted font-medium">
             {view === "bills"
               ? "No fully paid bills for this vendor."
               : "No payments found for this vendor."}
           </p>
-          <p className="text-xs text-gray-400 mt-1">
+          <p className="text-xs text-subtle mt-1">
             {month
               ? `Nothing recorded in ${monthLabel(month)}.`
               : "Records in this branch will appear here."}
           </p>
         </div>
       ) : view === "bills" ? (
-        <div className="overflow-x-auto rounded-xl border border-gray-100 shadow-sm">
+        <div className="overflow-x-auto rounded-xl border border-line shadow-sm">
           <table className="min-w-full text-sm">
-            <thead className="bg-gray-50 text-left text-gray-500 font-black uppercase tracking-widest text-[9px]">
+            <thead className="bg-surface-2/60 text-left text-muted font-black uppercase tracking-widest text-[9px]">
               <tr>
                 <th className="px-4 py-3">Inv. Date</th>
                 <th className="px-4 py-3">Invoice #</th>
@@ -347,30 +347,30 @@ export default function VendorPaidBills({ companyId, branchId, vendorId }) {
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50 bg-white">
+            <tbody className="divide-y divide-line bg-surface">
               {bills.map((b) => (
-                <tr key={b.id} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                <tr key={b.id} className="hover:bg-surface-2/50 transition-colors">
+                  <td className="px-4 py-3 text-muted whitespace-nowrap">
                     {formatDate(b.invoiceDate)}
                   </td>
-                  <td className="px-4 py-3 font-bold text-gray-900 uppercase font-mono">
+                  <td className="px-4 py-3 font-bold text-fg uppercase font-mono">
                     {b.invoiceNo || b.reference || "-"}
                   </td>
-                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                  <td className="px-4 py-3 text-muted whitespace-nowrap">
                     {formatDate(b.__lastPaid)}
                   </td>
                   <td className="px-4 py-3 text-center">
-                    <span className="px-2 py-0.5 rounded-full text-[10px] bg-gray-100 text-gray-600 font-bold tabular-nums">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] bg-surface-2 text-muted font-bold tabular-nums">
                       {b.paymentHistory?.length || 0}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-right font-black text-gray-900">
+                  <td className="px-4 py-3 text-right font-black text-fg">
                     {fmtRM(b.total)}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
                       onClick={() => setSelectedBill(b)}
-                      className="text-mint-600 hover:text-mint-700 font-bold text-xs"
+                      className="text-brand hover:text-brand font-bold text-xs"
                     >
                       View
                     </button>
@@ -378,12 +378,12 @@ export default function VendorPaidBills({ companyId, branchId, vendorId }) {
                 </tr>
               ))}
             </tbody>
-            <tfoot className="bg-gray-50 border-t-2 border-gray-100">
+            <tfoot className="bg-surface-2/60 border-t-2 border-line">
               <tr>
-                <td colSpan={4} className="px-4 py-3 font-black text-[10px] uppercase tracking-widest text-gray-400">
+                <td colSpan={4} className="px-4 py-3 font-black text-[10px] uppercase tracking-widest text-subtle">
                   {bills.length} Paid Bill{bills.length === 1 ? "" : "s"}
                 </td>
-                <td className="px-4 py-3 text-right font-black text-mint-600 text-base">
+                <td className="px-4 py-3 text-right font-black text-brand text-base">
                   {fmtRM(billsTotal)}
                 </td>
                 <td></td>
@@ -392,9 +392,9 @@ export default function VendorPaidBills({ companyId, branchId, vendorId }) {
           </table>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-gray-100 shadow-sm">
+        <div className="overflow-x-auto rounded-xl border border-line shadow-sm">
           <table className="min-w-full text-sm">
-            <thead className="bg-gray-50 text-left text-gray-500 font-black uppercase tracking-widest text-[9px]">
+            <thead className="bg-surface-2/60 text-left text-muted font-black uppercase tracking-widest text-[9px]">
               <tr>
                 <th className="px-4 py-3">Paid Date</th>
                 <th className="px-4 py-3">Method</th>
@@ -404,30 +404,30 @@ export default function VendorPaidBills({ companyId, branchId, vendorId }) {
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-50 bg-white">
+            <tbody className="divide-y divide-line bg-surface">
               {visiblePayments.map((p) => (
-                <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-gray-700 whitespace-nowrap">
+                <tr key={p.id} className="hover:bg-surface-2/50 transition-colors">
+                  <td className="px-4 py-3 font-medium text-fg whitespace-nowrap">
                     {p.paymentDate ? formatDate(p.paymentDate) : formatDateTime(p.createdISO)}
                   </td>
                   <td className="px-4 py-3">
-                    <span className="px-2 py-0.5 rounded-full text-[10px] bg-gray-100 text-gray-600 font-bold uppercase">
+                    <span className="px-2 py-0.5 rounded-full text-[10px] bg-surface-2 text-muted font-bold uppercase">
                       {METHOD_LABELS[p.paidMethod] || p.paidMethod || "-"}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-gray-500 truncate max-w-[120px]">
+                  <td className="px-4 py-3 text-muted truncate max-w-[120px]">
                     {p.reference || "-"}
                   </td>
-                  <td className="px-4 py-3 text-center text-gray-600 tabular-nums">
+                  <td className="px-4 py-3 text-center text-muted tabular-nums">
                     {p.allocations?.length || 0}
                   </td>
-                  <td className="px-4 py-3 text-right font-black text-gray-900">
+                  <td className="px-4 py-3 text-right font-black text-fg">
                     {fmtRM(p.total ?? p.totalPaid)}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button
                       onClick={() => setSelectedPayment(p)}
-                      className="text-mint-600 hover:text-mint-700 font-bold text-xs"
+                      className="text-brand hover:text-brand font-bold text-xs"
                     >
                       View
                     </button>
@@ -435,12 +435,12 @@ export default function VendorPaidBills({ companyId, branchId, vendorId }) {
                 </tr>
               ))}
             </tbody>
-            <tfoot className="bg-gray-50 border-t-2 border-gray-100">
+            <tfoot className="bg-surface-2/60 border-t-2 border-line">
               <tr>
-                <td colSpan={4} className="px-4 py-3 font-black text-[10px] uppercase tracking-widest text-gray-400">
+                <td colSpan={4} className="px-4 py-3 font-black text-[10px] uppercase tracking-widest text-subtle">
                   Total Payments
                 </td>
-                <td className="px-4 py-3 text-right font-black text-mint-600 text-base">
+                <td className="px-4 py-3 text-right font-black text-brand text-base">
                   {fmtRM(paymentsTotal)}
                 </td>
                 <td></td>

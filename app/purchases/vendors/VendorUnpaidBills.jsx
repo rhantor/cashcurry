@@ -107,7 +107,7 @@ export default function VendorUnpaidBills({ companyId, branchId, vendorId }) {
 
   if (isLoading) {
     return (
-      <div className="py-8 text-center text-gray-500 animate-pulse">
+      <div className="py-8 text-center text-muted animate-pulse">
         Loading outstanding bills...
       </div>
     );
@@ -115,14 +115,14 @@ export default function VendorUnpaidBills({ companyId, branchId, vendorId }) {
 
   if (!bills.length) {
     return (
-      <div className="py-12 text-center bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200">
-        <div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3 text-gray-400">
+      <div className="py-12 text-center bg-surface-2/60 rounded-2xl border-2 border-dashed border-line">
+        <div className="w-12 h-12 bg-surface-2 rounded-full flex items-center justify-center mx-auto mb-3 text-subtle">
           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
           </svg>
         </div>
-        <p className="text-gray-500 font-medium">No outstanding bills for this vendor.</p>
-        <p className="text-xs text-gray-400 mt-1">All bills are fully paid in this branch.</p>
+        <p className="text-muted font-medium">No outstanding bills for this vendor.</p>
+        <p className="text-xs text-subtle mt-1">All bills are fully paid in this branch.</p>
       </div>
     );
   }
@@ -132,15 +132,15 @@ export default function VendorUnpaidBills({ companyId, branchId, vendorId }) {
       <div className="flex justify-end px-1">
         <button
           onClick={handleExportPDF}
-          className="flex items-center gap-2 px-3 py-1.5 bg-mint-50 text-mint-700 hover:bg-mint-100 rounded-lg text-xs font-bold transition-all border border-mint-200"
+          className="flex items-center gap-2 px-3 py-1.5 bg-brand-soft text-brand hover:bg-brand-soft rounded-lg text-xs font-bold transition-all border border-brand/30"
         >
           <Download className="w-3.5 h-3.5" />
           Export PDF
         </button>
       </div>
-      <div className="overflow-x-auto rounded-xl border border-gray-100 shadow-sm">
+      <div className="overflow-x-auto rounded-xl border border-line shadow-sm">
         <table className="min-w-full text-sm">
-          <thead className="bg-gray-50 text-left text-gray-500 font-black uppercase tracking-widest text-[9px]">
+          <thead className="bg-surface-2/60 text-left text-muted font-black uppercase tracking-widest text-[9px]">
             <tr>
               <th className="px-4 py-3">Inv. Date</th>
               <th className="px-4 py-3">Invoice #</th>
@@ -150,28 +150,28 @@ export default function VendorUnpaidBills({ companyId, branchId, vendorId }) {
               <th className="px-4 py-3"></th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-50 bg-white">
+          <tbody className="divide-y divide-line bg-surface">
             {bills.map((b) => (
-              <tr key={b.id} className="hover:bg-gray-50/50 transition-colors">
-                <td className="px-4 py-3 text-gray-600 whitespace-nowrap">
+              <tr key={b.id} className="hover:bg-surface-2/50 transition-colors">
+                <td className="px-4 py-3 text-muted whitespace-nowrap">
                   {formatDate(b.invoiceDate)}
                 </td>
-                <td className="px-4 py-3 font-bold text-gray-900 uppercase font-mono">
+                <td className="px-4 py-3 font-bold text-fg uppercase font-mono">
                   {b.invoiceNo || b.reference || "-"}
                 </td>
-                <td className="px-4 py-3 text-gray-600">
+                <td className="px-4 py-3 text-muted">
                   {formatDate(b.dueDate)}
                 </td>
-                <td className="px-4 py-3 text-right text-gray-500">
+                <td className="px-4 py-3 text-right text-muted">
                   {fmtRM(b.total)}
                 </td>
-                <td className="px-4 py-3 text-right font-black text-red-600">
+                <td className="px-4 py-3 text-right font-black text-danger">
                   {fmtRM(b.balance)}
                 </td>
                 <td className="px-4 py-3 text-right">
                   <button
                     onClick={() => setSelectedBill(b)}
-                    className="text-mint-600 hover:text-mint-700 font-bold text-xs"
+                    className="text-brand hover:text-brand font-bold text-xs"
                   >
                     View
                   </button>
@@ -179,12 +179,12 @@ export default function VendorUnpaidBills({ companyId, branchId, vendorId }) {
               </tr>
             ))}
           </tbody>
-          <tfoot className="bg-gray-50 border-t-2 border-gray-100">
+          <tfoot className="bg-surface-2/60 border-t-2 border-line">
             <tr>
-              <td colSpan={4} className="px-4 py-3 font-black text-[10px] uppercase tracking-widest text-gray-400">
+              <td colSpan={4} className="px-4 py-3 font-black text-[10px] uppercase tracking-widest text-subtle">
                 Total Outstanding
               </td>
-              <td className="px-4 py-3 text-right font-black text-red-600 text-base">
+              <td className="px-4 py-3 text-right font-black text-danger text-base">
                 {fmtRM(bills.reduce((sum, b) => sum + Number(b.balance ?? 0), 0))}
               </td>
               <td></td>

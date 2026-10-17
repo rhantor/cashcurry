@@ -40,15 +40,15 @@ function StatTile({ label, value, sub, accent = false }) {
   return (
     <div
       className={`rounded-2xl border p-4 ${
-        accent ? "border-mint-200 bg-mint-50/50" : "border-slate-200 bg-white"
+        accent ? "border-brand/30 bg-brand-soft/50" : "border-line bg-surface"
       }`}
     >
-      <p className="text-xs font-medium text-slate-500">{label}</p>
+      <p className="text-xs font-medium text-muted">{label}</p>
       {/* Proportional figures: tabular-nums makes a large standalone value look loose. */}
-      <p className={`mt-1 text-2xl font-semibold ${accent ? "text-mint-800" : "text-slate-900"}`}>
+      <p className={`mt-1 text-2xl font-semibold ${accent ? "text-brand" : "text-fg"}`}>
         {value}
       </p>
-      {sub && <p className="text-xs text-slate-400 mt-0.5">{sub}</p>}
+      {sub && <p className="text-xs text-subtle mt-0.5">{sub}</p>}
     </div>
   );
 }
@@ -176,16 +176,16 @@ export default function PurchaseReportPage() {
   const rangeChip = (activeChip) =>
     `min-h-[44px] px-4 rounded-2xl text-sm font-semibold transition-colors ${
       activeChip
-        ? "bg-slate-900 text-white"
-        : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 active:bg-slate-100"
+        ? "bg-brand text-white"
+        : "bg-surface text-muted border border-line hover:bg-surface-2 active:bg-surface-2"
     }`;
 
   return (
     <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-4 pb-24">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Purchase Report</h1>
-          <p className="text-slate-500 text-sm mt-0.5">
+          <h1 className="text-2xl font-bold text-fg tracking-tight">Purchase Report</h1>
+          <p className="text-muted text-sm mt-0.5">
             What you bought, how much of it, and what it cost.
           </p>
         </div>
@@ -193,17 +193,17 @@ export default function PurchaseReportPage() {
           <button
             onClick={handleCsv}
             disabled={busy || loading}
-            className="flex-1 sm:flex-none min-h-[48px] px-4 rounded-2xl bg-white border border-slate-200
-                       text-slate-700 font-semibold flex items-center justify-center gap-2
-                       hover:bg-slate-50 active:bg-slate-100 disabled:opacity-50 transition-colors"
+            className="flex-1 sm:flex-none min-h-[48px] px-4 rounded-2xl bg-surface border border-line
+                       text-fg font-semibold flex items-center justify-center gap-2
+                       hover:bg-surface-2 active:bg-surface-2 disabled:opacity-50 transition-colors"
           >
             <SheetIcon className="w-5 h-5" /> CSV
           </button>
           <button
             onClick={handlePdf}
             disabled={busy || loading}
-            className="flex-1 sm:flex-none min-h-[48px] px-4 rounded-2xl bg-slate-900 text-white font-semibold
-                       flex items-center justify-center gap-2 active:bg-slate-700 disabled:opacity-50
+            className="flex-1 sm:flex-none min-h-[48px] px-4 rounded-2xl bg-brand text-white font-semibold
+                       flex items-center justify-center gap-2 active:brightness-95 disabled:opacity-50
                        transition-colors"
           >
             <FileText className="w-5 h-5" /> {busy ? "Building…" : "PDF"}
@@ -228,31 +228,31 @@ export default function PurchaseReportPage() {
         {rangeId === "custom" && (
           <div className="flex flex-col sm:flex-row gap-2.5">
             <label className="flex-1">
-              <span className="block text-xs font-medium text-slate-500 mb-1">From</span>
+              <span className="block text-xs font-medium text-muted mb-1">From</span>
               <input
                 type="date"
                 value={custom.start}
                 max={custom.end || undefined}
                 onChange={(e) => setCustom((c) => ({ ...c, start: e.target.value }))}
-                className="w-full min-h-[48px] px-4 text-[15px] border border-slate-200 rounded-2xl bg-slate-50
-                           focus:bg-white focus:border-mint-500 focus:ring-2 focus:ring-mint-500/20 outline-none"
+                className="w-full min-h-[48px] px-4 text-[15px] border border-line rounded-2xl bg-surface-2/60
+                           focus:bg-surface focus:border-brand focus:ring-2 focus:ring-[var(--cc-ring)]/20 outline-none"
               />
             </label>
             <label className="flex-1">
-              <span className="block text-xs font-medium text-slate-500 mb-1">To</span>
+              <span className="block text-xs font-medium text-muted mb-1">To</span>
               <input
                 type="date"
                 value={custom.end}
                 min={custom.start || undefined}
                 onChange={(e) => setCustom((c) => ({ ...c, end: e.target.value }))}
-                className="w-full min-h-[48px] px-4 text-[15px] border border-slate-200 rounded-2xl bg-slate-50
-                           focus:bg-white focus:border-mint-500 focus:ring-2 focus:ring-mint-500/20 outline-none"
+                className="w-full min-h-[48px] px-4 text-[15px] border border-line rounded-2xl bg-surface-2/60
+                           focus:bg-surface focus:border-brand focus:ring-2 focus:ring-[var(--cc-ring)]/20 outline-none"
               />
             </label>
           </div>
         )}
 
-        <p className="text-xs text-slate-500">
+        <p className="text-xs text-muted">
           {active.start} to {active.end} · counts goods actually received, at the invoiced price
         </p>
       </div>
@@ -280,8 +280,8 @@ export default function PurchaseReportPage() {
           <select
             value={vendorId}
             onChange={(e) => setVendorId(e.target.value)}
-            className="flex-1 min-h-[48px] px-4 text-[15px] border border-slate-200 rounded-2xl bg-white
-                       focus:border-mint-500 focus:ring-2 focus:ring-mint-500/20 outline-none transition-colors"
+            className="flex-1 min-h-[48px] px-4 text-[15px] border border-line rounded-2xl bg-surface
+                       focus:border-brand focus:ring-2 focus:ring-[var(--cc-ring)]/20 outline-none transition-colors"
           >
             <option value="">All suppliers</option>
             {vendors.map((v) => (
@@ -293,8 +293,8 @@ export default function PurchaseReportPage() {
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="sm:w-56 min-h-[48px] px-4 text-[15px] border border-slate-200 rounded-2xl bg-white
-                       focus:border-mint-500 focus:ring-2 focus:ring-mint-500/20 outline-none transition-colors"
+            className="sm:w-56 min-h-[48px] px-4 text-[15px] border border-line rounded-2xl bg-surface
+                       focus:border-brand focus:ring-2 focus:ring-[var(--cc-ring)]/20 outline-none transition-colors"
           >
             <option value="spend">Sort by spend</option>
             <option value="qty">Sort by quantity</option>
@@ -314,22 +314,22 @@ export default function PurchaseReportPage() {
 
       {/* --------------------------------- rows -------------------------------- */}
       {loading ? (
-        <p className="py-10 text-center text-slate-400 animate-pulse">Loading…</p>
+        <p className="py-10 text-center text-subtle animate-pulse">Loading…</p>
       ) : visible.length === 0 ? (
-        <div className="py-14 px-6 text-center bg-white rounded-3xl border border-slate-100">
-          <Package className="w-12 h-12 text-slate-300 mx-auto mb-3" />
-          <h3 className="text-lg font-bold text-slate-700">Nothing purchased in this period</h3>
-          <p className="text-slate-500 text-sm mt-1 max-w-sm mx-auto">
+        <div className="py-14 px-6 text-center bg-surface rounded-3xl border border-line">
+          <Package className="w-12 h-12 text-subtle mx-auto mb-3" />
+          <h3 className="text-lg font-bold text-fg">Nothing purchased in this period</h3>
+          <p className="text-muted text-sm mt-1 max-w-sm mx-auto">
             Only received deliveries count. Orders still waiting with a supplier are not included.
           </p>
         </div>
       ) : (
         <>
           {/* Desktop table */}
-          <div className="hidden md:block bg-white rounded-3xl border border-slate-100 overflow-hidden">
+          <div className="hidden md:block bg-surface rounded-3xl border border-line overflow-hidden">
             <table className="min-w-full text-sm">
-              <thead className="bg-slate-50 border-b border-slate-100">
-                <tr className="text-slate-600">
+              <thead className="bg-surface-2/60 border-b border-line">
+                <tr className="text-muted">
                   <th className="px-4 py-3 text-left font-semibold">Item</th>
                   <th className="px-4 py-3 text-right font-semibold">Quantity</th>
                   <th className="px-4 py-3 text-right font-semibold">Spend</th>
@@ -339,38 +339,38 @@ export default function PurchaseReportPage() {
                   <th className="px-4 py-3 text-right font-semibold">Last bought</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-line">
                 {visible.map((r) => (
                   <tr
                     key={r.key}
                     onClick={() => setDetail(r)}
-                    className="hover:bg-slate-50 cursor-pointer transition-colors"
+                    className="hover:bg-surface-2 cursor-pointer transition-colors"
                   >
                     <td className="px-4 py-3">
-                      <div className="font-semibold text-slate-900">{r.name}</div>
-                      <div className="text-xs text-slate-500">
+                      <div className="font-semibold text-fg">{r.name}</div>
+                      <div className="text-xs text-muted">
                         {r.category} · {r.vendors.join(", ") || "—"}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums font-semibold text-slate-900">
-                      {r.qty} <span className="text-xs font-normal text-slate-400">{r.unit}</span>
+                    <td className="px-4 py-3 text-right tabular-nums font-semibold text-fg">
+                      {r.qty} <span className="text-xs font-normal text-subtle">{r.unit}</span>
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums font-semibold text-slate-900">
+                    <td className="px-4 py-3 text-right tabular-nums font-semibold text-fg">
                       {money(r.spend)}
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-slate-600">{money(r.avgPrice)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-xs text-slate-500">
+                    <td className="px-4 py-3 text-right tabular-nums text-muted">{money(r.avgPrice)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-xs text-muted">
                       {r.minPrice === r.maxPrice ? "—" : `${money(r.minPrice)}–${money(r.maxPrice)}`}
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums text-slate-600">{r.orders}</td>
-                    <td className="px-4 py-3 text-right tabular-nums text-slate-500">
+                    <td className="px-4 py-3 text-right tabular-nums text-muted">{r.orders}</td>
+                    <td className="px-4 py-3 text-right tabular-nums text-muted">
                       {localDate(r.lastDate)}
                     </td>
                   </tr>
                 ))}
               </tbody>
-              <tfoot className="bg-slate-50 border-t border-slate-200">
-                <tr className="font-bold text-slate-900">
+              <tfoot className="bg-surface-2/60 border-t border-line">
+                <tr className="font-bold text-fg">
                   <td className="px-4 py-3">Total</td>
                   <td className="px-4 py-3 text-right tabular-nums">{shownTotals.qty}</td>
                   <td className="px-4 py-3 text-right tabular-nums">
@@ -388,20 +388,20 @@ export default function PurchaseReportPage() {
               <button
                 key={r.key}
                 onClick={() => setDetail(r)}
-                className="w-full text-left rounded-2xl border border-slate-200 bg-white p-3.5
-                           active:bg-slate-50 transition-colors"
+                className="w-full text-left rounded-2xl border border-line bg-surface p-3.5
+                           active:bg-surface-2/60 transition-colors"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="font-semibold text-slate-900 text-[15px] leading-snug">{r.name}</p>
-                    <p className="text-xs text-slate-500 mt-0.5">{r.category}</p>
+                    <p className="font-semibold text-fg text-[15px] leading-snug">{r.name}</p>
+                    <p className="text-xs text-muted mt-0.5">{r.category}</p>
                   </div>
-                  <p className="text-base font-bold text-slate-900 tabular-nums shrink-0">
+                  <p className="text-base font-bold text-fg tabular-nums shrink-0">
                     {currency} {money(r.spend)}
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500 mt-2">
-                  <span className="font-semibold text-slate-700 tabular-nums">
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted mt-2">
+                  <span className="font-semibold text-fg tabular-nums">
                     {r.qty} {r.unit}
                   </span>
                   <span>avg {money(r.avgPrice)}</span>
@@ -410,7 +410,7 @@ export default function PurchaseReportPage() {
                 </div>
               </button>
             ))}
-            <div className="rounded-2xl bg-slate-900 text-white p-4 flex items-center justify-between">
+            <div className="rounded-2xl bg-brand text-white p-4 flex items-center justify-between">
               <span className="text-sm font-semibold">Total</span>
               <span className="text-lg font-bold tabular-nums">
                 {currency} {money(shownTotals.spend)}
@@ -436,9 +436,9 @@ export default function PurchaseReportPage() {
             </div>
 
             {detail.minPrice !== detail.maxPrice && (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50/60 p-3.5 flex items-start gap-2.5">
-                <TrendingUp className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                <p className="text-sm text-amber-900">
+              <div className="rounded-2xl border border-warning/30 bg-warning-soft/60 p-3.5 flex items-start gap-2.5">
+                <TrendingUp className="w-5 h-5 text-warning shrink-0 mt-0.5" />
+                <p className="text-sm text-warning">
                   Price moved between {currency} {money(detail.minPrice)} and {currency}{" "}
                   {money(detail.maxPrice)} in this period.
                 </p>
@@ -446,29 +446,29 @@ export default function PurchaseReportPage() {
             )}
 
             <div>
-              <p className="text-sm font-semibold text-slate-700 mb-2">Every purchase</p>
-              <div className="rounded-2xl border border-slate-200 divide-y divide-slate-100">
+              <p className="text-sm font-semibold text-fg mb-2">Every purchase</p>
+              <div className="rounded-2xl border border-line divide-y divide-line">
                 {detail.history.map((h, idx) => (
                   <div key={idx} className="p-3.5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <p className="font-semibold text-slate-900 text-sm">{h.date}</p>
-                        <p className="text-xs text-slate-500 mt-0.5 truncate">
+                        <p className="font-semibold text-fg text-sm">{h.date}</p>
+                        <p className="text-xs text-muted mt-0.5 truncate">
                           {h.vendor}
                           {h.poNo ? ` · ${h.poNo}` : ""}
                         </p>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="font-bold text-slate-900 tabular-nums text-sm">
+                        <p className="font-bold text-fg tabular-nums text-sm">
                           {currency} {money(h.value)}
                         </p>
-                        <p className="text-xs text-slate-500 tabular-nums">
+                        <p className="text-xs text-muted tabular-nums">
                           {h.qty} {detail.unit} @ {money(h.price)}
                         </p>
                       </div>
                     </div>
                     {h.orderedQty > 0 && h.orderedQty !== h.qty && (
-                      <p className="text-xs text-amber-700 mt-1.5">
+                      <p className="text-xs text-warning mt-1.5">
                         Ordered {h.orderedQty}, received {h.qty}
                       </p>
                     )}

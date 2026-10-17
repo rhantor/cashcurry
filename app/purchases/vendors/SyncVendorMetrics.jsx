@@ -105,16 +105,16 @@ export default function SyncVendorMetrics({ companyId }) {
   };
 
   return (
-    <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-4 rounded-xl shadow-sm mb-6">
+    <div className="bg-warning-soft border border-warning/30 text-warning p-4 rounded-xl shadow-sm mb-6">
       <h3 className="font-bold mb-2">Historical Data Sync</h3>
       <p className="text-sm mb-4">Run this once to backfill all Vendor payment metrics (Total Billed, Total Paid, Last Payment Date) from existing payments and bills.</p>
       
-      <Button onClick={handleSync} disabled={syncing} className="bg-yellow-600 hover:bg-yellow-700 text-white">
+      <Button onClick={handleSync} disabled={syncing} className="bg-warning hover:brightness-95 text-white">
         {syncing ? "Synchronizing..." : "Sync Vendor Metrics Now"}
       </Button>
       
       {lines.length > 0 && (
-        <div className="mt-4 p-3 bg-white border rounded text-xs text-gray-700 h-32 overflow-y-auto">
+        <div className="mt-4 p-3 bg-surface border rounded text-xs text-fg h-32 overflow-y-auto">
           {lines.map((l, i) => <div key={i}>{l}</div>)}
         </div>
       )}

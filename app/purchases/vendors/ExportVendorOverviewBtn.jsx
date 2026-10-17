@@ -135,7 +135,7 @@ export default function ExportVendorOverviewBtn({ companyId, branchId, vendor })
     <button
       onClick={handleExport}
       disabled={isExporting}
-      className="flex items-center gap-2 px-4 py-2 bg-mint-500 hover:bg-mint-600 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-mint-100 disabled:opacity-50"
+      className="flex items-center gap-2 px-4 py-2 bg-brand hover:bg-brand text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-card disabled:opacity-50"
     >
       <Download className="w-4 h-4" />
       {isExporting ? "Exporting..." : "Export Full Details"}

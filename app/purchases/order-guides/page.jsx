@@ -270,14 +270,14 @@ export default function OrderGuidesPage() {
     <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-5 pb-24">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Order Guides</h1>
-          <p className="text-slate-500 text-sm mt-0.5">Tap a guide to place today&apos;s order.</p>
+          <h1 className="text-2xl font-bold text-fg tracking-tight">Order Guides</h1>
+          <p className="text-muted text-sm mt-0.5">Tap a guide to place today&apos;s order.</p>
         </div>
         <button
           onClick={() => handleOpenBuilder()}
           disabled={busy}
-          className="min-h-[48px] px-5 rounded-2xl bg-slate-900 text-white font-semibold
-                     flex items-center justify-center gap-2 active:bg-slate-700 disabled:opacity-50 transition-colors"
+          className="min-h-[48px] px-5 rounded-2xl bg-brand text-white font-semibold
+                     flex items-center justify-center gap-2 active:brightness-95 disabled:opacity-50 transition-colors"
         >
           <Plus className="w-5 h-5" /> New Guide
         </button>
@@ -290,42 +290,42 @@ export default function OrderGuidesPage() {
           return (
             <div
               key={guide.id}
-              className="bg-white rounded-3xl border border-slate-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)]
+              className="bg-surface rounded-3xl border border-line shadow-[0_2px_12px_rgba(0,0,0,0.03)]
                          p-5 flex flex-col"
             >
               <div className="flex items-start justify-between gap-2 mb-1">
-                <h3 className="font-bold text-slate-900 text-lg leading-snug">{guide.name}</h3>
+                <h3 className="font-bold text-fg text-lg leading-snug">{guide.name}</h3>
                 <div className="flex gap-1 shrink-0 -mr-2 -mt-1">
                   <button
                     onClick={() => handleOpenBuilder(guide)}
                     aria-label="Edit guide"
-                    className="w-10 h-10 flex items-center justify-center rounded-full text-slate-400
-                               active:bg-slate-100 transition-colors"
+                    className="w-10 h-10 flex items-center justify-center rounded-full text-subtle
+                               active:bg-surface-2 transition-colors"
                   >
                     <Pencil className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => setGuideToDelete(guide)}
                     aria-label="Delete guide"
-                    className="w-10 h-10 flex items-center justify-center rounded-full text-slate-400
-                               active:bg-red-50 active:text-red-600 transition-colors"
+                    className="w-10 h-10 flex items-center justify-center rounded-full text-subtle
+                               active:bg-danger-soft active:text-danger transition-colors"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               </div>
 
-              <p className="text-sm font-medium text-slate-500 mb-4">{guide.vendorName}</p>
+              <p className="text-sm font-medium text-muted mb-4">{guide.vendorName}</p>
 
-              <div className="flex items-center gap-2 text-sm text-slate-600 bg-slate-50 px-3 py-2.5
-                              rounded-xl border border-slate-100">
-                <ListChecks className="w-4 h-4 text-mint-600 shrink-0" />
+              <div className="flex items-center gap-2 text-sm text-muted bg-surface-2/60 px-3 py-2.5
+                              rounded-xl border border-line">
+                <ListChecks className="w-4 h-4 text-brand shrink-0" />
                 <span>{rows.length} items</span>
               </div>
 
               {missing > 0 && (
-                <div className="flex items-start gap-2 text-xs text-amber-800 mt-2 bg-amber-50 px-3 py-2.5
-                                rounded-xl border border-amber-100">
+                <div className="flex items-start gap-2 text-xs text-warning mt-2 bg-warning-soft px-3 py-2.5
+                                rounded-xl border border-warning/30">
                   <AlertTriangle className="w-4 h-4 shrink-0 mt-px" />
                   <span>
                     {missing} item{missing > 1 ? "s are" : " is"} no longer in the catalog and will be skipped.
@@ -335,8 +335,8 @@ export default function OrderGuidesPage() {
 
               <button
                 onClick={() => handleOpenOrder(guide)}
-                className="mt-4 min-h-[52px] w-full rounded-2xl bg-mint-600 text-white font-bold text-base
-                           flex items-center justify-center gap-2 active:bg-mint-700 transition-colors"
+                className="mt-4 min-h-[52px] w-full rounded-2xl bg-brand text-white font-bold text-base
+                           flex items-center justify-center gap-2 active:brightness-95 transition-colors"
               >
                 <ShoppingCart className="w-5 h-5" /> Place Order
               </button>
@@ -345,16 +345,16 @@ export default function OrderGuidesPage() {
         })}
 
         {guides.length === 0 && !guidesLoading && (
-          <div className="col-span-full py-16 px-6 text-center bg-white rounded-3xl border border-slate-100">
-            <ListChecks className="w-12 h-12 text-slate-300 mx-auto mb-4" />
-            <h3 className="text-lg font-bold text-slate-700">No order guides yet</h3>
-            <p className="text-slate-500 mt-1 max-w-sm mx-auto text-sm">
+          <div className="col-span-full py-16 px-6 text-center bg-surface rounded-3xl border border-line">
+            <ListChecks className="w-12 h-12 text-subtle mx-auto mb-4" />
+            <h3 className="text-lg font-bold text-fg">No order guides yet</h3>
+            <p className="text-muted mt-1 max-w-sm mx-auto text-sm">
               A guide is a saved list of what you normally buy from one supplier. Make one and ordering takes
               seconds.
             </p>
             <button
               onClick={() => handleOpenBuilder()}
-              className="mt-5 min-h-[48px] px-6 rounded-2xl bg-mint-600 text-white font-semibold active:bg-mint-700"
+              className="mt-5 min-h-[48px] px-6 rounded-2xl bg-brand text-white font-semibold active:brightness-95"
             >
               Create your first guide
             </button>
@@ -372,18 +372,18 @@ export default function OrderGuidesPage() {
         footer={
           <div className="flex items-center gap-3">
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+              <p className="text-xs font-semibold text-subtle uppercase tracking-wide">
                 {chosen.length} item{chosen.length === 1 ? "" : "s"}
               </p>
-              <p className="text-xl font-bold text-slate-900 tabular-nums truncate">
+              <p className="text-xl font-bold text-fg tabular-nums truncate">
                 {currency} {money(orderTotal)}
               </p>
             </div>
             <button
               onClick={handleSubmitOrder}
               disabled={busy || chosen.length === 0}
-              className="flex-1 min-h-[52px] rounded-2xl bg-mint-600 text-white font-bold text-base
-                         active:bg-mint-700 disabled:opacity-40 transition-colors"
+              className="flex-1 min-h-[52px] rounded-2xl bg-brand text-white font-bold text-base
+                         active:brightness-95 disabled:opacity-40 transition-colors"
             >
               {creatingOrder ? "Sending…" : "Submit Order"}
             </button>
@@ -391,7 +391,7 @@ export default function OrderGuidesPage() {
         }
       >
         {orderItems.length === 0 ? (
-          <div className="py-12 text-center text-slate-500">
+          <div className="py-12 text-center text-muted">
             None of this guide&apos;s items are in the catalog any more. Edit the guide to fix it.
           </div>
         ) : (
@@ -411,7 +411,7 @@ export default function OrderGuidesPage() {
 
             {/* Filtering only hides rows; quantities already entered still count
                 towards the order, so say so rather than let it look lost. */}
-            <p className="text-sm text-slate-500 mb-3">
+            <p className="text-sm text-muted mb-3">
               {orderCategory || orderSearch
                 ? `Showing ${visibleOrderItems.length} of ${orderItems.length}. Amounts you already entered are still in the order.`
                 : "Quantities are prefilled from your usual amounts. Change what you need, leave the rest at zero."}
@@ -425,24 +425,24 @@ export default function OrderGuidesPage() {
                   <div
                     key={item.itemId}
                     className={`rounded-2xl border p-3.5 transition-colors ${
-                      picked ? "border-mint-200 bg-mint-50/40" : "border-slate-200 bg-white"
+                      picked ? "border-brand/30 bg-brand-soft/40" : "border-line bg-surface"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3 mb-3">
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
-                          {picked && <Check className="w-4 h-4 text-mint-600 shrink-0" />}
-                          <span className="font-semibold text-slate-900 text-[15px] leading-snug">
+                          {picked && <Check className="w-4 h-4 text-brand shrink-0" />}
+                          <span className="font-semibold text-fg text-[15px] leading-snug">
                             {item.name}
                           </span>
                         </div>
-                        <p className="text-xs text-slate-500 mt-0.5">
+                        <p className="text-xs text-muted mt-0.5">
                           {item.category ? `${item.category} · ` : ""}
                           {currency} {money(item.estPrice)} / {item.unit}
                         </p>
                       </div>
                       {picked && (
-                        <p className="text-base font-bold text-slate-900 tabular-nums shrink-0">
+                        <p className="text-base font-bold text-fg tabular-nums shrink-0">
                           {currency} {money(qty * Number(item.estPrice || 0))}
                         </p>
                       )}
@@ -458,7 +458,7 @@ export default function OrderGuidesPage() {
               })}
 
               {visibleOrderItems.length === 0 && (
-                <p className="py-10 text-center text-slate-500">Nothing matches &ldquo;{orderSearch}&rdquo;.</p>
+                <p className="py-10 text-center text-muted">Nothing matches &ldquo;{orderSearch}&rdquo;.</p>
               )}
             </div>
           </>
@@ -475,8 +475,8 @@ export default function OrderGuidesPage() {
           <button
             onClick={handleSaveGuide}
             disabled={busy}
-            className="w-full min-h-[52px] rounded-2xl bg-mint-600 text-white font-bold text-base
-                       active:bg-mint-700 disabled:opacity-40 transition-colors"
+            className="w-full min-h-[52px] rounded-2xl bg-brand text-white font-bold text-base
+                       active:brightness-95 disabled:opacity-40 transition-colors"
           >
             Save Guide ({builderForm.rows.length} item{builderForm.rows.length === 1 ? "" : "s"})
           </button>
@@ -484,24 +484,24 @@ export default function OrderGuidesPage() {
       >
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Guide name</label>
+            <label className="block text-sm font-semibold text-fg mb-1.5">Guide name</label>
             <input
               value={builderForm.name}
               onChange={(e) => setBuilderForm((f) => ({ ...f, name: e.target.value }))}
               placeholder="e.g. Daily Produce"
-              className="w-full min-h-[48px] px-4 text-[15px] border border-slate-200 rounded-2xl bg-slate-50
-                         focus:bg-white focus:border-mint-500 focus:ring-2 focus:ring-mint-500/20 outline-none
+              className="w-full min-h-[48px] px-4 text-[15px] border border-line rounded-2xl bg-surface-2/60
+                         focus:bg-surface focus:border-brand focus:ring-2 focus:ring-[var(--cc-ring)]/20 outline-none
                          transition-colors"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-semibold text-slate-700 mb-1.5">Supplier</label>
+            <label className="block text-sm font-semibold text-fg mb-1.5">Supplier</label>
             <select
               value={builderForm.vendorId}
               onChange={(e) => setBuilderForm((f) => ({ ...f, vendorId: e.target.value }))}
-              className="w-full min-h-[48px] px-4 text-[15px] border border-slate-200 rounded-2xl bg-slate-50
-                         focus:bg-white focus:border-mint-500 focus:ring-2 focus:ring-mint-500/20 outline-none
+              className="w-full min-h-[48px] px-4 text-[15px] border border-line rounded-2xl bg-surface-2/60
+                         focus:bg-surface focus:border-brand focus:ring-2 focus:ring-[var(--cc-ring)]/20 outline-none
                          transition-colors"
             >
               <option value="">Choose a supplier…</option>
@@ -515,8 +515,8 @@ export default function OrderGuidesPage() {
 
           <div>
             <div className="flex items-baseline justify-between mb-2">
-              <label className="text-sm font-semibold text-slate-700">Items in this guide</label>
-              <span className="text-xs text-slate-400">{builderForm.rows.length} selected</span>
+              <label className="text-sm font-semibold text-fg">Items in this guide</label>
+              <span className="text-xs text-subtle">{builderForm.rows.length} selected</span>
             </div>
 
             {vendorItems.length > 6 && (
@@ -534,7 +534,7 @@ export default function OrderGuidesPage() {
 
             <div className="space-y-2">
               {selectableItems.length === 0 ? (
-                <p className="py-8 text-center text-sm text-slate-500">
+                <p className="py-8 text-center text-sm text-muted">
                   {builderSearch || builderCategory
                     ? "Nothing matches that filter."
                     : builderForm.vendorId
@@ -548,7 +548,7 @@ export default function OrderGuidesPage() {
                     <div
                       key={item.id}
                       className={`rounded-2xl border transition-colors ${
-                        row ? "border-mint-200 bg-mint-50/40" : "border-slate-200 bg-white"
+                        row ? "border-brand/30 bg-brand-soft/40" : "border-line bg-surface"
                       }`}
                     >
                       <button
@@ -559,16 +559,16 @@ export default function OrderGuidesPage() {
                         <span
                           className={`w-6 h-6 rounded-lg border-2 shrink-0 flex items-center justify-center
                                       transition-colors ${
-                                        row ? "bg-mint-600 border-mint-600" : "border-slate-300 bg-white"
+                                        row ? "bg-brand border-brand" : "border-line bg-surface"
                                       }`}
                         >
                           {row && <Check className="w-4 h-4 text-white" strokeWidth={3} />}
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block font-semibold text-slate-900 text-[15px] leading-snug truncate">
+                          <span className="block font-semibold text-fg text-[15px] leading-snug truncate">
                             {item.name}
                           </span>
-                          <span className="block text-xs text-slate-500 mt-0.5">
+                          <span className="block text-xs text-muted mt-0.5">
                             {item.category} · {item.unit}
                           </span>
                         </span>
@@ -576,7 +576,7 @@ export default function OrderGuidesPage() {
 
                       {row && (
                         <div className="px-3.5 pb-3.5 -mt-1">
-                          <p className="text-xs font-medium text-slate-500 mb-1.5">
+                          <p className="text-xs font-medium text-muted mb-1.5">
                             Usual order amount (prefilled when ordering)
                           </p>
                           <QtyStepper

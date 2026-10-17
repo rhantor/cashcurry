@@ -75,7 +75,7 @@ export default function RowActions({ busy, onView, onEdit, onInc, onDelete }) {
     <>
       <button
         ref={btnRef}
-        className="ml-auto px-2 py-1 rounded-lg bg-gray-100 hover:bg-gray-200"
+        className="ml-auto px-2 py-1 rounded-lg bg-surface-2 hover:bg-surface-2"
         onClick={() => setOpen((v) => !v)}
         disabled={busy}
         aria-haspopup="menu"
@@ -89,12 +89,12 @@ export default function RowActions({ busy, onView, onEdit, onInc, onDelete }) {
         <Portal>
           <div
             ref={menuRef}
-            className="fixed z-50 w-44 rounded-xl border bg-white shadow-lg"
+            className="fixed z-50 w-44 rounded-xl border bg-surface shadow-lg"
             style={{ top: pos.top, left: pos.left }}
             role="menu"
           >
             <button
-              className="w-full text-left px-3 py-2 hover:bg-gray-50 text-indigo-600 font-medium"
+              className="w-full text-left px-3 py-2 hover:bg-surface-2 text-info font-medium"
               onClick={() => {
                 onView?.();
                 setOpen(false);
@@ -104,7 +104,7 @@ export default function RowActions({ busy, onView, onEdit, onInc, onDelete }) {
               View Details
             </button>
             <button
-              className="w-full text-left px-3 py-2 hover:bg-gray-50"
+              className="w-full text-left px-3 py-2 hover:bg-surface-2"
               onClick={() => {
                 onEdit?.();
                 setOpen(false);
@@ -114,7 +114,7 @@ export default function RowActions({ busy, onView, onEdit, onInc, onDelete }) {
               Edit
             </button>
             <button
-              className="w-full text-left px-3 py-2 hover:bg-gray-50"
+              className="w-full text-left px-3 py-2 hover:bg-surface-2"
               onClick={() => {
                 onInc?.();
                 setOpen(false);
@@ -124,7 +124,7 @@ export default function RowActions({ busy, onView, onEdit, onInc, onDelete }) {
               Increase Max Credit Bills
             </button>
             <button
-              className="w-full text-left px-3 py-2 text-red-600 hover:bg-red-50"
+              className="w-full text-left px-3 py-2 text-danger hover:bg-danger-soft"
               onClick={() => {
                 onDelete?.();
                 setOpen(false);

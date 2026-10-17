@@ -29,7 +29,7 @@ function PaginationBar({ page, pageCount, onPrev, onNext }) {
   const disabledNext = page >= pageCount;
   return (
     <div className="flex items-center justify-between gap-3 mt-3">
-      <div className="text-sm text-gray-600">
+      <div className="text-sm text-muted">
         Page {page} of {pageCount || 1}
       </div>
       <div className="flex items-center gap-2">
@@ -38,8 +38,8 @@ function PaginationBar({ page, pageCount, onPrev, onNext }) {
           disabled={disabledPrev}
           className={`px-3 py-1.5 rounded-lg ${
             disabledPrev
-              ? "bg-gray-200 text-gray-500"
-              : "bg-white border hover:bg-gray-50"
+              ? "bg-surface-2 text-muted"
+              : "bg-surface border hover:bg-surface-2"
           }`}
         >
           Prev
@@ -49,8 +49,8 @@ function PaginationBar({ page, pageCount, onPrev, onNext }) {
           disabled={disabledNext}
           className={`px-3 py-1.5 rounded-lg ${
             disabledNext
-              ? "bg-gray-200 text-gray-500"
-              : "bg-white border hover:bg-gray-50"
+              ? "bg-surface-2 text-muted"
+              : "bg-surface border hover:bg-surface-2"
           }`}
         >
           Next
@@ -224,10 +224,10 @@ export default function PaymentsPage() {
   if (!ready) {
     return (
       <div className="p-3 sm:p-4">
-        <h1 className="text-lg sm:text-xl font-bold text-mint-500">
+        <h1 className="text-lg sm:text-xl font-bold text-brand">
           Payments
         </h1>
-        <div className="bg-white rounded-xl shadow p-4 text-sm text-gray-500">
+        <div className="bg-surface rounded-xl shadow p-4 text-sm text-muted">
           Resolving company & branch…
         </div>
       </div>
@@ -237,10 +237,10 @@ export default function PaymentsPage() {
   if (!companyId || !branchId) {
     return (
       <div className="p-3 sm:p-4">
-        <h1 className="text-lg sm:text-xl font-bold text-mint-500">
+        <h1 className="text-lg sm:text-xl font-bold text-brand">
           Payments
         </h1>
-        <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3">
+        <div className="bg-danger-soft border border-danger/30 text-danger rounded-lg p-3">
           Couldn’t resolve company/branch. Please check your access.
         </div>
       </div>
@@ -251,17 +251,17 @@ export default function PaymentsPage() {
   return (
     <div className="p-3 sm:p-4">
       <div className="mb-3 sm:mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-        <h1 className="text-lg sm:text-xl font-bold text-mint-500">
+        <h1 className="text-lg sm:text-xl font-bold text-brand">
           {branchLoading ? "Loading…" : branchData?.name ? title : "Payments"}
         </h1>
 
         <div className="flex items-center gap-2">
-          <span className="text-sm text-gray-600">
+          <span className="text-sm text-muted">
             Showing {showingFrom}–{showingTo} of {payments.length}
           </span>
           <button
             onClick={() => refetch()}
-            className="px-3 py-2 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm"
+            className="px-3 py-2 rounded-lg bg-surface-2 hover:bg-surface-2 text-sm"
           >
             Refresh
           </button>
@@ -270,7 +270,7 @@ export default function PaymentsPage() {
 
       {/* Data load errors */}
       {(vendorsIsError || branchIsError || paymentsIsError) && (
-        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-3 text-red-700">
+        <div className="mb-3 rounded-lg border border-danger/30 bg-danger-soft p-3 text-danger">
           <strong>Couldn’t load data.</strong>{" "}
           <span className="text-sm">
             {(vendorsError &&
@@ -290,13 +290,13 @@ export default function PaymentsPage() {
           <div className="mt-2 flex gap-3">
             <button
               onClick={() => refetchVendors?.()}
-              className="text-sm text-mint-600 underline"
+              className="text-sm text-brand underline"
             >
               Retry vendors
             </button>
             <button
               onClick={() => refetch?.()}
-              className="text-sm text-mint-600 underline"
+              className="text-sm text-brand underline"
             >
               Retry payments
             </button>
@@ -305,9 +305,9 @@ export default function PaymentsPage() {
       )}
 
       {/* Filters */}
-      <div className="bg-white rounded-xl shadow p-3 sm:p-4 mb-4 grid gap-3 md:grid-cols-4">
+      <div className="bg-surface rounded-xl shadow p-3 sm:p-4 mb-4 grid gap-3 md:grid-cols-4">
         <div>
-          <label className="text-sm text-gray-600">Vendor</label>
+          <label className="text-sm text-muted">Vendor</label>
           <select
             className="mt-1 w-full border rounded-lg p-2"
             value={vendorId}
@@ -326,7 +326,7 @@ export default function PaymentsPage() {
           </select>
         </div>
         <div>
-          <label className="text-sm text-gray-600">Method</label>
+          <label className="text-sm text-muted">Method</label>
           <select
             className="mt-1 w-full border rounded-lg p-2"
             value={method}
@@ -341,7 +341,7 @@ export default function PaymentsPage() {
           </select>
         </div>
         <div>
-          <label className="text-sm text-gray-600">From</label>
+          <label className="text-sm text-muted">From</label>
           <input
             type="date"
             className="mt-1 w-full border rounded-lg p-2"
@@ -350,7 +350,7 @@ export default function PaymentsPage() {
           />
         </div>
         <div>
-          <label className="text-sm text-gray-600">To</label>
+          <label className="text-sm text-muted">To</label>
           <input
             type="date"
             className="mt-1 w-full border rounded-lg p-2"
@@ -362,13 +362,13 @@ export default function PaymentsPage() {
         <div className="md:col-span-4 flex flex-wrap items-center gap-2">
           <button
             onClick={clearFilters}
-            className="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm"
+            className="px-3 py-1.5 rounded-lg bg-surface-2 hover:bg-surface-2 text-sm"
             disabled={vendorsLoading}
           >
             Clear filters
           </button>
           {from && to && from > to && (
-            <span className="text-xs text-red-600">
+            <span className="text-xs text-danger">
               “From” date cannot be later than “To”.
             </span>
           )}
@@ -377,12 +377,12 @@ export default function PaymentsPage() {
 
       {/* Loading skeleton */}
       {(paymentsLoading || branchLoading) && (
-        <div className="bg-white rounded-xl shadow p-4">
+        <div className="bg-surface rounded-xl shadow p-4">
           <div className="animate-pulse space-y-3">
-            <div className="h-4 bg-gray-200 rounded w-1/3" />
-            <div className="h-4 bg-gray-200 rounded w-2/3" />
-            <div className="h-4 bg-gray-200 rounded w-1/2" />
-            <div className="h-4 bg-gray-200 rounded w-3/4" />
+            <div className="h-4 bg-surface-2 rounded w-1/3" />
+            <div className="h-4 bg-surface-2 rounded w-2/3" />
+            <div className="h-4 bg-surface-2 rounded w-1/2" />
+            <div className="h-4 bg-surface-2 rounded w-3/4" />
           </div>
         </div>
       )}
@@ -392,25 +392,25 @@ export default function PaymentsPage() {
         {visible.map((p) => {
           const officeChip =
             p.paidFromOffice === "front"
-              ? "bg-emerald-100 text-emerald-700"
-              : "bg-indigo-100 text-indigo-700";
+              ? "bg-brand-soft text-brand"
+              : "bg-info-soft text-info";
           const methodLabel =
             METHOD_LABELS[p.paidMethod] || p.paidMethod || "-";
           return (
-            <div key={p.id} className="bg-white rounded-xl shadow p-3">
+            <div key={p.id} className="bg-surface rounded-xl shadow p-3">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="text-sm text-gray-500">{getDisplayDate(p)}</p>
+                  <p className="text-sm text-muted">{getDisplayDate(p)}</p>
                   <p className="font-medium truncate">{p.vendorName || "-"}</p>
                 </div>
-                <span className="px-2 py-0.5 rounded-full text-[11px] bg-gray-100">
+                <span className="px-2 py-0.5 rounded-full text-[11px] bg-surface-2">
                   {methodLabel}
                 </span>
               </div>
 
               <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-                <div className="rounded-lg bg-gray-50 p-2">
-                  <p className="text-gray-500">Bills</p>
+                <div className="rounded-lg bg-surface-2/60 p-2">
+                  <p className="text-muted">Bills</p>
                   <p className="font-semibold">{p.allocations?.length || 0}</p>
                 </div>
                 <div className={`rounded-lg p-2 ${officeChip}`}>
@@ -419,8 +419,8 @@ export default function PaymentsPage() {
                     {p.paidFromOffice === "front" ? "Front" : "Back"}
                   </p>
                 </div>
-                <div className="rounded-lg bg-gray-50 p-2 text-right">
-                  <p className="text-gray-500">Amount</p>
+                <div className="rounded-lg bg-surface-2/60 p-2 text-right">
+                  <p className="text-muted">Amount</p>
                   <p className="font-semibold">
                     {fmtRM(p.total ?? p.totalPaid)}
                   </p>
@@ -428,8 +428,8 @@ export default function PaymentsPage() {
               </div>
 
               <div className="mt-2 flex items-center justify-between">
-                <div className="text-xs text-gray-600 truncate">
-                  Ref: {p.reference || <span className="text-gray-400">—</span>}
+                <div className="text-xs text-muted truncate">
+                  Ref: {p.reference || <span className="text-subtle">—</span>}
                 </div>
                 <div className="flex items-center gap-2">
                   {p.receiptURL ? (
@@ -437,15 +437,15 @@ export default function PaymentsPage() {
                       href={p.receiptURL}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-xs text-mint-600 underline"
+                      className="text-xs text-brand underline"
                     >
                       Receipt
                     </a>
                   ) : (
-                    <span className="text-xs text-gray-400">No receipt</span>
+                    <span className="text-xs text-subtle">No receipt</span>
                   )}
                   <button
-                    className="px-3 py-1 rounded-lg bg-gray-100 hover:bg-gray-200 text-xs"
+                    className="px-3 py-1 rounded-lg bg-surface-2 hover:bg-surface-2 text-xs"
                     onClick={() => setSelectedPayment(p)}
                   >
                     Details
@@ -457,7 +457,7 @@ export default function PaymentsPage() {
         })}
 
         {!visible.length && !paymentsLoading && (
-          <div className="bg-white rounded-xl shadow p-4 text-center text-gray-500">
+          <div className="bg-surface rounded-xl shadow p-4 text-center text-muted">
             No payments to show.
           </div>
         )}
@@ -472,9 +472,9 @@ export default function PaymentsPage() {
       </div>
 
       {/* Desktop/tablet table */}
-      <div className="hidden md:block bg-white rounded-xl shadow p-4 overflow-x-auto">
+      <div className="hidden md:block bg-surface rounded-xl shadow p-4 overflow-x-auto">
         <table className="min-w-full text-sm">
-          <thead className="text-left text-gray-600">
+          <thead className="text-left text-muted">
             <tr>
               <th className="py-2">Paid Date</th>
               <th className="py-2">Vendor</th>
@@ -491,8 +491,8 @@ export default function PaymentsPage() {
             {visible.map((p) => {
               const officeChip =
                 p.paidFromOffice === "front"
-                  ? "bg-emerald-100 text-emerald-700"
-                  : "bg-indigo-100 text-indigo-700";
+                  ? "bg-brand-soft text-brand"
+                  : "bg-info-soft text-info";
               const methodLabel =
                 METHOD_LABELS[p.paidMethod] || p.paidMethod || "-";
               return (
@@ -508,12 +508,12 @@ export default function PaymentsPage() {
                     </span>
                   </td>
                   <td className="py-2">
-                    <span className="px-2 py-1 rounded-full text-xs bg-gray-100">
+                    <span className="px-2 py-1 rounded-full text-xs bg-surface-2">
                       {methodLabel}
                     </span>
                   </td>
                   <td className="py-2">
-                    {p.reference || <span className="text-gray-400">—</span>}
+                    {p.reference || <span className="text-subtle">—</span>}
                   </td>
                   <td className="py-2">
                     {p.receiptURL ? (
@@ -521,12 +521,12 @@ export default function PaymentsPage() {
                         href={p.receiptURL}
                         target="_blank"
                         rel="noreferrer"
-                        className="text-mint-600 hover:underline"
+                        className="text-brand hover:underline"
                       >
                         View
                       </a>
                     ) : (
-                      <span className="text-gray-400">—</span>
+                      <span className="text-subtle">—</span>
                     )}
                   </td>
                   <td className="py-2 font-medium text-right">
@@ -534,7 +534,7 @@ export default function PaymentsPage() {
                   </td>
                   <td className="py-2 text-right">
                     <button
-                      className="px-3 py-1 rounded-lg bg-gray-100 hover:bg-gray-200"
+                      className="px-3 py-1 rounded-lg bg-surface-2 hover:bg-surface-2"
                       onClick={() => setSelectedPayment(p)}
                     >
                       Details
@@ -545,7 +545,7 @@ export default function PaymentsPage() {
             })}
             {!visible.length && !paymentsLoading && (
               <tr>
-                <td className="py-6 text-center text-gray-500" colSpan={9}>
+                <td className="py-6 text-center text-muted" colSpan={9}>
                   No payments to show.
                 </td>
               </tr>
@@ -564,10 +564,10 @@ export default function PaymentsPage() {
                 <td />
               </tr>
               <tr>
-                <td className="py-1 text-sm text-gray-500" colSpan={7}>
+                <td className="py-1 text-sm text-muted" colSpan={7}>
                   All results total
                 </td>
-                <td className="py-1 text-sm text-right text-gray-500">
+                <td className="py-1 text-sm text-right text-muted">
                   {fmtRM(totalRMAll)}
                 </td>
                 <td />

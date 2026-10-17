@@ -114,7 +114,7 @@ export default function UploadInvoice({
   const onDrop = async (e) => {
     e.preventDefault();
     e.stopPropagation();
-    dropRef.current?.classList.remove("ring-2", "ring-mint-400");
+    dropRef.current?.classList.remove("ring-2", "ring-brand");
     const f = e.dataTransfer?.files?.[0];
     await handleFileInternal(f);
   };
@@ -122,13 +122,13 @@ export default function UploadInvoice({
   const onDragOver = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    dropRef.current?.classList.add("ring-2", "ring-mint-400");
+    dropRef.current?.classList.add("ring-2", "ring-brand");
   };
 
   const onDragLeave = (e) => {
     e.preventDefault();
     e.stopPropagation();
-    dropRef.current?.classList.remove("ring-2", "ring-mint-400");
+    dropRef.current?.classList.remove("ring-2", "ring-brand");
   };
 
   // Paste (Ctrl/Cmd+V) images directly
@@ -181,14 +181,14 @@ export default function UploadInvoice({
 
   return (
     <div className="space-y-2">
-      <label className="block text-sm font-medium text-gray-600">
+      <label className="block text-sm font-medium text-muted">
         {label}
       </label>
 
       {/* Drop zone / picker */}
       <div
         ref={dropRef}
-        className="rounded-xl border border-dashed border-gray-300 bg-gray-50 hover:bg-gray-100 transition-colors p-3 sm:p-4"
+        className="rounded-xl border border-dashed border-line bg-surface-2/60 hover:bg-surface-2 transition-colors p-3 sm:p-4"
         onDrop={onDrop}
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
@@ -205,7 +205,7 @@ export default function UploadInvoice({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="px-4 py-2 bg-mint-100 hover:bg-mint-200 rounded-lg text-mint-700 font-medium"
+              className="px-4 py-2 bg-brand-soft hover:bg-brand-soft rounded-lg text-brand font-medium"
             >
               Choose File
             </button>
@@ -213,7 +213,7 @@ export default function UploadInvoice({
               <button
                 type="button"
                 onClick={() => cameraInputRef.current?.click()}
-                className="px-4 py-2 bg-white border rounded-lg lg:hidden hover:bg-gray-50 text-gray-700"
+                className="px-4 py-2 bg-surface border rounded-lg lg:hidden hover:bg-surface-2 text-fg"
                 title="Use camera"
               >
                 Use Camera
@@ -221,9 +221,9 @@ export default function UploadInvoice({
             )}
           </div>
 
-          <div className="text-xs sm:text-sm text-gray-600">
+          <div className="text-xs sm:text-sm text-muted">
             Drag & drop a PDF or image{enablePaste ? ", or paste an image" : ""}.
-            <div className="text-[11px] sm:text-xs text-gray-500">
+            <div className="text-[11px] sm:text-xs text-muted">
               Max {maxFileSizeMB} MB. Images auto-compressed.
             </div>
           </div>
@@ -251,9 +251,9 @@ export default function UploadInvoice({
 
       {/* Selected file info / preview */}
       {hasFile && !isImageSelected && (
-        <div className="text-xs sm:text-sm text-gray-700">
+        <div className="text-xs sm:text-sm text-fg">
           Selected: <span className="font-medium break-all">{file?.name}</span>{" "}
-          <span className="text-gray-500">({bytesToSize(file?.size)})</span>
+          <span className="text-muted">({bytesToSize(file?.size)})</span>
         </div>
       )}
 
@@ -267,9 +267,9 @@ export default function UploadInvoice({
 
       {/* External upload progress (from parent) */}
       {progress > 0 && progress < 100 && (
-        <div className="w-full bg-gray-200 rounded-full h-2" aria-hidden>
+        <div className="w-full bg-surface-2 rounded-full h-2" aria-hidden>
           <div
-            className="h-2 rounded-full bg-mint-500 transition-[width] duration-200"
+            className="h-2 rounded-full bg-brand transition-[width] duration-200"
             style={{ width: `${progress}%` }}
           />
         </div>
@@ -281,13 +281,13 @@ export default function UploadInvoice({
           <button
             type="button"
             onClick={removeFile}
-            className="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-sm"
+            className="px-3 py-1.5 rounded-lg bg-surface-2 hover:bg-surface-2 text-sm"
           >
             Remove
           </button>
         )}
         {localError && (
-          <span className="text-xs text-red-600">{localError}</span>
+          <span className="text-xs text-danger">{localError}</span>
         )}
       </div>
     </div>

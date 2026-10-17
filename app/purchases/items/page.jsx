@@ -38,8 +38,8 @@ import {
 
 /** Shared field styling — one place so every input keeps a thumb-sized target. */
 const FIELD =
-  "w-full min-h-[48px] px-4 text-[15px] border border-slate-200 rounded-2xl bg-slate-50 " +
-  "focus:bg-white focus:border-mint-500 focus:ring-2 focus:ring-mint-500/20 outline-none transition-colors";
+  "w-full min-h-[48px] px-4 text-[15px] border border-line rounded-2xl bg-surface-2/60 " +
+  "focus:bg-surface focus:border-brand focus:ring-2 focus:ring-[var(--cc-ring)]/20 outline-none transition-colors";
 
 /**
  * Tappable multi-select.
@@ -50,10 +50,10 @@ const FIELD =
  */
 function CheckList({ options, selected = [], onToggle, empty = "Nothing to choose from" }) {
   if (!options.length) {
-    return <p className="py-6 text-center text-sm text-slate-500">{empty}</p>;
+    return <p className="py-6 text-center text-sm text-muted">{empty}</p>;
   }
   return (
-    <div className="rounded-2xl border border-slate-200 divide-y divide-slate-100 max-h-56 overflow-y-auto">
+    <div className="rounded-2xl border border-line divide-y divide-line max-h-56 overflow-y-auto">
       {options.map((o) => {
         const on = selected.includes(o.id);
         return (
@@ -62,19 +62,19 @@ function CheckList({ options, selected = [], onToggle, empty = "Nothing to choos
             type="button"
             onClick={() => onToggle(o.id)}
             className={`w-full flex items-center gap-3 p-3.5 text-left transition-colors ${
-              on ? "bg-mint-50/60" : "active:bg-slate-50"
+              on ? "bg-brand-soft/60" : "active:bg-surface-2/60"
             }`}
           >
             <span
               className={`w-6 h-6 rounded-lg border-2 shrink-0 flex items-center justify-center transition-colors ${
-                on ? "bg-mint-600 border-mint-600" : "border-slate-300 bg-white"
+                on ? "bg-brand border-brand" : "border-line bg-surface"
               }`}
             >
               {on && <Check className="w-4 h-4 text-white" strokeWidth={3} />}
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block text-[15px] font-medium text-slate-800 truncate">{o.label}</span>
-              {o.hint && <span className="block text-xs text-slate-500 mt-0.5">{o.hint}</span>}
+              <span className="block text-[15px] font-medium text-fg truncate">{o.label}</span>
+              {o.hint && <span className="block text-xs text-muted mt-0.5">{o.hint}</span>}
             </span>
           </button>
         );
@@ -107,23 +107,23 @@ function BranchPicker({ branches, selected = [], onChange }) {
 
   return (
     <div>
-      <label className="block text-sm font-semibold text-slate-700 mb-1.5">Stocked at</label>
-      <div className="rounded-2xl border border-slate-200 divide-y divide-slate-100 max-h-56 overflow-y-auto">
+      <label className="block text-sm font-semibold text-fg mb-1.5">Stocked at</label>
+      <div className="rounded-2xl border border-line divide-y divide-line max-h-56 overflow-y-auto">
         <button
           type="button"
           onClick={() => onChange([])}
           className={`w-full flex items-center gap-3 p-3.5 text-left transition-colors ${
-            all ? "bg-mint-50/60" : "active:bg-slate-50"
+            all ? "bg-brand-soft/60" : "active:bg-surface-2/60"
           }`}
         >
           <span
             className={`w-6 h-6 rounded-lg border-2 shrink-0 flex items-center justify-center transition-colors ${
-              all ? "bg-mint-600 border-mint-600" : "border-slate-300 bg-white"
+              all ? "bg-brand border-brand" : "border-line bg-surface"
             }`}
           >
             {all && <Check className="w-4 h-4 text-white" strokeWidth={3} />}
           </span>
-          <span className="text-[15px] font-semibold text-slate-800">All branches</span>
+          <span className="text-[15px] font-semibold text-fg">All branches</span>
         </button>
         {branches.map((b) => {
           const on = all || selected.includes(b.id);
@@ -133,25 +133,25 @@ function BranchPicker({ branches, selected = [], onChange }) {
               type="button"
               onClick={() => toggle(b.id)}
               className={`w-full flex items-center gap-3 p-3.5 text-left transition-colors ${
-                on ? "bg-mint-50/60" : "active:bg-slate-50"
+                on ? "bg-brand-soft/60" : "active:bg-surface-2/60"
               }`}
             >
               <span
                 className={`w-6 h-6 rounded-lg border-2 shrink-0 flex items-center justify-center transition-colors ${
-                  on ? "bg-mint-600 border-mint-600" : "border-slate-300 bg-white"
+                  on ? "bg-brand border-brand" : "border-line bg-surface"
                 }`}
               >
                 {on && <Check className="w-4 h-4 text-white" strokeWidth={3} />}
               </span>
-              <span className="text-[15px] text-slate-700 min-w-0 truncate">
+              <span className="text-[15px] text-fg min-w-0 truncate">
                 {b.name || b.id}
-                {b.code ? <span className="text-slate-400 ml-1.5">{b.code}</span> : null}
+                {b.code ? <span className="text-subtle ml-1.5">{b.code}</span> : null}
               </span>
             </button>
           );
         })}
       </div>
-      <p className="text-xs text-slate-500 mt-1.5">
+      <p className="text-xs text-muted mt-1.5">
         Only these branches see the item when ordering. Leave it on “All branches” if everyone carries it.
       </p>
     </div>
@@ -440,8 +440,8 @@ export default function ItemsCatalogPage() {
     <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-4 pb-24">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 tracking-tight">Items Catalog</h1>
-          <p className="text-slate-500 text-sm mt-0.5">The products this branch can order.</p>
+          <h1 className="text-2xl font-bold text-fg tracking-tight">Items Catalog</h1>
+          <p className="text-muted text-sm mt-0.5">The products this branch can order.</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -456,8 +456,8 @@ export default function ItemsCatalogPage() {
           <button
             onClick={downloadTemplate}
             aria-label="Download Excel template"
-            className="w-12 min-h-[48px] flex items-center justify-center rounded-2xl bg-white border border-slate-200
-                       text-slate-600 active:bg-slate-100 transition-colors"
+            className="w-12 min-h-[48px] flex items-center justify-center rounded-2xl bg-surface border border-line
+                       text-muted active:bg-surface-2 transition-colors"
           >
             <FileSpreadsheet className="w-5 h-5" />
           </button>
@@ -466,8 +466,8 @@ export default function ItemsCatalogPage() {
             onClick={() => fileInputRef.current?.click()}
             disabled={busy}
             aria-label="Import from Excel"
-            className="w-12 min-h-[48px] flex items-center justify-center rounded-2xl bg-white border border-slate-200
-                       text-slate-600 active:bg-slate-100 disabled:opacity-50 transition-colors"
+            className="w-12 min-h-[48px] flex items-center justify-center rounded-2xl bg-surface border border-line
+                       text-muted active:bg-surface-2 disabled:opacity-50 transition-colors"
           >
             <Upload className="w-5 h-5" />
           </button>
@@ -475,8 +475,8 @@ export default function ItemsCatalogPage() {
           <button
             onClick={() => setOpenAdd(true)}
             disabled={!companyId || busy}
-            className="flex-1 sm:flex-none min-h-[48px] px-5 rounded-2xl bg-slate-900 text-white font-semibold
-                       flex items-center justify-center gap-2 active:bg-slate-700 disabled:opacity-50 transition-colors"
+            className="flex-1 sm:flex-none min-h-[48px] px-5 rounded-2xl bg-brand text-white font-semibold
+                       flex items-center justify-center gap-2 active:brightness-95 disabled:opacity-50 transition-colors"
           >
             <Plus className="w-5 h-5" /> Add Item
           </button>
@@ -488,8 +488,8 @@ export default function ItemsCatalogPage() {
           onClick={() => setScope(SCOPE_BRANCH)}
           className={`min-h-[44px] px-4 rounded-2xl font-semibold transition-colors ${
             scope === SCOPE_BRANCH
-              ? "bg-slate-900 text-white"
-              : "bg-white text-slate-600 border border-slate-200 active:bg-slate-100"
+              ? "bg-brand text-white"
+              : "bg-surface text-muted border border-line active:bg-surface-2"
           }`}
         >
           This branch ({branchItems.length})
@@ -498,8 +498,8 @@ export default function ItemsCatalogPage() {
           onClick={() => setScope(SCOPE_COMPANY)}
           className={`min-h-[44px] px-4 rounded-2xl font-semibold transition-colors ${
             scope === SCOPE_COMPANY
-              ? "bg-slate-900 text-white"
-              : "bg-white text-slate-600 border border-slate-200 active:bg-slate-100"
+              ? "bg-brand text-white"
+              : "bg-surface text-muted border border-line active:bg-surface-2"
           }`}
         >
           All items ({active.length})
@@ -512,8 +512,8 @@ export default function ItemsCatalogPage() {
             onClick={() => setScope(SCOPE_RETIRED)}
             className={`min-h-[44px] px-4 rounded-2xl font-semibold transition-colors ${
               scope === SCOPE_RETIRED
-                ? "bg-slate-900 text-white"
-                : "bg-white text-slate-600 border border-slate-200 active:bg-slate-100"
+                ? "bg-brand text-white"
+                : "bg-surface text-muted border border-line active:bg-surface-2"
             }`}
           >
             Retired ({retiredCount})
@@ -531,7 +531,7 @@ export default function ItemsCatalogPage() {
       />
 
       {scope === SCOPE_COMPANY && (
-        <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-3.5 text-sm text-blue-900 leading-relaxed">
+        <div className="rounded-2xl border border-info/20 bg-info-soft/60 p-3.5 text-sm text-info leading-relaxed">
           Every product in the company. Greyed-out ones are not stocked here — tap{" "}
           <span className="font-semibold">Add to branch</span> to start using one. Ordering screens only ever
           show what this branch stocks.
@@ -539,18 +539,18 @@ export default function ItemsCatalogPage() {
       )}
 
       {busy ? (
-        <div className="text-slate-400 animate-pulse text-sm py-4">Working…</div>
+        <div className="text-subtle animate-pulse text-sm py-4">Working…</div>
       ) : Object.keys(itemsByCategory).length === 0 ? (
-        <div className="text-center py-14 px-6 bg-white rounded-3xl border border-slate-100">
-          <FileSpreadsheet className="w-12 h-12 mx-auto text-slate-300 mb-3" />
-          <h3 className="text-lg font-bold text-slate-700">
+        <div className="text-center py-14 px-6 bg-surface rounded-3xl border border-line">
+          <FileSpreadsheet className="w-12 h-12 mx-auto text-subtle mb-3" />
+          <h3 className="text-lg font-bold text-fg">
             {search
               ? "Nothing matches that search"
               : scope === SCOPE_BRANCH && active.length > 0
               ? "Nothing stocked here yet"
               : "No items yet"}
           </h3>
-          <p className="text-slate-500 text-sm mb-5 max-w-sm mx-auto">
+          <p className="text-muted text-sm mb-5 max-w-sm mx-auto">
             {search
               ? "Try a different word, or check the All items tab."
               : scope === SCOPE_BRANCH && active.length > 0
@@ -561,14 +561,14 @@ export default function ItemsCatalogPage() {
             (scope === SCOPE_BRANCH && active.length > 0 ? (
               <button
                 onClick={() => setScope(SCOPE_COMPANY)}
-                className="min-h-[48px] px-6 rounded-2xl bg-mint-600 text-white font-semibold active:bg-mint-700"
+                className="min-h-[48px] px-6 rounded-2xl bg-brand text-white font-semibold active:brightness-95"
               >
                 Browse all items
               </button>
             ) : (
               <button
                 onClick={() => setOpenAdd(true)}
-                className="min-h-[48px] px-6 rounded-2xl bg-mint-600 text-white font-semibold active:bg-mint-700"
+                className="min-h-[48px] px-6 rounded-2xl bg-brand text-white font-semibold active:brightness-95"
               >
                 Add your first item
               </button>
@@ -577,35 +577,35 @@ export default function ItemsCatalogPage() {
       ) : (
         <div className="space-y-4">
           {Object.entries(itemsByCategory).map(([category, catItems]) => (
-            <div key={category} className="bg-white rounded-3xl border border-slate-100 overflow-hidden">
-              <div className="px-4 py-3 bg-slate-50 border-b border-slate-100 font-bold text-slate-800 flex items-center gap-2">
+            <div key={category} className="bg-surface rounded-3xl border border-line overflow-hidden">
+              <div className="px-4 py-3 bg-surface-2/60 border-b border-line font-bold text-fg flex items-center gap-2">
                 {category}
-                <span className="text-xs font-semibold text-mint-700 px-2 py-0.5 bg-mint-50 rounded-full">
+                <span className="text-xs font-semibold text-brand px-2 py-0.5 bg-brand-soft rounded-full">
                   {catItems.length}
                 </span>
               </div>
-              <ul className="divide-y divide-slate-100">
+              <ul className="divide-y divide-line">
                 {catItems.map((item) => {
                   const here = itemInBranch(item, branchId);
                   const localPrice = branchLastPrice(item, branchId);
                   const localDate = branchLastPriceDate(item, branchId);
                   const hasOwnPrice = Number(item.lastPurchaseByBranch?.[branchId]?.price) > 0;
                   return (
-                    <li key={item.id} className={`p-4 ${here ? "" : "bg-slate-50/60"}`}>
+                    <li key={item.id} className={`p-4 ${here ? "" : "bg-surface-2/60/60"}`}>
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className={`font-semibold text-[15px] ${here ? "text-slate-900" : "text-slate-500"}`}>
+                            <span className={`font-semibold text-[15px] ${here ? "text-fg" : "text-muted"}`}>
                               {item.name}
                             </span>
                             {!here && (
-                              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-200 text-slate-600">
+                              <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-surface-2 text-muted">
                                 not stocked here
                               </span>
                             )}
                             {here && item.branchIds?.length > 0 && (
                               <span
-                                className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-violet-50 text-violet-700
+                                className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-info-soft text-info
                                            inline-flex items-center gap-1"
                                 title={item.branchIds.map((id) => branchNameById.get(id) || id).join(", ")}
                               >
@@ -614,11 +614,11 @@ export default function ItemsCatalogPage() {
                               </span>
                             )}
                           </div>
-                          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-slate-500 mt-1.5">
+                          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted mt-1.5">
                             <span>{item.unit}</span>
                             {item.defaultPrice > 0 && <span>· Est {Number(item.defaultPrice).toFixed(2)}</span>}
                             {localPrice > 0 && (item.lastPurchasePrice > 0 || hasOwnPrice) && (
-                              <span className={hasOwnPrice ? "text-emerald-600 font-semibold" : "text-slate-400"}>
+                              <span className={hasOwnPrice ? "text-brand font-semibold" : "text-subtle"}>
                                 · {hasOwnPrice ? "Last paid" : "Other branch paid"} {localPrice.toFixed(2)}
                                 {localDate ? ` (${localDate})` : ""}
                               </span>
@@ -632,8 +632,8 @@ export default function ItemsCatalogPage() {
                             <button
                               onClick={() => handleRestore(item)}
                               aria-label="Restore to catalog"
-                              className="w-11 h-11 flex items-center justify-center rounded-full text-slate-400
-                                         active:bg-emerald-50 active:text-emerald-600 transition-colors"
+                              className="w-11 h-11 flex items-center justify-center rounded-full text-subtle
+                                         active:bg-brand-soft active:text-brand transition-colors"
                             >
                               <ArchiveRestore className="w-5 h-5" />
                             </button>
@@ -643,8 +643,8 @@ export default function ItemsCatalogPage() {
                                 <button
                                   onClick={() => setItemToDrop(item)}
                                   aria-label="Stop stocking here"
-                                  className="w-11 h-11 flex items-center justify-center rounded-full text-slate-400
-                                             active:bg-amber-50 active:text-amber-600 transition-colors"
+                                  className="w-11 h-11 flex items-center justify-center rounded-full text-subtle
+                                             active:bg-warning-soft active:text-warning transition-colors"
                                 >
                                   <MinusCircle className="w-5 h-5" />
                                 </button>
@@ -652,16 +652,16 @@ export default function ItemsCatalogPage() {
                               <button
                                 onClick={() => handleOpenEdit(item)}
                                 aria-label={`Edit ${item.name}`}
-                                className="w-11 h-11 flex items-center justify-center rounded-full text-slate-400
-                                           active:bg-blue-50 active:text-blue-600 transition-colors"
+                                className="w-11 h-11 flex items-center justify-center rounded-full text-subtle
+                                           active:bg-info-soft active:text-info transition-colors"
                               >
                                 <Pencil className="w-4 h-4" />
                               </button>
                               <button
                                 onClick={() => setItemToRetire(item)}
                                 aria-label={`Retire ${item.name}`}
-                                className="w-11 h-11 flex items-center justify-center rounded-full text-slate-400
-                                           active:bg-red-50 active:text-red-600 transition-colors"
+                                className="w-11 h-11 flex items-center justify-center rounded-full text-subtle
+                                           active:bg-danger-soft active:text-danger transition-colors"
                               >
                                 <Archive className="w-4 h-4" />
                               </button>
@@ -675,8 +675,8 @@ export default function ItemsCatalogPage() {
                       {!here && branchId && item.isActive !== false && (
                         <button
                           onClick={() => handlePullToBranch(item)}
-                          className="mt-3 w-full min-h-[44px] rounded-xl bg-mint-600 text-white font-semibold text-sm
-                                     flex items-center justify-center gap-2 active:bg-mint-700 transition-colors"
+                          className="mt-3 w-full min-h-[44px] rounded-xl bg-brand text-white font-semibold text-sm
+                                     flex items-center justify-center gap-2 active:brightness-95 transition-colors"
                         >
                           <DownloadCloud className="w-4 h-4" /> Add to branch
                         </button>
@@ -700,8 +700,8 @@ export default function ItemsCatalogPage() {
           <button
             onClick={handleSaveNew}
             disabled={busy}
-            className="w-full min-h-[52px] rounded-2xl bg-mint-600 text-white font-bold text-base
-                       active:bg-mint-700 disabled:opacity-40 transition-colors"
+            className="w-full min-h-[52px] rounded-2xl bg-brand text-white font-bold text-base
+                       active:brightness-95 disabled:opacity-40 transition-colors"
           >
             Save Item
           </button>
@@ -727,8 +727,8 @@ export default function ItemsCatalogPage() {
           <button
             onClick={handleSaveEdit}
             disabled={busy}
-            className="w-full min-h-[52px] rounded-2xl bg-mint-600 text-white font-bold text-base
-                       active:bg-mint-700 disabled:opacity-40 transition-colors"
+            className="w-full min-h-[52px] rounded-2xl bg-brand text-white font-bold text-base
+                       active:brightness-95 disabled:opacity-40 transition-colors"
           >
             Update Item
           </button>
@@ -806,7 +806,7 @@ function ItemFields({ form, setForm, vendors, branches, categories }) {
   return (
     <div className="space-y-4">
       <div>
-        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Item name</label>
+        <label className="block text-sm font-semibold text-fg mb-1.5">Item name</label>
         <input
           value={form.name || ""}
           onChange={(e) => patch({ name: e.target.value })}
@@ -816,7 +816,7 @@ function ItemFields({ form, setForm, vendors, branches, categories }) {
       </div>
 
       <div>
-        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Category</label>
+        <label className="block text-sm font-semibold text-fg mb-1.5">Category</label>
         <input
           list="cat-list"
           value={form.category || ""}
@@ -833,7 +833,7 @@ function ItemFields({ form, setForm, vendors, branches, categories }) {
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Unit</label>
+          <label className="block text-sm font-semibold text-fg mb-1.5">Unit</label>
           <input
             value={form.unit || ""}
             onChange={(e) => patch({ unit: e.target.value })}
@@ -842,7 +842,7 @@ function ItemFields({ form, setForm, vendors, branches, categories }) {
           />
         </div>
         <div>
-          <label className="block text-sm font-semibold text-slate-700 mb-1.5">Usual price</label>
+          <label className="block text-sm font-semibold text-fg mb-1.5">Usual price</label>
           <input
             type="text"
             inputMode="decimal"
@@ -858,14 +858,14 @@ function ItemFields({ form, setForm, vendors, branches, categories }) {
       </div>
 
       <div>
-        <label className="block text-sm font-semibold text-slate-700 mb-1.5">Suppliers</label>
+        <label className="block text-sm font-semibold text-fg mb-1.5">Suppliers</label>
         <CheckList
           options={vendors.map((v) => ({ id: v.id, label: v.name }))}
           selected={form.vendorIds || []}
           onToggle={toggleVendor}
           empty="No suppliers added yet."
         />
-        <p className="text-xs text-slate-500 mt-1.5">
+        <p className="text-xs text-muted mt-1.5">
           Leave all unticked if any supplier can provide this item.
         </p>
       </div>

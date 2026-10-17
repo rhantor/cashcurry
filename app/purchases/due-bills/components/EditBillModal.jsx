@@ -36,9 +36,9 @@ const clampMoney = v => {
 // ── sub-components ────────────────────────────────────────────────────────────
 function FieldLabel ({ children, required }) {
   return (
-    <label className='block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5'>
+    <label className='block text-xs font-semibold text-muted uppercase tracking-wide mb-1.5'>
       {children}
-      {required && <span className='text-mint-500 ml-0.5'>*</span>}
+      {required && <span className='text-brand ml-0.5'>*</span>}
     </label>
   )
 }
@@ -46,9 +46,9 @@ function FieldLabel ({ children, required }) {
 function InputBase ({ className = '', ...props }) {
   return (
     <input
-      className={`w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg
-        focus:outline-none focus:ring-2 focus:ring-mint-500/25 focus:border-mint-500
-        disabled:bg-gray-50 disabled:text-gray-400 transition-all ${className}`}
+      className={`w-full px-3 py-2.5 text-sm border border-line rounded-lg
+        focus:outline-none focus:ring-2 focus:ring-[var(--cc-ring)]/25 focus:border-brand
+        disabled:bg-surface-2/60 disabled:text-subtle transition-all ${className}`}
       {...props}
     />
   )
@@ -57,11 +57,11 @@ function InputBase ({ className = '', ...props }) {
 function SectionDivider ({ icon: Icon, title }) {
   return (
     <div className='flex items-center gap-2 pt-1'>
-      <div className='w-6 h-6 bg-mint-100 rounded-md flex items-center justify-center flex-shrink-0'>
-        <Icon className='w-3.5 h-3.5 text-mint-600' />
+      <div className='w-6 h-6 bg-brand-soft rounded-md flex items-center justify-center flex-shrink-0'>
+        <Icon className='w-3.5 h-3.5 text-brand' />
       </div>
-      <span className='text-xs font-bold text-gray-500 uppercase tracking-wider'>{title}</span>
-      <div className='flex-1 h-px bg-gray-100' />
+      <span className='text-xs font-bold text-muted uppercase tracking-wider'>{title}</span>
+      <div className='flex-1 h-px bg-surface-2' />
     </div>
   )
 }
@@ -73,14 +73,14 @@ function AttachmentRow ({ url, onRemove }) {
     catch { return url }
   })()
   return (
-    <div className='flex items-center gap-2 p-2.5 bg-gray-50 border border-gray-200 rounded-lg'>
-      <Paperclip className='w-3.5 h-3.5 text-gray-400 flex-shrink-0' />
-      <span className='text-xs text-gray-600 truncate flex-1'>{filename}</span>
+    <div className='flex items-center gap-2 p-2.5 bg-surface-2/60 border border-line rounded-lg'>
+      <Paperclip className='w-3.5 h-3.5 text-subtle flex-shrink-0' />
+      <span className='text-xs text-muted truncate flex-1'>{filename}</span>
       <a
         href={url}
         target='_blank'
         rel='noreferrer'
-        className='text-gray-400 hover:text-blue-600 transition-colors p-1'
+        className='text-subtle hover:text-info transition-colors p-1'
         title='Open'
       >
         <ExternalLink className='w-3.5 h-3.5' />
@@ -88,7 +88,7 @@ function AttachmentRow ({ url, onRemove }) {
       <button
         type='button'
         onClick={onRemove}
-        className='text-gray-400 hover:text-red-500 transition-colors p-1'
+        className='text-subtle hover:text-danger transition-colors p-1'
         title='Remove attachment'
       >
         <Trash2 className='w-3.5 h-3.5' />
@@ -104,19 +104,19 @@ function NewFileRow ({ file, onRemove }) {
     : null
 
   return (
-    <div className='flex items-center gap-2 p-2.5 bg-mint-50 border border-mint-200 rounded-lg'>
+    <div className='flex items-center gap-2 p-2.5 bg-brand-soft border border-brand/30 rounded-lg'>
       {previewUrl
         ? <img src={previewUrl} alt='' className='w-8 h-8 rounded object-cover flex-shrink-0' />
-        : <FileText className='w-4 h-4 text-mint-400 flex-shrink-0' />
+        : <FileText className='w-4 h-4 text-brand flex-shrink-0' />
       }
       <div className='flex-1 min-w-0'>
-        <p className='text-xs text-mint-700 font-medium truncate'>{file.name}</p>
-        <p className='text-xs text-mint-400'>{(file.size / 1024).toFixed(0)} KB · pending upload</p>
+        <p className='text-xs text-brand font-medium truncate'>{file.name}</p>
+        <p className='text-xs text-brand'>{(file.size / 1024).toFixed(0)} KB · pending upload</p>
       </div>
       <button
         type='button'
         onClick={onRemove}
-        className='text-mint-300 hover:text-red-500 transition-colors p-1 flex-shrink-0'
+        className='text-brand hover:text-danger transition-colors p-1 flex-shrink-0'
         title='Remove'
       >
         <Trash2 className='w-3.5 h-3.5' />
@@ -150,18 +150,18 @@ function FileDropZone ({ onFiles, disabled }) {
       }}
       onClick={() => !disabled && inputRef.current?.click()}
       className={`flex flex-col items-center justify-center gap-2 p-4 border-2 border-dashed rounded-xl cursor-pointer transition-all
-        ${disabled ? 'opacity-40 cursor-not-allowed' : 'hover:border-mint-400 hover:bg-mint-50/50'}
-        ${dragging ? 'border-mint-400 bg-mint-50' : 'border-gray-200 bg-gray-50'}`}
+        ${disabled ? 'opacity-40 cursor-not-allowed' : 'hover:border-brand hover:bg-brand-soft/50'}
+        ${dragging ? 'border-brand bg-brand-soft' : 'border-line bg-surface-2/60'}`}
     >
       <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors
-        ${dragging ? 'bg-mint-100' : 'bg-gray-100'}`}>
-        <ImagePlus className={`w-4 h-4 ${dragging ? 'text-mint-500' : 'text-gray-400'}`} />
+        ${dragging ? 'bg-brand-soft' : 'bg-surface-2'}`}>
+        <ImagePlus className={`w-4 h-4 ${dragging ? 'text-brand' : 'text-subtle'}`} />
       </div>
       <div className='text-center'>
-        <p className='text-xs font-medium text-gray-600'>
-          Drop file here or <span className='text-mint-500'>browse</span>
+        <p className='text-xs font-medium text-muted'>
+          Drop file here or <span className='text-brand'>browse</span>
         </p>
-        <p className='text-xs text-gray-400 mt-0.5'>JPG, PNG, PDF · max 5 MB each</p>
+        <p className='text-xs text-subtle mt-0.5'>JPG, PNG, PDF · max 5 MB each</p>
       </div>
       <input
         ref={inputRef}
@@ -311,21 +311,21 @@ export default function EditBillModal ({ isOpen, onClose, bill, onSave, isLoadin
         style={{ touchAction: 'none' }}
       >
         <motion.div
-          className='w-10 h-1 rounded-full bg-gray-300'
+          className='w-10 h-1 rounded-full bg-line'
           whileTap={{ scaleX: 1.3, backgroundColor: '#f97316' }}
           transition={{ duration: 0.15 }}
         />
       </div>
 
       {/* ── header ── */}
-      <div className='flex items-start justify-between px-4 md:px-6 py-3 md:py-4 border-b border-gray-100 flex-shrink-0'>
+      <div className='flex items-start justify-between px-4 md:px-6 py-3 md:py-4 border-b border-line flex-shrink-0'>
         <div>
-          <h2 className='text-base md:text-lg font-bold text-gray-900'>Edit Bill</h2>
-          <p className='text-xs text-gray-400 mt-0.5'>{bill.vendorName} · {bill.invoiceNo || bill.reference || 'No ref'}</p>
+          <h2 className='text-base md:text-lg font-bold text-fg'>Edit Bill</h2>
+          <p className='text-xs text-subtle mt-0.5'>{bill.vendorName} · {bill.invoiceNo || bill.reference || 'No ref'}</p>
         </div>
         <button
           onClick={onClose}
-          className='p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors -mt-1 -mr-1'
+          className='p-2 hover:bg-surface-2 rounded-full text-muted transition-colors -mt-1 -mr-1'
         >
           <X className='w-5 h-5' />
         </button>
@@ -342,10 +342,10 @@ export default function EditBillModal ({ isOpen, onClose, bill, onSave, isLoadin
             <InputBase
               value={vendorName}
               disabled
-              className='bg-gray-50 text-gray-500 cursor-not-allowed'
+              className='bg-surface-2/60 text-muted cursor-not-allowed'
               title='Vendor cannot be changed after bill creation'
             />
-            <p className='text-xs text-gray-400 mt-1'>Vendor cannot be changed after creation.</p>
+            <p className='text-xs text-subtle mt-1'>Vendor cannot be changed after creation.</p>
           </div>
 
           {/* ── Invoice Details ── */}
@@ -365,17 +365,17 @@ export default function EditBillModal ({ isOpen, onClose, bill, onSave, isLoadin
 
             <div>
               <FieldLabel>Status</FieldLabel>
-              <div className='flex items-center gap-2 px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg'>
+              <div className='flex items-center gap-2 px-3 py-2.5 bg-surface-2/60 border border-line rounded-lg'>
                 <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${
                   status === 'paid'
-                    ? 'bg-green-100 text-green-700'
+                    ? 'bg-brand-soft text-brand'
                     : status === 'partially_paid'
-                    ? 'bg-amber-100 text-amber-700'
-                    : 'bg-red-100 text-red-700'
+                    ? 'bg-warning-soft text-warning'
+                    : 'bg-danger-soft text-danger'
                 }`}>
                   {status === 'paid' ? 'Paid' : status === 'partially_paid' ? 'Partially Paid' : 'Unpaid'}
                 </span>
-                <span className='text-xs text-gray-400'>Updated via payments only</span>
+                <span className='text-xs text-subtle'>Updated via payments only</span>
               </div>
             </div>
           </div>
@@ -412,11 +412,11 @@ export default function EditBillModal ({ isOpen, onClose, bill, onSave, isLoadin
               />
               {/* Auto-filled hint — shown when due date was auto-calculated */}
               {autoFilledHint && !userEditedDueDate && (
-                <p className='text-xs text-emerald-600 mt-1'>{autoFilledHint}</p>
+                <p className='text-xs text-brand mt-1'>{autoFilledHint}</p>
               )}
               {/* Payment term helper — shown when both dates are valid */}
               {!autoFilledHint && dueDate && invoiceDate && dueDate >= invoiceDate && (
-                <p className='text-xs text-gray-400 mt-1'>
+                <p className='text-xs text-subtle mt-1'>
                   {(() => {
                     const [y1,m1,d1] = invoiceDate.split('-').map(Number)
                     const [y2,m2,d2] = dueDate.split('-').map(Number)
@@ -435,7 +435,7 @@ export default function EditBillModal ({ isOpen, onClose, bill, onSave, isLoadin
             <div>
               <FieldLabel required>Total ({currency})</FieldLabel>
               <div className='relative'>
-                <span className='absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-400'>{currency}</span>
+                <span className='absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-subtle'>{currency}</span>
                 <InputBase
                   type='number'
                   min='0'
@@ -456,16 +456,16 @@ export default function EditBillModal ({ isOpen, onClose, bill, onSave, isLoadin
             {/* Balance summary (read-only) */}
             <div>
               <FieldLabel>Balance / Paid</FieldLabel>
-              <div className='px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm'>
+              <div className='px-3 py-2.5 bg-surface-2/60 border border-line rounded-lg text-sm'>
                 <div className='flex justify-between'>
-                  <span className='text-gray-500'>Paid</span>
-                  <span className='font-medium text-green-600'>
+                  <span className='text-muted'>Paid</span>
+                  <span className='font-medium text-brand'>
                     {currency} {Number(bill.paid ?? 0).toFixed(2)}
                   </span>
                 </div>
                 <div className='flex justify-between mt-0.5'>
-                  <span className='text-gray-500'>Balance</span>
-                  <span className='font-bold text-mint-600'>
+                  <span className='text-muted'>Balance</span>
+                  <span className='font-bold text-brand'>
                     {currency} {Number(bill.balance ?? Math.max(0, Number(total || 0) - Number(bill.paid ?? 0))).toFixed(2)}
                   </span>
                 </div>
@@ -502,7 +502,7 @@ export default function EditBillModal ({ isOpen, onClose, bill, onSave, isLoadin
             />
 
             {newFiles.length > 0 && (
-              <p className='text-xs text-mint-600 flex items-center gap-1'>
+              <p className='text-xs text-brand flex items-center gap-1'>
                 <Upload className='w-3 h-3' />
                 {newFiles.length} new file{newFiles.length > 1 ? 's' : ''} will be uploaded on save
               </p>
@@ -520,15 +520,15 @@ export default function EditBillModal ({ isOpen, onClose, bill, onSave, isLoadin
               value={notes}
               onChange={e => setNotes(e.target.value)}
               disabled={isLoading}
-              className='w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg resize-none
-                focus:outline-none focus:ring-2 focus:ring-mint-500/25 focus:border-mint-500
-                disabled:bg-gray-50 disabled:text-gray-400 transition-all'
+              className='w-full px-3 py-2.5 text-sm border border-line rounded-lg resize-none
+                focus:outline-none focus:ring-2 focus:ring-[var(--cc-ring)]/25 focus:border-brand
+                disabled:bg-surface-2/60 disabled:text-subtle transition-all'
             />
           </div>
 
           {/* ── Error ── */}
           {errText && (
-            <div className='flex items-start gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-600'>
+            <div className='flex items-start gap-2 p-3 bg-danger-soft border border-danger/30 rounded-lg text-sm text-danger'>
               <AlertCircle className='w-4 h-4 mt-0.5 flex-shrink-0' />
               {errText}
             </div>
@@ -537,12 +537,12 @@ export default function EditBillModal ({ isOpen, onClose, bill, onSave, isLoadin
       </div>
 
       {/* ── footer ── */}
-      <div className='flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 px-4 md:px-6 py-3 md:py-4 border-t border-gray-100 bg-gray-50/60 flex-shrink-0'>
+      <div className='flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2 px-4 md:px-6 py-3 md:py-4 border-t border-line bg-surface-2/60/60 flex-shrink-0'>
         <button
           type='button'
           onClick={onClose}
           disabled={isLoading}
-          className='px-5 py-2.5 sm:py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-100 border border-gray-200 rounded-xl transition-colors disabled:opacity-50 w-full sm:w-auto'
+          className='px-5 py-2.5 sm:py-2 text-sm font-medium text-fg bg-surface hover:bg-surface-2 border border-line rounded-xl transition-colors disabled:opacity-50 w-full sm:w-auto'
         >
           Cancel
         </button>
@@ -550,7 +550,7 @@ export default function EditBillModal ({ isOpen, onClose, bill, onSave, isLoadin
           type='button'
           onClick={handleSubmit}
           disabled={isLoading}
-          className='flex items-center justify-center gap-2 px-5 py-2.5 sm:py-2 text-sm font-medium text-white bg-mint-500 hover:bg-mint-600 active:scale-[0.99] rounded-xl shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto'
+          className='flex items-center justify-center gap-2 px-5 py-2.5 sm:py-2 text-sm font-medium text-brand-fg bg-brand hover:bg-brand active:scale-[0.99] rounded-xl shadow-sm transition-all disabled:opacity-50 disabled:cursor-not-allowed w-full sm:w-auto'
         >
           {isLoading
             ? <><span className='w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin' /> Saving…</>
@@ -580,7 +580,7 @@ export default function EditBillModal ({ isOpen, onClose, bill, onSave, isLoadin
           <div className='md:hidden fixed inset-0 z-50 flex items-end justify-center pointer-events-none'>
             <motion.div
               key='edit-sheet-mobile'
-              className='pointer-events-auto bg-white flex flex-col overflow-hidden w-full rounded-t-2xl max-h-[95vh] shadow-2xl'
+              className='pointer-events-auto bg-surface flex flex-col overflow-hidden w-full rounded-t-2xl max-h-[95vh] shadow-2xl'
               style={{ y: _dragY, opacity: _sheetOpacity }}
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
@@ -600,7 +600,7 @@ export default function EditBillModal ({ isOpen, onClose, bill, onSave, isLoadin
           <div className='hidden md:flex fixed inset-0 z-50 items-center justify-center p-4 pointer-events-none'>
             <motion.div
               key='edit-sheet-desktop'
-              className='pointer-events-auto bg-white flex flex-col overflow-hidden w-full max-w-xl max-h-[90vh] rounded-2xl shadow-2xl'
+              className='pointer-events-auto bg-surface flex flex-col overflow-hidden w-full max-w-xl max-h-[90vh] rounded-2xl shadow-2xl'
               initial={{ opacity: 0, scale: 0.96, y: 12 }}
               animate={{ opacity: 1, scale: 1,    y: 0  }}
               exit={{    opacity: 0, scale: 0.96, y: 12 }}

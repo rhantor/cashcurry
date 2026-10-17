@@ -154,44 +154,44 @@ export default function PaymentDetailsModal({
       <div className={`grid grid-cols-1 ${previewUrl ? "lg:grid-cols-2 gap-6" : ""}`}>
         {/* Left Panel: Details and table */}
         <div className="space-y-6">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-2xl">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-surface-2/60 p-4 rounded-2xl">
             <div className="space-y-1">
-              <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">Vendor</span>
-              <div className="font-bold text-gray-900">{payment?.vendorName || "-"}</div>
+              <span className="text-[10px] uppercase font-black tracking-widest text-subtle">Vendor</span>
+              <div className="font-bold text-fg">{payment?.vendorName || "-"}</div>
             </div>
             <div className="space-y-1">
-              <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">Paid Date</span>
-              <div className="font-bold text-gray-900">{formatDate(payment?.createdISO)}</div>
+              <span className="text-[10px] uppercase font-black tracking-widest text-subtle">Paid Date</span>
+              <div className="font-bold text-fg">{formatDate(payment?.createdISO)}</div>
             </div>
             <div className="space-y-1">
-              <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">Office / Method</span>
+              <span className="text-[10px] uppercase font-black tracking-widest text-subtle">Office / Method</span>
               <div className="flex items-center gap-2">
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${payment?.paidFromOffice === 'front' ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-100 text-indigo-700'}`}>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${payment?.paidFromOffice === 'front' ? 'bg-brand-soft text-brand' : 'bg-info-soft text-info'}`}>
                   {payment?.paidFromOffice || '-'}
                 </span>
-                <span className="px-2 py-0.5 rounded-full text-[10px] bg-gray-200 text-gray-700 font-bold uppercase">
+                <span className="px-2 py-0.5 rounded-full text-[10px] bg-surface-2 text-fg font-bold uppercase">
                   {payment?.paidMethod || "-"}
                 </span>
               </div>
             </div>
             <div className="space-y-1">
-              <span className="text-[10px] uppercase font-black tracking-widest text-gray-400">Reference / Receipt</span>
+              <span className="text-[10px] uppercase font-black tracking-widest text-subtle">Reference / Receipt</span>
               <div className="flex items-center gap-3">
-                <span className="font-mono text-sm text-gray-600">{payment?.reference || "-"}</span>
+                <span className="font-mono text-sm text-muted">{payment?.reference || "-"}</span>
                 {payment?.receiptURL && (
                   <div className="flex items-center gap-2 text-xs font-sans">
                     <button
                       onClick={() => setPreviewUrl(payment.receiptURL)}
                       type="button"
-                      className="text-blue-600 hover:underline font-bold focus:outline-none"
+                      className="text-info hover:underline font-bold focus:outline-none"
                     >
                       View Receipt
                     </button>
-                    <span className="text-gray-300">|</span>
+                    <span className="text-subtle">|</span>
                     <a
                       href={payment.receiptURL}
                       download
-                      className="text-emerald-600 hover:underline font-bold"
+                      className="text-brand hover:underline font-bold"
                     >
                       Download
                     </a>
@@ -201,9 +201,9 @@ export default function PaymentDetailsModal({
             </div>
           </div>
 
-          <div className="overflow-hidden border border-gray-100 rounded-2xl shadow-sm">
+          <div className="overflow-hidden border border-line rounded-2xl shadow-sm">
             <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 text-left text-gray-500 font-black uppercase tracking-widest text-[9px]">
+              <thead className="bg-surface-2/60 text-left text-muted font-black uppercase tracking-widest text-[9px]">
                 <tr>
                   <th className="px-4 py-3">Invoice #</th>
                   <th className="px-4 py-3">Inv. Date</th>
@@ -212,38 +212,38 @@ export default function PaymentDetailsModal({
                   <th className="px-4 py-3 text-right">Paid Here</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-line">
                 {loading ? (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-gray-400 animate-pulse font-medium">
+                    <td colSpan={5} className="px-4 py-8 text-center text-subtle animate-pulse font-medium">
                       Fetching bill details...
                     </td>
                   </tr>
                 ) : rows.length ? (
                   rows.map((r) => (
-                    <tr key={r.billId} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="px-4 py-3 font-bold text-gray-900 uppercase font-mono">
+                    <tr key={r.billId} className="hover:bg-surface-2/50 transition-colors">
+                      <td className="px-4 py-3 font-bold text-fg uppercase font-mono">
                         <div className="flex flex-col">
                           <span>{r.invoiceNo}</span>
                           {r.attachments && r.attachments.length > 0 && (
-                            <div className="flex flex-col gap-1 mt-1 font-sans text-[11px] font-normal normal-case text-gray-500">
+                            <div className="flex flex-col gap-1 mt-1 font-sans text-[11px] font-normal normal-case text-muted">
                               {r.attachments.map((url, i) => {
                                 const label = r.attachments.length > 1 ? `Invoice #${i + 1}` : "Invoice";
                                 return (
                                   <div key={i} className="flex items-center gap-1.5">
-                                    <span className="font-semibold text-gray-700">{label}:</span>
+                                    <span className="font-semibold text-fg">{label}:</span>
                                     <button
                                       onClick={() => setPreviewUrl(url)}
                                       type="button"
-                                      className="text-blue-600 hover:underline font-bold focus:outline-none"
+                                      className="text-info hover:underline font-bold focus:outline-none"
                                     >
                                       View
                                     </button>
-                                    <span className="text-gray-300">|</span>
+                                    <span className="text-subtle">|</span>
                                     <a
                                       href={url}
                                       download
-                                      className="text-emerald-600 hover:underline font-bold"
+                                      className="text-brand hover:underline font-bold"
                                     >
                                       Download
                                     </a>
@@ -254,27 +254,27 @@ export default function PaymentDetailsModal({
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-gray-600">{r.invoiceDate}</td>
-                      <td className="px-4 py-3 text-gray-600">{r.dueDate}</td>
-                      <td className="px-4 py-3 text-right text-gray-500">{formatRM(r.total)}</td>
-                      <td className="px-4 py-3 text-right font-black text-gray-900">{formatRM(r.amount)}</td>
+                      <td className="px-4 py-3 text-muted">{r.invoiceDate}</td>
+                      <td className="px-4 py-3 text-muted">{r.dueDate}</td>
+                      <td className="px-4 py-3 text-right text-muted">{formatRM(r.total)}</td>
+                      <td className="px-4 py-3 text-right font-black text-fg">{formatRM(r.amount)}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={5} className="px-4 py-8 text-center text-gray-400 italic">
+                    <td colSpan={5} className="px-4 py-8 text-center text-subtle italic">
                       No allocations recorded.
                     </td>
                   </tr>
                 )}
               </tbody>
               {!loading && rows.length > 0 && (
-                <tfoot className="bg-gray-50 border-t-2 border-gray-100">
+                <tfoot className="bg-surface-2/60 border-t-2 border-line">
                   <tr>
-                    <td colSpan={4} className="px-4 py-3 font-black text-[10px] uppercase tracking-widest text-gray-400">
+                    <td colSpan={4} className="px-4 py-3 font-black text-[10px] uppercase tracking-widest text-subtle">
                       Total Payment Applied
                     </td>
-                    <td className="px-4 py-3 text-right font-black text-mint-600 text-base">
+                    <td className="px-4 py-3 text-right font-black text-brand text-base">
                       {formatRM(rows.reduce((s, x) => s + Number(x.amount || 0), 0))}
                     </td>
                   </tr>
@@ -286,28 +286,28 @@ export default function PaymentDetailsModal({
 
         {/* Right Panel: Document Previewer */}
         {previewUrl && (
-          <div className="flex flex-col border border-gray-200 rounded-2xl overflow-hidden bg-gray-50 p-4 h-full">
+          <div className="flex flex-col border border-line rounded-2xl overflow-hidden bg-surface-2/60 p-4 h-full">
             <div className="flex items-center justify-between pb-3 border-b mb-3">
-              <span className="text-[10px] uppercase font-black tracking-widest text-gray-500">Document Preview</span>
+              <span className="text-[10px] uppercase font-black tracking-widest text-muted">Document Preview</span>
               <div className="flex items-center gap-2">
                 <a
                   href={previewUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl text-xs font-bold transition-all"
+                  className="px-3 py-1.5 bg-info-soft hover:bg-info-soft text-info rounded-xl text-xs font-bold transition-all"
                 >
                   Open in tab
                 </a>
                 <button
                   onClick={() => setPreviewUrl(null)}
                   type="button"
-                  className="px-3 py-1.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl text-xs font-bold transition-all focus:outline-none"
+                  className="px-3 py-1.5 bg-surface-2 hover:bg-line text-fg rounded-xl text-xs font-bold transition-all focus:outline-none"
                 >
                   Close Preview
                 </button>
               </div>
             </div>
-            <div className="flex-1 bg-white rounded-xl border flex items-center justify-center p-2 min-h-[300px] lg:h-[55vh]">
+            <div className="flex-1 bg-surface rounded-xl border flex items-center justify-center p-2 min-h-[300px] lg:h-[55vh]">
               {previewUrl.match(/\.(pdf)(\?|$)/i) ? (
                 <iframe
                   src={previewUrl}
@@ -318,7 +318,7 @@ export default function PaymentDetailsModal({
                 <img
                   src={previewUrl}
                   alt="Document Preview"
-                  className="max-w-full max-h-full object-contain rounded-lg shadow-sm bg-white"
+                  className="max-w-full max-h-full object-contain rounded-lg shadow-sm bg-surface"
                 />
               )}
             </div>
