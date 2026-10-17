@@ -37,7 +37,7 @@ computer, has its own loading look, and its old modals are redone too.
 - ✅ `/staff-loans` Staff loan tracker
 - ✅ `/loans/request-loan` Request a branch loan
 - ✅ `/loans/loan-updates` Loan updates
-- ⬜ `/loans/loan-summary` Loan summary
+- ✅ `/loans/loan-summary` Loan summary
 
 ## 3.4.5 Staff and attendance
 - ⬜ `/staff-management` Staff management
