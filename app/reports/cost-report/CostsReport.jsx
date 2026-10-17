@@ -10,6 +10,7 @@ import EditCostModal from "@/app/components/reports/costs/EditCostModal";
 import RecordSheet from "@/app/components/entry/RecordSheet";
 import { Chip } from "@/app/components/entry/Choices";
 import { COLOR, ChartCard, RankedBars } from "@/app/components/dashboard/charts/kit";
+import { categoryLabel } from "@/app/entry-data/cost-entry/logic/constants";
 import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/lib/region/currency";
 import { Badge, Select, Skeleton, confirmDialog, toast } from "@/app/components/ui";
@@ -53,7 +54,7 @@ export default function CostsReport() {
   const remove = async (cost, close) => {
     const ok = await confirmDialog({
       title: "Delete this cost?",
-      message: `${categoryOf(cost)} · ${money(cost.amount)} on ${format(parseISO(cost.date), "d MMM yyyy")}. This can't be undone.`,
+      message: `${categoryLabel(categoryOf(cost))} · ${money(cost.amount)} on ${format(parseISO(cost.date), "d MMM yyyy")}. This can't be undone.`,
       danger: true,
     });
     if (!ok) return;
@@ -85,7 +86,7 @@ export default function CostsReport() {
             label: "What for",
             render: (_v, c) => (
               <span className="block max-w-[16rem]">
-                <span className="block font-medium">{categoryOf(c)}</span>
+                <span className="block font-medium">{categoryLabel(categoryOf(c))}</span>
                 {c.description && <span className="block truncate text-xs text-muted">{c.description}</span>}
               </span>
             ),
@@ -133,7 +134,7 @@ export default function CostsReport() {
                 <option value="">All categories</option>
                 {categories.map((c) => (
                   <option key={c} value={c}>
-                    {c}
+                    {categoryLabel(c)}
                   </option>
                 ))}
               </Select>
@@ -166,8 +167,8 @@ export default function CostsReport() {
                 <RankedBars
                   format={money}
                   color={COLOR.out}
-                  rows={Object.entries(rows.reduce((m, c) => ((m[categoryOf(c)] = (m[categoryOf(c)] || 0) + (Number(c.amount) || 0)), m), {})).map(([name, value]) => ({ name, value }))}
-                  onPick={(r) => setCategory(r.name)}
+                  rows={Object.entries(rows.reduce((m, c) => ((m[categoryOf(c)] = (m[categoryOf(c)] || 0) + (Number(c.amount) || 0)), m), {})).map(([key, value]) => ({ key, name: categoryLabel(key), value }))}
+                  onPick={(r) => setCategory(r.key)}
                   empty="No costs in this period"
                 />
               </ChartCard>
@@ -196,7 +197,7 @@ export default function CostsReport() {
               title={`Cost · ${format(parseISO(c.date), "EEEE, d MMMM yyyy")}`}
               branch={branch?.name}
               amount={c.amount}
-              amountLabel={categoryOf(c)}
+              amountLabel={categoryLabel(categoryOf(c))}
               tone="out"
               money={money}
               note={locked ? `Paid to ${c.meta?.vendorName || "a vendor"} from Purchases — change or undo it there.` : undefined}

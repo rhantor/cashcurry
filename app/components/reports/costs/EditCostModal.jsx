@@ -12,7 +12,7 @@ import { Button, DatePicker, Field, Input, Sheet, Textarea, toast } from "@/app/
 import MoneyInput from "@/app/components/entry/MoneyInput";
 import ProofUpload from "@/app/components/entry/ProofUpload";
 import { Chip, PaidFromChoice } from "@/app/components/entry/Choices";
-import { CATEGORIES, BACK_OFFICE_METHODS } from "@/app/entry-data/cost-entry/logic/constants";
+import { CATEGORIES, BACK_OFFICE_METHODS, categoryLabel } from "@/app/entry-data/cost-entry/logic/constants";
 
 const SHRINK = { maxMB: 0.5, maxSide: 1024 };
 const toDay = (v) => {
@@ -187,7 +187,7 @@ export default function EditCostModal({ cost, onClose, onSuccess }) {
       <div className="flex flex-wrap gap-2">
         {CATEGORIES.map((c) => (
           <Chip key={c} on={category === c} onClick={() => setCategory(c)}>
-            {c}
+            {categoryLabel(c)}
           </Chip>
         ))}
       </div>

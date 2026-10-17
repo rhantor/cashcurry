@@ -12,7 +12,7 @@ import { Chip, PaidFromChoice } from '@/app/components/entry/Choices'
 import { EntryLayout, EntrySection, SummaryLine } from '@/app/components/entry/EntryLayout'
 import useCurrency from '@/app/hooks/useCurrency'
 import { formatMoney } from '@/lib/region/currency'
-import { CATEGORIES, BACK_OFFICE_METHODS, DESCRIPTION_CHIPS } from '../logic/constants'
+import { CATEGORIES, BACK_OFFICE_METHODS, DESCRIPTION_CHIPS, categoryLabel } from '../logic/constants'
 import ImageCaptureEditor from './ImageCaptureEditor'
 
 // Invoices and receipts: photos shrunk like the old uploader did.
@@ -158,7 +158,7 @@ export default function CostEntryForm ({ form, onSave, errors = {}, saved = fals
           >
             {CATEGORIES.map(c => (
               <Chip key={c} on={category === c} onClick={() => setCategory(c)}>
-                {c}
+                {categoryLabel(c)}
               </Chip>
             ))}
           </motion.div>

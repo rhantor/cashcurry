@@ -22,7 +22,7 @@ computer, has its own loading look, and its old modals are redone too.
 ## 3.4.3 Reports
 - ⬜ `/reports` Summary report
 - ✅ `/reports/sales-report` Sales report (+ day sheet, + change sales sheet)
-- ⬜ `/reports/cost-report` Cost report (+ edit cost, attachments)
+- ✅ `/reports/cost-report` Cost report (+ edit cost, attachments)
 - ⬜ `/reports/deposit-report` Cash to bank report
 - ⬜ `/reports/withdrawal-report` Bank to cash report
 - ⬜ `/reports/advance-report` Advance report
