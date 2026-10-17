@@ -66,7 +66,7 @@ computer, has its own loading look, and its old modals are redone too.
 - ✅ `/branches/branch-management`, `/branches/[branchId]` Branches (restyled to the tokens)
 - ✅ `/audit-log`, `/branch-audit` Audit logs
 - ✅ `/login` Sign in (animated brand side, show/hide password, Caps Lock warning, shake on a wrong try, check before opening)
-- ⬜ `/signup`, `/signup/verify`, `/reset-password` Sign-up and password reset
+- ✅ `/signup`, `/signup/verify`, `/reset-password` Sign-up and password reset
 - ✅ `/unauthorized` — made (was missing: people sent here got the 404)
 - ✅ Error and not-found screens (`app/error.jsx`, `app/not-found.jsx`, section `error.js` files)
 - ⬜ `/tools/invoice-generator` Invoice generator

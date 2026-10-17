@@ -1,158 +1,117 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useSignupMutation } from "@/lib/redux/api/authApiSlice";
 import { doc, getDoc } from "firebase/firestore";
+import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { db } from "@/lib/firebase";
+import { useSignupMutation } from "@/lib/redux/api/authApiSlice";
+import AuthFrame from "@/app/components/auth/AuthFrame";
+import { Button, Field, Input } from "@/app/components/ui";
 
+/**
+ * Open a new company: an invite code (checked before any account is made),
+ * the company's name, the owner's username, email and password. Then the
+ * email is verified on the next screen.
+ */
 export default function SignupPage() {
   const [companyName, setCompanyName] = useState("");
   const [userName, setUserName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [inviteCode, setInviteCode] = useState("");
-  const [msg, setMsg] = useState("");
-
+  const [show, setShow] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [checking, setChecking] = useState(false);
   const [signup, { isLoading }] = useSignupMutation();
   const router = useRouter();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setMsg("");
+    const er = {};
+    if (!inviteCode.trim()) er.code = "Enter the invite code you were given";
+    if (!companyName.trim()) er.company = "Enter the company's name";
+    if (!userName.trim()) er.user = "Pick a username";
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) er.email = "Enter a working email";
+    if (password.length < 6) er.password = "At least 6 characters";
+    setErrors(er);
+    if (Object.keys(er).length) return;
 
-    // Validate invite code before creating Firebase Auth user
+    // the invite code is checked before any account is made
     const codeKey = inviteCode.trim().toLowerCase();
+    setChecking(true);
     let codeSnap;
     try {
       codeSnap = await getDoc(doc(db, "signupInvites", codeKey));
     } catch {
-      setMsg("Failed to validate invite code. Please try again.");
-      return;
+      setChecking(false);
+      return setErrors({ form: "Couldn't check the invite code. Try again." });
     }
+    setChecking(false);
+    if (!codeSnap.exists() || codeSnap.data().used === true) return setErrors({ code: "That code isn't valid, or it has been used" });
 
-    if (!codeSnap.exists() || codeSnap.data().used === true) {
-      setMsg("Invalid or already used invite code.");
-      return;
-    }
-
-    const res = await signup({ email, password });
-
+    const res = await signup({ email: email.trim(), password });
     if (res.data) {
       router.push(
-        `/signup/verify?uid=${res.data.uid}&email=${encodeURIComponent(
-          email
-        )}&company=${encodeURIComponent(
-          companyName
-        )}&username=${encodeURIComponent(userName)}&inviteCode=${encodeURIComponent(codeKey)}`
+        `/signup/verify?uid=${res.data.uid}&email=${encodeURIComponent(email.trim())}&company=${encodeURIComponent(companyName.trim())}&username=${encodeURIComponent(
+          userName.trim()
+        )}&inviteCode=${encodeURIComponent(codeKey)}`
       );
     } else {
-      setMsg(res.error?.error || "Signup failed");
+      setErrors({ form: res.error?.error || "Couldn't create the account. Try again." });
     }
   };
 
+  const clear = (k) => errors[k] && setErrors((x) => ({ ...x, [k]: undefined }));
+
   return (
-    <div className="min-h-screen flex bg-gray-100">
-      {/* LEFT SIDE (SVG / BRANDING) */}
-      <div className="hidden lg:flex w-1/2 items-center justify-center bg-mint-500">
-        <div className="max-w-md text-center text-white px-8">
-          <svg
-            viewBox="0 0 512 512"
-            className="w-72 mx-auto mb-6"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            <circle cx="256" cy="256" r="256" fill="white" opacity="0.15" />
-            <rect
-              x="156"
-              y="150"
-              width="200"
-              height="200"
-              rx="20"
-              fill="white"
-            />
-            <path
-              d="M200 260h112M200 300h112"
-              stroke="#F97316"
-              strokeWidth="10"
-              strokeLinecap="round"
-            />
-          </svg>
-
-          <h2 className="text-3xl font-bold">Create Your Company</h2>
-          <p className="mt-2 text-mint-100">
-            Start managing sales, inventory, and staff in one system
-          </p>
+    <AuthFrame title="Open your company" subtitle="You'll be its owner. Add branches and people once you're in." tagline="Bring every branch into one place.">
+      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+        <Field label="Invite code" error={errors.code}>
+          {({ id, invalid }) => <Input id={id} size="lg" value={inviteCode} invalid={invalid} autoCapitalize="none" onChange={(e) => (setInviteCode(e.target.value), clear("code"))} />}
+        </Field>
+        <Field label="Company name" error={errors.company}>
+          {({ id, invalid }) => <Input id={id} size="lg" value={companyName} invalid={invalid} onChange={(e) => (setCompanyName(e.target.value), clear("company"))} placeholder="e.g. Saffron Empire Sdn Bhd" />}
+        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Your username" error={errors.user}>
+            {({ id, invalid }) => <Input id={id} size="lg" value={userName} invalid={invalid} autoCapitalize="none" onChange={(e) => (setUserName(e.target.value), clear("user"))} />}
+          </Field>
+          <Field label="Email" error={errors.email}>
+            {({ id, invalid }) => <Input id={id} size="lg" type="email" autoComplete="email" value={email} invalid={invalid} onChange={(e) => (setEmail(e.target.value), clear("email"))} />}
+          </Field>
         </div>
-      </div>
-
-      {/* RIGHT SIDE (FORM) */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center px-4">
-        <div className="w-full max-w-md bg-white shadow-xl rounded-2xl p-8">
-          <h1 className="text-2xl font-bold text-center text-mint-500 mb-6">
-            Create Company Account
-          </h1>
-
-          {msg && (
-            <p className="text-red-500 text-sm text-center mb-3">{msg}</p>
+        <Field label="Password" error={errors.password} hint="At least 6 characters">
+          {({ id, invalid }) => (
+            <div className="relative">
+              <Input
+                id={id}
+                size="lg"
+                type={show ? "text" : "password"}
+                autoComplete="new-password"
+                value={password}
+                invalid={invalid}
+                onChange={(e) => (setPassword(e.target.value), clear("password"))}
+                className="pr-11"
+              />
+              <button type="button" onClick={() => setShow((s) => !s)} aria-label={show ? "Hide password" : "Show password"} className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-subtle hover:text-fg">
+                {show ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </button>
+            </div>
           )}
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <input
-              type="text"
-              placeholder="Invite Code"
-              value={inviteCode}
-              onChange={(e) => setInviteCode(e.target.value)}
-              className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-mint-400 outline-none"
-              required
-            />
-
-            <input
-              type="text"
-              placeholder="Company Name"
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
-              className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-mint-400 outline-none"
-              required
-            />
-
-            <input
-              type="text"
-              placeholder="Username"
-              value={userName}
-              onChange={(e) => setUserName(e.target.value)}
-              className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-mint-400 outline-none"
-              required
-            />
-
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-mint-400 outline-none"
-              required
-            />
-
-            <input
-              type="password"
-              placeholder="Password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full border border-gray-300 p-3 rounded-lg focus:ring-2 focus:ring-mint-400 outline-none"
-              required
-            />
-
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="w-full bg-mint-500 text-white py-3 rounded-lg font-medium hover:bg-mint-600 transition disabled:opacity-60"
-            >
-              {isLoading ? "Validating..." : "Sign Up"}
-            </button>
-          </form>
-        </div>
-      </div>
-    </div>
+        </Field>
+        {errors.form && <p className="rounded-xl bg-danger-soft px-3.5 py-2.5 text-sm font-medium text-danger">{errors.form}</p>}
+        <Button type="submit" size="lg" className="w-full" loading={checking || isLoading}>
+          Create account <ArrowRight className="size-4" />
+        </Button>
+      </form>
+      <p className="mt-6 text-center text-sm text-muted">
+        Already have one?{" "}
+        <Link href="/login" className="font-semibold text-brand hover:underline">
+          Sign in
+        </Link>
+      </p>
+    </AuthFrame>
   );
 }
