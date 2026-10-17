@@ -14,6 +14,7 @@ import { formatMoney } from "@/lib/region/currency";
 import { exportLoanSummaryToExcel, exportLoanSummaryToPDF } from "@/utils/export/exportLoanSummary";
 import { Badge, Button, Card, DateRangePicker, EmptyState, Menu, Skeleton, Tabs, cn } from "@/app/components/ui";
 
+import { personName } from "@/lib/people";
 /* ─── periods ─── */
 const PERIODS = [
   { value: "all", label: "All time" },
@@ -81,7 +82,7 @@ function LoanRow({ row, counterparty, money, lent }) {
         <span className="mt-0.5 block text-[11px] text-subtle">
           {fmtDate(row.createdAt)}
           {row.durationDays > 0 ? ` · ${row.durationDays} days` : ""}
-          {row.requestedBy?.username ? ` · asked by ${row.requestedBy.username}` : ""}
+          {personName(row.requestedBy) ? ` · asked by ${row.requestedBy.username}` : ""}
           {row.approvedBy ? ` · approved by ${row.approvedBy.name || row.approvedBy.username || "—"}` : ""}
         </span>
       </span>

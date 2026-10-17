@@ -10,6 +10,7 @@ import { formatMoney } from "@/lib/region/currency";
 import { Badge, Card, Skeleton, Tabs, cn } from "@/app/components/ui";
 import { Chip } from "@/app/components/entry/Choices";
 
+import { personName } from "@/lib/people";
 const fmtDate = (v) => {
   const ms = v?.seconds ? v.seconds * 1000 : v ? Date.parse(v) : 0;
   return ms ? new Date(ms).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
@@ -151,8 +152,8 @@ export default function LoanActivityFeed({ fromMs = null, toMs = null, periodLab
                     </span>
                     <span className="mt-0.5 block text-[11px] text-subtle">
                       {fmtDate(r.createdAt)}
-                      {r.requestedBy?.username || r.createdBy?.username ? ` · by ${r.requestedBy?.username || r.createdBy?.username}` : ""}
-                      {r.approvedBy ? ` · ${r.status === "rejected" ? "rejected" : "approved"} by ${r.approvedBy?.name || r.approvedBy?.username || "-"}` : ""}
+                      {personName(r.requestedBy) || personName(r.createdBy) ? ` · by ${personName(r.requestedBy) || personName(r.createdBy)}` : ""}
+                      {r.approvedBy ? ` · ${r.status === "rejected" ? "rejected" : "approved"} by ${personName(r.approvedBy) || "-"}` : ""}
                       {repay ? ` · ${r.paymentMethod || "-"}${r.paymentMethod === "cash" && r.voucherNo ? ` ${r.voucherNo}` : ""}${r.paymentMethod === "online" && r.referenceNo ? ` ref ${r.referenceNo}` : ""}` : ""}
                     </span>
                     {(r.reason || r.note) && <span className="block truncate text-[11px] italic text-muted">“{repay ? r.note : r.reason}”</span>}

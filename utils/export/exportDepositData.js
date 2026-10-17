@@ -4,6 +4,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { toast } from "@/app/components/ui/notify";
 
+import { personName } from "@/lib/people";
 // 🔹 Helper: Fetch image and convert to Base64
 const getBase64ImageFromUrl = async (url) => {
   const res = await fetch(url, { mode: "cors" });
@@ -32,7 +33,7 @@ export const exportDepositToExcel = (deposit, branchData) => {
       ["Proof", deposit.fileURL || "-"],
       [
         "Added By",
-        deposit.createdBy?.username || "Unknown",
+        personName(deposit.createdBy) || "Unknown",
         "Role",
         deposit.createdBy?.role || "-",
       ],
@@ -79,7 +80,7 @@ export const exportDepositToPDF = async (deposit, branchData) => {
       ["Proof", deposit.fileURL ? "See below 👇" : "-", "-"],
       [
         "Added By",
-        deposit.createdBy?.username || "Unknown",
+        personName(deposit.createdBy) || "Unknown",
         deposit.createdBy?.role || "-",
       ],
     ];
@@ -155,7 +156,7 @@ export const shareDeposit = async (deposit, branchData) => {
       ["Proof", deposit.fileURL ? "See below 👇" : "-", "-"],
       [
         "Added By",
-        deposit.createdBy?.username || "Unknown",
+        personName(deposit.createdBy) || "Unknown",
         deposit.createdBy?.role || "-",
       ],
     ];
@@ -274,7 +275,7 @@ export const exportDepositsToExcel = (
       d.amount || "0.00",
       d.traceNo || "-",
       d.fileURL || "-", // Proof URL
-      d.createdBy?.username || "Unknown",
+      personName(d.createdBy) || "Unknown",
       d.createdBy?.email || "-",
       d.createdBy?.role || "-",
       d.createdAt
@@ -392,7 +393,7 @@ export const exportDepositsToPDF = (
       d.amount || "0.00",
       d.traceNo || "-",
       "", // clickable proof
-      d.createdBy?.username || "Unknown",
+      personName(d.createdBy) || "Unknown",
       d.createdBy?.email || "-",
       d.createdBy?.role || "-",
       d.createdAt

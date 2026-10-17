@@ -39,12 +39,12 @@ export default function EditCompanyUserModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md bg-white rounded-xl shadow-2xl p-6 relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-[2px]">
+      <div className="w-full max-w-md bg-surface rounded-xl shadow-2xl p-6 relative">
         <h3 className="text-xl font-bold mb-4">Edit Company User</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-fg">
               Username
             </label>
             <input
@@ -55,14 +55,14 @@ export default function EditCompanyUserModal({
               required
             />
             {isOwner && (
-              <p className="text-xs text-red-500 mt-1">
+              <p className="text-xs text-danger mt-1">
                 Owner username cannot be changed.
               </p>
             )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-fg">
               Role
             </label>
             <select
@@ -80,7 +80,7 @@ export default function EditCompanyUserModal({
               ))}
             </select>
             {isOwner && (
-              <p className="text-xs text-red-500 mt-1">
+              <p className="text-xs text-danger mt-1">
                 Owner role cannot be changed.
               </p>
             )}
@@ -97,7 +97,7 @@ export default function EditCompanyUserModal({
             <button
               type="submit"
               disabled={!canSubmit}
-              className="px-4 py-2 rounded-md bg-blue-600 text-white disabled:opacity-50"
+              className="px-4 py-2 rounded-md bg-brand text-brand-fg disabled:opacity-50"
             >
               {saving ? "Saving..." : "Save changes"}
             </button>

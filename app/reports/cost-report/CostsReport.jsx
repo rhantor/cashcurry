@@ -15,6 +15,7 @@ import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/lib/region/currency";
 import { Badge, Select, Skeleton, confirmDialog, toast } from "@/app/components/ui";
 
+import { personName } from "@/lib/people";
 const METHODS = { cash: "Cash", card: "Card", qr: "QR", online: "Online", bank_transfer: "Bank transfer" };
 
 // derive safe fields for old documents
@@ -207,7 +208,7 @@ export default function CostsReport() {
                 { label: "Note", value: c.description },
               ]}
               files={filesOf(c)}
-              by={c.createdBy?.username || c.createdBy?.userName}
+              by={personName(c.createdBy)}
               at={c.createdAt}
               share={() => handleCostShare(c, branch)}
               pdf={() => exportCostToPDF(c, branch)}

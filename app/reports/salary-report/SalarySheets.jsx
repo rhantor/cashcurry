@@ -12,6 +12,7 @@ import ProofUpload from "@/app/components/entry/ProofUpload";
 import { Chip, PaidFromChoice } from "@/app/components/entry/Choices";
 import { Button, DatePicker, Field, Sheet, Textarea, confirmDialog, toast } from "@/app/components/ui";
 
+import { personName } from "@/lib/people";
 // the same ways the salary entry form offers
 const METHODS = { cash: "Cash", bank_transfer: "Bank transfer", card: "Card", qr: "QR", online: "Online", cheque: "Cheque" };
 export const monthText = (m, f = "MMMM yyyy") => (m && /^\d{4}-\d{2}/.test(m) ? format(parseISO(`${m.slice(0, 7)}-01`), f) : "");
@@ -62,7 +63,7 @@ export function SalaryRecord({ s, branch, money, canEdit, onClose, onEdit, onDel
         { label: "Note", value: s.notes },
       ]}
       files={s.pdfUrl ? [s.pdfUrl] : payroll ? null : []}
-      by={s.createdBy?.username || s.createdBy?.userName}
+      by={personName(s.createdBy)}
       at={s.createdAt}
       share={() => shareSalary(s, branch)}
       pdf={() => exportOneSalaryToPDF(s, branch)}

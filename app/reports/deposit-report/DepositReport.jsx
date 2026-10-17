@@ -11,6 +11,7 @@ import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/lib/region/currency";
 import { Skeleton } from "@/app/components/ui";
 
+import { personName } from "@/lib/people";
 const filesOf = (d) => (d.attachments?.length ? d.attachments : d.fileURL ? [d.fileURL] : []);
 const bankOf = (d) => (d.bankName || "").trim() || "Bank not named";
 
@@ -61,10 +62,10 @@ export default function DepositReport() {
             );
           },
         },
-        { key: "createdBy", label: "By", hideOnMobile: true, render: (v) => <span className="text-muted">{v?.username || v?.userName || "—"}</span> },
+        { key: "createdBy", label: "By", hideOnMobile: true, render: (v) => <span className="text-muted">{personName(v) || "—"}</span> },
         { key: "amount", label: "Amount", align: "right", sortValue: (d) => Number(d.amount) || 0, render: (v) => <span className="font-semibold">{money(v)}</span> },
       ]}
-      filterConfig={{ dateField: "date", searchFields: ["bankName", "traceNo", "createdBy.username"] }}
+      filterConfig={{ dateField: "date", searchFields: ["bankName", "traceNo", "createdBy.username", "createdBy.name"] }}
       exportFunctions={{ exportPDF: exportDepositsToPDF, exportExcel: exportDepositsToExcel }}
       showTotalsFooter
       searchBarShow
@@ -93,7 +94,7 @@ export default function DepositReport() {
             { label: "Trace number", value: d.traceNo },
           ]}
           files={filesOf(d)}
-          by={d.createdBy?.username || d.createdBy?.userName}
+          by={personName(d.createdBy)}
           at={d.createdAt}
           share={() => shareDeposit(d, branch)}
           pdf={() => exportDepositToPDF(d, branch)}

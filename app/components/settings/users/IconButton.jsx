@@ -15,7 +15,7 @@ export default function IconButton({
       onClick={onClick}
       title={title}
       disabled={disabled}
-      className={`inline-flex p-2 rounded-md hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+      className={`inline-flex p-2 rounded-md hover:bg-surface-2 disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
     >
       {children}
     </button>

@@ -6,7 +6,7 @@ const Sidebar = ({ setSelectedPage, selectedPage }) => {
   return (
     <>
       {/* Mobile top bar */}
-      <div className="bg-slate-800 text-white p-4 flex justify-between items-center md:hidden">
+      <div className="bg-surface text-fg border-r border-line p-4 flex justify-between items-center md:hidden">
         <h2 className="text-xl font-bold">Branch Dashboard</h2>
         <button onClick={() => setIsOpen(true)} aria-label="Open sidebar menu">
           <svg
@@ -29,7 +29,7 @@ const Sidebar = ({ setSelectedPage, selectedPage }) => {
       {/* Sidebar */}
       <aside
         className={`
-          bg-slate-800 text-white p-4 shadow-lg
+          bg-surface text-fg border-r border-line p-4 shadow-lg
           fixed top-0 left-0 h-screen z-40
           transform transition-transform duration-300 ease-in-out
           w-4/5 max-w-xs md:w-64 md:sticky md:top-0 md:translate-x-0
@@ -69,8 +69,8 @@ const Sidebar = ({ setSelectedPage, selectedPage }) => {
           <li
             className={`mb-3 py-2 px-3 rounded-lg transition-colors duration-200 ${
               selectedPage === "branch info"
-                ? "bg-slate-700 font-semibold"
-                : "hover:bg-slate-700"
+                ? "bg-brand-soft text-brand font-semibold"
+                : "hover:bg-surface-2"
             }`}
             onClick={() => setSelectedPage("branch info")}
           >
@@ -79,8 +79,8 @@ const Sidebar = ({ setSelectedPage, selectedPage }) => {
           <li
             className={`mb-3 py-2 px-3 rounded-lg transition-colors duration-200 ${
               selectedPage === "reports"
-                ? "bg-slate-700 font-semibold"
-                : "hover:bg-slate-700"
+                ? "bg-brand-soft text-brand font-semibold"
+                : "hover:bg-surface-2"
             }`}
             onClick={() => setSelectedPage("reports")}
           >
@@ -89,8 +89,8 @@ const Sidebar = ({ setSelectedPage, selectedPage }) => {
           <li
             className={`mb-3 py-2 px-3 rounded-lg transition-colors duration-200 ${
               selectedPage === "settings"
-                ? "bg-slate-700 font-semibold"
-                : "hover:bg-slate-700"
+                ? "bg-brand-soft text-brand font-semibold"
+                : "hover:bg-surface-2"
             }`}
             onClick={() => setSelectedPage("settings")}
           >

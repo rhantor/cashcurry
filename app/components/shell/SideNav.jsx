@@ -6,6 +6,7 @@ import { ChevronDown, LogOut, PanelLeftClose, PanelLeftOpen } from "lucide-react
 import { Avatar, LogoMark, Tooltip, cn, menuIcon } from "@/app/components/ui";
 import { spring } from "@/app/components/ui/motion";
 
+import { personName } from "@/lib/people";
 const roleName = (r) => ({ owner: "Owner", gm: "General manager", superAdmin: "Super admin", branchAdmin: "Branch admin" })[r] || (r ? r[0].toUpperCase() + r.slice(1) : "");
 
 /** The computer's sidebar: sections, a sliding highlight, groups that open, and a collapsed (icons only) mode. */
@@ -56,10 +57,10 @@ export default function SideNav({ sections, activePath, badges = {}, user, compa
       {/* me */}
       <div className={cn("shrink-0 border-t border-line p-3", collapsed && "flex flex-col items-center gap-2")}>
         <div className={cn("flex items-center gap-3", !collapsed && "rounded-xl px-2 py-1.5")}>
-          <Avatar name={user?.userName || user?.username || user?.email} size="md" />
+          <Avatar name={personName(user)} size="md" />
           {!collapsed && (
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-fg">{user?.userName || user?.username || "Me"}</p>
+              <p className="truncate text-sm font-semibold text-fg">{personName(user) || "Me"}</p>
               <p className="truncate text-xs text-muted">{roleName(user?.role)}</p>
             </div>
           )}

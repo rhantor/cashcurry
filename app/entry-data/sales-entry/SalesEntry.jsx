@@ -27,6 +27,7 @@ import MoneyInput from "@/app/components/entry/MoneyInput";
 import ProofUpload from "@/app/components/entry/ProofUpload";
 import { EntryLayout, EntrySection, RecentEntries, SummaryLine } from "@/app/components/entry/EntryLayout";
 
+import { personName } from "@/lib/people";
 const day = (d) => (d ? format(parseISO(d), "EEE, d MMM") : "");
 const blank = (tenders) => Object.fromEntries(tenders.map((t) => [t.key, ""]));
 
@@ -269,7 +270,7 @@ export default function SalesEntry() {
               date: s.date,
               amount: s.total,
               proof: !!s.zReportUrl,
-              note: s.createdBy?.username || s.createdBy?.userName || "—",
+              note: personName(s.createdBy) || "—",
               onOpen: () => setViewing(s),
               // A supervisor may change only the latest day.
               onEdit: canEdit && (role !== "supervisor" || i === 0) ? () => startEdit(s) : undefined,

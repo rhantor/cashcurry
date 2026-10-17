@@ -5,15 +5,15 @@ import { normalizeRole } from "@/utils/roles";
 
 const cls = (role) => {
   const r = normalizeRole(role);
-  if (r === "owner") return "bg-red-100 text-red-800";
-  if (r === "superadmin") return "bg-indigo-100 text-indigo-800";
-  if (r === "gm" || r === "general manager") return "bg-blue-100 text-blue-800";
+  if (r === "owner") return "bg-danger-soft text-red-800";
+  if (r === "superadmin") return "bg-info-soft text-info";
+  if (r === "gm" || r === "general manager") return "bg-info-soft text-info";
   if (r === "manager") return "bg-teal-100 text-teal-800"; // ⬅️ added
-  if (r === "supervisor") return "bg-green-100 text-green-800";
-  if (r === "accountant") return "bg-purple-100 text-purple-800";
+  if (r === "supervisor") return "bg-brand-soft text-brand";
+  if (r === "accountant") return "bg-warning-soft text-warning";
   if (r === "branchadmin") return "bg-pink-100 text-pink-800";
-  if (r === "cashier") return "bg-yellow-100 text-yellow-800";
-  return "bg-gray-100 text-gray-800";
+  if (r === "cashier") return "bg-warning-soft text-warning";
+  return "bg-surface-2 text-fg";
 };
 
 export default function RoleBadge({ role }) {

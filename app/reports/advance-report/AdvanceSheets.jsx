@@ -10,6 +10,7 @@ import MoneyInput from "@/app/components/entry/MoneyInput";
 import { Chip } from "@/app/components/entry/Choices";
 import { Avatar, Badge, Button, DatePicker, Field, Sheet, Textarea, confirmDialog, toast } from "@/app/components/ui";
 
+import { personName } from "@/lib/people";
 export const ADVANCE_TYPES = { salary: "Salary advance", emergency: "Emergency", personal: "Personal" };
 const STATUS = { pending: "Waiting for approval", approved: "Approved", rejected: "Rejected", closed: "Paid back" };
 
@@ -56,7 +57,7 @@ export function AdvanceRecord({ a, branch, money, onClose, onEdit, onDelete }) {
         { label: "Approval note", value: a.approvalNotes },
       ]}
       files={null}
-      by={a.createdBy?.username || a.createdBy?.userName}
+      by={personName(a.createdBy)}
       at={a.createdAt}
       share={() => shareAdvance(a, branch)}
       pdf={() => exportAdvanceToPDF(a, branch)}

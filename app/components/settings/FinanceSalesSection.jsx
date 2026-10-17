@@ -26,8 +26,8 @@ export default function FinanceSalesSection({ role, value, onChange }) {
           <div className="space-y-6">
             
             {/* Core Financials */}
-            <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm space-y-4">
-              <h3 className="text-sm font-semibold text-slate-800 uppercase tracking-wider mb-2">Core Settings</h3>
+            <div className="p-5 rounded-2xl border border-line bg-surface shadow-sm space-y-4">
+              <h3 className="text-sm font-semibold text-fg uppercase tracking-wider mb-2">Core Settings</h3>
               
               <FieldRow
                 label={
@@ -68,13 +68,13 @@ export default function FinanceSalesSection({ role, value, onChange }) {
               </FieldRow>
 
               <FieldRow label="Currency" hint="Set under General → Region & business day">
-                <p className="text-sm text-slate-700">{formatMoney(1234.5, v.currency)}</p>
+                <p className="text-sm text-fg">{formatMoney(1234.5, v.currency)}</p>
               </FieldRow>
             </div>
 
             {/* Rates & Deposits */}
-            <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm space-y-4">
-               <h3 className="text-sm font-semibold text-slate-800 uppercase tracking-wider mb-2">Rates & Banking</h3>
+            <div className="p-5 rounded-2xl border border-line bg-surface shadow-sm space-y-4">
+               <h3 className="text-sm font-semibold text-fg uppercase tracking-wider mb-2">Rates & Banking</h3>
                
                <div className="space-y-4">
                  <FieldRow label="Tax %" hint="Storewide">
@@ -96,7 +96,7 @@ export default function FinanceSalesSection({ role, value, onChange }) {
                  </FieldRow>
                </div>
 
-               <hr className="border-slate-100 my-2" />
+               <hr className="border-line my-2" />
 
                <div className="space-y-4">
                  <FieldRow label="Default Bank" hint="For Deposits">
@@ -121,11 +121,11 @@ export default function FinanceSalesSection({ role, value, onChange }) {
 
           </div>
 
-          <hr className="border-slate-100" />
+          <hr className="border-line" />
 
           {/* --- Tenders Editor --- */}
           <div>
-            <h3 className="text-sm font-medium text-slate-900 mb-3">Payment Methods (Tenders)</h3>
+            <h3 className="text-sm font-medium text-fg mb-3">Payment Methods (Tenders)</h3>
             <TendersEditor
               value={v.tenders || []}
               onChange={(tenders) => patch({ tenders })}

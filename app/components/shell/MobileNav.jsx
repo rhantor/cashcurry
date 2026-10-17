@@ -8,6 +8,7 @@ import { spring } from "@/app/components/ui/motion";
 import BranchSwitcher from "./BranchSwitcher";
 import { CountBadge } from "./SideNav";
 
+import { personName } from "@/lib/people";
 const roleName = (r) => ({ owner: "Owner", gm: "General manager", superAdmin: "Super admin", branchAdmin: "Branch admin" })[r] || (r ? r[0].toUpperCase() + r.slice(1) : "");
 
 /**
@@ -85,9 +86,9 @@ function MoreMenu({ sections, hidden, activePath, badges, user, isCompany, branc
     <div className="space-y-4">
       {/* me + branch */}
       <div className="flex items-center gap-3">
-        <Avatar name={user?.userName || user?.username || user?.email} size="lg" />
+        <Avatar name={personName(user)} size="lg" />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-base font-bold text-fg">{user?.userName || user?.username || "Me"}</p>
+          <p className="truncate text-base font-bold text-fg">{personName(user) || "Me"}</p>
           <p className="text-xs text-muted">{roleName(user?.role)}</p>
         </div>
       </div>

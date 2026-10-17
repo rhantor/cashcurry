@@ -26,7 +26,7 @@ export default function ShiftRulesSection({ value, patch, can }) {
         />
 
         {v.shiftsEnabled && (
-          <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-sm font-medium text-sky-800">
+          <div className="rounded-xl border border-brand/30 bg-brand-soft p-3 text-sm font-medium text-brand">
             Shift times are on. Set each person&apos;s Shift Start and Shift End in Staff
             Management → edit staff → Attendance. Anyone left blank keeps using their Basic
             Hours Per Day.
@@ -55,7 +55,7 @@ export default function ShiftRulesSection({ value, patch, can }) {
           </FieldRow>
         </div>
 
-        <ul className="space-y-1.5 text-xs font-medium text-slate-500">
+        <ul className="space-y-1.5 text-xs font-medium text-muted">
           <li>• Arriving less than the threshold early → paid from shift start (no OT, not late).</li>
           <li>• Arriving at or beyond it → a pending Early-OT request in the Requested Panel; approved pays from the actual punch-in.</li>
           <li>• Arriving after shift start → paid from the actual punch-in and flagged late.</li>

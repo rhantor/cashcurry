@@ -22,7 +22,7 @@ export default function PurchasesSection({ role, value, onChange }) {
             />
           </FieldRow>
 
-          <p className="text-sm text-slate-500 max-w-prose">
+          <p className="text-sm text-muted max-w-prose">
             {v.requirePoApproval
               ? "Orders are raised as Pending and must be approved before they can be sent to the vendor. Editing an approved order sends it back for approval."
               : "Orders can be sent to the vendor as soon as they are raised. Turn this on to add an Approve / Reject step in between."}

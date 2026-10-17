@@ -1,6 +1,7 @@
 "use client";
 import React, { useState } from "react";
-
+import { AnimatePresence, motion } from "framer-motion";
+import { Banknote, Building2, Clock, ReceiptText, Save, Settings2, TriangleAlert, Undo2, UserCog } from "lucide-react";
 import BasicInfoSection from "@/app/components/settings/BasicInfoSection";
 import RegionSection from "@/app/components/settings/RegionSection";
 import FinanceSalesSection from "@/app/components/settings/FinanceSalesSection";
@@ -10,191 +11,193 @@ import PurchasesSection from "@/app/components/settings/PurchasesSection";
 import OtherSection from "@/app/components/settings/OtherSection";
 import AttendanceSettingsSection from "@/app/components/settings/AttendanceSettingsSection";
 import PayrollSettingsSection from "@/app/components/settings/PayrollSettingsSection";
+import StatusScreen from "@/app/components/common/StatusScreen";
+import { Button, Card, Skeleton, cn, toast } from "@/app/components/ui";
 import useBranchSettingsForm from "./useBranchSettingsForm";
-import { Building2, Banknote, UserCog, Settings2, ReceiptText, Clock } from "lucide-react";
 
 const TABS = [
-  { id: "general",    label: "General",          icon: Building2 },
-  { id: "finance",    label: "Finance & Sales",   icon: Banknote },
-  { id: "operations", label: "Operations & Staff", icon: UserCog },
-  { id: "attendance", label: "Attendance",          icon: Clock },
-  { id: "payroll",    label: "Payroll",            icon: ReceiptText },
-  { id: "advanced",   label: "Advanced",           icon: Settings2 },
+  { id: "general", label: "General", note: "Name, contact, region, money", icon: Building2 },
+  { id: "finance", label: "Sales & money", note: "Ways of paying, sales rules", icon: Banknote },
+  { id: "operations", label: "Staff & spending", note: "Roles, loans, purchases", icon: UserCog },
+  { id: "attendance", label: "Attendance", note: "Kiosk, shifts, pay cycle", icon: Clock },
+  { id: "payroll", label: "Payroll", note: "Pay mode, OT, deductions", icon: ReceiptText },
+  { id: "advanced", label: "Advanced", note: "Everything else", icon: Settings2 },
 ];
 
-export default function BranchSettingsPage() {
-  const { role, form, setForm, save, saving, saveError, loadError, isDirty } =
-    useBranchSettingsForm();
-  const [activeTab, setActiveTab] = useState("general");
+// A section that doesn't bring its own card.
+const Panel = ({ title, note, children }) => (
+  <Card className="p-5">
+    {title && (
+      <div className="mb-4">
+        <h3 className="text-base font-semibold text-fg">{title}</h3>
+        {note && <p className="mt-0.5 text-sm text-muted">{note}</p>}
+      </div>
+    )}
+    {children}
+  </Card>
+);
 
-  if (loadError) {
+const Heading = ({ title, note }) => (
+  <div className="mb-4">
+    <h2 className="text-lg font-bold tracking-tight text-fg">{title}</h2>
+    {note && <p className="mt-0.5 text-sm text-muted">{note}</p>}
+  </div>
+);
+
+/**
+ * Branch settings: one group at a time from the list on the left (a row of
+ * tabs on phones). Changes collect until saved — a bar at the bottom says
+ * there are unsaved changes, with Discard and Save.
+ */
+export default function BranchSettingsPage() {
+  const { role, form, setForm, save, discard, saving, saveError, loadError, isDirty } = useBranchSettingsForm();
+  const [activeTab, setActiveTab] = useState("general");
+  const set = (group) => (v) => setForm((prev) => ({ ...prev, [group]: v }));
+
+  const onSave = async () => {
+    if (await save()) toast.success("Settings saved");
+  };
+
+  if (loadError)
     return (
-      <div className="p-6 max-w-lg mx-auto mt-10 bg-white border border-red-200 rounded-2xl shadow-sm text-center">
-        <h1 className="text-lg font-bold text-slate-800">
-          Branch settings couldn&apos;t be loaded
-        </h1>
-        <p className="text-sm text-slate-500 mt-2">
-          {loadError?.message ||
-            loadError?.error?.message ||
-            "Your account may not have access to this branch's settings."}
-        </p>
+      <StatusScreen
+        full={false}
+        icon={TriangleAlert}
+        title="Branch settings couldn't load"
+        message={loadError?.message || loadError?.error?.message || "Your account may not have access to this branch's settings."}
+      />
+    );
+
+  if (!form)
+    return (
+      <div className="mx-auto grid max-w-6xl gap-6 px-4 py-6 md:grid-cols-[15rem_1fr]">
+        <Skeleton className="h-72" rounded="rounded-2xl" />
+        <Skeleton className="h-[28rem]" rounded="rounded-2xl" />
       </div>
     );
-  }
 
-  if (!form) return <div className="p-6 text-slate-500 animate-pulse">Loading settings...</div>;
+  const tab = TABS.find((t) => t.id === activeTab);
 
   return (
-    <div className="p-4 sm:p-6 max-w-5xl mx-auto pb-24">
-      {/* Header */}
-      <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-800">Branch Settings</h1>
-          <p className="text-slate-500 text-sm mt-1">Configure your POS, branch details, and team operations.</p>
-        </div>
-        
-        <button
-          onClick={save}
-          disabled={saving || !isDirty}
-          className={`font-bold py-2 px-6 rounded-xl transition-all shadow-sm ${
-            saving || !isDirty
-              ? "bg-slate-100 text-slate-400 cursor-not-allowed" 
-              : "bg-mint-600 hover:bg-mint-700 text-white shadow-mint-500/20 shadow-md"
-          }`}
-        >
-          {saving ? "Saving..." : "Save Settings"}
-        </button>
-      </div>
-
-      {saveError && (
-        <div className="mb-6 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-          {saveError}
-        </div>
-      )}
-
-      {/* Tabs / Content Layout */}
-      <div className="flex flex-col md:flex-row gap-8">
-        
-        {/* Sidebar Tabs */}
-        <div className="md:w-64 shrink-0 flex overflow-x-auto md:flex-col gap-2 pb-2 md:pb-0 hide-scrollbar border-b md:border-b-0 border-slate-200">
+    <div className="mx-auto max-w-6xl px-4 py-5 pb-32 sm:px-6 sm:py-6">
+      <div className="grid gap-6 md:grid-cols-[15rem_1fr]">
+        {/* the groups */}
+        <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:sticky md:top-20 md:mx-0 md:flex-col md:self-start md:overflow-visible md:px-0">
           {TABS.map((t) => {
-            const Icon = t.icon;
-            const isActive = activeTab === t.id;
+            const on = activeTab === t.id;
             return (
               <button
                 key={t.id}
+                type="button"
                 onClick={() => setActiveTab(t.id)}
-                className={`flex items-center gap-3 px-4 py-3 rounded-2xl text-sm font-medium transition-all whitespace-nowrap
-                  ${isActive 
-                    ? "bg-mint-500 text-white shadow-md shadow-mint-500/20" 
-                    : "text-slate-600 hover:bg-slate-100"
-                  }`}
+                aria-current={on ? "page" : undefined}
+                className={cn(
+                  "relative flex shrink-0 items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors",
+                  on ? "text-fg" : "text-muted hover:bg-surface-2 hover:text-fg"
+                )}
               >
-                <Icon size={16} />
-                {t.label}
+                {on && <motion.span layoutId="settings-tab" transition={{ type: "spring", stiffness: 400, damping: 34 }} className="absolute inset-0 rounded-2xl border border-line bg-surface shadow-card" />}
+                <span className={cn("relative flex size-8 shrink-0 items-center justify-center rounded-xl", on ? "bg-brand-soft text-brand" : "bg-surface-2")}>
+                  <t.icon className="size-4" />
+                </span>
+                <span className="relative min-w-0">
+                  <span className="block whitespace-nowrap text-sm font-semibold">{t.label}</span>
+                  <span className="hidden truncate text-[11px] text-subtle md:block">{t.note}</span>
+                </span>
               </button>
             );
           })}
-        </div>
+        </nav>
 
-        {/* Tab Content Area */}
-        <div className="flex-1 bg-white p-6 rounded-3xl shadow-sm border border-slate-100 min-h-[500px]">
+        {/* the chosen group */}
+        <motion.div key={activeTab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="min-w-0 space-y-6">
           {activeTab === "general" && (
-            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <h2 className="text-lg font-bold text-slate-800 mb-6">General Information</h2>
-              <BasicInfoSection
-                role={role}
-                value={form.basic}
-                onChange={(v) => setForm((prev) => ({ ...prev, basic: v }))}
-              />
-              <div className="mt-8">
-                <RegionSection role={role} form={form} setForm={setForm} />
-              </div>
-            </div>
+            <>
+              <Heading title="General" note="The branch's name and contact details, its time zone, business day and money." />
+              <BasicInfoSection role={role} value={form.basic} onChange={set("basic")} />
+              <RegionSection role={role} form={form} setForm={setForm} />
+            </>
           )}
 
           {activeTab === "finance" && (
-            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <h2 className="text-lg font-bold text-slate-800 mb-6">Finance & Sales Settings</h2>
-              <FinanceSalesSection
-                role={role}
-                value={form.financeSales}
-                onChange={(v) => setForm((prev) => ({ ...prev, financeSales: v }))}
-              />
-            </div>
+            <>
+              <Heading title="Sales & money" note="How customers pay, which of those go to the bank, and the sales entry rules." />
+              <FinanceSalesSection role={role} value={form.financeSales} onChange={set("financeSales")} />
+            </>
           )}
 
           {activeTab === "operations" && (
-             <div className="animate-in fade-in slide-in-from-bottom-2 duration-300 space-y-12">
-               <div>
-                  <h2 className="text-lg font-bold text-slate-800 mb-6">Staff & Roles</h2>
-                  <StaffRolesSection
-                    role={role}
-                    value={form.staffRoles}
-                    onChange={(v) => setForm((prev) => ({ ...prev, staffRoles: v }))}
-                  />
-               </div>
-               <hr className="border-slate-100" />
-               <div>
-                  <h2 className="text-lg font-bold text-slate-800 mb-6">Loans & Cash Advances</h2>
-                  <LoansFinanceSection
-                    role={role}
-                    value={form.loansFinance}
-                    onChange={(v) => setForm((prev) => ({ ...prev, loansFinance: v }))}
-                  />
-               </div>
-               <hr className="border-slate-100" />
-               <div>
-                  <h2 className="text-lg font-bold text-slate-800 mb-6">Purchasing Controls</h2>
-                  <PurchasesSection
-                    role={role}
-                    value={form.purchases}
-                    onChange={(v) => setForm((prev) => ({ ...prev, purchases: v }))}
-                  />
-               </div>
-             </div>
+            <>
+              <Heading title="Staff & spending" note="Staff roles, advances and loans, and purchasing limits." />
+              <Panel title="Staff & roles">
+                <StaffRolesSection role={role} value={form.staffRoles} onChange={set("staffRoles")} />
+              </Panel>
+              <Panel title="Loans & advances">
+                <LoansFinanceSection role={role} value={form.loansFinance} onChange={set("loansFinance")} />
+              </Panel>
+              <Panel title="Purchasing">
+                <PurchasesSection role={role} value={form.purchases} onChange={set("purchases")} />
+              </Panel>
+            </>
           )}
 
           {activeTab === "attendance" && (
-            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <h2 className="text-lg font-bold text-slate-800 mb-2">Attendance Configuration</h2>
-              <p className="text-sm text-slate-500 mb-6">
-                Manage pay cycles, kiosk behavior, and biometric enrollment for your team.
-              </p>
-              <AttendanceSettingsSection 
-                role={role} 
-                companyId={form.companyId || form.basic?.companyId} // Fallback
+            <>
+              <Heading title="Attendance" note="The pay cycle, how the kiosk behaves, and shifts." />
+              <AttendanceSettingsSection
+                role={role}
+                companyId={form.companyId || form.basic?.companyId}
                 branchId={form.branchId || form.basic?.branchId}
-                value={form.attendance} 
-                onChange={(v) => setForm((prev) => ({ ...prev, attendance: v }))} 
+                value={form.attendance}
+                onChange={set("attendance")}
               />
-            </div>
+            </>
           )}
 
           {activeTab === "payroll" && (
-            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <h2 className="text-lg font-bold text-slate-800 mb-2">Payroll Settings</h2>
-              <p className="text-sm text-slate-500 mb-6">
-                Configure default pay mode, multipliers, and statutory deductions for your country.
-                These apply to all staff unless overridden per individual.
-              </p>
-              <PayrollSettingsSection form={form} setForm={setForm} />
-            </div>
+            <>
+              <Heading title="Payroll" note="Pay mode, overtime rates and statutory deductions. They apply to every staff member unless set on the person." />
+              <Panel>
+                <PayrollSettingsSection form={form} setForm={setForm} />
+              </Panel>
+            </>
           )}
 
           {activeTab === "advanced" && (
-            <div className="animate-in fade-in slide-in-from-bottom-2 duration-300">
-              <h2 className="text-lg font-bold text-slate-800 mb-6">Advanced Configurations</h2>
-              <OtherSection
-                role={role}
-                value={form.other}
-                onChange={(v) => setForm((prev) => ({ ...prev, other: v }))}
-              />
-            </div>
+            <>
+              <Heading title="Advanced" note={tab?.note} />
+              <Panel>
+                <OtherSection role={role} value={form.other} onChange={set("other")} />
+              </Panel>
+            </>
           )}
-        </div>
+        </motion.div>
       </div>
 
+      {/* unsaved changes */}
+      <AnimatePresence>
+        {(isDirty || saveError) && (
+          <motion.div
+            initial={{ y: 80, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 80, opacity: 0 }}
+            transition={{ type: "spring", stiffness: 320, damping: 30 }}
+            className="fixed inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom))] z-30 mx-auto max-w-2xl lg:bottom-5 lg:left-[calc(16rem+1.5rem)]"
+          >
+            <div className="flex items-center gap-3 rounded-2xl border border-line bg-surface/95 p-3 pl-4 shadow-float backdrop-blur">
+              <p className={cn("min-w-0 flex-1 text-sm font-medium", saveError ? "text-danger" : "text-fg")}>{saveError || "You have changes that aren't saved"}</p>
+              {isDirty && (
+                <Button variant="ghost" icon={Undo2} onClick={discard} disabled={saving}>
+                  <span className="hidden sm:inline">Discard</span>
+                </Button>
+              )}
+              <Button icon={Save} onClick={onSave} loading={saving} disabled={!isDirty}>
+                Save
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

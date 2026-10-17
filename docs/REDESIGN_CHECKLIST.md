@@ -60,18 +60,18 @@ computer, has its own loading look, and its old modals are redone too.
 - ⬜ `/purchases/reports` Purchase report
 
 ## 3.4.8 Settings, admin, sign-in, tools
-- ⬜ `/settings` Settings (company)
-- ⬜ `/settings/user-management` User management
-- ⬜ `/branch-settings` Branch settings (owner saw UI problems — 4.1 notes)
-- ⬜ `/branches/branch-management`, `/branches/[branchId]` Branches
-- ⬜ `/audit-log`, `/branch-audit` Audit logs
+- ✅ `/settings` Settings (company) — people, branches, appearance (empty sections removed)
+- ✅ `/settings/user-management` User management
+- ✅ `/branch-settings` Branch settings (owner saw UI problems — 4.1 notes; who may edit what is still 4.1)
+- ✅ `/branches/branch-management`, `/branches/[branchId]` Branches (restyled to the tokens)
+- ✅ `/audit-log`, `/branch-audit` Audit logs
 - ✅ `/login` Sign in (animated brand side, show/hide password, Caps Lock warning, shake on a wrong try, check before opening)
-- ⬜ `/signup`, `/signup/verify`, `/reset-password` Sign-up and password reset
-- ⬜ `/unauthorized` — **missing page**: middleware sends people here, today they get the 404
-- ⬜ Error and not-found screens (`app/error.jsx`, `app/not-found.jsx`, section `error.js` files)
-- ⬜ `/tools/invoice-generator` Invoice generator
+- ✅ `/signup`, `/signup/verify`, `/reset-password` Sign-up and password reset
+- ✅ `/unauthorized` — made (was missing: people sent here got the 404)
+- ✅ Error and not-found screens (`app/error.jsx`, `app/not-found.jsx`, section `error.js` files)
+- ✅ `/tools/invoice-generator` Invoice generator (form restyled; the invoice itself stays white)
 - ⬜ `/tools/appointment-letter` Appointment letter (2.7k lines — 3.5)
-- ⬜ `/support` Support
+- ✅ `/support` Support (help page; NEXT_PUBLIC_SUPPORT_EMAIL shows the email button)
 - ⬜ `/branch-chat`, `/feeds` Branch chat and feeds (replaced later by 4.4)
 
 ## Staff app (Phase 4.6 rebuilds these; restyle only if needed before)

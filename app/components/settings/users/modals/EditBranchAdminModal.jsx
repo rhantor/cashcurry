@@ -33,12 +33,12 @@ export default function EditBranchAdminModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md bg-white rounded-xl shadow-2xl p-6 relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-[2px]">
+      <div className="w-full max-w-md bg-surface rounded-xl shadow-2xl p-6 relative">
         <h3 className="text-xl font-bold mb-4">Edit Branch Admin</h3>
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-fg">
               Name
             </label>
             <input
@@ -50,7 +50,7 @@ export default function EditBranchAdminModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-fg">
               Email
             </label>
             <input
@@ -73,7 +73,7 @@ export default function EditBranchAdminModal({
             <button
               type="submit"
               disabled={!canSubmit}
-              className="px-4 py-2 rounded-md bg-blue-600 text-white disabled:opacity-50"
+              className="px-4 py-2 rounded-md bg-brand text-brand-fg disabled:opacity-50"
             >
               {saving ? "Saving..." : "Save changes"}
             </button>

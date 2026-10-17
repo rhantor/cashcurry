@@ -36,6 +36,7 @@ import { canManageAllBranches } from "@/utils/roles";
 import { sanitizeUpdates, normalizeRole } from "@/utils/sanitize";
 import { getSessionUser } from "@/lib/session";
 import { toast, confirmDialog } from "@/app/components/ui/notify";
+import { Skeleton, Tabs } from "@/app/components/ui";
 
 export default function UserManagement() {
   // state for add modals
@@ -313,44 +314,27 @@ export default function UserManagement() {
   };
 
   return (
-    <div className="p-4 md:p-8 space-y-6 bg-gray-50 min-h-screen font-sans">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center bg-white p-4 md:p-6 rounded-lg shadow-md">
-        <h3 className="text-xl md:text-2xl font-bold text-gray-800 mb-4 md:mb-0">
-          User Management
-        </h3>
-        <div className="text-sm text-gray-500">
-          {hasManageAll ? "You can manage all branches" : "Limited permissions"}
-        </div>
-      </div>
-
-      {/* Tabs */}
-      <div className="bg-white rounded-lg shadow-md p-2 inline-flex">
-        <button
-          onClick={() => setTab("company")}
-          className={`px-4 py-2 rounded-md text-sm font-semibold ${
-            tab === "company" ? "bg-gray-900 text-white" : "text-gray-700"
-          }`}
-        >
-          Company Users ({companyUsers.length})
-        </button>
-        <button
-          onClick={() => setTab("branches")}
-          className={`ml-2 px-4 py-2 rounded-md text-sm font-semibold ${
-            tab === "branches" ? "bg-gray-900 text-white" : "text-gray-700"
-          }`}
-        >
-          Branch Users ({branches?.length || 0})
-        </button>
+    <div className="space-y-4">
+      {/* company users / branch users */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Tabs
+          value={tab}
+          onChange={setTab}
+          tabs={[
+            { value: "company", label: `Company (${companyUsers.length})` },
+            { value: "branches", label: `Branches (${branches?.length || 0})` },
+          ]}
+        />
+        <span className="text-xs text-muted">{hasManageAll ? "You can look after every branch" : "Some changes need an owner"}</span>
       </div>
 
       {/* Content */}
       {(loadingCompany || loadingBranches) && (
-        <p className="text-center text-gray-500">Loading…</p>
+        <Skeleton className="h-48" rounded="rounded-2xl" />
       )}
 
       {!loading && (errCompany || errBranches) && (
-        <div className="bg-white rounded-lg shadow p-6 text-red-600">
+        <div className="bg-surface rounded-lg shadow p-6 text-danger">
           Failed to load data.
         </div>
       )}

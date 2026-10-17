@@ -13,6 +13,7 @@ import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/lib/region/currency";
 import { Button, Skeleton } from "@/app/components/ui";
 
+import { personName } from "@/lib/people";
 /** Sales report: each day's takings over a period, the Z report beside it; a day opens as its sheet. */
 export default function SalesReport() {
   const { ready, args, setFetchArgs, branchData, companyId, branchId } = useReportData();
@@ -65,7 +66,7 @@ export default function SalesReport() {
           {
             key: "createdBy",
             label: "Entered by",
-            render: (val) => <span className="truncate text-muted">{val?.username || val?.userName || "Unknown"}</span>,
+            render: (val) => <span className="truncate text-muted">{personName(val) || "Unknown"}</span>,
           },
           {
             key: "__actions",
@@ -86,7 +87,7 @@ export default function SalesReport() {
             ),
           },
         ]}
-        filterConfig={{ dateField: "date", searchFields: ["createdBy.username"] }}
+        filterConfig={{ dateField: "date", searchFields: ["createdBy.username", "createdBy.name"] }}
         showTotalsFooter
         exportFunctions={{ exportPDF: exportSalesToPDF, exportExcel: exportSalesToExcel }}
         modalContentRenderer={(item, branchData, closeModal, monthTotal) => (

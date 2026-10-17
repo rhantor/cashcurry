@@ -20,14 +20,14 @@ const EMPTY_DED = () => ({
 
 function DeductionRow({ ded, onChange, onDelete }) {
   return (
-    <div className="grid grid-cols-12 gap-2 items-start py-3 border-b border-gray-100 last:border-0">
+    <div className="grid grid-cols-12 gap-2 items-start py-3 border-b border-line last:border-0">
       {/* Enabled toggle */}
       <div className="col-span-1 flex items-center pt-1">
         <input
           type="checkbox"
           checked={ded.enabled}
           onChange={e => onChange({ ...ded, enabled: e.target.checked })}
-          className="w-4 h-4 accent-mint-600"
+          className="w-4 h-4 accent-[var(--cc-brand)]"
         />
       </div>
 
@@ -38,7 +38,7 @@ function DeductionRow({ ded, onChange, onDelete }) {
           value={ded.name}
           onChange={e => onChange({ ...ded, name: e.target.value })}
           placeholder="e.g. EPF / PF"
-          className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-mint-400 outline-none"
+          className="w-full border border-line rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-[var(--cc-ring)] outline-none"
         />
       </div>
 
@@ -53,9 +53,9 @@ function DeductionRow({ ded, onChange, onDelete }) {
             value={ded.employeeRate}
             onChange={e => onChange({ ...ded, employeeRate: e.target.value })}
             placeholder="0"
-            className="w-full border border-gray-200 rounded-lg pl-2 pr-6 py-1.5 text-sm focus:ring-2 focus:ring-mint-400 outline-none"
+            className="w-full border border-line rounded-lg pl-2 pr-6 py-1.5 text-sm focus:ring-2 focus:ring-[var(--cc-ring)] outline-none"
           />
-          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">%</span>
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-subtle">%</span>
         </div>
       </div>
 
@@ -70,9 +70,9 @@ function DeductionRow({ ded, onChange, onDelete }) {
             value={ded.employerRate}
             onChange={e => onChange({ ...ded, employerRate: e.target.value })}
             placeholder="0"
-            className="w-full border border-gray-200 rounded-lg pl-2 pr-6 py-1.5 text-sm focus:ring-2 focus:ring-mint-400 outline-none"
+            className="w-full border border-line rounded-lg pl-2 pr-6 py-1.5 text-sm focus:ring-2 focus:ring-[var(--cc-ring)] outline-none"
           />
-          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400">%</span>
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-subtle">%</span>
         </div>
       </div>
 
@@ -81,7 +81,7 @@ function DeductionRow({ ded, onChange, onDelete }) {
         <select
           value={ded.basis}
           onChange={e => onChange({ ...ded, basis: e.target.value })}
-          className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-mint-400 outline-none"
+          className="w-full border border-line rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-[var(--cc-ring)] outline-none"
         >
           {BASIS_OPTIONS.map(o => (
             <option key={o.value} value={o.value}>{o.label}</option>
@@ -98,10 +98,10 @@ function DeductionRow({ ded, onChange, onDelete }) {
             value={ded.capAmount}
             onChange={e => onChange({ ...ded, capAmount: e.target.value })}
             placeholder="Cap"
-            className="w-full border border-gray-200 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-mint-400 outline-none"
+            className="w-full border border-line rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-[var(--cc-ring)] outline-none"
           />
         ) : (
-          <span className="text-xs text-gray-300 pl-2">—</span>
+          <span className="text-xs text-subtle pl-2">—</span>
         )}
       </div>
 
@@ -110,7 +110,7 @@ function DeductionRow({ ded, onChange, onDelete }) {
         <button
           type="button"
           onClick={onDelete}
-          className="text-red-400 hover:text-red-600 text-sm font-bold"
+          className="text-red-400 hover:text-danger text-sm font-bold"
           title="Remove"
         >
           ✕
@@ -147,32 +147,32 @@ export default function PayrollSettingsSection({ form, setForm }) {
 
       {/* ── Default Pay Settings ───────────────────────────────────────── */}
       <div>
-        <h3 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wide">
+        <h3 className="text-sm font-semibold text-fg mb-4 uppercase tracking-wide">
           Default Pay Settings
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
           {/* Default mode */}
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">
+            <label className="block text-sm font-medium text-muted mb-1">
               Default Pay Mode
             </label>
             <select
               value={payroll.defaultMode || "hours"}
               onChange={e => set("defaultMode", e.target.value)}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-mint-400 outline-none"
+              className="w-full border border-line rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-[var(--cc-ring)] outline-none"
             >
               <option value="hours">Hours-based</option>
               <option value="days">Days-based</option>
             </select>
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-subtle mt-1">
               Can be overridden per staff member.
             </p>
           </div>
 
           {/* Standard hours */}
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">
+            <label className="block text-sm font-medium text-muted mb-1">
               Standard Hours / Month
             </label>
             <input
@@ -180,14 +180,14 @@ export default function PayrollSettingsSection({ form, setForm }) {
               min="1"
               value={payroll.defaultStandardHours ?? 208}
               onChange={e => set("defaultStandardHours", Number(e.target.value))}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-mint-400 outline-none"
+              className="w-full border border-line rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-[var(--cc-ring)] outline-none"
             />
-            <p className="text-xs text-gray-400 mt-1">Used when pay mode is Hours.</p>
+            <p className="text-xs text-subtle mt-1">Used when pay mode is Hours.</p>
           </div>
 
           {/* Working days */}
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">
+            <label className="block text-sm font-medium text-muted mb-1">
               Working Days / Month
             </label>
             <input
@@ -195,14 +195,14 @@ export default function PayrollSettingsSection({ form, setForm }) {
               min="1"
               value={payroll.defaultWorkingDays ?? 26}
               onChange={e => set("defaultWorkingDays", Number(e.target.value))}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-mint-400 outline-none"
+              className="w-full border border-line rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-[var(--cc-ring)] outline-none"
             />
-            <p className="text-xs text-gray-400 mt-1">Used when pay mode is Days.</p>
+            <p className="text-xs text-subtle mt-1">Used when pay mode is Days.</p>
           </div>
 
           {/* OT multiplier */}
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">
+            <label className="block text-sm font-medium text-muted mb-1">
               OT Rate Multiplier
             </label>
             <input
@@ -211,16 +211,16 @@ export default function PayrollSettingsSection({ form, setForm }) {
               step="0.25"
               value={payroll.otMultiplier ?? 1.5}
               onChange={e => set("otMultiplier", parseFloat(e.target.value))}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-mint-400 outline-none"
+              className="w-full border border-line rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-[var(--cc-ring)] outline-none"
             />
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-subtle mt-1">
               e.g. 1.5 = time-and-a-half. Applied to hourly rate.
             </p>
           </div>
 
           {/* PH multiplier */}
           <div>
-            <label className="block text-sm font-medium text-gray-600 mb-1">
+            <label className="block text-sm font-medium text-muted mb-1">
               Public Holiday Multiplier
             </label>
             <input
@@ -229,9 +229,9 @@ export default function PayrollSettingsSection({ form, setForm }) {
               step="0.25"
               value={payroll.phMultiplier ?? 2.0}
               onChange={e => set("phMultiplier", parseFloat(e.target.value))}
-              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-mint-400 outline-none"
+              className="w-full border border-line rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-[var(--cc-ring)] outline-none"
             />
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-subtle mt-1">
               e.g. 2.0 = double pay on public holidays.
             </p>
           </div>
@@ -242,10 +242,10 @@ export default function PayrollSettingsSection({ form, setForm }) {
       <div>
         <div className="flex items-center justify-between mb-3">
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+            <h3 className="text-sm font-semibold text-fg uppercase tracking-wide">
               Statutory Deductions
             </h3>
-            <p className="text-xs text-gray-400 mt-0.5">
+            <p className="text-xs text-subtle mt-0.5">
               Configure contributions for your country (EPF, SOCSO, PF, etc.).
               Each entry applies to all staff unless overridden individually.
             </p>
@@ -253,28 +253,28 @@ export default function PayrollSettingsSection({ form, setForm }) {
           <button
             type="button"
             onClick={addDed}
-            className="px-3 py-1.5 rounded-lg bg-mint-100 hover:bg-mint-200 text-mint-700 text-sm font-medium"
+            className="px-3 py-1.5 rounded-lg bg-brand-soft hover:brightness-95 text-brand text-sm font-medium"
           >
             + Add
           </button>
         </div>
 
         {deductions.length === 0 ? (
-          <div className="text-center py-8 text-gray-400 text-sm border-2 border-dashed border-gray-200 rounded-xl">
+          <div className="text-center py-8 text-subtle text-sm border-2 border-dashed border-line rounded-xl">
             No statutory deductions configured.
             <br />
             <button
               type="button"
               onClick={addDed}
-              className="mt-2 text-mint-600 hover:underline text-sm"
+              className="mt-2 text-brand hover:underline text-sm"
             >
               Add your first deduction
             </button>
           </div>
         ) : (
-          <div className="border border-gray-200 rounded-xl overflow-hidden">
+          <div className="border border-line rounded-xl overflow-hidden">
             {/* Header */}
-            <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-gray-50 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-200">
+            <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-surface-2/60 text-xs font-semibold text-muted uppercase tracking-wide border-b border-line">
               <div className="col-span-1">On</div>
               <div className="col-span-3">Name</div>
               <div className="col-span-2">Emp %</div>
@@ -296,7 +296,7 @@ export default function PayrollSettingsSection({ form, setForm }) {
           </div>
         )}
 
-        <p className="text-xs text-gray-400 mt-3">
+        <p className="text-xs text-subtle mt-3">
           <strong>Basis:</strong> Basic Salary = rate applied to basic only.
           Gross = applied to all earnings. Capped = applied up to the cap amount.
         </p>

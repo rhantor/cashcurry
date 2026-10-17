@@ -14,6 +14,7 @@ import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { toast } from "@/app/components/ui/notify";
 
+import { personName } from "@/lib/people";
 /* ==========================================================
    Helpers
 ========================================================== */
@@ -170,7 +171,7 @@ export const exportAdvanceToExcel = (advance, branchData) => {
       ['Status', advance.status || 'Pending'],
       [
         'Added By',
-        advance.createdBy?.username || 'Unknown',
+        personName(advance.createdBy) || 'Unknown',
         'Role',
         advance.createdBy?.role || '-'
       ],
@@ -236,7 +237,7 @@ export const exportAdvanceToPDF = (advance, branchData) => {
       ['Status', advance.status || 'Pending', '-'],
       [
         'Added By',
-        advance.createdBy?.username || 'Unknown',
+        personName(advance.createdBy) || 'Unknown',
         advance.createdBy?.role || '-'
       ],
       [
@@ -303,7 +304,7 @@ export const exportAdvancesToExcel = (
       (Number(a.amount) || 0).toFixed(2),
       a.reason || '-',
       a.status || 'Pending',
-      a.createdBy?.username || 'Unknown',
+      personName(a.createdBy) || 'Unknown',
       a.createdBy?.email || '-',
       a.createdBy?.role || '-',
       a.approvedBy?.name || '—',
@@ -423,7 +424,7 @@ export const exportAdvancesToPDF = (
       (Number(a.amount) || 0).toFixed(2),
       a.reason || '-',
       a.status || 'Pending',
-      a.createdBy?.username || 'Unknown',
+      personName(a.createdBy) || 'Unknown',
       a.createdBy?.email || '-',
       a.createdBy?.role || '-',
       a.approvedBy?.name || '—',
@@ -690,7 +691,7 @@ export const exportAdvanceStaffDetailToPDF = (staff, branchData) => {
       (Number(a.amount) || 0).toFixed(2),
       a.reason || '-',
       a.status || '-',
-      a.createdBy?.username || 'Unknown'
+      personName(a.createdBy) || 'Unknown'
     ])
 
     autoTable(doc, {
@@ -730,7 +731,7 @@ export const exportAdvanceStaffDetailToExcel = (staff, branchData) => {
       (Number(a.amount) || 0).toFixed(2),
       a.reason || '-',
       a.status || '-',
-      a.createdBy?.username || 'Unknown',
+      personName(a.createdBy) || 'Unknown',
       a.createdBy?.role || '-',
       a.createdBy?.email || '-'
     ])
@@ -930,7 +931,7 @@ export const exportAdvanceAllStaffToPDF = (
       (Number(a.amount) || 0).toFixed(2),
       a.reason || '-',
       a.status || '-',
-      a.createdBy?.username || 'Unknown'
+      personName(a.createdBy) || 'Unknown'
     ])
 
     autoTable(doc, {
@@ -1074,7 +1075,7 @@ export const exportAdvanceAllStaffToExcel = (
       (Number(a.amount) || 0).toFixed(2),
       a.reason || '-',
       a.status || '-',
-      a.createdBy?.username || 'Unknown',
+      personName(a.createdBy) || 'Unknown',
       a.createdBy?.role || '-',
       a.createdBy?.email || '-'
     ])
@@ -1168,7 +1169,7 @@ export const shareAdvance = async (advance, branchData) => {
       ['Amount (RM)', (Number(advance.amount) || 0).toFixed(2)],
       ['Reason', advance.reason || '-'],
       ['Status', advance.status || '-'],
-      ['Created By', advance.createdBy?.username || '-'],
+      ['Created By', personName(advance.createdBy) || '-'],
       ['Role', advance.createdBy?.role || '-']
     ]
 

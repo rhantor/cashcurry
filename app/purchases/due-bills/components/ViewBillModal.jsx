@@ -1,4 +1,5 @@
 'use client'
+import { personName } from "@/lib/people";
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import {
@@ -275,7 +276,7 @@ function PaymentHistory ({ history, fmtRM }) {
                       {methodLabel[p.paidMethod] || p.paidMethod}
                     </span>
                   )}
-                  {p.paidBy?.username && (
+                  {personName(p.paidBy) && (
                     <span className='text-[10px] text-gray-400'>
                       by {p.paidBy.username}
                     </span>

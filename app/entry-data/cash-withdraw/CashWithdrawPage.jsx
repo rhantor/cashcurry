@@ -18,6 +18,7 @@ import { Chip } from "@/app/components/entry/Choices";
 import RecordSheet from "@/app/components/entry/RecordSheet";
 import { EntryLayout, EntrySection, MoneyRoute, RecentEntries, SummaryLine } from "@/app/components/entry/EntryLayout";
 
+import { personName } from "@/lib/people";
 // What the cash was taken out for (kept as stored before).
 const CATEGORIES = ["Supplier Payment", "Staff Advance", "Staff Salary", "Utility Bills", "Rent/Deposit", "Maintenance", "Transport/Delivery", "Petty Cash", "Other"];
 const METHODS = ["ATM Withdraw", "Online Transfer", "Other"];
@@ -263,7 +264,7 @@ export default function CashWithdrawPage() {
             { label: "Note", value: viewing.notes },
           ]}
           files={viewing.receiptUrls?.length ? viewing.receiptUrls : viewing.receiptUrl ? [viewing.receiptUrl] : []}
-          by={viewing.createdBy?.username || viewing.createdBy?.userName}
+          by={personName(viewing.createdBy)}
           at={viewing.createdAt}
           share={() => shareWithdrawal(viewing, branchData)}
           pdf={() => exportWithdrawalToPDF(viewing, branchData)}

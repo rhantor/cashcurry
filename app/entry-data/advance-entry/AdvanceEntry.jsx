@@ -1,4 +1,5 @@
 'use client'
+import { personName } from "@/lib/people";
 import { useMemo, useState } from 'react'
 import { addMonths, format, parseISO } from 'date-fns'
 import { AnimatePresence, motion } from 'framer-motion'
@@ -26,7 +27,7 @@ const ADVANCE_TYPES = [
 const LOAN_DURATIONS = [3, 6, 9, 12, 18, 24]
 
 // Who paid, for paidOut.by — the same shape the pay-out action records.
-const payerOf = user => ({ uid: user?.uid || '', name: user?.username || user?.name || '', role: user?.role || '' })
+const payerOf = user => ({ uid: user?.uid || '', name: personName(user) || '', role: user?.role || '' })
 const ym = d => (d || '').slice(0, 7)
 const monthLabel = m => (m ? format(parseISO(`${m}-01`), 'MMM yyyy') : '')
 // the month a date falls in and the next few, for picking a payroll month

@@ -21,11 +21,11 @@ const AssignBranchAdminForm = ({
   return (
     <form
       onSubmit={handleAssignAdmin}
-      className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-white p-4 rounded-lg shadow"
+      className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-surface p-4 rounded-lg shadow"
     >
       {/* Branch Selection */}
       <div className="col-span-2 md:col-span-1">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-fg">
           Select Branch
         </label>
         <select
@@ -46,7 +46,7 @@ const AssignBranchAdminForm = ({
 
       {/* Admin Name */}
       <div className="md:col-span-1">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-fg">
           Admin Name
         </label>
         <input
@@ -62,7 +62,7 @@ const AssignBranchAdminForm = ({
 
       {/* Admin Username */}
       <div className="md:col-span-1">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-fg">
           Admin Username
         </label>
         <input
@@ -78,14 +78,14 @@ const AssignBranchAdminForm = ({
         />
         {errorMsg ===
           "This username is already taken. Please choose another." && (
-          <p className="text-xs text-red-500 mt-1">{errorMsg}</p>
+          <p className="text-xs text-danger mt-1">{errorMsg}</p>
         )}
-        <p className="text-xs text-gray-500 mt-1">Must be unique per branch.</p>
+        <p className="text-xs text-muted mt-1">Must be unique per branch.</p>
       </div>
 
       {/* Admin Email */}
       <div className="md:col-span-1">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-fg">
           Admin Email
         </label>
         <input
@@ -98,14 +98,14 @@ const AssignBranchAdminForm = ({
           required
         />
         {errorMsg === "This email is already in use by another account." && (
-          <p className="text-xs text-red-500 mt-1">{errorMsg}</p>
+          <p className="text-xs text-danger mt-1">{errorMsg}</p>
         )}
-        <p className="text-xs text-gray-500 mt-1">Must be unique per branch.</p>
+        <p className="text-xs text-muted mt-1">Must be unique per branch.</p>
       </div>
 
       {/* Admin Password */}
       <div className="md:col-span-1 relative">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-fg">
           Password
         </label>
         <input
@@ -121,7 +121,7 @@ const AssignBranchAdminForm = ({
         <button
           type="button"
           onClick={() => setShowPassword(!showPassword)}
-          className="absolute right-3 top-9 text-gray-500 hover:text-gray-700"
+          className="absolute right-3 top-9 text-muted hover:text-fg"
         >
           {showPassword ? (
             <EyeOff size={20} />
@@ -129,7 +129,7 @@ const AssignBranchAdminForm = ({
             <Eye size={20} />
           )}
         </button>
-        <p className="text-xs text-gray-500 mt-1">
+        <p className="text-xs text-muted mt-1">
           Minimum 6 characters. Admin can reset password later.
         </p>
       </div>
@@ -139,7 +139,7 @@ const AssignBranchAdminForm = ({
       {errorMsg &&
         errorMsg !== "This username is already taken. Please choose another." &&
         errorMsg !== "This email is already in use by another account." && (
-          <p className="md:col-span-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
+          <p className="md:col-span-2 text-sm text-danger bg-danger-soft border border-danger/30 rounded px-3 py-2">
             {errorMsg}
           </p>
         )}
@@ -151,7 +151,7 @@ const AssignBranchAdminForm = ({
           className={`px-6 py-2 rounded text-white ${
             isFormValid
               ? "bg-blue-600 hover:bg-blue-700"
-              : "bg-gray-400 cursor-not-allowed"
+              : "bg-surface-2 text-subtle cursor-not-allowed"
           }`}
         >
           {isAssigningBranchAdmin

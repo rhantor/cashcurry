@@ -51,16 +51,16 @@ export default function AddBranchUserModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-      <div className="w-full max-w-md bg-white rounded-xl shadow-2xl p-6 relative">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-[2px]">
+      <div className="w-full max-w-md bg-surface rounded-xl shadow-2xl p-6 relative">
         <h3 className="text-xl font-bold mb-1">Add Branch User</h3>
-        <p className="text-sm text-gray-500 mb-4">
+        <p className="text-sm text-muted mb-4">
           {branchName ? `Branch: ${branchName}` : null}
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-fg">
               Full name
             </label>
             <input
@@ -80,7 +80,7 @@ export default function AddBranchUserModal({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-fg">
               Username
             </label>
             <input
@@ -90,12 +90,12 @@ export default function AddBranchUserModal({
               placeholder="unique id (used for login)"
               required
             />
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-subtle mt-1">
               Must be unique across the system.
             </p>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-fg">
               Email
             </label>
             <input
@@ -107,7 +107,7 @@ export default function AddBranchUserModal({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-fg">
               Password
             </label>
             <input
@@ -120,7 +120,7 @@ export default function AddBranchUserModal({
             />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700">
+            <label className="block text-sm font-medium text-fg">
               Role
             </label>
             <select
@@ -148,13 +148,13 @@ export default function AddBranchUserModal({
             <button
               type="submit"
               disabled={!canSubmit}
-              className="px-4 py-2 rounded-md bg-mint-600 text-white disabled:opacity-50"
+              className="px-4 py-2 rounded-md bg-brand text-white disabled:opacity-50"
             >
               {creating ? "Creating..." : "Create user"}
             </button>
           </div>{" "}
           {errorMsg ? (
-            <p className="text-sm text-red-600 mt-2">{errorMsg}</p>
+            <p className="text-sm text-danger mt-2">{errorMsg}</p>
           ) : null}
         </form>
       </div>

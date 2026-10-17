@@ -1,125 +1,85 @@
-// app/settings/page.jsx
 "use client";
-import { React, useState } from "react";
+import { useState } from "react";
+import { motion } from "framer-motion";
+import { Building2, Monitor, Moon, Palette, Sun, Users } from "lucide-react";
 import BranchManagement from "../components/settings/BranchManagement";
 import UserManagement from "../components/settings/users/UserMangement";
-import { Users, Building2, Palette, Shield, Menu, X } from "lucide-react";
+import { Card, cn, useTheme } from "@/app/components/ui";
+import { ChoiceCards } from "@/app/components/entry/Choices";
 
-const sections = [
-  { id: "users", name: "User Management", icon: Users },
-  { id: "company", name: "Company Profile", icon: Building2 },
-  { id: "branch", name: "Branch Management", icon: Building2 },
-  { id: "theme", name: "Theme & Branding", icon: Palette },
-  { id: "security", name: "Security", icon: Shield },
+const SECTIONS = [
+  { id: "users", label: "People", note: "Who can sign in, and their role", icon: Users },
+  { id: "branches", label: "Branches", note: "Add and look after branches", icon: Building2 },
+  { id: "appearance", label: "Appearance", note: "Light or dark", icon: Palette },
 ];
 
+/** Light, dark, or as the device is set — kept on this device. */
+function Appearance() {
+  const [theme, setTheme] = useTheme();
+  return (
+    <Card className="p-5">
+      <h3 className="text-base font-semibold text-fg">Theme</h3>
+      <p className="mb-4 mt-0.5 text-sm text-muted">Applies on this device only, so each person can pick their own.</p>
+      <ChoiceCards
+        className="sm:grid-cols-3"
+        value={theme}
+        onChange={setTheme}
+        options={[
+          { value: "light", title: "Light", note: "Always light", icon: Sun, tone: "warning" },
+          { value: "dark", title: "Dark", note: "Easier at night", icon: Moon, tone: "info" },
+          { value: "system", title: "Like the device", note: "Follows the phone or computer", icon: Monitor, tone: "brand" },
+        ]}
+      />
+    </Card>
+  );
+}
+
+/**
+ * Company settings: the people who can sign in (company and branch users),
+ * the branches, and how the app looks. Each branch's own settings live in
+ * Branch Settings.
+ */
 export default function SettingsPage() {
-  const [activeSection, setActiveSection] = useState("users");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [active, setActive] = useState("users");
+  const sec = SECTIONS.find((s) => s.id === active);
 
   return (
-    <div className="flex flex-col md:flex-row bg-gray-50 h-screen overflow-hidden">
-      {/* Mobile Toggle Button */}
-      <div className="md:hidden flex justify-between items-center p-4 bg-white shadow">
-        <h2 className="text-lg font-bold text-mint-500">Settings</h2>
-        <button
-          onClick={() => setSidebarOpen(!sidebarOpen)}
-          className="text-gray-700 text-2xl"
-        >
-          {sidebarOpen ? <X size="1em" /> : <Menu size="1em" />}
-        </button>
-      </div>
-
-      {/* Sidebar */}
-      <aside
-        className={`
-          ${sidebarOpen ? "block" : "hidden"}
-          md:block w-full md:w-64 bg-white shadow-lg p-4
-          md:sticky md:top-0 md:h-screen
-          ${sidebarOpen ? "fixed" : "md:relative"} 
-          top-0 left-0 h-full z-20 md:z-auto
-        `}
-      >
-        <h2 className="text-lg font-bold text-mint-500 mb-4 hidden md:block">
-          Settings
-        </h2>
-        <nav className="space-y-2">
-          {sections.map((section) => {
-            const Icon = section.icon;
+    <div className="mx-auto max-w-6xl px-4 py-5 sm:px-6 sm:py-6">
+      <div className="grid gap-6 md:grid-cols-[15rem_1fr]">
+        <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:sticky md:top-20 md:mx-0 md:flex-col md:self-start md:overflow-visible md:px-0">
+          {SECTIONS.map((s) => {
+            const on = active === s.id;
             return (
               <button
-                key={section.id}
-                onClick={() => {
-                  setActiveSection(section.id);
-                  setSidebarOpen(false); // close on mobile
-                }}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition ${
-                  activeSection === section.id
-                    ? "bg-mint-100 text-mint-600 font-semibold"
-                    : "hover:bg-gray-100 text-gray-700"
-                }`}
+                key={s.id}
+                type="button"
+                onClick={() => setActive(s.id)}
+                aria-current={on ? "page" : undefined}
+                className={cn("relative flex shrink-0 items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors", on ? "text-fg" : "text-muted hover:bg-surface-2 hover:text-fg")}
               >
-                <Icon />
-                {section.name}
+                {on && <motion.span layoutId="company-settings-tab" transition={{ type: "spring", stiffness: 400, damping: 34 }} className="absolute inset-0 rounded-2xl border border-line bg-surface shadow-card" />}
+                <span className={cn("relative flex size-8 shrink-0 items-center justify-center rounded-xl", on ? "bg-brand-soft text-brand" : "bg-surface-2")}>
+                  <s.icon className="size-4" />
+                </span>
+                <span className="relative min-w-0">
+                  <span className="block whitespace-nowrap text-sm font-semibold">{s.label}</span>
+                  <span className="hidden truncate text-[11px] text-subtle md:block">{s.note}</span>
+                </span>
               </button>
             );
           })}
         </nav>
-      </aside>
 
-      {/* Main Content */}
-      <main className="flex-1 p-6 overflow-y-auto h-screen">
-        {activeSection === "users" && (
+        <motion.div key={active} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="min-w-0 space-y-4">
           <div>
-            <h3 className="text-xl font-bold mb-4">User Management</h3>
-            <p className="text-gray-600">
-              Here you can add, remove, and manage user roles.
-            </p>
-            <div className="mt-4">
-              <UserManagement />
-            </div>
+            <h2 className="text-lg font-bold tracking-tight text-fg">{sec.label}</h2>
+            <p className="mt-0.5 text-sm text-muted">{sec.note}</p>
           </div>
-        )}
-
-        {activeSection === "company" && (
-          <div>
-            <h3 className="text-xl font-bold mb-4">Company Profile</h3>
-            <p className="text-gray-600">
-              Manage company details, logo, and tax information.
-            </p>
-          </div>
-        )}
-
-        {activeSection === "branch" && (
-          <div>
-            <h3 className="text-xl font-bold mb-4">Branch Management</h3>
-            <p className="text-gray-600">
-              Manage branch details, location, and contact information.
-            </p>
-            <div className="mt-4">
-              <BranchManagement />
-            </div>
-          </div>
-        )}
-
-        {activeSection === "theme" && (
-          <div>
-            <h3 className="text-xl font-bold mb-4">Theme & Branding</h3>
-            <p className="text-gray-600">
-              Change theme colors, dark/light mode, and branding.
-            </p>
-          </div>
-        )}
-
-        {activeSection === "security" && (
-          <div>
-            <h3 className="text-xl font-bold mb-4">Security</h3>
-            <p className="text-gray-600">
-              Manage login security, session timeout, and 2FA.
-            </p>
-          </div>
-        )}
-      </main>
+          {active === "users" && <UserManagement />}
+          {active === "branches" && <BranchManagement />}
+          {active === "appearance" && <Appearance />}
+        </motion.div>
+      </div>
     </div>
   );
 }

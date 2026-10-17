@@ -25,8 +25,8 @@ export default function TendersEditor({ value = [], onChange, can }) {
   return (
     <div className="space-y-6">
       {/* Quick Add Section */}
-      <div className="bg-slate-50 p-4 rounded-2xl border border-slate-100 mb-6">
-        <p className="text-sm font-semibold text-slate-600 mb-3 uppercase tracking-wider">Quick Add Payment Methods</p>
+      <div className="bg-surface-2/60 p-4 rounded-2xl border border-line mb-6">
+        <p className="text-sm font-semibold text-muted mb-3 uppercase tracking-wider">Quick Add Payment Methods</p>
         <div className="flex flex-wrap gap-2">
           {quickAddPresets.map((p) => {
             const exists = tenders.some((t) => t.key === p.key);
@@ -36,8 +36,8 @@ export default function TendersEditor({ value = [], onChange, can }) {
                 type="button"
                 className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition-all ${
                   exists 
-                    ? "bg-white border-slate-200 text-slate-400 cursor-not-allowed opacity-60" 
-                    : "bg-white border-mint-200 text-mint-700 hover:bg-mint-50 hover:border-mint-300 shadow-sm"
+                    ? "bg-surface border-line text-subtle cursor-not-allowed opacity-60" 
+                    : "bg-surface border-brand/30 text-brand hover:bg-brand-soft hover:border-brand/30 shadow-sm"
                 }`}
                 disabled={!canEdit || exists}
                 onClick={() => {
@@ -57,14 +57,14 @@ export default function TendersEditor({ value = [], onChange, can }) {
                   ]);
                 }}
               >
-                {exists ? <CircleCheck size="1em" className="text-mint-400" /> : "+"} {p.label}
+                {exists ? <CircleCheck size="1em" className="text-brand" /> : "+"} {p.label}
               </button>
             );
           })}
           
           <button
             type="button"
-            className="flex items-center gap-2 rounded-xl bg-slate-800 border border-slate-800 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700 transition-all shadow-sm"
+            className="flex items-center gap-2 rounded-xl bg-fg border border-fg px-4 py-2 text-sm font-medium text-bg hover:opacity-90 transition-all shadow-sm"
             disabled={!canEdit}
             onClick={() =>
               commit([
@@ -94,22 +94,22 @@ export default function TendersEditor({ value = [], onChange, can }) {
             key={t.key + idx}
             className={`p-5 rounded-2xl border transition-all duration-200 ${
               t.enabled 
-                ? "bg-white border-slate-200 shadow-sm hover:shadow-md hover:border-mint-300" 
-                : "bg-slate-50 border-slate-200 opacity-70"
+                ? "bg-surface border-line shadow-sm hover:shadow-md hover:border-brand/30" 
+                : "bg-surface-2/60 border-line opacity-70"
             }`}
           >
             {/* Header: Label & Key */}
             <div className="flex justify-between items-start mb-4">
               <div className="w-full mr-4">
                 <input
-                  className="w-full bg-transparent text-lg font-bold text-slate-800 placeholder-slate-400 focus:outline-none focus:border-b-2 focus:border-mint-500 pb-1 mb-1 transition-all"
+                  className="w-full bg-transparent text-lg font-bold text-fg placeholder:text-subtle focus:outline-none focus:border-b-2 focus:border-brand pb-1 mb-1 transition-all"
                   value={t.label}
                   onChange={(e) => update(idx, { label: e.target.value })}
                   placeholder="Method Label (e.g. Card)"
                   disabled={!canEdit}
                 />
                 <input
-                  className="w-full text-xs font-mono text-slate-500 bg-transparent focus:outline-none focus:border-b focus:border-slate-300"
+                  className="w-full text-xs font-mono text-muted bg-transparent focus:outline-none focus:border-b focus:border-line"
                   value={t.key}
                   onChange={(e) => update(idx, { key: e.target.value.trim().toLowerCase() })}
                   placeholder="internal_key"
@@ -126,64 +126,64 @@ export default function TendersEditor({ value = [], onChange, can }) {
                   onChange={(e) => update(idx, { enabled: e.target.checked })}
                   disabled={!canEdit}
                 />
-                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-mint-500"></div>
+                <div className="w-11 h-6 bg-surface-2 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-surface after:border-line after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand"></div>
               </label>
             </div>
 
             {/* Toggle Grid */}
             <div className="grid grid-cols-2 gap-3 mb-4">
               {/* Include in Total Toggle */}
-              <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer select-none transition-colors ${t.includeInTotal ? 'bg-mint-50/50 border-mint-200' : 'bg-slate-50 hover:bg-slate-100 border-slate-200'}`}>
+              <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer select-none transition-colors ${t.includeInTotal ? 'bg-brand-soft/50 border-brand/30' : 'bg-surface-2/60 hover:bg-surface-2 border-line'}`}>
                 <input
                   type="checkbox"
-                  className="w-4 h-4 text-mint-600 border-slate-300 rounded focus:ring-mint-500"
+                  className="w-4 h-4 text-brand border-line rounded focus:ring-[var(--cc-ring)]"
                   checked={!!t.includeInTotal}
                   onChange={(e) => update(idx, { includeInTotal: e.target.checked })}
                   disabled={!canEdit}
                 />
-                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700">
-                  <Calculator className={t.includeInTotal ? 'text-mint-500' : 'text-slate-400'} size={11} /> 
+                <div className="flex items-center gap-1.5 text-xs font-medium text-fg">
+                  <Calculator className={t.includeInTotal ? 'text-brand' : 'text-subtle'} size={11} /> 
                   Count in Total
                 </div>
               </label>
 
               {/* Settles to Bank Toggle */}
-              <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer select-none transition-colors ${t.banked ? 'bg-sky-50/50 border-sky-200' : 'bg-slate-50 hover:bg-slate-100 border-slate-200'}`}>
+              <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer select-none transition-colors ${t.banked ? 'bg-brand-soft/50 border-brand/30' : 'bg-surface-2/60 hover:bg-surface-2 border-line'}`}>
                 <input
                   type="checkbox"
-                  className="w-4 h-4 text-sky-600 border-slate-300 rounded focus:ring-sky-500"
+                  className="w-4 h-4 text-brand border-line rounded focus:ring-[var(--cc-ring)]"
                   checked={!!t.banked}
                   onChange={(e) => update(idx, { banked: e.target.checked })}
                   disabled={!canEdit}
                 />
-                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700">
-                  <Landmark className={t.banked ? 'text-sky-500' : 'text-slate-400'} size={11} /> 
+                <div className="flex items-center gap-1.5 text-xs font-medium text-fg">
+                  <Landmark className={t.banked ? 'text-brand' : 'text-subtle'} size={11} /> 
                   Sent to Bank
                 </div>
               </label>
 
               {/* Delivery Toggle */}
-              <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer select-none transition-colors col-span-2 ${t.delivery ? 'bg-orange-50/50 border-orange-200' : 'bg-slate-50 hover:bg-slate-100 border-slate-200'}`}>
+              <label className={`flex items-center gap-2 p-2.5 rounded-xl border cursor-pointer select-none transition-colors col-span-2 ${t.delivery ? 'bg-warning-soft/50 border-warning/30' : 'bg-surface-2/60 hover:bg-surface-2 border-line'}`}>
                 <input
                   type="checkbox"
-                  className="w-4 h-4 text-orange-600 border-slate-300 rounded focus:ring-orange-500"
+                  className="w-4 h-4 text-warning border-line rounded focus:ring-orange-500"
                   checked={!!t.delivery}
                   onChange={(e) => update(idx, { delivery: e.target.checked })}
                   disabled={!canEdit}
                 />
-                <div className="flex items-center gap-1.5 text-xs font-medium text-slate-700">
-                  <Truck className={t.delivery ? 'text-orange-500' : 'text-slate-400'} size={11} /> 
+                <div className="flex items-center gap-1.5 text-xs font-medium text-fg">
+                  <Truck className={t.delivery ? 'text-orange-500' : 'text-subtle'} size={11} /> 
                   Delivery Platform (Grab/Foodpanda logic)
                 </div>
               </label>
             </div>
 
             {/* Footer Actions */}
-            <div className="flex justify-between items-center border-t border-slate-100 pt-3">
-              <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-slate-600">
+            <div className="flex justify-between items-center border-t border-line pt-3">
+              <label className="flex items-center gap-2 cursor-pointer select-none text-xs text-muted">
                 <input
                   type="checkbox"
-                  className="w-3.5 h-3.5 text-slate-600 border-slate-300 rounded focus:ring-slate-500"
+                  className="w-3.5 h-3.5 text-muted border-line rounded focus:ring-[var(--cc-ring)]"
                   checked={!!t.requireProof}
                   onChange={(e) => update(idx, { requireProof: e.target.checked })}
                   disabled={!canEdit}
@@ -193,7 +193,7 @@ export default function TendersEditor({ value = [], onChange, can }) {
 
               <button
                 type="button"
-                className="text-red-400 hover:text-red-600 p-1.5 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                className="text-red-400 hover:text-danger p-1.5 hover:bg-danger-soft rounded-lg transition-colors cursor-pointer"
                 onClick={() => remove(idx)}
                 disabled={!canEdit}
                 title="Delete this payment method"
@@ -205,7 +205,7 @@ export default function TendersEditor({ value = [], onChange, can }) {
         ))}
 
         {tenders.length === 0 && (
-          <div className="col-span-1 md:col-span-2 p-8 text-center text-slate-400 border-2 border-dashed border-slate-200 rounded-2xl">
+          <div className="col-span-1 md:col-span-2 p-8 text-center text-subtle border-2 border-dashed border-line rounded-2xl">
             No payment methods found. Use the quick add buttons above!
           </div>
         )}

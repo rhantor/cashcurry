@@ -12,6 +12,7 @@ import { Button, CountUp, Field, Input, Skeleton, cn, toast } from "@/app/compon
 import MoneyInput from "@/app/components/entry/MoneyInput";
 import { EntryLayout, EntrySection, SummaryLine } from "@/app/components/entry/EntryLayout";
 
+import { personName, stampOf } from "@/lib/people";
 /**
  * Ask another branch for a loan: which branch, how much, why. It reaches that
  * branch's Requested panel; once they approve and send it, it shows under
@@ -46,7 +47,7 @@ const LoanRequestForm = () => {
     setErrors(e);
     if (Object.keys(e).length || !companyId || !branchId || !user) return;
 
-    const who = { uid: user?.uid ?? null, username: user?.username ?? "", email: user?.email ?? "", role: user?.role ?? "" };
+    const who = stampOf(user);
     const payload = {
       requestFromBranchId: branchId,
       requestedToBranchId: toBranchId,
@@ -92,7 +93,7 @@ const LoanRequestForm = () => {
           <div className="space-y-2 border-t border-line pt-3">
             <SummaryLine label="From" value={target || "Pick a branch"} muted={!target} />
             <SummaryLine label="To" value={fromBranchName || "This branch"} />
-            <SummaryLine label="Asked by" value={user?.username || "—"} />
+            <SummaryLine label="Asked by" value={personName(user) || "—"} />
           </div>
           {send}
           <p className="text-[11px] text-muted">Nothing moves until {target || "that branch"} approves and sends it.</p>

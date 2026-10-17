@@ -72,7 +72,7 @@ export default function AttendanceSettingsSection({ role, companyId, branchId, v
                       value={v.startDayOfWeek || "Monday"}
                       onChange={(e) => patch({ startDayOfWeek: e.target.value })}
                       disabled={!can("startDayOfWeek")}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800"
+                      className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-fg"
                     >
                       {["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].map(d => (
                         <option key={d} value={d}>{d}</option>
@@ -84,7 +84,7 @@ export default function AttendanceSettingsSection({ role, companyId, branchId, v
                       value={v.hoursFormat || "decimal"}
                       onChange={(e) => patch({ hoursFormat: e.target.value })}
                       disabled={!can("hoursFormat")}
-                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800"
+                      className="w-full rounded-xl border border-line bg-surface px-3 py-2 text-fg"
                     >
                       <option value="decimal">Decimal (e.g. 8.5h)</option>
                       <option value="hhmm">HH:mm (e.g. 08:30)</option>
@@ -141,7 +141,7 @@ export default function AttendanceSettingsSection({ role, companyId, branchId, v
                 />
               </div>
               {!biometricSupported && v.useBiometrics && (
-                <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-3 text-amber-700 text-sm font-medium">
+                <div className="mt-4 p-3 bg-warning-soft border border-warning/30 rounded-xl flex items-center gap-3 text-warning text-sm font-medium">
                   <ShieldAlert size={18} />
                   Biometrics are enabled, but this browser/device does not seem to support them.
                 </div>
@@ -152,34 +152,34 @@ export default function AttendanceSettingsSection({ role, companyId, branchId, v
       </SettingsSection>
 
       {/* Staff Biometric Enrollment */}
-      <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
+      <div className="bg-surface rounded-3xl border border-line overflow-hidden shadow-sm">
+        <div className="p-6 border-b border-line flex items-center justify-between">
           <div>
-            <h3 className="text-lg font-bold text-slate-800">Staff Biometric Enrollment</h3>
-            <p className="text-sm text-slate-500">Supervisors: Register staff fingerprints here for kiosk use.</p>
+            <h3 className="text-lg font-bold text-fg">Staff Biometric Enrollment</h3>
+            <p className="text-sm text-muted">Supervisors: Register staff fingerprints here for kiosk use.</p>
           </div>
           <Fingerprint className="text-indigo-500" size={28} />
         </div>
 
-        <div className="divide-y divide-slate-50">
+        <div className="divide-y divide-line">
           {Object.values(enrollStatus).includes('loading') && (
-            <div className="p-3 bg-indigo-50 text-indigo-700 text-xs font-bold text-center animate-pulse">
+            <div className="p-3 bg-info-soft text-info text-xs font-bold text-center animate-pulse">
               Please follow the prompt on your device to scan the fingerprint...
             </div>
           )}
           {loadingStaff ? (
-            <div className="p-10 text-center text-slate-400">Loading staff list...</div>
+            <div className="p-10 text-center text-subtle">Loading staff list...</div>
           ) : staffList.length === 0 ? (
-            <div className="p-10 text-center text-slate-400">No staff found in this branch.</div>
+            <div className="p-10 text-center text-subtle">No staff found in this branch.</div>
           ) : (
             staffList.map((staff) => {
               const status = enrollStatus[staff.id] || 'idle';
               const isEnrolled = !!staff.biometric?.credentialId;
 
               return (
-                <div key={staff.id} className="p-4 flex items-center justify-between hover:bg-slate-50 transition-colors">
+                <div key={staff.id} className="p-4 flex items-center justify-between hover:bg-surface-2 transition-colors">
                   <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500 overflow-hidden">
+                    <div className="w-10 h-10 rounded-full bg-surface-2 flex items-center justify-center font-bold text-muted overflow-hidden">
                       {staff.photoUrl ? (
                         <img src={staff.photoUrl} className="w-full h-full object-cover" alt="" />
                       ) : (
@@ -187,26 +187,26 @@ export default function AttendanceSettingsSection({ role, companyId, branchId, v
                       )}
                     </div>
                     <div>
-                      <div className="font-bold text-slate-800">{staff.firstName} {staff.lastName}</div>
-                      <div className="text-xs text-slate-400 font-medium uppercase">{staff.role || "Staff"}</div>
+                      <div className="font-bold text-fg">{staff.firstName} {staff.lastName}</div>
+                      <div className="text-xs text-subtle font-medium uppercase">{staff.role || "Staff"}</div>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-3">
                     {isEnrolled ? (
-                      <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-green-50 text-green-600 text-xs font-bold border border-green-100">
+                      <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-soft text-brand text-xs font-bold border border-green-100">
                         <CheckCircle2 size={14} /> Registered
                       </div>
                     ) : (
-                      <div className="text-xs text-slate-400 font-medium italic">Not Enrolled</div>
+                      <div className="text-xs text-subtle font-medium italic">Not Enrolled</div>
                     )}
 
                     <button
                       onClick={() => handleEnroll(staff)}
                       disabled={status === 'loading'}
                       className={`min-w-[120px] px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2
-                        ${status === 'loading' ? 'bg-slate-100 text-slate-400' : 
-                          isEnrolled ? 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-200'}
+                        ${status === 'loading' ? 'bg-surface-2 text-subtle' : 
+                          isEnrolled ? 'bg-info-soft text-info hover:bg-info-soft' : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md shadow-indigo-200'}
                       `}
                     >
                       {status === 'loading' ? (

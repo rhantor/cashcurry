@@ -9,7 +9,7 @@ import {
 } from "@/lib/region";
 
 const selectCls =
-  "w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-800 shadow-sm focus:outline-none focus:ring-2 focus:ring-sky-500 disabled:bg-slate-100 disabled:text-slate-500";
+  "w-full rounded-xl border border-line bg-surface px-3 py-2 text-fg shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--cc-ring)] disabled:bg-surface-2 disabled:text-muted";
 
 /** The clock in a zone, e.g. "14:32". */
 const clockIn = (timeZone, now) =>
@@ -40,10 +40,10 @@ export default function RegionSection({ role, form, setForm }) {
   return (
     <SettingsSection role={role} sectionKey="region">
       {(can) => (
-        <div className="p-5 rounded-2xl border border-slate-200 bg-white shadow-sm space-y-5">
+        <div className="p-5 rounded-2xl border border-line bg-surface shadow-sm space-y-5">
           <div>
-            <h3 className="text-sm font-semibold text-slate-800 uppercase tracking-wider">Region &amp; business day</h3>
-            <p className="text-xs text-slate-500 mt-1">
+            <h3 className="text-sm font-semibold text-fg uppercase tracking-wider">Region &amp; business day</h3>
+            <p className="text-xs text-muted mt-1">
               Decides which day sales, costs and payments are booked to, and how money is written.
               {!can("timeZone") && " Only an owner or branch admin can change these."}
             </p>
@@ -70,7 +70,7 @@ export default function RegionSection({ role, form, setForm }) {
               onChange={(v) => set("attendance", "dayCutoffTime", v)}
               disabled={!can("dayCutoffTime")}
             />
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-muted mt-1">
               Anything entered before this time belongs to the previous day. With 05:00, a sale entered at
               1:30am on the 18th is booked to the 17th. Leave empty (or 00:00) if the restaurant closes before
               midnight. Attendance and the POS use the same setting.
@@ -91,10 +91,10 @@ export default function RegionSection({ role, form, setForm }) {
             </select>
           </FieldRow>
 
-          <div className="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3 text-sm text-slate-700 space-y-1">
+          <div className="rounded-xl bg-surface-2/60 border border-line px-4 py-3 text-sm text-fg space-y-1">
             <div>
               It is <b>{clockIn(region.timeZone, now)}</b> at the branch
-              {!region.timeZoneIsSet && <span className="text-slate-500"> (this device&apos;s clock)</span>}.
+              {!region.timeZoneIsSet && <span className="text-muted"> (this device&apos;s clock)</span>}.
               New entries default to <b>{format(parseISO(today), "EEE d MMM yyyy")}</b>.
             </div>
             <div>

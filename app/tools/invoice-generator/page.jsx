@@ -116,84 +116,84 @@ export default function InvoiceGenerator() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-4 md:p-8 flex flex-col md:flex-row gap-8 print:bg-white print:p-0 print:m-0">
+    <div className="min-h-screen bg-surface-2 p-4 md:p-8 flex flex-col md:flex-row gap-8 print:bg-white print:p-0 print:m-0">
       
       {/* Configuration Form - Hidden when printing */}
-      <div className="w-full md:w-1/3 bg-white p-6 rounded-lg shadow-md h-fit overflow-y-auto max-h-[90vh] print:hidden">
-        <h2 className="text-2xl font-bold mb-6 text-gray-800">Invoice Generator</h2>
+      <div className="w-full md:w-1/3 bg-surface p-6 rounded-lg shadow-md h-fit overflow-y-auto max-h-[90vh] print:hidden">
+        <h2 className="text-2xl font-bold mb-6 text-fg">Invoice Generator</h2>
         
         <div className="space-y-6">
           {/* Logo Upload */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Company Logo</label>
-            <input type="file" accept="image/*" onChange={handleLogoUpload} className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" />
+            <label className="block text-sm font-medium text-fg mb-1">Company Logo</label>
+            <input type="file" accept="image/*" onChange={handleLogoUpload} className="w-full text-sm text-muted file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-info-soft file:text-info hover:file:bg-info-soft" />
           </div>
 
           {/* Company Details */}
           <div className="border-t pt-4">
-            <h3 className="text-lg font-semibold mb-3 text-gray-800">Company Details</h3>
-            <input type="text" className="w-full border p-2 mb-2 rounded text-sm text-black" placeholder="Company Name" value={companyDetails.name} onChange={(e) => setCompanyDetails({...companyDetails, name: e.target.value})} />
-            <input type="text" className="w-full border p-2 mb-2 rounded text-sm text-black" placeholder="Registration No" value={companyDetails.registrationNo} onChange={(e) => setCompanyDetails({...companyDetails, registrationNo: e.target.value})} />
-            <input type="text" className="w-full border p-2 mb-2 rounded text-sm text-black" placeholder="Address Line 1" value={companyDetails.addressLine1} onChange={(e) => setCompanyDetails({...companyDetails, addressLine1: e.target.value})} />
-            <input type="text" className="w-full border p-2 mb-2 rounded text-sm text-black" placeholder="Address Line 2" value={companyDetails.addressLine2} onChange={(e) => setCompanyDetails({...companyDetails, addressLine2: e.target.value})} />
-            <input type="text" className="w-full border p-2 mb-2 rounded text-sm text-black" placeholder="Phone/Fax" value={companyDetails.phoneFax} onChange={(e) => setCompanyDetails({...companyDetails, phoneFax: e.target.value})} />
+            <h3 className="text-lg font-semibold mb-3 text-fg">Company Details</h3>
+            <input type="text" className="w-full rounded-lg border border-line bg-surface px-3 py-2 mb-2 text-sm text-fg outline-none focus:border-brand focus:ring-4 focus:ring-[var(--cc-ring)]" placeholder="Company Name" value={companyDetails.name} onChange={(e) => setCompanyDetails({...companyDetails, name: e.target.value})} />
+            <input type="text" className="w-full rounded-lg border border-line bg-surface px-3 py-2 mb-2 text-sm text-fg outline-none focus:border-brand focus:ring-4 focus:ring-[var(--cc-ring)]" placeholder="Registration No" value={companyDetails.registrationNo} onChange={(e) => setCompanyDetails({...companyDetails, registrationNo: e.target.value})} />
+            <input type="text" className="w-full rounded-lg border border-line bg-surface px-3 py-2 mb-2 text-sm text-fg outline-none focus:border-brand focus:ring-4 focus:ring-[var(--cc-ring)]" placeholder="Address Line 1" value={companyDetails.addressLine1} onChange={(e) => setCompanyDetails({...companyDetails, addressLine1: e.target.value})} />
+            <input type="text" className="w-full rounded-lg border border-line bg-surface px-3 py-2 mb-2 text-sm text-fg outline-none focus:border-brand focus:ring-4 focus:ring-[var(--cc-ring)]" placeholder="Address Line 2" value={companyDetails.addressLine2} onChange={(e) => setCompanyDetails({...companyDetails, addressLine2: e.target.value})} />
+            <input type="text" className="w-full rounded-lg border border-line bg-surface px-3 py-2 mb-2 text-sm text-fg outline-none focus:border-brand focus:ring-4 focus:ring-[var(--cc-ring)]" placeholder="Phone/Fax" value={companyDetails.phoneFax} onChange={(e) => setCompanyDetails({...companyDetails, phoneFax: e.target.value})} />
           </div>
 
           {/* Invoice Details */}
           <div className="border-t pt-4">
-            <h3 className="text-lg font-semibold mb-3 text-gray-800">Invoice Meta</h3>
+            <h3 className="text-lg font-semibold mb-3 text-fg">Invoice Meta</h3>
             <div className="grid grid-cols-2 gap-2">
-              <input type="text" className="border p-2 rounded text-sm text-black" placeholder="Invoice No" value={invoiceDetails.invoiceNo} onChange={(e) => setInvoiceDetails({...invoiceDetails, invoiceNo: e.target.value})} />
-              <input type="text" className="border p-2 rounded text-sm text-black" placeholder="Date" value={invoiceDetails.date} onChange={(e) => setInvoiceDetails({...invoiceDetails, date: e.target.value})} />
-              <input type="text" className="border p-2 rounded text-sm text-black" placeholder="Terms" value={invoiceDetails.terms} onChange={(e) => setInvoiceDetails({...invoiceDetails, terms: e.target.value})} />
-              <input type="text" className="border p-2 rounded text-sm text-black" placeholder="Attn" value={invoiceDetails.attn} onChange={(e) => setInvoiceDetails({...invoiceDetails, attn: e.target.value})} />
+              <input type="text" className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg outline-none focus:border-brand focus:ring-4 focus:ring-[var(--cc-ring)]" placeholder="Invoice No" value={invoiceDetails.invoiceNo} onChange={(e) => setInvoiceDetails({...invoiceDetails, invoiceNo: e.target.value})} />
+              <input type="text" className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg outline-none focus:border-brand focus:ring-4 focus:ring-[var(--cc-ring)]" placeholder="Date" value={invoiceDetails.date} onChange={(e) => setInvoiceDetails({...invoiceDetails, date: e.target.value})} />
+              <input type="text" className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg outline-none focus:border-brand focus:ring-4 focus:ring-[var(--cc-ring)]" placeholder="Terms" value={invoiceDetails.terms} onChange={(e) => setInvoiceDetails({...invoiceDetails, terms: e.target.value})} />
+              <input type="text" className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg outline-none focus:border-brand focus:ring-4 focus:ring-[var(--cc-ring)]" placeholder="Attn" value={invoiceDetails.attn} onChange={(e) => setInvoiceDetails({...invoiceDetails, attn: e.target.value})} />
             </div>
           </div>
 
           {/* Bill To */}
           <div className="border-t pt-4">
-            <h3 className="text-lg font-semibold mb-3 text-gray-800">Bill To</h3>
-            <textarea className="w-full border p-2 rounded text-sm text-black" rows="3" placeholder="Client Address/Details" value={billTo} onChange={(e) => setBillTo(e.target.value)}></textarea>
+            <h3 className="text-lg font-semibold mb-3 text-fg">Bill To</h3>
+            <textarea className="w-full rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg outline-none focus:border-brand focus:ring-4 focus:ring-[var(--cc-ring)]" rows="3" placeholder="Client Address/Details" value={billTo} onChange={(e) => setBillTo(e.target.value)}></textarea>
           </div>
 
           {/* Items */}
           <div className="border-t pt-4">
-            <h3 className="text-lg font-semibold mb-3 flex justify-between items-center text-gray-800">
+            <h3 className="text-lg font-semibold mb-3 flex justify-between items-center text-fg">
               Items
               <button onClick={addItem} className="bg-blue-500 text-white px-2 py-1 rounded text-xs">Add Item</button>
             </h3>
             {items.map((item, index) => (
-              <div key={index} className="border p-3 rounded mb-3 bg-gray-50">
-                <textarea className="w-full border p-2 mb-2 rounded text-sm text-black" placeholder="Description" rows="2" value={item.description} onChange={(e) => handleItemChange(index, "description", e.target.value)}></textarea>
+              <div key={index} className="border p-3 rounded mb-3 bg-surface-2/60">
+                <textarea className="w-full rounded-lg border border-line bg-surface px-3 py-2 mb-2 text-sm text-fg outline-none focus:border-brand focus:ring-4 focus:ring-[var(--cc-ring)]" placeholder="Description" rows="2" value={item.description} onChange={(e) => handleItemChange(index, "description", e.target.value)}></textarea>
                 <div className="flex gap-2 mb-2">
-                  <input type="number" className="w-1/3 border p-2 rounded text-sm text-black" placeholder="Qty" value={item.qty} onChange={(e) => handleItemChange(index, "qty", parseFloat(e.target.value) || 0)} />
-                  <input type="number" className="w-2/3 border p-2 rounded text-sm text-black" placeholder="Unit Price" value={item.unitPrice} onChange={(e) => handleItemChange(index, "unitPrice", parseFloat(e.target.value) || 0)} />
+                  <input type="number" className="w-1/3 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg outline-none focus:border-brand focus:ring-4 focus:ring-[var(--cc-ring)]" placeholder="Qty" value={item.qty} onChange={(e) => handleItemChange(index, "qty", parseFloat(e.target.value) || 0)} />
+                  <input type="number" className="w-2/3 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg outline-none focus:border-brand focus:ring-4 focus:ring-[var(--cc-ring)]" placeholder="Unit Price" value={item.unitPrice} onChange={(e) => handleItemChange(index, "unitPrice", parseFloat(e.target.value) || 0)} />
                 </div>
                 {items.length > 1 && (
-                  <button onClick={() => removeItem(index)} className="text-red-500 text-xs">Remove</button>
+                  <button onClick={() => removeItem(index)} className="text-danger text-xs">Remove</button>
                 )}
               </div>
             ))}
             <div className="mt-2 flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700">Rounding / Adjustment:</span>
-              <input type="number" className="border p-2 rounded text-sm w-32 text-black" value={rounding} onChange={(e) => setRounding(parseFloat(e.target.value) || 0)} />
+              <span className="text-sm font-medium text-fg">Rounding / Adjustment:</span>
+              <input type="number" className="rounded-lg border border-line bg-surface px-3 py-2 rounded text-sm w-32 text-fg outline-none focus:border-brand focus:ring-4 focus:ring-[var(--cc-ring)]" value={rounding} onChange={(e) => setRounding(parseFloat(e.target.value) || 0)} />
             </div>
           </div>
 
           {/* Extras */}
           <div className="border-t pt-4">
-            <h3 className="text-lg font-semibold mb-3 text-gray-800">Extras</h3>
-            <input type="text" className="w-full border p-2 mb-2 rounded text-sm text-black" placeholder="Amount In Words" value={amountInWords} onChange={(e) => setAmountInWords(e.target.value)} />
+            <h3 className="text-lg font-semibold mb-3 text-fg">Extras</h3>
+            <input type="text" className="w-full rounded-lg border border-line bg-surface px-3 py-2 mb-2 text-sm text-fg outline-none focus:border-brand focus:ring-4 focus:ring-[var(--cc-ring)]" placeholder="Amount In Words" value={amountInWords} onChange={(e) => setAmountInWords(e.target.value)} />
             
-            <h4 className="text-sm font-medium mt-3 mb-1 text-gray-700">Bank Details</h4>
-            <input type="text" className="w-full border p-2 mb-1 rounded text-sm text-black" placeholder="Account Name" value={bankDetails.accountName} onChange={(e) => setBankDetails({...bankDetails, accountName: e.target.value})} />
-            <input type="text" className="w-full border p-2 mb-1 rounded text-sm text-black" placeholder="Account Number" value={bankDetails.accountNumber} onChange={(e) => setBankDetails({...bankDetails, accountNumber: e.target.value})} />
-            <input type="text" className="w-full border p-2 mb-1 rounded text-sm text-black" placeholder="Bank Name" value={bankDetails.bankName} onChange={(e) => setBankDetails({...bankDetails, bankName: e.target.value})} />
+            <h4 className="text-sm font-medium mt-3 mb-1 text-fg">Bank Details</h4>
+            <input type="text" className="w-full rounded-lg border border-line bg-surface px-3 py-2 mb-1 text-sm text-fg outline-none focus:border-brand focus:ring-4 focus:ring-[var(--cc-ring)]" placeholder="Account Name" value={bankDetails.accountName} onChange={(e) => setBankDetails({...bankDetails, accountName: e.target.value})} />
+            <input type="text" className="w-full rounded-lg border border-line bg-surface px-3 py-2 mb-1 text-sm text-fg outline-none focus:border-brand focus:ring-4 focus:ring-[var(--cc-ring)]" placeholder="Account Number" value={bankDetails.accountNumber} onChange={(e) => setBankDetails({...bankDetails, accountNumber: e.target.value})} />
+            <input type="text" className="w-full rounded-lg border border-line bg-surface px-3 py-2 mb-1 text-sm text-fg outline-none focus:border-brand focus:ring-4 focus:ring-[var(--cc-ring)]" placeholder="Bank Name" value={bankDetails.bankName} onChange={(e) => setBankDetails({...bankDetails, bankName: e.target.value})} />
 
-            <h4 className="text-sm font-medium mt-3 mb-1 text-gray-700">Signatures</h4>
+            <h4 className="text-sm font-medium mt-3 mb-1 text-fg">Signatures</h4>
             <div className="flex gap-2">
-              <input type="text" className="w-1/2 border p-2 rounded text-sm text-black" placeholder="Left Sign" value={signatures.left} onChange={(e) => setSignatures({...signatures, left: e.target.value})} />
-              <input type="text" className="w-1/2 border p-2 rounded text-sm text-black" placeholder="Right Sign" value={signatures.right} onChange={(e) => setSignatures({...signatures, right: e.target.value})} />
+              <input type="text" className="w-1/2 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg outline-none focus:border-brand focus:ring-4 focus:ring-[var(--cc-ring)]" placeholder="Left Sign" value={signatures.left} onChange={(e) => setSignatures({...signatures, left: e.target.value})} />
+              <input type="text" className="w-1/2 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-fg outline-none focus:border-brand focus:ring-4 focus:ring-[var(--cc-ring)]" placeholder="Right Sign" value={signatures.right} onChange={(e) => setSignatures({...signatures, right: e.target.value})} />
             </div>
           </div>
 
@@ -220,10 +220,9 @@ export default function InvoiceGenerator() {
           <div className="flex justify-between items-start mb-6">
             <div className="flex flex-col items-start text-left">
               {logo ? (
-                // eslint-disable-next-line @next/next/no-img-element
                 <img src={logo} alt="Company Logo" className="h-16 w-auto object-contain object-left self-start mb-4" />
               ) : (
-                <div className="h-16 w-16 bg-gray-200 border border-gray-300 flex items-center justify-center text-xs text-gray-500 mb-4 print:hidden self-start">
+                <div className="h-16 w-16 bg-surface-2 border border-line flex items-center justify-center text-xs text-muted mb-4 print:hidden self-start">
                   Logo
                 </div>
               )}

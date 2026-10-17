@@ -23,11 +23,11 @@ const AssignBranchUserForm = ({
   return (
     <form
       onSubmit={handleAssignUser}
-      className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-white p-4 rounded-lg shadow"
+      className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-surface p-4 rounded-lg shadow"
     >
       {/* Branch Selection */}
       <div className="col-span-2 md:col-span-1">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-fg">
           Select Branch
         </label>
         <select
@@ -48,7 +48,7 @@ const AssignBranchUserForm = ({
 
       {/* Name */}
       <div className="md:col-span-1">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-fg">
           Full Name
         </label>
         <input
@@ -64,7 +64,7 @@ const AssignBranchUserForm = ({
 
       {/* Username */}
       <div className="md:col-span-1">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-fg">
           Username
         </label>
         <input
@@ -76,12 +76,12 @@ const AssignBranchUserForm = ({
           className="border px-3 py-2 rounded w-full"
           required
         />
-        <p className="text-xs text-gray-500 mt-1">Must be unique per branch.</p>
+        <p className="text-xs text-muted mt-1">Must be unique per branch.</p>
       </div>
 
       {/* Email */}
       <div className="md:col-span-1">
-        <label className="block text-sm font-medium text-gray-700">Email</label>
+        <label className="block text-sm font-medium text-fg">Email</label>
         <input
           type="email"
           name="email"
@@ -95,7 +95,7 @@ const AssignBranchUserForm = ({
 
       {/* Role Selection */}
       <div className="md:col-span-1">
-        <label className="block text-sm font-medium text-gray-700">Role</label>
+        <label className="block text-sm font-medium text-fg">Role</label>
         <select
           name="role"
           value={userForm.role || ""}
@@ -113,7 +113,7 @@ const AssignBranchUserForm = ({
 
       {/* Password */}
       <div className="md:col-span-1 relative">
-        <label className="block text-sm font-medium text-gray-700">
+        <label className="block text-sm font-medium text-fg">
           Password
         </label>
         <input
@@ -129,7 +129,7 @@ const AssignBranchUserForm = ({
         <button
           type="button"
           onClick={() => setShowPassword(!showPassword)}
-          className="absolute right-3 top-9 text-gray-500 hover:text-gray-700"
+          className="absolute right-3 top-9 text-muted hover:text-fg"
         >
           {showPassword ? (
             <EyeOff size={20} />
@@ -137,7 +137,7 @@ const AssignBranchUserForm = ({
             <Eye size={20} />
           )}
         </button>
-        <p className="text-xs text-gray-500 mt-1">
+        <p className="text-xs text-muted mt-1">
           Minimum 6 characters. User can reset password later.
         </p>
       </div>
@@ -150,7 +150,7 @@ const AssignBranchUserForm = ({
           className={`px-6 py-2 rounded text-white ${
             isFormValid
               ? "bg-blue-600 hover:bg-blue-700"
-              : "bg-gray-400 cursor-not-allowed"
+              : "bg-surface-2 text-subtle cursor-not-allowed"
           }`}
         >
           {isAssigningBranchUser ? "asigning..." : "Assign Branch User"}
