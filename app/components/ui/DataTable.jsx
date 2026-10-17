@@ -178,18 +178,23 @@ export default function DataTable({
                 </dl>
               </motion.li>
             ))}
-        {footer && !loading && (
-          <li className="grid grid-cols-2 gap-x-3 bg-surface-2/60 p-4 text-xs font-semibold">
-            {columns
-              .filter((c) => footer[c.key] != null && footer[c.key] !== "")
-              .map((c) => (
-                <div key={c.key} className="contents">
-                  <span className="text-muted">{c.label}</span>
-                  <span className={cn("text-fg", c.align === "right" && "text-right tabular-nums")}>{footer[c.key]}</span>
-                </div>
-              ))}
-          </li>
-        )}
+        {footer && !loading && (() => {
+          // the first filled cell names the row ("Total"); the rest are its figures
+          const [head, ...rest] = columns.filter((c) => footer[c.key] != null && footer[c.key] !== "");
+          return (
+            <li className="flex items-start justify-between gap-3 bg-surface-2/60 p-4 text-sm font-semibold">
+              <span className="text-muted">{head && footer[head.key]}</span>
+              <span className="space-y-0.5 text-right">
+                {rest.map((c) => (
+                  <span key={c.key} className="block tabular-nums text-fg">
+                    {rest.length > 1 && <span className="mr-2 text-xs font-medium text-muted">{c.label}</span>}
+                    {footer[c.key]}
+                  </span>
+                ))}
+              </span>
+            </li>
+          );
+        })()}
       </ul>
 
       {/* ── paging ── */}
