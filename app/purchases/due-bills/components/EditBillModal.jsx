@@ -1,4 +1,7 @@
 'use client'
+import { DatePicker } from '@/app/components/ui'
+import MoneyInput from '@/app/components/entry/MoneyInput'
+import { formatMoney } from '@/lib/region/currency'
 import React, { useEffect, useState, useRef } from 'react'
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion'
 import {
@@ -261,6 +264,7 @@ export default function EditBillModal ({ isOpen, onClose, bill, onSave, isLoadin
     if (!dueDate)                     return 'Due date is required.'
     if (dueDate < invoiceDate)        return 'Due date cannot be before invoice date.'
     if (!total || Number(total) <= 0) return 'Total must be greater than 0.'
+    if (Number(total) < Number(bill?.paid || 0)) return `Total can't be less than the ${Number(bill.paid).toFixed(2)} already paid on this bill.`
     return null
   }
 
@@ -386,29 +390,27 @@ export default function EditBillModal ({ isOpen, onClose, bill, onSave, isLoadin
           <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
             <div>
               <FieldLabel required>Invoice Date</FieldLabel>
-              <InputBase
-                type='date'
+              <DatePicker
+                size='lg'
                 value={invoiceDate}
-                onChange={e => {
-                  setInvoiceDate(e.target.value)
+                onChange={v => {
+                  setInvoiceDate(v)
                   // Allow auto-recalculation of due date based on original term
                   setUserEditedDueDate(false)
                 }}
-                disabled={isLoading}
               />
             </div>
             <div>
               <FieldLabel required>Due Date</FieldLabel>
-              <InputBase
-                type='date'
+              <DatePicker
+                size='lg'
                 value={dueDate}
-                onChange={e => {
+                invalid={!!dueDate && !!invoiceDate && dueDate < invoiceDate}
+                onChange={v => {
                   setUserEditedDueDate(true)
-                  setDueDate(e.target.value)
+                  setDueDate(v)
                   setAutoFilledHint('')
                 }}
-                disabled={isLoading}
-                min={invoiceDate || undefined}
               />
               {/* Auto-filled hint — shown when due date was auto-calculated */}
               {autoFilledHint && !userEditedDueDate && (
@@ -433,40 +435,24 @@ export default function EditBillModal ({ isOpen, onClose, bill, onSave, isLoadin
 
           <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
             <div>
-              <FieldLabel required>Total ({currency})</FieldLabel>
-              <div className='relative'>
-                <span className='absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-subtle'>{currency}</span>
-                <InputBase
-                  type='number'
-                  min='0'
-                  step='0.01'
-                  placeholder='0.00'
-                  value={total}
-                  onChange={e => {
-                    const cleaned = e.target.value.replace(/[^\d.]/g, '')
-                    setTotal(cleaned)
-                  }}
-                  onBlur={() => setTotal(clampMoney(total))}
-                  disabled={isLoading}
-                  className='pl-10'
-                />
-              </div>
+              <FieldLabel required>Total</FieldLabel>
+              <MoneyInput size='lg' currency={currency} value={total} onValueChange={setTotal} disabled={isLoading} />
             </div>
 
             {/* Balance summary (read-only) */}
             <div>
-              <FieldLabel>Balance / Paid</FieldLabel>
+              <FieldLabel>Paid so far · still owed</FieldLabel>
               <div className='px-3 py-2.5 bg-surface-2/60 border border-line rounded-lg text-sm'>
                 <div className='flex justify-between'>
                   <span className='text-muted'>Paid</span>
                   <span className='font-medium text-brand'>
-                    {currency} {Number(bill.paid ?? 0).toFixed(2)}
+                    {formatMoney(Number(bill.paid ?? 0), currency)}
                   </span>
                 </div>
                 <div className='flex justify-between mt-0.5'>
                   <span className='text-muted'>Balance</span>
                   <span className='font-bold text-brand'>
-                    {currency} {Number(bill.balance ?? Math.max(0, Number(total || 0) - Number(bill.paid ?? 0))).toFixed(2)}
+                    {formatMoney(Math.max(0, Number(total || 0) - Number(bill.paid ?? 0)), currency)}
                   </span>
                 </div>
               </div>

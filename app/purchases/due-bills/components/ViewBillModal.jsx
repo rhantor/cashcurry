@@ -1,4 +1,5 @@
 'use client'
+import { formatMoney } from '@/lib/region/currency'
 import { personName } from "@/lib/people";
 import React, { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -18,17 +19,12 @@ import {
   Download,
   AlertCircle,
   CheckCircle2,
-  Tag,
   Receipt
 } from 'lucide-react'
 import useCurrency from '@/app/hooks/useCurrency'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
-const makeFmtRM = currency => v =>
-  `${currency} ${Number(v ?? 0).toLocaleString(undefined, {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  })}`
+const makeFmtRM = currency => v => formatMoney(Number(v ?? 0), currency)
 
 const fmtDate = iso => {
   if (!iso) return '—'
@@ -278,7 +274,7 @@ function PaymentHistory ({ history, fmtRM }) {
                   )}
                   {personName(p.paidBy) && (
                     <span className='text-[10px] text-subtle'>
-                      by {p.paidBy.username}
+                      by {personName(p.paidBy)}
                     </span>
                   )}
                 </div>
@@ -383,7 +379,6 @@ export default function ViewBillModal ({ isOpen, onClose, bill }) {
               label='Invoice No.'
               value={bill.invoiceNo || bill.reference}
             />
-            <InfoRow icon={Tag} label='Vendor ID' value={bill.vendorId} mono />
             <InfoRow
               icon={Calendar}
               label='Invoice Date'
@@ -431,7 +426,7 @@ export default function ViewBillModal ({ isOpen, onClose, bill }) {
                   </div>
                   <div className='min-w-0'>
                     <p className='text-sm font-medium text-fg truncate'>
-                      {bill.createdBy.username || bill.createdBy.email}
+                      {personName(bill.createdBy)}
                     </p>
                     <p className='text-xs text-subtle capitalize'>
                       {bill.createdBy.role}

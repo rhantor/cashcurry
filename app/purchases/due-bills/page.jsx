@@ -32,7 +32,7 @@ import * as XLSX from "xlsx"
 import { PDFDocument } from 'pdf-lib'
 import { toast, confirmDialog } from "@/app/components/ui/notify";
 import { Badge, DataTable } from '@/app/components/ui'
-import { format } from 'date-fns'
+import { format, parseISO } from 'date-fns'
 
 // --- Helper Functions ---
 function daysBetween (aISO, bISO) {
@@ -298,16 +298,26 @@ export default function DueBillsPage () {
   }
 
   const handleDeleteClick = async billId => {
-    if (
-      await confirmDialog({ title: 'Delete this bill?', message: "The vendor's balance is adjusted to match.", danger: true })
-    ) {
-      try {
-        await deleteBill({ companyId, branchId, billId }).unwrap()
-        setSelectedIds(prev => prev.filter(id => id !== billId))
-      } catch (err) {
-        console.error('Failed to delete bill:', err)
-        toast.error('Failed to delete bill.')
-      }
+    const bill = allBills.find(b => b.id === billId)
+    const paidOn = Number(bill?.paid || 0)
+    if (paidOn > 0) {
+      toast.warning(`${fmtRM(paidOn)} has been paid on ${bill?.invoiceNo || 'this bill'}, so it can't be deleted. To close it, edit its total down to ${fmtRM(paidOn)}.`)
+      return
+    }
+    const ok = await confirmDialog({
+      title: `Delete bill ${bill?.invoiceNo || ''}?`.replace(' ?', '?'),
+      message: `${bill?.vendorName || 'The vendor'} will no longer be owed ${fmtRM(bill?.total)} for it.`,
+      confirmLabel: 'Delete bill',
+      danger: true
+    })
+    if (!ok) return
+    try {
+      await deleteBill({ companyId, branchId, billId }).unwrap()
+      setSelectedIds(prev => prev.filter(id => id !== billId))
+      toast.success('Bill deleted')
+    } catch (err) {
+      console.error('Failed to delete bill:', err)
+      toast.error(err?.message ? `Couldn't delete the bill: ${err.message}` : "Couldn't delete the bill.")
     }
   }
 
@@ -354,9 +364,10 @@ const handleSaveEdit = async (billId, formData) => {
     }).unwrap()
 
     setEditModalOpen(false)
+    toast.success('Bill saved')
   } catch (err) {
     console.error('Failed to update bill:', err)
-    toast.error('Failed to update bill.')
+    toast.error(err?.message ? `Couldn't save the bill: ${err.message}` : "Couldn't save the bill.")
   }
 }
 
@@ -416,7 +427,7 @@ const handleSaveEdit = async (billId, formData) => {
         }
       })
 
-      await payVendorBills({
+      const paid = await payVendorBills({
         companyId,
         branchId,
         vendorId,
@@ -435,11 +446,16 @@ const handleSaveEdit = async (billId, formData) => {
       await Promise.all([refetchUnpaid(), refetchPartial()])
       setPayOpen(false)
       setSelectedIds([])
-      toast.success('Payment recorded!')
+      const asked = allocations.reduce((n, a) => n + Number(a.amount || 0), 0)
+      if (paid && paid.total < Math.round(asked * 100) / 100) {
+        toast.warning(`Paid ${fmtRM(paid.total)} — part of a bill had been paid already, so only what was still owed was taken.`)
+      } else {
+        toast.success(`Paid ${fmtRM(paid?.total ?? asked)} to ${vendorName}`)
+      }
       router.refresh?.()
     } catch (e) {
       console.error(e)
-      toast.error('Failed to record payment.')
+      toast.error(e?.message ? `Couldn't record the payment: ${e.message}` : "Couldn't record the payment.")
     }
   }
 
@@ -843,13 +859,13 @@ const handleSaveEdit = async (billId, formData) => {
                   />
                 </th>
                 <th className='px-6 py-4 font-semibold text-fg'>
-                  Vendor & Bill Info
+                  Invoice
                 </th>
                 <th className='px-6 py-4 font-semibold text-fg'>
                   Status
                 </th>
                 <th className='px-6 py-4 font-semibold text-fg text-right'>
-                  Amount
+                  Still owed
                 </th>
                 <th className='px-6 py-4 font-semibold text-fg text-right'>
                   Due Date
@@ -886,11 +902,12 @@ const handleSaveEdit = async (billId, formData) => {
                       />
                     </td>
                     <td className='px-6 py-4'>
-                      <div className='font-medium text-fg'>
-                        {bill.vendorName}
+                      <div className='font-semibold text-fg'>
+                        {bill.invoiceNo || bill.reference || 'No invoice no.'}
                       </div>
                       <div className='text-xs text-muted mt-0.5'>
-                        Ref: {bill.invoiceNo || bill.reference || 'N/A'}
+                        {bill.vendorName}
+                        {bill.invoiceDate ? ` · dated ${format(parseISO(bill.invoiceDate), 'd MMM')}` : ''}
                       </div>
                     </td>
                     <td className='px-6 py-4'>
@@ -900,12 +917,14 @@ const handleSaveEdit = async (billId, formData) => {
                       <div className='font-bold text-fg'>
                         {fmtRM(bill.balance)}
                       </div>
-                      <div className='text-xs text-subtle'>
-                        Total: {fmtRM(bill.total)}
-                      </div>
+                      {Number(bill.paid) > 0 && (
+                        <div className='text-xs text-subtle'>
+                          {fmtRM(bill.paid)} paid of {fmtRM(bill.total)}
+                        </div>
+                      )}
                     </td>
                     <td className='px-6 py-4 text-right text-muted'>
-                      {bill.dueDate || '-'}
+                      {bill.dueDate ? format(parseISO(bill.dueDate), 'd MMM yyyy') : '—'}
                     </td>
                     <td className='px-6 py-4 text-center'>
                       <div className='flex items-center justify-center gap-1'>
@@ -989,7 +1008,8 @@ const handleSaveEdit = async (billId, formData) => {
 
                   {/* Reference */}
                   <div className='text-xs text-muted mb-3'>
-                    Ref: {bill.invoiceNo || bill.reference || 'N/A'}
+                    {bill.invoiceNo || bill.reference || 'No invoice no.'}
+                    {bill.invoiceDate ? ` · dated ${format(parseISO(bill.invoiceDate), 'd MMM')}` : ''}
                   </div>
 
                   {/* Bottom row: status + due date (left) | amounts (right) */}
@@ -997,16 +1017,18 @@ const handleSaveEdit = async (billId, formData) => {
                     <div className='space-y-1'>
                       <StatusBadge dueDays={bill.__dueInDays} />
                       <div className='text-xs text-subtle'>
-                        Due: {bill.dueDate || '—'}
+                        Due {bill.dueDate ? format(parseISO(bill.dueDate), 'd MMM yyyy') : '—'}
                       </div>
                     </div>
                     <div className='text-right'>
                       <div className='font-bold text-fg text-lg tabular-nums'>
                         {fmtRM(bill.balance)}
                       </div>
-                      <div className='text-xs text-subtle'>
-                        of {fmtRM(bill.total)}
-                      </div>
+                      {Number(bill.paid) > 0 && (
+                        <div className='text-xs text-subtle'>
+                          {fmtRM(bill.paid)} paid of {fmtRM(bill.total)}
+                        </div>
+                      )}
                     </div>
                   </div>
 

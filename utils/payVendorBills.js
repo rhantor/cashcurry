@@ -4,12 +4,15 @@ import { db } from "@/lib/firebase";
 import {
   collection,
   doc,
-  writeBatch,
+  runTransaction,
   serverTimestamp,
   increment,
-  getDoc,
   arrayUnion,
 } from "firebase/firestore";
+import { stampOf } from "@/lib/people";
+import { billStatus } from "@/lib/redux/api/vendorBillsApiSlice";
+
+const r2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
 
 /**
  * Record payment(s) against one or more vendor bills and mirror as a Cost entry.
@@ -28,7 +31,7 @@ import {
  * @param {string|null} [args.paymentFileURL=null] // backward compat specific file
  * @param {string[]} [args.attachments=[]] // NEW: multi-attachment array natively mirrored to generic viewer
  *
- * @returns {Promise<void>}
+ * @returns {Promise<{paymentId, total, applied}>} what was actually paid
  */
 export async function payVendorBills({
   companyId,
@@ -53,139 +56,106 @@ export async function payVendorBills({
 
   const now = serverTimestamp();
   const paymentDateStr = paymentDate || businessToday();
-  const batch = writeBatch(db);
+  const billsCol = collection(db, "companies", companyId, "branches", branchId, "vendorBills");
+  const paymentRef = doc(collection(db, "companies", companyId, "branches", branchId, "vendorPayments"));
+  const costRef = doc(collection(db, "companies", companyId, "branches", branchId, "costs"));
+  const vendorRef = doc(db, "companies", companyId, "vendors", vendorId);
+  const receipt = paymentFileURL || (attachments.length > 0 ? attachments[0] : null);
 
-  // --- 1) Create a vendor payment "header" (optional; useful for audit) ---
-  const paymentsCol = collection(
-    db,
-    "companies",
-    companyId,
-    "branches",
-    branchId,
-    "vendorPayments"
-  );
-  const paymentRef = doc(paymentsCol); // auto id
+  // All in one transaction: each bill is read as it is now, so two people
+  // paying the same bill at once can't both take its balance, and nothing is
+  // paid past what a bill still owes (the payment, the cost and the vendor's
+  // totals use what was actually applied).
+  return runTransaction(db, async (tx) => {
+    const wanted = allocations.map((x) => ({ ...x, amount: r2(x.amount) })).filter((x) => x.billId && x.amount > 0);
+    const snaps = await Promise.all(wanted.map((x) => tx.get(doc(billsCol, x.billId))));
 
-  const totalPaid = allocations.reduce((s, a) => s + Number(a.amount || 0), 0);
-
-  batch.set(paymentRef, {
-    vendorId,
-    vendorName: vendorName || "",
-    total: Number(totalPaid),
-    allocations, // [{ billId, amount }]
-    paidFromOffice, // "front" | "back"
-    paidMethod, // normalized already by caller
-    reference: reference || "",
-    createdBy: createdBy || {},
-    paymentDate: paymentDateStr,
-    createdAt: now,
-    createdAtClient: new Date().toISOString(),
-    receiptURL: paymentFileURL || (attachments.length > 0 ? attachments[0] : null),
-    attachments: attachments,
-  });
-
-  // --- 2) Apply allocations to each bill ---
-  const billsCol = collection(
-    db,
-    "companies",
-    companyId,
-    "branches",
-    branchId,
-    "vendorBills"
-  );
-
-  for (const { billId, amount } of allocations) {
-    const a = Number(amount || 0);
-    if (a <= 0) continue;
-
-    const billRef = doc(billsCol, billId);
-    const billSnap = await getDoc(billRef);
-    if (!billSnap.exists()) continue;
-
-    const bill = billSnap.data();
-    const prevPaid = Number(bill.paid || 0);
-    const prevTotal = Number(bill.total || 0);
-    const nextPaid = prevPaid + a;
-    const nextBalance = Math.max(0, prevTotal - nextPaid);
-
-    let nextStatus = "unpaid";
-    if (nextPaid <= 0) nextStatus = "unpaid";
-    else if (nextPaid < prevTotal) nextStatus = "partially_paid";
-    else nextStatus = "paid";
-
-    batch.update(billRef, {
-      paid: increment(a),
-      balance: nextBalance,
-      status: nextStatus,
-      updatedAt: now,
-      // Append payment record to history for the ViewBillModal
-      paymentHistory: arrayUnion({
-        amount: a,
-        paidFrom: paidFromOffice,
-        paidMethod: paidMethod || "",
-        paidBy: createdBy ? { username: createdBy.username || createdBy.email || "" } : {},
-        note: reference || "",
-        paymentDate: paymentDateStr,
-        paidAtClient: new Date().toISOString(),
-      }),
+    const applied = [];
+    const updates = [];
+    snaps.forEach((snap, i) => {
+      if (!snap.exists()) return;
+      const bill = snap.data();
+      if (bill.vendorId && bill.vendorId !== vendorId) throw new Error(`Bill ${bill.invoiceNo || snap.id} is from another vendor.`);
+      const total = r2(bill.total);
+      const paidBefore = r2(bill.paid);
+      const amount = Math.min(wanted[i].amount, r2(total - paidBefore));
+      if (amount <= 0) return;
+      const paidNow = r2(paidBefore + amount);
+      applied.push({ ...wanted[i], billId: snap.id, amount }); // keeps invoiceNo etc. for the cost report
+      updates.push([
+        snap.ref,
+        {
+          paid: paidNow,
+          balance: r2(total - paidNow),
+          status: billStatus(total, paidNow),
+          updatedAt: now,
+          paymentHistory: arrayUnion({
+            amount,
+            paidFrom: paidFromOffice,
+            paidMethod: paidMethod || "",
+            paidBy: stampOf(createdBy || {}),
+            note: reference || "",
+            paymentDate: paymentDateStr,
+            paidAtClient: new Date().toISOString(),
+          }),
+        },
+      ]);
     });
-  }
 
-  // --- 3) Mirror a single Cost entry for the payment (so it appears in Cost Report) ---
-  // If you prefer *per-allocation* cost rows, you can split this into multiple batch.set calls.
-  const costsCol = collection(
-    db,
-    "companies",
-    companyId,
-    "branches",
-    branchId,
-    "costs"
-  );
+    const totalPaid = r2(applied.reduce((n, x) => n + x.amount, 0));
+    if (totalPaid <= 0) throw new Error("These bills are already paid — nothing was taken.");
 
-  const costRef = doc(costsCol);
-  batch.set(costRef, {
-    // Required / standard fields your cost report expects:
-    date: paymentDateStr, // YYYY-MM-DD
-    amount: Number(totalPaid),
-    category: costCategory, // e.g. "Inventory"
-    description: reference?.trim()
-      ? `Vendor payment to ${vendorName} — ${reference}`
-      : `Vendor payment to ${vendorName}`,
-    fileURL: paymentFileURL || (attachments.length > 0 ? attachments[0] : null), 
-    attachments: attachments, // <- NEW: array representing all bound proof URLs
+    updates.forEach(([ref, data]) => tx.update(ref, data));
 
-    // Payment source flags for your dashboards
-    paidFromOffice, // "front" | "back"
-    paidMethod, // already normalized by caller
-    isFrontOffice: paidFromOffice === "front",
-    isBackOffice: paidFromOffice === "back",
-
-    // Audit
-    createdAt: now,
-    createdAtClient: new Date().toISOString(),
-    createdBy: createdBy || {},
-
-    // Optional linkage back to vendor payment
-    meta: {
+    // the payment, for Payments and the vendor's history
+    tx.set(paymentRef, {
       vendorId,
       vendorName: vendorName || "",
-      vendorPaymentId: paymentRef.id,
-      allocations, // could be helpful in drill-down
-      type: "vendor_payment",
-    },
-  });
+      total: totalPaid,
+      allocations: applied, // [{ billId, amount }]
+      paidFromOffice, // "front" | "back"
+      paidMethod,
+      reference: reference || "",
+      createdBy: createdBy || {},
+      paymentDate: paymentDateStr,
+      createdAt: now,
+      createdAtClient: new Date().toISOString(),
+      receiptURL: receipt,
+      attachments,
+    });
 
-  // --- 4) Update vendor aggregate AP if you track it here (optional) ---
-  // If you maintain vendors.currentBalance as "amount owed to vendor",
-  // decrease it by the total paid:
-  const vendorRef = doc(db, "companies", companyId, "vendors", vendorId);
-  batch.update(vendorRef, {
-    currentBalance: increment(-Number(totalPaid)),
-    totalPaid: increment(Number(totalPaid)),
-    lastPaymentDate: paymentDateStr,
-    updatedAt: now,
-  });
+    // the same money as a cost, so it is in the cost report and the cash / bank figures
+    tx.set(costRef, {
+      date: paymentDateStr, // YYYY-MM-DD
+      amount: totalPaid,
+      category: costCategory,
+      description: reference?.trim() ? `Vendor payment to ${vendorName} — ${reference}` : `Vendor payment to ${vendorName}`,
+      fileURL: receipt,
+      attachments,
+      paidFromOffice,
+      paidMethod,
+      isFrontOffice: paidFromOffice === "front",
+      isBackOffice: paidFromOffice === "back",
+      createdAt: now,
+      createdAtClient: new Date().toISOString(),
+      createdBy: createdBy || {},
+      meta: {
+        vendorId,
+        vendorName: vendorName || "",
+        vendorPaymentId: paymentRef.id,
+        allocations: applied,
+        type: "vendor_payment",
+      },
+    });
 
-  // --- Commit ---
-  await batch.commit();
+    // what the vendor is owed, and has been paid
+    tx.update(vendorRef, {
+      currentBalance: increment(-totalPaid),
+      totalPaid: increment(totalPaid),
+      lastPaymentDate: paymentDateStr,
+      updatedAt: now,
+    });
+
+    return { paymentId: paymentRef.id, total: totalPaid, applied };
+  });
 }
