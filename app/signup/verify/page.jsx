@@ -3,11 +3,12 @@ import React, { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { MailOpen, RotateCw } from "lucide-react";
-import Cookies from "js-cookie";
 import { useFinalizeSignupMutation, useResendVerificationMutation } from "@/lib/redux/api/authApiSlice";
 import { auth } from "@/lib/firebase";
 import AuthFrame from "@/app/components/auth/AuthFrame";
 import { Button } from "@/app/components/ui";
+import { signedIn } from "@/lib/session";
+import { clearPendingSignup, readPendingSignup } from "@/lib/signupPending";
 
 /**
  * Waiting for the new owner to click the link in the verification email.
@@ -18,11 +19,16 @@ function VerifySignup() {
   const searchParams = useSearchParams();
   const router = useRouter();
 
-  const uid = searchParams.get("uid");
-  const email = searchParams.get("email");
-  const companyName = searchParams.get("company");
-  const userName = searchParams.get("username");
-  const inviteCode = searchParams.get("inviteCode");
+  // from the address, or — if the page was closed and opened again — from
+  // the sign-up kept on this device
+  const [pending] = useState(() => (typeof window === "undefined" ? null : readPendingSignup()));
+  const pick = (k) => searchParams.get(k) || pending?.[k] || "";
+  const uid = pick("uid");
+  const email = pick("email");
+  const companyName = pick("company");
+  const userName = pick("username");
+  const name = pick("name");
+  const inviteCode = pick("inviteCode");
 
   const [msg, setMsg] = useState("");
   const [error, setError] = useState("");
@@ -37,13 +43,12 @@ function VerifySignup() {
         await auth.currentUser?.reload();
         if (auth.currentUser?.emailVerified) {
           clearInterval(interval);
-          const res = await finalizeSignup({ uid, email, userName, companyName, inviteCode });
+          const res = await finalizeSignup({ uid, email, userName, name, companyName, inviteCode });
           if (res.data) {
-            Cookies.set("isLoggedIn", "true", { path: "/", expires: 7 });
-            Cookies.set("role", "owner", { path: "/", expires: 7 });
-            Cookies.set("uid", res.data.uid, { path: "/", expires: 7 });
-            Cookies.set("companyId", res.data.companyId, { path: "/", expires: 7 });
-            localStorage.setItem("user", JSON.stringify({ uid: res.data.uid, companyId: res.data.companyId, userName, role: "owner" }));
+            // the app's session (and its routing cookies) learns who this is,
+            // as after a normal sign-in — before, the app opened without a role
+            signedIn({ uid: res.data.uid, email, username: userName, userName, name: name || userName, role: "owner", companyId: res.data.companyId, branchId: null });
+            clearPendingSignup();
             router.replace("/");
           } else {
             setError(res.error?.error || "Couldn't finish setting up the company.");
@@ -54,7 +59,7 @@ function VerifySignup() {
       }
     }, 4000);
     return () => clearInterval(interval);
-  }, [uid, email, companyName, userName, inviteCode, finalizeSignup, router]);
+  }, [uid, email, companyName, userName, name, inviteCode, finalizeSignup, router]);
 
   useEffect(() => {
     if (cooldown <= 0) return;

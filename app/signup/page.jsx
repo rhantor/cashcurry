@@ -8,16 +8,19 @@ import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { useSignupMutation } from "@/lib/redux/api/authApiSlice";
 import AuthFrame from "@/app/components/auth/AuthFrame";
+import { savePendingSignup } from "@/lib/signupPending";
 import { Button, Field, Input } from "@/app/components/ui";
 
 /**
- * Open a new company: an invite code (checked before any account is made),
- * the company's name, the owner's username, email and password. Then the
- * email is verified on the next screen.
+ * Open a new company: an invite code and the username (both checked before
+ * any account is made), the company's name, the owner's name, email and
+ * password. Then the email is verified on the next screen. Signing up again
+ * with the same email and password picks up a sign-up that didn't finish.
  */
 export default function SignupPage() {
   const [companyName, setCompanyName] = useState("");
   const [userName, setUserName] = useState("");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [inviteCode, setInviteCode] = useState("");
@@ -32,7 +35,8 @@ export default function SignupPage() {
     const er = {};
     if (!inviteCode.trim()) er.code = "Enter the invite code you were given";
     if (!companyName.trim()) er.company = "Enter the company's name";
-    if (!userName.trim()) er.user = "Pick a username";
+    if (!name.trim()) er.name = "Enter your name";
+    if (!/^[a-z0-9._-]{3,}$/i.test(userName.trim())) er.user = "3 or more letters or numbers, no spaces";
     if (!/^\S+@\S+\.\S+$/.test(email.trim())) er.email = "Enter a working email";
     if (password.length < 6) er.password = "At least 6 characters";
     setErrors(er);
@@ -51,13 +55,15 @@ export default function SignupPage() {
     setChecking(false);
     if (!codeSnap.exists() || codeSnap.data().used === true) return setErrors({ code: "That code isn't valid, or it has been used" });
 
+    // usernames are shared across the app — check this one is free
+    const taken = await getDoc(doc(db, "usernames", userName.trim().toLowerCase())).catch(() => null);
+    if (taken?.exists()) return setErrors({ user: "That username is taken — try another" });
+
     const res = await signup({ email: email.trim(), password });
     if (res.data) {
-      router.push(
-        `/signup/verify?uid=${res.data.uid}&email=${encodeURIComponent(email.trim())}&company=${encodeURIComponent(companyName.trim())}&username=${encodeURIComponent(
-          userName.trim()
-        )}&inviteCode=${encodeURIComponent(codeKey)}`
-      );
+      const pending = { uid: res.data.uid, email: email.trim(), company: companyName.trim(), username: userName.trim(), name: name.trim(), inviteCode: codeKey };
+      savePendingSignup(pending);
+      router.push(`/signup/verify?${new URLSearchParams(pending).toString()}`);
     } else {
       setErrors({ form: res.error?.error || "Couldn't create the account. Try again." });
     }
@@ -74,8 +80,11 @@ export default function SignupPage() {
         <Field label="Company name" error={errors.company}>
           {({ id, invalid }) => <Input id={id} size="lg" value={companyName} invalid={invalid} onChange={(e) => (setCompanyName(e.target.value), clear("company"))} placeholder="e.g. Saffron Empire Sdn Bhd" />}
         </Field>
+        <Field label="Your name" error={errors.name}>
+          {({ id, invalid }) => <Input id={id} size="lg" value={name} invalid={invalid} autoComplete="name" onChange={(e) => (setName(e.target.value), clear("name"))} placeholder="Shown on everything you enter" />}
+        </Field>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Your username" error={errors.user}>
+          <Field label="Username" error={errors.user} hint="To sign in">
             {({ id, invalid }) => <Input id={id} size="lg" value={userName} invalid={invalid} autoCapitalize="none" onChange={(e) => (setUserName(e.target.value), clear("user"))} />}
           </Field>
           <Field label="Email" error={errors.email}>

@@ -8,6 +8,7 @@ import { ArrowRight, Eye, EyeOff, FlaskConical, KeyRound, Lock, ShieldCheck, Use
 import { useLoginMutation } from "@/lib/redux/api/authApiSlice";
 import { USE_EMULATOR } from "@/lib/firebase";
 import { signedIn } from "@/lib/session";
+import { readPendingSignup } from "@/lib/signupPending";
 import BrandPanel, { Globe } from "@/app/components/auth/BrandPanel";
 import { Button, Logo, cn } from "@/app/components/ui";
 
@@ -28,6 +29,7 @@ const friendly = (message = "") => {
   const m = message.toLowerCase();
   if (/wrong-password|invalid-credential|invalid-login|user-not-found|not found|invalid username|invalid password|incorrect/.test(m)) return "That username or password isn't right.";
   if (/too-many-requests/.test(m)) return "Too many tries. Wait a minute, then try again.";
+  if (/metadata not found/.test(m)) return "This account's sign-up didn't finish. Go to Create an account and use the same email and password to finish it.";
   if (/network|offline|unavailable/.test(m)) return "Can't reach the server. Check the internet connection.";
   return message || "Couldn't sign in. Try again.";
 };
@@ -108,6 +110,8 @@ export default function LoginPage() {
     setError("");
     try {
       const res = await login({ usernameOrEmail: user, password: pass });
+      // a sign-up from this device that stopped before its company was made: finish it
+      if (res?.error?.status === "NO_METADATA" && readPendingSignup()) return router.push("/signup/verify");
       if (!res?.data) throw new Error(res?.error?.error || res?.error?.message || "Login failed");
       // The session caches the profile and sets the routing cookies.
       signedIn(res.data.user);
