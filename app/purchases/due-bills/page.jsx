@@ -124,6 +124,7 @@ export default function DueBillsPage () {
   const { ready, user, companyId, branchId } = useResolvedCompanyBranch()
   const currency = useCurrency()
   const fmtRM = makeFmtRM(currency)
+  const pdfRM = v => formatMoney(Number(v ?? 0), currency, { plain: true }) // PDF fonts have no ৳ or ₹
 
   // --- State ---
   const [searchTerm, setSearchTerm] = useState('')
@@ -464,7 +465,7 @@ const handleSaveEdit = async (billId, formData) => {
         v.name,
         v.billsCount,
         v.lastPurchaseTimestamp ? new Date(v.lastPurchaseTimestamp).toLocaleDateString() : "-",
-        fmtRM(v.totalPending),
+        pdfRM(v.totalPending),
         v.isEmergency
       ]);
 
@@ -503,7 +504,7 @@ const handleSaveEdit = async (billId, formData) => {
     doc.text("Total Outstanding Balance:", 155, finalY + 18, { align: 'right' });
     
     doc.setTextColor(46, 204, 113);
-    doc.text(`${fmtRM(totalPending)}`, 195, finalY + 18, { align: 'right' });
+    doc.text(`${pdfRM(totalPending)}`, 195, finalY + 18, { align: 'right' });
     
     doc.save(`Vendors_Summary_${Date.now()}.pdf`);
   };
@@ -564,8 +565,8 @@ const handleSaveEdit = async (billId, formData) => {
       b.invoiceNo || b.reference || "-",
       b.createdAt?.seconds ? new Date(b.createdAt.seconds * 1000).toLocaleDateString() : "-",
       b.dueDate || "-",
-      fmtRM(b.total),
-      fmtRM(b.balance)
+      pdfRM(b.total),
+      pdfRM(b.balance)
     ]);
 
     autoTable(doc, {
@@ -595,7 +596,7 @@ const handleSaveEdit = async (billId, formData) => {
     doc.text("Total Outstanding Balance:", 155, finalY + 18, { align: 'right' });
     
     doc.setTextColor(46, 204, 113);
-    doc.text(`${fmtRM(totalPending)}`, 195, finalY + 18, { align: 'right' });
+    doc.text(`${pdfRM(totalPending)}`, 195, finalY + 18, { align: 'right' });
 
     const pdfsToMerge = [];
     for (const bill of vendorBills) {

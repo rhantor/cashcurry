@@ -61,6 +61,7 @@ export default function VendorUnpaidBills({ companyId, branchId, vendorId }) {
   const isLoading = loadingUnpaid || loadingPartial;
 
   const fmtRM = (v) => formatMoney(Number(v ?? 0), currency);
+  const pdfRM = (v) => formatMoney(Number(v ?? 0), currency, { plain: true }); // PDF fonts have no ৳ or ₹
 
   const totalBalance = bills.reduce((sum, b) => sum + Number(b.balance ?? 0), 0);
 
@@ -80,8 +81,8 @@ export default function VendorUnpaidBills({ companyId, branchId, vendorId }) {
       formatDate(b.invoiceDate),
       b.invoiceNo || b.reference || "-",
       formatDate(b.dueDate),
-      fmtRM(b.total),
-      fmtRM(b.balance)
+      pdfRM(b.total),
+      pdfRM(b.balance)
     ]);
     
     autoTable(doc, {
@@ -99,7 +100,7 @@ export default function VendorUnpaidBills({ companyId, branchId, vendorId }) {
     const finalY = doc.lastAutoTable.finalY;
     doc.setFontSize(12);
     doc.setTextColor(0);
-    doc.text(`Total Outstanding: ${fmtRM(totalBalance)}`, 196, finalY + 10, { align: 'right' });
+    doc.text(`Total Outstanding: ${pdfRM(totalBalance)}`, 196, finalY + 10, { align: 'right' });
     
     doc.save(`Outstanding_Statement_${bills[0].vendorName?.replace(/\s+/g, '_') || 'Vendor'}.pdf`);
   };

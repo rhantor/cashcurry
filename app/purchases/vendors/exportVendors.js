@@ -37,7 +37,7 @@ export function exportVendorsExcel(vendors, mode) {
 }
 
 export function exportVendorsPDF(vendors, currency) {
-  const money = (v) => formatMoney(Number(v || 0), currency);
+  const money = (v) => formatMoney(Number(v || 0), currency, { plain: true }); // PDF fonts have no ৳ or ₹
   const doc = new jsPDF();
   doc.setFontSize(20);
   doc.text("Vendor Financial Directory", 14, 22);

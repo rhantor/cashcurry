@@ -87,6 +87,7 @@ export default function VendorPaidBills({ companyId, branchId, vendorId }) {
   );
 
   const fmtRM = (v) => formatMoney(Number(v ?? 0), currency);
+  const pdfRM = (v) => formatMoney(Number(v ?? 0), currency, { plain: true }); // PDF fonts have no ৳ or ₹
 
   const bills = useMemo(() => {
     const rows = paidBills.map((b) => ({ ...b, __lastPaid: lastPaidOf(b) }));
@@ -139,7 +140,7 @@ export default function VendorPaidBills({ companyId, branchId, vendorId }) {
           b.invoiceNo || b.reference || "-",
           formatDate(b.__lastPaid),
           String(b.paymentHistory?.length || 0),
-          fmtRM(b.total),
+          pdfRM(b.total),
         ]),
         theme: 'grid',
         headStyles: { fillColor: [16, 185, 129] }, // mint-500
@@ -153,7 +154,7 @@ export default function VendorPaidBills({ companyId, branchId, vendorId }) {
           formatDate(p.paymentDate || p.createdISO),
           METHOD_LABELS[p.paidMethod] || p.paidMethod || "-",
           p.reference || "-",
-          fmtRM(p.total ?? p.totalPaid),
+          pdfRM(p.total ?? p.totalPaid),
         ]),
         theme: 'grid',
         headStyles: { fillColor: [16, 185, 129] }, // mint-500
@@ -166,8 +167,8 @@ export default function VendorPaidBills({ companyId, branchId, vendorId }) {
     doc.setTextColor(0);
     doc.text(
       onBills
-        ? `${bills.length} bill(s) — Total: ${fmtRM(billsTotal)}`
-        : `${visiblePayments.length} payment(s) — Total Paid: ${fmtRM(paymentsTotal)}`,
+        ? `${bills.length} bill(s) — Total: ${pdfRM(billsTotal)}`
+        : `${visiblePayments.length} payment(s) — Total Paid: ${pdfRM(paymentsTotal)}`,
       196,
       finalY + 10,
       { align: 'right' }

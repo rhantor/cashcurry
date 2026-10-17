@@ -1,4 +1,7 @@
 "use client";
+import { personName } from "@/lib/people";
+import { Select } from "@/app/components/ui";
+import { formatMoney } from "@/lib/region/currency";
 import React, { useMemo, useState } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
 import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
@@ -39,11 +42,11 @@ const guideRows = (guide) => {
   return (guide?.itemIds || []).map((itemId) => ({ itemId, parQty: "" }));
 };
 
-const money = (n) => Number(n || 0).toFixed(2);
 
 export default function OrderGuidesPage() {
   const { ready, companyId, branchId, user } = useResolvedCompanyBranch();
   const currency = useCurrency();
+  const fmtMoney = (n) => formatMoney(n, currency);
   const router = useRouter();
   const { toastOk, toastError, toastNode } = useToast();
 
@@ -250,7 +253,7 @@ export default function OrderGuidesPage() {
           })),
           notes: `Generated from Order Guide: ${selectedGuide.name}`,
           createdBy: user?.uid || "Unknown User",
-          createdByName: user?.displayName || user?.email || "Unknown",
+          createdByName: personName(user, "Unknown"),
           totalEst: orderTotal,
           status: "Pending", // Maps to Purchase Orders pipeline
         },
@@ -267,16 +270,16 @@ export default function OrderGuidesPage() {
 
   /* --------------------------------- render -------------------------------- */
   return (
-    <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-5 pb-24">
+    <div className="mx-auto max-w-7xl space-y-5 px-4 py-5 pb-24">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-fg tracking-tight">Order Guides</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-fg">Order guides</h1>
           <p className="text-muted text-sm mt-0.5">Tap a guide to place today&apos;s order.</p>
         </div>
         <button
           onClick={() => handleOpenBuilder()}
           disabled={busy}
-          className="min-h-[48px] px-5 rounded-2xl bg-brand text-white font-semibold
+          className="min-h-[48px] px-5 rounded-2xl bg-brand text-brand-fg font-semibold
                      flex items-center justify-center gap-2 active:brightness-95 disabled:opacity-50 transition-colors"
         >
           <Plus className="w-5 h-5" /> New Guide
@@ -335,7 +338,7 @@ export default function OrderGuidesPage() {
 
               <button
                 onClick={() => handleOpenOrder(guide)}
-                className="mt-4 min-h-[52px] w-full rounded-2xl bg-brand text-white font-bold text-base
+                className="mt-4 min-h-[52px] w-full rounded-2xl bg-brand text-brand-fg font-bold text-base
                            flex items-center justify-center gap-2 active:brightness-95 transition-colors"
               >
                 <ShoppingCart className="w-5 h-5" /> Place Order
@@ -354,7 +357,7 @@ export default function OrderGuidesPage() {
             </p>
             <button
               onClick={() => handleOpenBuilder()}
-              className="mt-5 min-h-[48px] px-6 rounded-2xl bg-brand text-white font-semibold active:brightness-95"
+              className="mt-5 min-h-[48px] px-6 rounded-2xl bg-brand text-brand-fg font-semibold active:brightness-95"
             >
               Create your first guide
             </button>
@@ -376,13 +379,13 @@ export default function OrderGuidesPage() {
                 {chosen.length} item{chosen.length === 1 ? "" : "s"}
               </p>
               <p className="text-xl font-bold text-fg tabular-nums truncate">
-                {currency} {money(orderTotal)}
+                {fmtMoney(orderTotal)}
               </p>
             </div>
             <button
               onClick={handleSubmitOrder}
               disabled={busy || chosen.length === 0}
-              className="flex-1 min-h-[52px] rounded-2xl bg-brand text-white font-bold text-base
+              className="flex-1 min-h-[52px] rounded-2xl bg-brand text-brand-fg font-bold text-base
                          active:brightness-95 disabled:opacity-40 transition-colors"
             >
               {creatingOrder ? "Sending…" : "Submit Order"}
@@ -438,12 +441,12 @@ export default function OrderGuidesPage() {
                         </div>
                         <p className="text-xs text-muted mt-0.5">
                           {item.category ? `${item.category} · ` : ""}
-                          {currency} {money(item.estPrice)} / {item.unit}
+                          {fmtMoney(item.estPrice)} / {item.unit}
                         </p>
                       </div>
                       {picked && (
                         <p className="text-base font-bold text-fg tabular-nums shrink-0">
-                          {currency} {money(qty * Number(item.estPrice || 0))}
+                          {fmtMoney(qty * Number(item.estPrice || 0))}
                         </p>
                       )}
                     </div>
@@ -475,7 +478,7 @@ export default function OrderGuidesPage() {
           <button
             onClick={handleSaveGuide}
             disabled={busy}
-            className="w-full min-h-[52px] rounded-2xl bg-brand text-white font-bold text-base
+            className="w-full min-h-[52px] rounded-2xl bg-brand text-brand-fg font-bold text-base
                        active:brightness-95 disabled:opacity-40 transition-colors"
           >
             Save Guide ({builderForm.rows.length} item{builderForm.rows.length === 1 ? "" : "s"})
@@ -497,12 +500,10 @@ export default function OrderGuidesPage() {
 
           <div>
             <label className="block text-sm font-semibold text-fg mb-1.5">Supplier</label>
-            <select
+            <Select
               value={builderForm.vendorId}
               onChange={(e) => setBuilderForm((f) => ({ ...f, vendorId: e.target.value }))}
-              className="w-full min-h-[48px] px-4 text-[15px] border border-line rounded-2xl bg-surface-2/60
-                         focus:bg-surface focus:border-brand focus:ring-2 focus:ring-[var(--cc-ring)]/20 outline-none
-                         transition-colors"
+              className="h-12"
             >
               <option value="">Choose a supplier…</option>
               {vendors.map((v) => (
@@ -510,7 +511,7 @@ export default function OrderGuidesPage() {
                   {v.name}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
 
           <div>

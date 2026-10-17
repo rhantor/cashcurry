@@ -1,4 +1,8 @@
 "use client";
+import { format } from "date-fns";
+import { personName } from "@/lib/people";
+import { DatePicker } from "@/app/components/ui";
+import { formatMoney } from "@/lib/region/currency";
 import { businessToday } from "@/lib/region";
 import React, { useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
@@ -75,12 +79,12 @@ const lineTotal = (row, qtyKey = "requestedQty", priceKey = "estPrice") =>
 const sumLines = (rows = [], qtyKey, priceKey) =>
   rows.reduce((acc, row) => acc + lineTotal(row, qtyKey, priceKey), 0);
 
-const money = (n) => Number(n || 0).toFixed(2);
 const todayISO = () => businessToday(); // on the branch's clock
 
 export default function PurchaseOrdersPage() {
   const { ready, companyId, branchId, user } = useResolvedCompanyBranch();
   const currency = useCurrency();
+  const fmtMoney = (n) => formatMoney(n, currency);
   const router = useRouter();
   const dispatch = useDispatch();
   const { toastOk, toastError, toastNode } = useToast();
@@ -342,7 +346,7 @@ export default function PurchaseOrdersPage() {
           totalEst: sumLines(validItems),
           lastEditedAt: new Date().toISOString(),
           lastEditedBy: user?.uid || "",
-          lastEditedByName: user?.displayName || user?.email || "",
+          lastEditedByName: personName(user),
           ...(resetApproval
             ? {
                 status: "Pending",
@@ -413,7 +417,7 @@ export default function PurchaseOrdersPage() {
         {
           status: "Approved",
           approvedBy: user?.uid || "",
-          approvedByName: user?.displayName || user?.email || "",
+          approvedByName: personName(user),
           approvedAt: new Date().toISOString(),
           selfApproved: isSelf,
           rejectionReason: "",
@@ -428,7 +432,7 @@ export default function PurchaseOrdersPage() {
         {
           status: "Rejected",
           rejectedBy: user?.uid || "",
-          rejectedByName: user?.displayName || user?.email || "",
+          rejectedByName: personName(user),
           rejectedAt: new Date().toISOString(),
           rejectionReason: reason,
         },
@@ -461,13 +465,13 @@ export default function PurchaseOrdersPage() {
         title: "Approve this order?",
         message: isSelf
           ? `You raised this order for ${order.vendorName}. Approving it yourself is allowed, but it will be recorded as a self-approval.`
-          : `${order.vendorName} · ${currency} ${money(order.totalEst)}. Once approved it can be sent to the supplier.`,
+          : `${order.vendorName} · ${fmtMoney(order.totalEst)}. Once approved it can be sent to the supplier.`,
         confirmLabel: "Approve",
         tone: "default",
       },
       reject: {
         title: "Reject this order?",
-        message: `${order.vendorName} · ${currency} ${money(order.totalEst)}. Whoever raised it will see your reason.`,
+        message: `${order.vendorName} · ${fmtMoney(order.totalEst)}. Whoever raised it will see your reason.`,
         confirmLabel: "Reject order",
         tone: "danger",
         requireReason: true,
@@ -521,15 +525,15 @@ export default function PurchaseOrdersPage() {
     "w-11 h-11 flex items-center justify-center rounded-xl text-muted bg-surface-2/60 active:bg-surface-2 transition-colors";
 
   return (
-    <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-4 pb-24">
+    <div className="mx-auto max-w-7xl space-y-4 px-4 py-5 pb-24">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-fg tracking-tight">Purchase Orders</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-fg">Purchase orders</h1>
           <p className="text-muted text-sm mt-0.5">Send orders, then receive the goods when they arrive.</p>
         </div>
         <button
           onClick={() => router.push("/purchases/order-guides")}
-          className="min-h-[48px] px-5 rounded-2xl bg-brand text-white font-semibold
+          className="min-h-[48px] px-5 rounded-2xl bg-brand text-brand-fg font-semibold
                      flex items-center justify-center gap-2 active:brightness-95 transition-colors"
         >
           <Plus className="w-5 h-5" /> New Order
@@ -549,7 +553,7 @@ export default function PurchaseOrdersPage() {
               onClick={() => setStatusFilter(tab.id)}
               className={`flex-1 sm:flex-none sm:px-6 min-h-[44px] rounded-2xl font-semibold text-sm transition-colors ${
                 statusFilter === tab.id
-                  ? "bg-brand text-white"
+                  ? "bg-brand text-brand-fg"
                   : "bg-surface text-muted border border-line active:bg-surface-2"
               }`}
             >
@@ -597,7 +601,7 @@ export default function PurchaseOrdersPage() {
 
               <div className="flex items-baseline justify-between gap-2 mb-3">
                 <p className="text-2xl font-bold text-fg tabular-nums">
-                  {currency} {money(status === "Received" ? order.finalTotal : order.totalEst)}
+                  {fmtMoney(status === "Received" ? order.finalTotal : order.totalEst)}
                 </p>
                 <p className="text-xs text-subtle shrink-0">
                   {status === "Received" ? "billed" : "estimated"}
@@ -608,8 +612,8 @@ export default function PurchaseOrdersPage() {
                 <p className="flex justify-between gap-2">
                   <span className="font-mono text-subtle">{poReference(order)}</span>
                   <span>
-                    {order.items?.length || 0} items ·{" "}
-                    {order.createdAt ? new Date(order.createdAt.seconds * 1000).toLocaleDateString() : "-"}
+                    {order.items?.length || 0} item{order.items?.length === 1 ? "" : "s"} ·{" "}
+                    {order.createdAt?.seconds ? format(new Date(order.createdAt.seconds * 1000), "d MMM yyyy") : "-"}
                   </span>
                 </p>
 
@@ -633,7 +637,7 @@ export default function PurchaseOrdersPage() {
 
                 {order.lastEditedAt && status !== "Received" && (
                   <p className="text-subtle">
-                    Edited {new Date(order.lastEditedAt).toLocaleDateString()}
+                    Edited {format(new Date(order.lastEditedAt), "d MMM yyyy")}
                     {order.lastEditedByName ? ` by ${order.lastEditedByName}` : ""}
                   </p>
                 )}
@@ -683,7 +687,7 @@ export default function PurchaseOrdersPage() {
                 {(status === "Approved" || (status === "Pending" && !requireApproval)) && (
                   <button
                     onClick={() => handleSend(order)}
-                    className="w-full min-h-[48px] rounded-2xl bg-blue-600 text-white font-bold
+                    className="w-full min-h-[48px] rounded-2xl bg-info text-white font-bold
                                flex items-center justify-center gap-2 active:bg-blue-700 transition-colors"
                   >
                     <Send className="w-5 h-5" /> Send to Supplier
@@ -693,7 +697,7 @@ export default function PurchaseOrdersPage() {
                 {status === "Sent" && (
                   <button
                     onClick={() => handleOpenReceive(order)}
-                    className="w-full min-h-[48px] rounded-2xl bg-brand text-white font-bold
+                    className="w-full min-h-[48px] rounded-2xl bg-brand text-brand-fg font-bold
                                flex items-center justify-center gap-2 active:brightness-95 transition-colors"
                   >
                     <PackageOpen className="w-5 h-5" /> Goods Arrived
@@ -753,7 +757,7 @@ export default function PurchaseOrdersPage() {
             {orders.length === 0 && (
               <button
                 onClick={() => router.push("/purchases/order-guides")}
-                className="mt-5 min-h-[48px] px-6 rounded-2xl bg-brand text-white font-semibold active:brightness-95"
+                className="mt-5 min-h-[48px] px-6 rounded-2xl bg-brand text-brand-fg font-semibold active:brightness-95"
               >
                 Go to Order Guides
               </button>
@@ -774,13 +778,13 @@ export default function PurchaseOrdersPage() {
             <div className="min-w-0">
               <p className="text-xs font-semibold text-subtle uppercase tracking-wide">New total</p>
               <p className="text-xl font-bold text-fg tabular-nums truncate">
-                {currency} {money(editTotal)}
+                {fmtMoney(editTotal)}
               </p>
             </div>
             <button
               onClick={handleSaveEdit}
               disabled={busy}
-              className="flex-1 min-h-[52px] rounded-2xl bg-brand text-white font-bold text-base
+              className="flex-1 min-h-[52px] rounded-2xl bg-brand text-brand-fg font-bold text-base
                          active:brightness-95 disabled:opacity-40 transition-colors"
             >
               Save Changes
@@ -801,7 +805,7 @@ export default function PurchaseOrdersPage() {
                   <p className="font-semibold text-fg text-[15px] leading-snug">{item.name}</p>
                   <p className="text-xs text-muted mt-0.5">
                     {item.category ? `${item.category} · ` : ""}
-                    {currency} {money(lineTotal(item))} total
+                    {fmtMoney(lineTotal(item))} total
                   </p>
                 </div>
                 <button
@@ -925,13 +929,13 @@ export default function PurchaseOrdersPage() {
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs font-semibold text-subtle uppercase tracking-wide">Invoice total</p>
               <p className="text-xl font-bold text-fg tabular-nums">
-                {currency} {money(receiveTotal)}
+                {fmtMoney(receiveTotal)}
               </p>
             </div>
             <button
               onClick={handleReceiveOrder}
               disabled={busy || !invoiceFile}
-              className="w-full min-h-[52px] rounded-2xl bg-brand text-white font-bold text-base
+              className="w-full min-h-[52px] rounded-2xl bg-brand text-brand-fg font-bold text-base
                          active:brightness-95 disabled:opacity-40 transition-colors"
             >
               {uploading
@@ -989,17 +993,10 @@ export default function PurchaseOrdersPage() {
                            transition-colors"
               />
             </label>
-            <label className="block">
+            <div>
               <span className="block text-sm font-semibold text-fg mb-1.5">Invoice date</span>
-              <input
-                type="date"
-                value={receiveData.invoiceDate}
-                onChange={(e) => setReceiveData((p) => ({ ...p, invoiceDate: e.target.value }))}
-                className="w-full min-h-[48px] px-4 text-[15px] border border-line rounded-2xl bg-surface-2/60
-                           focus:bg-surface focus:border-brand focus:ring-2 focus:ring-[var(--cc-ring)]/20 outline-none
-                           transition-colors"
-              />
-            </label>
+              <DatePicker size="lg" value={receiveData.invoiceDate} onChange={(v) => setReceiveData((p) => ({ ...p, invoiceDate: v }))} />
+            </div>
           </div>
 
           <div className="space-y-2.5">
@@ -1021,7 +1018,7 @@ export default function PurchaseOrdersPage() {
                       </p>
                     </div>
                     <p className="text-base font-bold text-fg tabular-nums shrink-0">
-                      {currency} {money(lineTotal(item, "receivedQty", "finalPrice"))}
+                      {fmtMoney(lineTotal(item, "receivedQty", "finalPrice"))}
                     </p>
                   </div>
 

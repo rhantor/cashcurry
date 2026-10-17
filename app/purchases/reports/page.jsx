@@ -1,4 +1,7 @@
 "use client";
+import { Button, DateRangePicker, Select } from "@/app/components/ui";
+import { format as fmtDate, parseISO } from "date-fns";
+import { formatMoney, currencyInfo } from "@/lib/region/currency";
 import React, { useMemo, useState } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
 import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
@@ -23,6 +26,7 @@ import { loadLogo } from "@/utils/pdf/purchaseOrderPdf";
 import { FileText, Sheet as SheetIcon, Package, TrendingUp, Calendar } from "lucide-react";
 
 const money = (n) => Number(n || 0).toFixed(2);
+const niceDay = (k) => (k ? fmtDate(parseISO(k), "d MMM yyyy") : "");
 
 /** Compact form for headline numbers — 12.9K rather than 12,946. */
 const compact = (n) => {
@@ -56,6 +60,7 @@ function StatTile({ label, value, sub, accent = false }) {
 export default function PurchaseReportPage() {
   const { ready, companyId, branchId } = useResolvedCompanyBranch();
   const currency = useCurrency();
+  const fmtMoney = (n) => formatMoney(n, currency);
   const { toastOk, toastError, toastNode } = useToast();
 
   const presets = useMemo(() => dateRangePresets(), []);
@@ -176,38 +181,26 @@ export default function PurchaseReportPage() {
   const rangeChip = (activeChip) =>
     `min-h-[44px] px-4 rounded-2xl text-sm font-semibold transition-colors ${
       activeChip
-        ? "bg-brand text-white"
+        ? "bg-brand text-brand-fg"
         : "bg-surface text-muted border border-line hover:bg-surface-2 active:bg-surface-2"
     }`;
 
   return (
-    <div className="p-4 sm:p-6 max-w-6xl mx-auto space-y-4 pb-24">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+    <div className="mx-auto max-w-7xl space-y-4 px-4 py-5 pb-24">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-fg tracking-tight">Purchase Report</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-fg">Purchase report</h1>
           <p className="text-muted text-sm mt-0.5">
             What you bought, how much of it, and what it cost.
           </p>
         </div>
         <div className="flex gap-2">
-          <button
-            onClick={handleCsv}
-            disabled={busy || loading}
-            className="flex-1 sm:flex-none min-h-[48px] px-4 rounded-2xl bg-surface border border-line
-                       text-fg font-semibold flex items-center justify-center gap-2
-                       hover:bg-surface-2 active:bg-surface-2 disabled:opacity-50 transition-colors"
-          >
-            <SheetIcon className="w-5 h-5" /> CSV
-          </button>
-          <button
-            onClick={handlePdf}
-            disabled={busy || loading}
-            className="flex-1 sm:flex-none min-h-[48px] px-4 rounded-2xl bg-brand text-white font-semibold
-                       flex items-center justify-center gap-2 active:brightness-95 disabled:opacity-50
-                       transition-colors"
-          >
-            <FileText className="w-5 h-5" /> {busy ? "Building…" : "PDF"}
-          </button>
+          <Button variant="secondary" icon={SheetIcon} className="flex-1 sm:flex-none" disabled={busy || loading} onClick={handleCsv}>
+            CSV
+          </Button>
+          <Button icon={FileText} className="flex-1 sm:flex-none" loading={busy} disabled={loading} onClick={handlePdf}>
+            PDF
+          </Button>
         </div>
       </div>
 
@@ -226,34 +219,15 @@ export default function PurchaseReportPage() {
         </div>
 
         {rangeId === "custom" && (
-          <div className="flex flex-col sm:flex-row gap-2.5">
-            <label className="flex-1">
-              <span className="block text-xs font-medium text-muted mb-1">From</span>
-              <input
-                type="date"
-                value={custom.start}
-                max={custom.end || undefined}
-                onChange={(e) => setCustom((c) => ({ ...c, start: e.target.value }))}
-                className="w-full min-h-[48px] px-4 text-[15px] border border-line rounded-2xl bg-surface-2/60
-                           focus:bg-surface focus:border-brand focus:ring-2 focus:ring-[var(--cc-ring)]/20 outline-none"
-              />
-            </label>
-            <label className="flex-1">
-              <span className="block text-xs font-medium text-muted mb-1">To</span>
-              <input
-                type="date"
-                value={custom.end}
-                min={custom.start || undefined}
-                onChange={(e) => setCustom((c) => ({ ...c, end: e.target.value }))}
-                className="w-full min-h-[48px] px-4 text-[15px] border border-line rounded-2xl bg-surface-2/60
-                           focus:bg-surface focus:border-brand focus:ring-2 focus:ring-[var(--cc-ring)]/20 outline-none"
-              />
-            </label>
-          </div>
+          <DateRangePicker
+            className="sm:w-72"
+            value={custom.start && custom.end ? { from: custom.start, to: custom.end } : null}
+            onChange={(v) => setCustom({ start: v?.from || "", end: v?.to || "" })}
+          />
         )}
 
         <p className="text-xs text-muted">
-          {active.start} to {active.end} · counts goods actually received, at the invoiced price
+          {niceDay(active.start)} – {niceDay(active.end)} · counts goods actually received, at the invoiced price
         </p>
       </div>
 
@@ -261,27 +235,27 @@ export default function PurchaseReportPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         <StatTile
           label="Total spend"
-          value={`${currency} ${compact(shownTotals.spend)}`}
-          sub={`${currency} ${money(shownTotals.spend)}`}
+          value={`${currencyInfo(currency).symbol} ${compact(shownTotals.spend)}`}
+          sub={`${fmtMoney(shownTotals.spend)}`}
           accent
         />
         <StatTile label="Products bought" value={compact(visible.length)} sub="distinct items" />
         <StatTile label="Deliveries received" value={compact(totals.orderCount)} sub="purchase orders" />
         <StatTile
           label="Average per delivery"
-          value={`${currency} ${compact(totals.avgOrderValue)}`}
-          sub={`${currency} ${money(totals.avgOrderValue)}`}
+          value={`${currencyInfo(currency).symbol} ${compact(totals.avgOrderValue)}`}
+          sub={`${fmtMoney(totals.avgOrderValue)}`}
         />
       </div>
 
       {/* ------------------------------- filters ------------------------------- */}
       <div className="space-y-2.5">
         <div className="flex flex-col sm:flex-row gap-2.5">
-          <select
+          <Select
             value={vendorId}
             onChange={(e) => setVendorId(e.target.value)}
-            className="flex-1 min-h-[48px] px-4 text-[15px] border border-line rounded-2xl bg-surface
-                       focus:border-brand focus:ring-2 focus:ring-[var(--cc-ring)]/20 outline-none transition-colors"
+            className="h-12 flex-1"
+            aria-label="Supplier"
           >
             <option value="">All suppliers</option>
             {vendors.map((v) => (
@@ -289,17 +263,17 @@ export default function PurchaseReportPage() {
                 {v.name}
               </option>
             ))}
-          </select>
-          <select
+          </Select>
+          <Select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="sm:w-56 min-h-[48px] px-4 text-[15px] border border-line rounded-2xl bg-surface
-                       focus:border-brand focus:ring-2 focus:ring-[var(--cc-ring)]/20 outline-none transition-colors"
+            className="h-12 sm:w-56"
+            aria-label="Sort"
           >
             <option value="spend">Sort by spend</option>
             <option value="qty">Sort by quantity</option>
             <option value="name">Sort by name</option>
-          </select>
+          </Select>
         </div>
 
         <ItemFilterBar
@@ -374,7 +348,7 @@ export default function PurchaseReportPage() {
                   <td className="px-4 py-3">Total</td>
                   <td className="px-4 py-3 text-right tabular-nums">{shownTotals.qty}</td>
                   <td className="px-4 py-3 text-right tabular-nums">
-                    {currency} {money(shownTotals.spend)}
+                    {fmtMoney(shownTotals.spend)}
                   </td>
                   <td colSpan={4} />
                 </tr>
@@ -397,7 +371,7 @@ export default function PurchaseReportPage() {
                     <p className="text-xs text-muted mt-0.5">{r.category}</p>
                   </div>
                   <p className="text-base font-bold text-fg tabular-nums shrink-0">
-                    {currency} {money(r.spend)}
+                    {fmtMoney(r.spend)}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted mt-2">
@@ -410,10 +384,10 @@ export default function PurchaseReportPage() {
                 </div>
               </button>
             ))}
-            <div className="rounded-2xl bg-brand text-white p-4 flex items-center justify-between">
+            <div className="rounded-2xl bg-brand text-brand-fg p-4 flex items-center justify-between">
               <span className="text-sm font-semibold">Total</span>
               <span className="text-lg font-bold tabular-nums">
-                {currency} {money(shownTotals.spend)}
+                {fmtMoney(shownTotals.spend)}
               </span>
             </div>
           </div>
@@ -431,16 +405,16 @@ export default function PurchaseReportPage() {
         {detail && (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-3">
-              <StatTile label="Total spend" value={`${currency} ${money(detail.spend)}`} accent />
-              <StatTile label="Average price" value={`${currency} ${money(detail.avgPrice)}`} sub={`per ${detail.unit}`} />
+              <StatTile label="Total spend" value={`${fmtMoney(detail.spend)}`} accent />
+              <StatTile label="Average price" value={`${fmtMoney(detail.avgPrice)}`} sub={`per ${detail.unit}`} />
             </div>
 
             {detail.minPrice !== detail.maxPrice && (
               <div className="rounded-2xl border border-warning/30 bg-warning-soft/60 p-3.5 flex items-start gap-2.5">
                 <TrendingUp className="w-5 h-5 text-warning shrink-0 mt-0.5" />
                 <p className="text-sm text-warning">
-                  Price moved between {currency} {money(detail.minPrice)} and {currency}{" "}
-                  {money(detail.maxPrice)} in this period.
+                  Price moved between {fmtMoney(detail.minPrice)} and{" "}
+                  {fmtMoney(detail.maxPrice)} in this period.
                 </p>
               </div>
             )}
@@ -460,7 +434,7 @@ export default function PurchaseReportPage() {
                       </div>
                       <div className="text-right shrink-0">
                         <p className="font-bold text-fg tabular-nums text-sm">
-                          {currency} {money(h.value)}
+                          {fmtMoney(h.value)}
                         </p>
                         <p className="text-xs text-muted tabular-nums">
                           {h.qty} {detail.unit} @ {money(h.price)}
