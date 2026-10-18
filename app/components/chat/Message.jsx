@@ -42,7 +42,7 @@ function Files({ files, mine, onOpenPhoto }) {
         <div className={cn("grid gap-1 overflow-hidden rounded-xl", photos.length > 1 && "grid-cols-2")}>
           {photos.slice(0, 4).map((f, i) => (
             <button key={f.path || f.url} type="button" onClick={() => onOpenPhoto(photos, i)} className="relative block overflow-hidden bg-surface-2">
-              <img src={f.url} alt={f.name} loading="lazy" className={cn("w-full object-cover transition-transform hover:scale-[1.02]", photos.length > 1 ? "aspect-square" : "max-h-80")} />
+              <img src={f.url} alt={f.name} loading="lazy" className={cn("w-full bg-surface-2 object-cover transition-transform hover:scale-[1.02]", photos.length > 1 ? "aspect-square" : "max-h-80 min-h-40 min-w-48")} />
               {i === 3 && photos.length > 4 && <span className="absolute inset-0 flex items-center justify-center bg-black/50 text-lg font-bold text-white">+{photos.length - 4}</span>}
             </button>
           ))}

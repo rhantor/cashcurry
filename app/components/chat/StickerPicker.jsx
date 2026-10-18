@@ -8,7 +8,7 @@ import { STICKER_PACK, canMakeGroups, isStickerFile } from "@/lib/chat/model";
 import { addCompanySticker, deleteCompanySticker } from "@/lib/chat/client";
 import { useCompanyStickers } from "./useChat";
 
-export default function StickerPicker({ user, onPick, disabled }) {
+export default function StickerPicker({ user, onPick, disabled, className }) {
   const [tab, setTab] = useState("cashcurry");
   const [busy, setBusy] = useState(false);
   const company = useCompanyStickers(user?.companyId);
@@ -36,7 +36,7 @@ export default function StickerPicker({ user, onPick, disabled }) {
       width={320}
       className="p-0"
       trigger={({ ref, toggle }) => (
-        <button ref={ref} type="button" aria-label="Stickers" onClick={toggle} disabled={disabled} className="mb-0.5 rounded-xl p-2 text-muted transition-colors hover:bg-surface-2 hover:text-fg disabled:opacity-50">
+        <button ref={ref} type="button" aria-label="Stickers" onClick={toggle} disabled={disabled} className={className || "rounded-xl p-2 text-muted transition-colors hover:bg-surface-2 hover:text-fg disabled:opacity-50"}>
           <Sticker className="size-5" />
         </button>
       )}

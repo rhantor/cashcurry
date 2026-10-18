@@ -1,20 +1,51 @@
 "use client";
-// Writing a message: words, photos and files (up to 32 MB each — picked,
-// pasted or dropped on the chat), a reply or an edit in progress shown above.
-// Enter sends on a computer; Shift+Enter is a new line. Phones use the button.
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { CornerUpLeft, FileText, Paperclip, Pencil, SendHorizontal, X } from "lucide-react";
-import { Button, cn, toast } from "@/app/components/ui";
+// Writing a message: one rounded box with attach, stickers and emoji on the
+// left, the words in the middle and a round send button on the right. Photos
+// and files (up to 32 MB each — picked, pasted or dropped on the chat) wait
+// above as thumbnails; a reply or an edit in progress shows as a card with a
+// coloured edge. Enter sends on a computer; Shift+Enter is a new line.
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import { Check, CornerUpLeft, FileText, Paperclip, Pencil, SendHorizontal, Smile, X } from "lucide-react";
+import { Popover, cn, toast } from "@/app/components/ui";
 import { checkFiles, previewOf } from "@/lib/chat/model";
 import StickerPicker from "./StickerPicker";
 
 const isTouch = () => typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
+const size = (b) => (b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
+const EMOJI = "😀 😂 😊 😍 🥰 😎 🤔 😅 😭 😡 👍 👎 👏 🙏 💪 👌 ✌️ 🤝 🙌 👋 ❤️ 🔥 ⭐ ✅ ❌ ⚠️ 🎉 💯 💰 💵 🧾 📦 🚚 🍛 🍗 🍚 ☕ 🥤 🕐 📞".split(" ");
+const ICON = "flex size-9 shrink-0 items-center justify-center rounded-full text-muted transition-colors hover:bg-surface hover:text-brand disabled:opacity-40";
+
+function EmojiPicker({ onPick, disabled }) {
+  return (
+    <Popover
+      align="start"
+      width={292}
+      className="p-2"
+      trigger={({ ref, toggle }) => (
+        <button ref={ref} type="button" aria-label="Emoji" onClick={toggle} disabled={disabled} className={ICON}>
+          <Smile className="size-5" />
+        </button>
+      )}
+    >
+      {() => (
+        <div className="grid grid-cols-8 gap-0.5">
+          {EMOJI.map((e) => (
+            <button key={e} type="button" onClick={() => onPick(e)} className="rounded-lg p-1 text-xl leading-none transition-transform hover:scale-125 hover:bg-surface-2">
+              {e}
+            </button>
+          ))}
+        </div>
+      )}
+    </Popover>
+  );
+}
 
 const Composer = forwardRef(function Composer({ onSend, onSaveEdit, onSticker, user, replyTo, editing, onCancel, disabled }, ref) {
   const [text, setText] = useState("");
   const [files, setFiles] = useState([]);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [focused, setFocused] = useState(false);
   const area = useRef(null);
   const picker = useRef(null);
 
@@ -24,6 +55,10 @@ const Composer = forwardRef(function Composer({ onSend, onSaveEdit, onSticker, u
     if (ok.length) setFiles((f) => [...f, ...ok].slice(0, 10));
   };
   useImperativeHandle(ref, () => ({ addFiles: add, focus: () => area.current?.focus() }));
+
+  // thumbnails for photos waiting to go (and let go of them after)
+  const previews = useMemo(() => files.map((f) => (f.type.startsWith("image/") ? URL.createObjectURL(f) : null)), [files]);
+  useEffect(() => () => previews.forEach((u) => u && URL.revokeObjectURL(u)), [previews]);
 
   // editing: start from the message's words
   useEffect(() => {
@@ -45,15 +80,28 @@ const Composer = forwardRef(function Composer({ onSend, onSaveEdit, onSticker, u
     el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
   }, [text]);
 
+  // an emoji goes where the cursor is
+  const insert = (e) => {
+    const el = area.current;
+    const at = el?.selectionStart ?? text.length;
+    const end = el?.selectionEnd ?? text.length;
+    setText((t) => t.slice(0, at) + e + t.slice(end));
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(at + e.length, at + e.length);
+    });
+  };
+
+  const ready = !disabled && (text.trim() || files.length);
   const send = async () => {
-    if (busy || disabled) return;
-    if (!text.trim() && !files.length) return;
+    if (busy || !ready) return;
     setBusy(true);
     try {
       if (editing) await onSaveEdit(text);
       else await onSend({ text, files, onProgress: setProgress });
       setText("");
       setFiles([]);
+      area.current?.focus();
     } catch (e) {
       toast.error(editing ? "Couldn't save the change" : "Couldn't send", { description: e?.message });
     } finally {
@@ -65,84 +113,130 @@ const Composer = forwardRef(function Composer({ onSend, onSaveEdit, onSticker, u
   const banner = editing ? { icon: Pencil, label: "Editing your message", text: editing.text } : replyTo ? { icon: CornerUpLeft, label: `Replying to ${replyTo.byName || "a message"}`, text: previewOf(replyTo) } : null;
 
   return (
-    <div className="border-t border-line bg-surface px-3 pb-3 pt-2">
-      {banner && (
-        <div className="mb-2 flex items-start gap-2 rounded-xl bg-surface-2 px-3 py-2 text-xs">
-          <banner.icon className="mt-0.5 size-3.5 shrink-0 text-brand" />
-          <div className="min-w-0 flex-1">
-            <p className="font-semibold text-fg">{banner.label}</p>
-            <p className="truncate text-muted">{banner.text}</p>
+    <div className="border-t border-line/70 bg-surface/95 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-2.5 backdrop-blur sm:px-4">
+      <div
+        className={cn(
+          "overflow-hidden rounded-[1.6rem] border bg-surface-2 transition-all",
+          focused ? "border-brand/40 bg-surface shadow-[0_0_0_4px_var(--color-brand-soft)]" : "border-transparent"
+        )}
+      >
+        {/* replying to / editing */}
+        {banner && (
+          <div className="flex items-start gap-2.5 px-3 pt-2.5">
+            <div className="flex min-w-0 flex-1 gap-2.5 rounded-xl bg-brand-soft/60 py-2 pl-2 pr-3">
+              <span className="w-1 shrink-0 rounded-full bg-brand" />
+              <div className="min-w-0 flex-1 text-xs">
+                <p className="flex items-center gap-1 font-semibold text-brand">
+                  <banner.icon className="size-3.5" />
+                  {banner.label}
+                </p>
+                <p className="truncate text-muted">{banner.text}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              aria-label="Cancel"
+              onClick={() => {
+                if (editing) setText("");
+                onCancel();
+              }}
+              className="mt-1 rounded-full p-1 text-muted hover:bg-surface hover:text-fg"
+            >
+              <X className="size-4" />
+            </button>
           </div>
+        )}
+
+        {/* photos and files waiting to go */}
+        {files.length > 0 && (
+          <div className="flex gap-2 overflow-x-auto px-3 pb-1 pt-3 [scrollbar-width:thin]">
+            {files.map((f, i) => (
+              <div key={`${f.name}-${i}`} className="group relative shrink-0">
+                {previews[i] ? (
+                  <img src={previews[i]} alt={f.name} className="size-16 rounded-xl object-cover ring-1 ring-line" />
+                ) : (
+                  <div className="flex h-16 w-40 items-center gap-2 rounded-xl bg-surface px-2.5 ring-1 ring-line">
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-soft text-brand">
+                      <FileText className="size-[18px]" />
+                    </span>
+                    <span className="min-w-0 text-[11px]">
+                      <span className="block truncate font-semibold text-fg">{f.name}</span>
+                      <span className="text-muted">{size(f.size)}</span>
+                    </span>
+                  </div>
+                )}
+                <button
+                  type="button"
+                  aria-label={`Remove ${f.name}`}
+                  onClick={() => setFiles((x) => x.filter((_, n) => n !== i))}
+                  className="absolute -right-1.5 -top-1.5 flex size-5 items-center justify-center rounded-full bg-fg text-surface shadow"
+                >
+                  <X className="size-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+        {busy && files.length > 0 && (
+          <div className="mx-4 mt-2 h-1 overflow-hidden rounded-full bg-line">
+            <div className="h-full rounded-full bg-brand transition-[width]" style={{ width: `${Math.round(progress * 100)}%` }} />
+          </div>
+        )}
+
+        {/* the line you type on */}
+        <div className="flex items-end gap-0.5 p-1.5">
+          {!editing && (
+            <>
+              <button type="button" aria-label="Attach photos or files" onClick={() => picker.current?.click()} disabled={disabled} className={ICON}>
+                <Paperclip className="size-5" />
+              </button>
+              <input ref={picker} type="file" multiple hidden onChange={(e) => (add(e.target.files || []), (e.target.value = ""))} />
+              {onSticker && <StickerPicker user={user} onPick={onSticker} disabled={disabled} className={ICON} />}
+            </>
+          )}
+          <EmojiPicker onPick={insert} disabled={disabled} />
+          <textarea
+            ref={area}
+            rows={1}
+            value={text}
+            disabled={disabled}
+            placeholder={disabled ? "You can't write here" : editing ? "Change your message…" : "Message"}
+            onChange={(e) => setText(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            onPaste={(e) => {
+              const pasted = [...(e.clipboardData?.files || [])];
+              if (pasted.length && !editing) {
+                e.preventDefault();
+                add(pasted);
+              }
+            }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey && !isTouch()) {
+                e.preventDefault();
+                send();
+              }
+              if (e.key === "Escape" && (editing || replyTo)) onCancel();
+            }}
+            className="max-h-40 min-h-9 flex-1 resize-none bg-transparent px-2 py-2 text-[15px] leading-snug text-fg outline-none placeholder:text-subtle"
+          />
           <button
             type="button"
-            aria-label="Cancel"
-            onClick={() => {
-              if (editing) setText("");
-              onCancel();
-            }}
-            className="rounded p-0.5 text-muted hover:text-fg"
+            aria-label={editing ? "Save" : "Send"}
+            onClick={send}
+            disabled={!ready || busy}
+            className={cn(
+              "flex size-9 shrink-0 items-center justify-center rounded-full transition-all duration-200",
+              ready ? "scale-100 bg-gradient-to-br from-brand to-brand/80 text-white shadow-md hover:shadow-lg active:scale-95" : "scale-90 bg-line/70 text-subtle"
+            )}
           >
-            <X className="size-4" />
+            {busy ? <span className="size-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : editing ? <Check className="size-[18px]" /> : <SendHorizontal className="size-[18px] translate-x-px" />}
           </button>
         </div>
-      )}
-      {files.length > 0 && (
-        <div className="mb-2 flex gap-2 overflow-x-auto pb-1">
-          {files.map((f, i) => (
-            <div key={`${f.name}-${i}`} className="relative flex shrink-0 items-center gap-2 rounded-xl border border-line bg-surface-2 py-1.5 pl-2 pr-7 text-xs">
-              {f.type.startsWith("image/") ? (
-                <img src={URL.createObjectURL(f)} alt="" className="size-9 rounded-lg object-cover" />
-              ) : (
-                <FileText className="size-5 text-muted" />
-              )}
-              <span className="max-w-32 truncate">{f.name}</span>
-              <button type="button" aria-label={`Remove ${f.name}`} onClick={() => setFiles((x) => x.filter((_, n) => n !== i))} className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-muted hover:text-fg">
-                <X className="size-3.5" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-      {busy && files.length > 0 && (
-        <div className="mb-2 h-1 overflow-hidden rounded-full bg-surface-2">
-          <div className="h-full bg-brand transition-[width]" style={{ width: `${Math.round(progress * 100)}%` }} />
-        </div>
-      )}
-      <div className="flex items-end gap-2">
-        {!editing && (
-          <>
-            <button type="button" aria-label="Attach photos or files" onClick={() => picker.current?.click()} disabled={disabled} className="mb-0.5 rounded-xl p-2 text-muted transition-colors hover:bg-surface-2 hover:text-fg disabled:opacity-50">
-              <Paperclip className="size-5" />
-            </button>
-            <input ref={picker} type="file" multiple hidden onChange={(e) => (add(e.target.files || []), (e.target.value = ""))} />
-            {onSticker && <StickerPicker user={user} onPick={onSticker} disabled={disabled} />}
-          </>
-        )}
-        <textarea
-          ref={area}
-          rows={1}
-          value={text}
-          disabled={disabled}
-          placeholder={disabled ? "You can't write here" : "Write a message…"}
-          onChange={(e) => setText(e.target.value)}
-          onPaste={(e) => {
-            const pasted = [...(e.clipboardData?.files || [])];
-            if (pasted.length && !editing) {
-              e.preventDefault();
-              add(pasted);
-            }
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey && !isTouch()) {
-              e.preventDefault();
-              send();
-            }
-            if (e.key === "Escape" && (editing || replyTo)) onCancel();
-          }}
-          className={cn("max-h-40 min-h-10 flex-1 resize-none rounded-2xl border border-line bg-surface-2 px-4 py-2.5 text-sm text-fg outline-none transition-colors placeholder:text-subtle focus:border-brand/50 focus:bg-surface")}
-        />
-        <Button icon={SendHorizontal} size="icon" aria-label={editing ? "Save" : "Send"} loading={busy} disabled={disabled || (!text.trim() && !files.length)} onClick={send} className="mb-0.5 shrink-0" />
       </div>
+      <p className="mt-1 hidden px-4 text-[10px] text-subtle sm:block">
+        <kbd className="font-sans font-semibold">Enter</kbd> to send · <kbd className="font-sans font-semibold">Shift + Enter</kbd> for a new line
+      </p>
     </div>
   );
 });
