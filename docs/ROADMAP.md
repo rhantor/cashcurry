@@ -188,3 +188,6 @@ rehearsed on the local copy first.
 | Attendance: confirm the kiosk plan (4.8) after a one-branch pilot; liveness check on or off; which tablets | 4.8 |
 | Staff app technology and login method | 4.0 |
 | Separate staging Firebase project (recommended before Phase 4) | 4.x deploys |
+| Payroll: when a slip's deductions are more than its gross, net shows 0 but finalize marks the whole loan / advance instalment repaid. Mark only what was actually taken (carry the rest), or stop finalize with a warning? | 4.2 |
+| Staff email is required to add staff; many kitchen staff have none. Make it optional and make the staff-app login from the IC number? | 4.6 |
+| Purchases ideas, to choose from: send the order to the supplier on WhatsApp; supplier returns / credit notes; pay all of a vendor's overdue bills at once; due-soon reminders; vendor statement PDF | any time |
