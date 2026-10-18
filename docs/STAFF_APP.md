@@ -32,6 +32,13 @@ Staff change for themselves:
 
 Staff **cannot** change the personal details they joined with — name, IC / passport, date of birth, address, bank details, job, pay. They see them, read-only, with "ask your manager to change these".
 
+## 3b. What is built (19 Oct)
+
+- Screens: Home, My pay (payslips), Requests, Chat, Issues, Me — `app/(staff)/`.
+- Me: photo, contact number (changing it changes the sign-in number; a number already used by another login is refused), emergency contact, change PIN (current PIN first; 111111 / 123456 refused), notifications, sign out. Joined-with details read-only, IC and bank masked.
+- Fingerprint shows as "Soon": it comes with the Android app (step 4).
+- Payslips: payroll writes each person's own copy when a run is finalized or paid (`lib/payroll/payslipCopy.js`), so staff never read the run itself (it carries the branch's totals).
+
 ## 4. Build order
 
 1. Login by phone / IC + PIN, long sessions, manager PIN reset, email optional.

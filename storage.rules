@@ -165,6 +165,18 @@ service firebase.storage {
       allow delete: if canDelete(companyId, branchId);
     }
 
+    // A staff member's own photo, from the staff app's settings:
+    // staffPhotos/{companyId}/{branchId}/self/{staffId}/{filename}
+    match /staffPhotos/{companyId}/{branchId}/self/{staffId}/{filename} {
+      allow read: if isBranchMember(companyId, branchId);
+      allow create, update: if isBranchMember(companyId, branchId) &&
+        userData().get('staffId', '') == staffId &&
+        request.resource.size <= 5 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/.*');
+      allow delete: if (isBranchMember(companyId, branchId) && userData().get('staffId', '') == staffId) ||
+        canDelete(companyId, branchId);
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Loan Repayment Receipts: loanRepayments/{companyId}/{segment}/{filename}
     // Note: segment is "{branchId}_to_{otherId}" — company-level check only
