@@ -59,7 +59,6 @@ for (const company of await db.collection("companies").listDocuments()) {
         reason: a.reason || "",
         status,
         approvals: a.approvals || [],
-        awaiting: status === "pending" ? "branch" : null,
         ...(a.approvedBy ? { approvedBy: a.approvedBy } : {}),
         createdBy: a.createdBy || {},
         createdAt: a.createdAt || null,

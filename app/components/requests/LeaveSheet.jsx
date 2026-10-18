@@ -12,7 +12,7 @@ import { Button, DatePicker, Field, Sheet, Switch, Textarea, toast } from "@/app
 import { Chip } from "@/app/components/entry/Choices";
 import StaffPicker, { staffName } from "@/app/components/entry/StaffPicker";
 
-export default function LeaveSheet({ open, onClose, companyId, branchId, user, policy, staff = [], staffLoading }) {
+export default function LeaveSheet({ open, onClose, companyId, branchId, user, staff = [], staffLoading }) {
   const today = useBusinessToday();
   const approver = can(user?.role, "advances.approve");
   // an approver picks who it is for; anyone else asks for themselves
@@ -37,7 +37,7 @@ export default function LeaveSheet({ open, onClose, companyId, branchId, user, p
     if (!reason.trim()) return toast.error("Say why");
     try {
       await addLeave({
-        companyId, branchId, user, policy,
+        companyId, branchId, user,
         data: {
           staffId: forOthers ? person.id : me,
           staffName: forOthers ? staffName(person) : personName(user),

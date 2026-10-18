@@ -15,11 +15,11 @@ import useRequestActions from "./useRequestActions";
 
 const FILTERS = ["all", "waiting", "approved", "paid", "closed", "rejected", "cancelled"];
 
-export default function MyRequests({ companyId, branchId, user, policy }) {
+export default function MyRequests({ companyId, branchId, user }) {
   const currency = useCurrency();
   const mine = user?.uid ? { uid: user.uid, staffId: user.staffId || undefined } : null;
   const { data = [], isLoading } = useGetRequestsQuery({ companyId, branchId, mine }, { skip: !companyId || !branchId || !mine });
-  const { run, busyId } = useRequestActions({ companyId, branchId, user, policy });
+  const { run, busyId } = useRequestActions({ companyId, branchId, user });
   const [filter, setFilter] = useState("all");
 
   const all = useMemo(() => data.map((r) => ({ ...r, stage: stageOf(r) })), [data]);
@@ -51,7 +51,7 @@ export default function MyRequests({ companyId, branchId, user, policy }) {
         <ul className="space-y-3">
           {shown.map((r, i) => (
             <motion.li key={`${r.type}-${r.id}`} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: Math.min(i, 8) * 0.03 }}>
-              <RequestItem req={r} actions={actionsFor(r, who, policy).filter((a) => a === "cancel")} onAction={run} busy={busyId === r.id} currency={currency} policy={policy} />
+              <RequestItem req={r} actions={actionsFor(r, who).filter((a) => a === "cancel")} onAction={run} busy={busyId === r.id} currency={currency} />
             </motion.li>
           ))}
         </ul>

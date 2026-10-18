@@ -1,6 +1,6 @@
 "use client";
 // A staff member asks for a salary advance for themselves. It goes to the
-// branch approvers (and the owner too, over the branch's limit); no money
+// branch's approvers; no money
 // moves until it is approved and paid out.
 import { useState } from "react";
 import { useAddAdvanceEntryMutation } from "@/lib/redux/api/AdvanceApiSlice";
@@ -13,7 +13,7 @@ import useCurrency from "@/app/hooks/useCurrency";
 import { Button, Field, Sheet, Textarea, toast } from "@/app/components/ui";
 import MoneyInput from "@/app/components/entry/MoneyInput";
 
-export default function AdvanceAskSheet({ open, onClose, companyId, branchId, user, policy }) {
+export default function AdvanceAskSheet({ open, onClose, companyId, branchId, user }) {
   const currency = useCurrency();
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
@@ -37,7 +37,7 @@ export default function AdvanceAskSheet({ open, onClose, companyId, branchId, us
           reason: reason.trim(),
           date: businessToday(),
           repaymentInstallments: 1,
-          ...newRequestFields({ type: "advance", amount: value }, user, policy),
+          ...newRequestFields({ type: "advance", amount: value }, user),
           createdBy: { uid: user.uid, name, role: user.role || "staff" },
         },
       }).unwrap();

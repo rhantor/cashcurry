@@ -120,7 +120,7 @@ Needed before staff phones get direct access to the database (Phase 4).
 |---|------|--------|
 | 4.0 | **Decision doc**: staff app technology (installable web app vs Android/iOS app via Capacitor like the POS), login method (email vs phone OTP — phone suits Bangladesh), shared code layout | ⏸ |
 | 4.1 | **Roles & permissions matrix** — `docs/ROLES.md`, agreed 18 Oct; one source (`lib/authz/permissions.js`) for the menu, page guard (deny by default), page checks and `firestore.rules`, with rules tests generated from it. New role in-charge. Fixed: branch roles read everyone's pay / IC / bank (now `staffPrivate`), pages open to anyone by address, cashier salary entry / gm vendors / owner payroll failing, staff writing purchase orders and notifications, any role deleting records, role pickers saving unknown roles | ✅ |
-| 4.2 | **Requests engine** — one model for advance, staff loan and leave (`lib/requests/model.js`, `requestsApiSlice`): asked → branch approval → owner approval when over the branch's limit (new setting, company roles only) → paid out (1.4, unchanged); reject with a reason; whoever asked can cancel while it waits. Leave has its own collection (from–to, half day, kind) instead of hiding in advances (`npm run requests:leaves` moves old ones). Requested panel, My requests and the staff portal read one list; the menu badge counts leave and only the step you can decide. Rules + tests for each step. Also: payroll takes advance/loan only as far as the pay covers and carries the rest; revert restores exactly | ✅ |
+| 4.2 | **Requests engine** — one model for advance, staff loan and leave (`lib/requests/model.js`, `requestsApiSlice`): asked → approved (one approval is enough — branch admin, manager, gm, super admin or owner; the owner is told who approved, decided 18 Oct) → paid out (1.4, unchanged); reject with a reason; whoever asked can cancel while it waits. Leave has its own collection (from–to, half day, kind) instead of hiding in advances (`npm run requests:leaves` moves old ones). Requested panel, My requests and the staff portal read one list; the menu badge counts leave too. Rules + tests for each step. Also: payroll takes advance/loan only as far as the pay covers and carries the rest; revert restores exactly | ✅ |
 | 4.3 | **Approvals inbox** for managers (web + app) with push notifications | ⬜ |
 | 4.4 | **Chat**: branch/company/custom groups, personal messages, photos/files, read receipts, push. Replaces today's basic branch chat | ⬜ |
 | 4.5 | **Issues**: staff raise an issue → assigned → resolved, with photos and its own thread | ⬜ |
@@ -157,8 +157,7 @@ rehearsed on the local copy first.
       (readable by branch roles); new and edited staff are split already. Check one
       user of each role can sign in and open their menu.
 - [ ] **Requests (4.2):** after the rules, `npm run requests:leaves -- --project <id>` (report), then with
-      `--write --confirm` — moves leave saved in advances to `leaves`. Then, if wanted, the owner sets each
-      branch's "Owner approves above" (default 0 = off, so nothing changes until set)
+      `--write --confirm` — moves leave saved in advances to `leaves`
 - [ ] Fix the backup export script first: it writes `{ id: doc.id, ...data }`, so any
       document with its own `id` field loses its real id (payroll salary entries —
       42 of them collapsed in the Sep 2026 backup). Export the id separately.

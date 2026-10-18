@@ -18,9 +18,8 @@ import MoneyInput from '@/app/components/entry/MoneyInput'
 import StaffPicker, { staffName } from '@/app/components/entry/StaffPicker'
 import { Chip, PaidFromChoice } from '@/app/components/entry/Choices'
 import { EntryLayout, EntrySection, SummaryLine } from '@/app/components/entry/EntryLayout'
-import { can, isCompanyRole } from '@/lib/authz/permissions'
-import { newRequestFields, stepsFor } from '@/lib/requests/model'
-import useApprovalPolicy from '@/lib/requests/useApprovalPolicy'
+import { can } from '@/lib/authz/permissions'
+import { newRequestFields } from '@/lib/requests/model'
 
 const ADVANCE_TYPES = [
   { value: 'salary', label: 'Salary advance' },
@@ -64,7 +63,7 @@ function Head ({ companyId, branchId, user, manager, tab, setTab }) {
 }
 
 // ─── Advance ──────────────────────────────────────────────────────────────────
-function AdvanceForm ({ head, staff, staffLoading, companyId, branchId, manager, policy, ownerNeeded, money, currency }) {
+function AdvanceForm ({ head, staff, staffLoading, companyId, branchId, manager, money, currency }) {
   const today = useBusinessToday()
   const [staffId, setStaffId] = useState('')
   const [amount, setAmount] = useState('')
@@ -90,8 +89,8 @@ function AdvanceForm ({ head, staff, staffLoading, companyId, branchId, manager,
     if (Object.keys(problems).length) return toast.error('Check the highlighted fields')
 
     const createdBy = getSessionUser() || {}
-    // approvers give it now — unless it is over the branch's limit and needs the owner too
-    const flow = newRequestFields({ type: 'advance', amount: Number(amount) || 0 }, createdBy, policy)
+    // approvers give it now; anyone else's entry is a request
+    const flow = newRequestFields({ type: 'advance', amount: Number(amount) || 0 }, createdBy)
     const given = flow.status === 'approved'
     try {
       await addAdvanceEntry({
@@ -116,8 +115,8 @@ function AdvanceForm ({ head, staff, staffLoading, companyId, branchId, manager,
           createdBy
         }
       }).unwrap()
-      toast.success(given ? 'Advance given' : manager ? 'Sent to the owner' : 'Request sent', {
-        description: `${staffName(person)} · ${money(amount)}${given ? ` · from the ${office === 'back' ? 'bank' : 'till'}` : manager ? ' · over the branch limit, the owner approves it' : ' · waiting for approval'}`
+      toast.success(given ? 'Advance given' : 'Request sent', {
+        description: `${staffName(person)} · ${money(amount)}${given ? ` · from the ${office === 'back' ? 'bank' : 'till'}` : ' · waiting for approval'}`
       })
       setSaved(true)
       setTimeout(() => setSaved(false), 1400)
@@ -134,7 +133,7 @@ function AdvanceForm ({ head, staff, staffLoading, companyId, branchId, manager,
     }
   }
 
-  const label = ownerNeeded(Number(amount), 'advance') ? 'Send to owner' : manager ? 'Give advance' : 'Send request'
+  const label = manager ? 'Give advance' : 'Send request'
   const button = (
     <Button size='lg' className='w-full' onClick={save} loading={isLoading} success={saved}>
       {label}
@@ -238,7 +237,7 @@ function AdvanceForm ({ head, staff, staffLoading, companyId, branchId, manager,
 }
 
 // ─── Staff loan ───────────────────────────────────────────────────────────────
-function LoanForm ({ head, staff, staffLoading, companyId, branchId, manager, policy, ownerNeeded, money, currency }) {
+function LoanForm ({ head, staff, staffLoading, companyId, branchId, manager, money, currency }) {
   const today = useBusinessToday()
   const [staffId, setStaffId] = useState('')
   const [amount, setAmount] = useState('')
@@ -280,7 +279,7 @@ function LoanForm ({ head, staff, staffLoading, companyId, branchId, manager, po
     if (Object.keys(problems).length) return toast.error('Check the highlighted fields')
 
     const createdBy = getSessionUser() || {}
-    const flow = newRequestFields({ type: 'staffLoan', amount: total }, createdBy, policy)
+    const flow = newRequestFields({ type: 'staffLoan', amount: total }, createdBy)
     const given = flow.status === 'approved'
     try {
       await addStaffLoan({
@@ -305,7 +304,7 @@ function LoanForm ({ head, staff, staffLoading, companyId, branchId, manager, po
           createdBy
         }
       }).unwrap()
-      toast.success(!given && manager ? 'Sent to the owner' : migration ? 'Earlier loan recorded' : given ? 'Loan given' : 'Request sent', {
+      toast.success(migration ? 'Earlier loan recorded' : given ? 'Loan given' : 'Request sent', {
         description: `${staffName(person)} · ${money(total)} over ${duration} months${migration ? ' · no cash moved' : ''}`
       })
       setSaved(true)
@@ -324,7 +323,7 @@ function LoanForm ({ head, staff, staffLoading, companyId, branchId, manager, po
     }
   }
 
-  const label = ownerNeeded(total, 'staffLoan') ? 'Send to owner' : migration ? 'Record earlier loan' : manager ? 'Give loan' : 'Send request'
+  const label = migration ? 'Record earlier loan' : manager ? 'Give loan' : 'Send request'
   const button = (
     <Button size='lg' className='w-full' onClick={save} loading={isLoading} success={saved}>
       {label}
@@ -515,12 +514,9 @@ export default function AdvanceLoanEntry () {
   const [tab, setTab] = useState('advance')
   const { data: staff = [], isLoading: staffLoading } = useGetStaffListQuery({ companyId, branchId }, { skip: !companyId || !branchId })
   const manager = can(role, 'advances.approve') // approvers record one handed over on the spot
-  const policy = useApprovalPolicy(companyId, branchId)
-  // over the branch's limit a branch approver's entry waits for the owner
-  const ownerNeeded = (amount, type) => manager && stepsFor({ type, amount }, policy).length > 1 && !isCompanyRole(role)
 
   const head = <Head companyId={companyId} branchId={branchId} user={user} manager={manager} tab={tab} setTab={setTab} />
-  const props = { head, staff, staffLoading, companyId, branchId, manager, policy, ownerNeeded, money, currency }
+  const props = { head, staff, staffLoading, companyId, branchId, manager, money, currency }
   return tab === 'advance' ? <AdvanceForm key='advance' {...props} /> : <LoanForm key='loan' {...props} />
 }
 

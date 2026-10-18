@@ -1,6 +1,5 @@
 // The requests engine (roadmap 4.2, lib/requests/model.js) in the database
-// rules: leave, cancelling your own request, and the owner's approval for
-// money above the branch's limit.
+// rules: one approval is enough, leave, and cancelling your own request.
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import fs from "node:fs";
 import { initializeTestEnvironment } from "@firebase/rules-unit-testing";
@@ -35,8 +34,7 @@ beforeEach(async () => {
     for (const [uid, p] of Object.entries(PEOPLE)) await d.doc(`users/${uid}`).set({ companyId: CO, ...p });
     await d.doc(`companies/${CO}`).set({ name: "Co", ownerUid: "owner" });
     await d.doc(B).set({ name: "kl" });
-    await d.doc(`${B}/settings/settings`).set({ requests: { ownerApprovalAbove: 1000 }, basic: { phone: "1" } });
-    const asked = { status: "pending", paidOut: null, approvals: [], awaiting: "branch", createdBy: { uid: "klStaff" }, staffId: "st-me" };
+    const asked = { status: "pending", paidOut: null, approvals: [], createdBy: { uid: "klStaff" }, staffId: "st-me" };
     await d.doc(`${B}/advances/small`).set({ ...asked, amount: 500 });
     await d.doc(`${B}/advances/big`).set({ ...asked, amount: 3000 });
     await d.doc(`${B}/loans/big`).set({ ...asked, amount: 5000 });
@@ -45,28 +43,17 @@ beforeEach(async () => {
   });
 });
 
-const approve = { status: "approved", awaiting: null };
+const approve = { status: "approved" };
 
-describe("owner approval above the branch's limit", () => {
-  it("a branch approver approves money up to the limit", async () => {
+describe("approving", () => {
+  it("one approval is enough — from the branch or a company role, any amount", async () => {
     expect(await ok(as("klManager").doc(`${B}/advances/small`).update(approve))).toBe(true);
-  });
-  it("above it the branch approves its step, but only a company role makes it approved", async () => {
-    const step = { approvals: [{ step: "branch", uid: "klManager" }], awaiting: "owner" };
-    expect(await ok(as("klManager").doc(`${B}/advances/big`).update(step))).toBe(true);
-    expect(await ok(as("klManager").doc(`${B}/advances/big`).update(approve))).toBe(false);
-    expect(await ok(as("klAdmin").doc(`${B}/loans/big`).update(approve))).toBe(false);
+    expect(await ok(as("klAdmin").doc(`${B}/loans/big`).update(approve))).toBe(true);
     expect(await ok(as("owner").doc(`${B}/advances/big`).update(approve))).toBe(true);
   });
-  it("a branch approver can't give money above the limit on the spot either", async () => {
-    const given = { staffId: "st1", amount: 2000, status: "approved", paidOut: { date: "2026-10-18" } };
-    expect(await ok(as("klManager").doc(`${B}/advances/new`).set(given))).toBe(false);
-    expect(await ok(as("klManager").doc(`${B}/advances/new2`).set({ ...given, amount: 900 }))).toBe(true);
-  });
-  it("the limit is the company's to change", async () => {
-    expect(await ok(as("klAdmin").doc(`${B}/settings/settings`).update({ "requests.ownerApprovalAbove": 0 }))).toBe(false);
-    expect(await ok(as("klAdmin").doc(`${B}/settings/settings`).update({ "basic.phone": "2" }))).toBe(true);
-    expect(await ok(as("owner").doc(`${B}/settings/settings`).update({ "requests.ownerApprovalAbove": 0 }))).toBe(true);
+  it("the supervisor and cashier can't approve", async () => {
+    expect(await ok(as("klSupervisor").doc(`${B}/advances/small`).update(approve))).toBe(false);
+    expect(await ok(as("klCashier").doc(`${B}/advances/small`).update(approve))).toBe(false);
   });
 });
 
@@ -78,7 +65,7 @@ describe("asking and cancelling", () => {
     expect(await ok(as("klStaff").doc(`${B}/leaves/new3`).set({ ...leave, approvals: [{ step: "branch" }] }))).toBe(false);
   });
   it("whoever asked cancels it while it waits — no one else, nothing more", async () => {
-    const cancel = { status: "cancelled", awaiting: null, cancelledBy: { uid: "klStaff" } };
+    const cancel = { status: "cancelled", cancelledBy: { uid: "klStaff" } };
     expect(await ok(as("klStaff2").doc(`${B}/advances/small`).update(cancel))).toBe(false);
     expect(await ok(as("klStaff").doc(`${B}/advances/small`).update({ ...cancel, amount: 1 }))).toBe(false);
     expect(await ok(as("klStaff").doc(`${B}/advances/small`).update(cancel))).toBe(true);

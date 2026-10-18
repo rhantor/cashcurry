@@ -16,7 +16,6 @@ const requests = [
 const decide = vi.fn(() => ({ unwrap: () => Promise.resolve({}) }));
 
 vi.mock("@/app/hooks/useSession", () => ({ default: () => ({ user: me, companyId: "c1", branchId: "b1", role: "supervisor" }) }));
-vi.mock("@/lib/requests/useApprovalPolicy", () => ({ default: () => ({ ownerApprovalAbove: 0 }) }));
 vi.mock("@/app/hooks/useCurrency", () => ({ default: () => "MYR" }));
 vi.mock("@/lib/redux/api/requestsApiSlice", () => ({
   useGetRequestsQuery: () => ({ data: requests, isLoading: false }),

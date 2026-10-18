@@ -5,7 +5,6 @@ import RequestInbox from "@/app/components/requests/RequestInbox";
 import LeaveSheet from "@/app/components/requests/LeaveSheet";
 import { useGetRequestsQuery } from "@/lib/redux/api/requestsApiSlice";
 import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
-import useApprovalPolicy from "@/lib/requests/useApprovalPolicy";
 import { CalendarPlus } from "lucide-react";
 import {
   useGetLoanEntriesQuery,
@@ -62,7 +61,6 @@ export default function RequestedPanel() {
     { companyId, branchId, status: "pending" },
     { skip: !companyId || !branchId, pollingInterval: 10000 }
   );
-  const policy = useApprovalPolicy(companyId, branchId);
   const [leaveOpen, setLeaveOpen] = useState(false);
   const { data: staff = [], isLoading: staffLoading } = useGetStaffListQuery({ companyId, branchId }, { skip: !companyId || !branchId || !leaveOpen });
 
@@ -244,7 +242,7 @@ export default function RequestedPanel() {
             <Button variant="secondary" icon={CalendarPlus} onClick={() => setLeaveOpen(true)}>Record leave</Button>
           </div>
           <RequestInbox companyId={companyId} branchId={branchId} user={user} />
-          <LeaveSheet open={leaveOpen} onClose={() => setLeaveOpen(false)} companyId={companyId} branchId={branchId} user={user} policy={policy} staff={staff} staffLoading={staffLoading} />
+          <LeaveSheet open={leaveOpen} onClose={() => setLeaveOpen(false)} companyId={companyId} branchId={branchId} user={user} staff={staff} staffLoading={staffLoading} />
         </>
       )}
       {currentTab === "loan" && (

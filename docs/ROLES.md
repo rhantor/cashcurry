@@ -138,13 +138,12 @@ Rules that go with it:
 4. A role that can't see pay can't see the pages that show it (payroll, salaries, staff detail).
 
 **Requests engine (4.2, 18 Oct 2026):** advances, staff loans and leave share one
-model (`lib/requests/model.js`). Whoever may approve advances (`advances.approve`)
-also approves leave; in-charge, accountant and supervisor see leave (to plan shifts
-and pay). Whoever asked may cancel while nothing is approved yet. Each branch has
-an **owner-approval limit** (Branch settings → Loans & advances, "Owner approves
-above"; 0 = off): an advance or staff loan above it needs a company role after the
-branch's approval, and only a company role may change the limit — both enforced in
-`firestore.rules` (`keepsOwnerStep`, `keepsApprovalLimit`).
+model (`lib/requests/model.js`). Whoever may approve advances (`advances.approve`:
+branch admin, manager, gm, super admin, owner) also approves leave, and **one
+approval is enough** — the owner is not a required step; they are told who
+approved, and may approve themselves if no one has yet. In-charge, accountant and
+supervisor see leave (to plan shifts and pay). Whoever asked may cancel while it
+still waits.
 
 ## 4. Evidence
 
