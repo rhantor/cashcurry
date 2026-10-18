@@ -45,3 +45,24 @@ Staff **cannot** change the personal details they joined with — name, IC / pas
 2. The settings page (above), with the rules for what staff may change.
 3. The staff app's screens (home, salary, advances / loan balance, attendance, requests, chat, issues, profile) in the new design.
 4. The Android wrapper (Capacitor): native push, fingerprint, Play Store listing.
+
+## 5. The Android app (step 4, built 19 Oct — not on the Play Store yet)
+
+A Capacitor shell (`capacitor.config.ts`, `android/`) around the hosted pages — the same pages as the iPhone home-screen app, so one fix reaches both. Inside the app only (`lib/native`, `app/components/native/NativeBridge.jsx`):
+
+- **Fingerprint unlock** — Me → "Unlock with fingerprint". Staff stay signed in; with it on, opening the app (or coming back after a minute away) asks for the fingerprint (or face, if the phone uses that). "Use my PIN instead" signs out to the PIN login. The fingerprint never leaves the phone and no PIN is stored on it.
+- **Push** — the app's own notifications through Firebase Cloud Messaging; tokens go where browser tokens go, so every notification the server sends reaches the app. Asked once when they first sign in inside the app (normal for an app; the website still asks only from a button). Tapping one opens its page.
+- The phone's back button goes back, and closes the app on the first screen.
+- No connection → a "No connection · Try again" page (`cap-shell/offline.html`).
+
+Build and try it (Android Studio installed):
+
+1. `CAP_SERVER_URL=http://<this computer's Wi-Fi address>:3000 npm run android:sync` with `npm run dev:phone` running (or the address of any test site).
+2. `npm run android:open`, then Run on a phone or emulator. Or `cd android && ./gradlew assembleDebug` → `android/app/build/outputs/apk/debug/app-debug.apk`.
+
+Before the Play Store (release checklist):
+
+- Firebase console → the project → add an **Android app** with package `com.cashcurry.staff`; put its `google-services.json` in `android/app/` (kept out of git). Without it the app works but gets no push.
+- `CAP_SERVER_URL=https://<app domain> npm run android:sync`.
+- App icon and splash (from `public/icons/icon-512.png`, e.g. `npx @capacitor/assets generate`).
+- A signing key (kept safe, never in git), then `./gradlew bundleRelease` → upload the `.aab` in Play Console under the existing developer account: new app "Cash Curry Staff", internal testing first, privacy policy page, data-safety form (name, phone, photo, pay shown to the person themselves).

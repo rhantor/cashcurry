@@ -5,6 +5,8 @@ import pluginReact from "eslint-plugin-react";
 import { defineConfig } from "eslint/config";
 
 export default defineConfig([
+  // The Android app's generated native project (npx cap add android)
+  { ignores: ["android/**"] },
   {
     files: ["**/*.{js,mjs,cjs,jsx}"],
     plugins: { js },
