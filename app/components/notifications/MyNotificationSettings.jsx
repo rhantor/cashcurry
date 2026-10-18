@@ -11,7 +11,10 @@ import useSession from "@/app/hooks/useSession";
 import { NOTIFY_TYPES } from "@/lib/notify/model";
 import { Switch, toast } from "@/app/components/ui";
 
-const MINE = { "requests.mine": { label: "My own requests", hint: "When something you asked for is approved, rejected or paid out" } };
+const MINE = {
+  "requests.mine": { label: "My own requests", hint: "When something you asked for is approved, rejected or paid out" },
+  "issues.mine": { label: "My issues", hint: "Issues you reported or were given: assigned, resolved, reopened, new comments" },
+};
 
 export default function MyNotificationSettings({ onBack }) {
   const { user } = useSession();

@@ -110,6 +110,8 @@ Branch settings**, though the database lets the owner change staff and settings.
 | Money settings (opening balances, currency, time zone, day end) | M | M | — | M | — | — | — | — | — | — |
 | Company settings, branches, users | M | M | V | — | — | — | — | — | — | — |
 | Cost categories (4.9) | M | M | M | — | — | — | — | — | — | — |
+| Issues: report (4.5) | E | E | E | E | E | E | E | E | E | E |
+| Issues: assign, close, reopen, delete (4.5) | M | M | M | M | M | M | — | — | — | — |
 | Chat: make and manage groups (4.4) | M | M | M | M | M | — | — | — | — | — |
 | Who gets notifications (4.3) | M | M | M | M (branch) | — | — | — | — | — | — |
 | Audit log | V | V | V | V (branch) | V (branch) | — | — | — | — | — |

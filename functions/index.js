@@ -73,6 +73,26 @@ exports.chatPeople = onDocumentWritten("users/{uid}", async (event) => {
   }
 });
 
+// Issues (4.5): reported, given to someone, resolved, reopened; comments.
+exports.notifyIssues = onDocumentWritten("companies/{companyId}/branches/{branchId}/issues/{id}", async (event) => {
+  const { companyId, branchId, id } = event.params;
+  const before = event.data?.before?.exists ? event.data.before.data() : null;
+  const after = event.data?.after?.exists ? event.data.after.data() : null;
+  try {
+    await notify.onIssue({ companyId, branchId, id, before, after });
+  } catch (err) {
+    console.error("[notify issues]", companyId, branchId, id, err);
+  }
+});
+exports.notifyIssueComments = onDocumentCreated("companies/{companyId}/branches/{branchId}/issues/{issueId}/comments/{id}", async (event) => {
+  const { companyId, branchId, issueId } = event.params;
+  try {
+    await notify.onIssueComment({ companyId, branchId, issueId, comment: event.data?.data() });
+  } catch (err) {
+    console.error("[notify issue comments]", companyId, branchId, issueId, err);
+  }
+});
+
 // Every hour; each branch's summary goes out at its own time on its own clock.
 exports.notifyDailySummary = onSchedule({ schedule: "0 * * * *", timeZone: "UTC", timeoutSeconds: 540 }, async () => {
   await notify.dailySummaries(new Date());

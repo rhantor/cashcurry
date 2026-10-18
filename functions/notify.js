@@ -213,6 +213,52 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
     await deliver({ companyId, branchId: chat.branchId || null, uids, type: "chat", message: { title, body: preview }, link, ref: `chats/${chatId}`, inbox: false, tag: `chat-${chatId}` });
   }
 
+  // ── issues (4.5) ───────────────────────────────────────────────────────────
+  const issueLink = (role, branchId, id) => `${role === "staff" ? "/my-issues" : "/issues"}?i=${branchId}/${id}`;
+
+  /** An issue was written: who reported it, who has it, and management, as it changes. */
+  async function onIssue({ companyId, branchId, id, before, after }) {
+    if (!after) return;
+    const [all, b] = await Promise.all([people(companyId), branch(companyId, branchId)]);
+    const roleOf = (uid) => all.find((p) => p.uid === uid)?.role;
+    const cat = N.categoryOf(after.category);
+    const what = `${after.priority === "urgent" ? "🚩 " : ""}${after.title}`;
+    const tell = (uids, type, title, body) =>
+      Promise.all(
+        [...new Set(uids)].filter(Boolean).map((u) => deliver({ companyId, branchId, uids: [u], type, message: { title, body }, link: issueLink(roleOf(u), branchId, id), ref: `issues/${id}` }))
+      );
+
+    if (!before) {
+      // a new issue: management at the branch (as chosen in its notification settings)
+      const managers = N.recipientsFor("issues.new", { config: b.config, people: N.branchPeople(all, branchId) }).filter((u) => u !== after.reporterUid);
+      await tell(managers, "issues.new", `${after.priority === "urgent" ? "Urgent issue" : "New issue"} · ${b.name}`, `${cat.emoji} ${after.title} — reported by ${after.reportedBy?.name || "someone"}`);
+    }
+    if (after.assigneeUid && after.assigneeUid !== before?.assigneeUid && after.assigneeUid !== after.reporterUid) {
+      await tell([after.assigneeUid], "issues.mine", `Issue for you · ${b.name}`, `${what}${after.dueDate ? ` — fix by ${after.dueDate}` : ""}`);
+    }
+    if (before && before.status !== "resolved" && after.status === "resolved" && after.resolvedBy?.uid !== after.reporterUid) {
+      await tell([after.reporterUid], "issues.mine", "Issue resolved", `${what} — ${after.resolvedBy?.name || "someone"}${after.resolution ? `: “${after.resolution}”` : ""}`);
+    }
+    if (before && before.status === "resolved" && after.status === "open" && after.assigneeUid) {
+      await tell([after.assigneeUid], "issues.mine", "Issue reopened", what);
+    }
+  }
+
+  /** A comment on an issue: everyone involved but whoever wrote it. */
+  async function onIssueComment({ companyId, branchId, issueId, comment }) {
+    if (!comment || comment.kind !== "comment") return;
+    const snap = await db.doc(`companies/${companyId}/branches/${branchId}/issues/${issueId}`).get();
+    if (!snap.exists) return;
+    const issue = snap.data();
+    const all = await people(companyId);
+    const to = [...new Set([...(issue.watchers || []), issue.reporterUid, issue.assigneeUid])].filter((u) => u && u !== comment.byUid);
+    const body = `${comment.byName || "Someone"}: ${comment.text || "📷 Photo"}`;
+    for (const u of to) {
+      const role = all.find((p) => p.uid === u)?.role;
+      await deliver({ companyId, branchId, uids: [u], type: "issues.mine", message: { title: `Comment · ${issue.title}`, body }, link: issueLink(role, branchId, issueId), ref: `issues/${issueId}` });
+    }
+  }
+
   /** users/{uid} changed: keep the chat directory (names and roles only) in step. */
   async function onUser({ uid, before, after }) {
     if (before?.companyId && before.companyId !== after?.companyId) await db.doc(`companies/${before.companyId}/chatPeople/${uid}`).delete().catch(() => {});
@@ -225,5 +271,5 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
     });
   }
 
-  return { deliver, onRequest, onPurchaseOrder, dailySummaries, onChatMessage, onUser };
+  return { deliver, onRequest, onPurchaseOrder, dailySummaries, onChatMessage, onUser, onIssue, onIssueComment };
 };

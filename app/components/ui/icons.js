@@ -6,7 +6,7 @@
 // didn't have to change. Unknown names fall back to a neutral dot.
 import {
   ArrowDownToLine, Banknote, CalendarDays, CalendarRange, ChartColumn, Circle, HandCoins, Headset, House, Inbox,
-  LayoutDashboard, ListChecks, MessagesSquare, Newspaper, NotebookPen, Receipt, Repeat, ScrollText, Settings, ShoppingCart,
+  LayoutDashboard, ListChecks, MessagesSquare, TriangleAlert, Newspaper, NotebookPen, Receipt, Repeat, ScrollText, Settings, ShoppingCart,
   TrendingUp, Users, Wallet, Wrench,
 } from "lucide-react";
 
@@ -31,6 +31,7 @@ export const MENU_ICONS = {
   MdAppRegistration: Wrench, // tools
   MdOutlineSupportAgent: Headset, // support
   MdOutlineChat: MessagesSquare, // chat
+  MdOutlineReportProblem: TriangleAlert, // issues
   MdOutlineAccountBalanceWallet: Wallet, // cash tracker, deposits
   MdOutlineAttachMoney: Receipt, // cost report
   MdOutlineAttachMoney2: Receipt,
