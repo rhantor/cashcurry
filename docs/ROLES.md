@@ -1,9 +1,19 @@
 # Roles and permissions (roadmap 4.1)
 
-**Status: draft for the owner to confirm (18 Oct 2026).** Nothing here is enforced yet. Once the
-matrix in part 3 is agreed, one file (`lib/authz/permissions.js`) will hold it and
-the menu, the page guard (`middleware.js`) and the database rules
-(`firestore.rules`) will all be checked against it, with tests.
+**Status: agreed by the owner and enforced (18 Oct 2026).** The matrix in part 3
+lives in `lib/authz/permissions.js`. The menu (`app/components/shell/navigation.js`),
+the page guard (`middleware.js`) and the checks inside pages read it;
+`firestore.rules` has one function per capability, and
+`tests-rules/matrix.test.js` tries every capability as every role against the real
+rules and fails if they disagree with the matrix. `tests/authz/permissions.test.js`
+holds the owner's decisions as tests and checks the menu never offers a page the
+guard refuses.
+
+**Release:** deploy the new `firestore.rules` and run `npm run staff:private` (moves
+pay, IC, bank and personal details into `staffPrivate`) in the same release — see
+the release checklist in `docs/ROADMAP.md`.
+
+Parts 2 and 4 below describe how things stood **before** the change.
 
 Today the same rule lives in up to four places that disagree: the menu
 (`app/components/shell/navigation.js`), the page guard (`middleware.js`), the
@@ -102,6 +112,23 @@ Branch settings**, though the database lets the owner change staff and settings.
 | Audit log | V | V | V | V (branch) | V (branch) | — | — | — | — | — |
 | Tools (invoice, appointment letter) | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ | — | — | — |
 | Chat / issues (4.4, 4.5) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+Settled while building it:
+- **Salary payments** (the `salaries` entries — "paid Ali RM 1,800 on 30 Sep") are
+  part of the cash book, so everyone who sees the reports reads them: the till and
+  bank figures can't be right without them. What stays private is the pay
+  structure — basic, allowances, OT rate, bank, IC (`staffPrivate`) — and payslips
+  (`payrollRuns`).
+- **Editing and deleting saved records:** `records.edit` (company roles, branchAdmin,
+  manager, inCharge, accountant, supervisor) and `records.delete` (company roles,
+  branchAdmin, manager — also enforced in the database).
+- **Receiving goods** (supervisor and up) may only raise what a vendor is owed and
+  record what the branch paid for an item; changing vendors and items otherwise
+  is `catalog.manage`.
+- **Approving a purchase order** (approve, reject, re-open) is `purchases.approve`;
+  sending an approved order or editing it (which clears the approval) is not.
+- Inside a page, a role that may see but not change gets a read-only page
+  (vendors, items, attendance log, payroll history for the accountant).
 
 Rules that go with it:
 1. **Nobody approves their own** request, pay-out or voucher (decided 16 Oct).

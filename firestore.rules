@@ -553,7 +553,11 @@ service cloud.firestore {
 
         // ── Salaries ─────────────────────────────────────────────────────────
         match /salaries/{docId} {
-          allow read, create, update: if canSalariesEnter(companyId, branchId);
+          // Salary payments are entries in the cash book: those who see the
+          // reports read them (the figures need them). Pay rates, bank and ID
+          // stay in staffPrivate; payslips in payrollRuns.
+          allow read: if canSalariesEnter(companyId, branchId) || canReportsView(companyId, branchId);
+          allow create, update: if canSalariesEnter(companyId, branchId);
           allow delete: if canRecordsDelete(companyId, branchId);
         }
 

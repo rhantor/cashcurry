@@ -90,6 +90,16 @@ beforeEach(async () => {
   });
 });
 
+describe("the cash book", () => {
+  it("salary payments are read by everyone who sees the reports — the figures need them", async () => {
+    await env.withSecurityRulesDisabled((ctx) => ctx.firestore().doc(`${B}/salaries/paid`).set({ paymentDate: "2026-10-01", amount: 1800 }));
+    for (const u of USERS) {
+      const want = can(PEOPLE[u].role, "salaries.enter") || can(PEOPLE[u].role, "reports.view");
+      expect(await tries(as(u).doc(`${B}/salaries/paid`).get()), u).toBe(want);
+    }
+  });
+});
+
 describe("private staff details", () => {
   it("staff read their own private details and no one else's", async () => {
     expect(await tries(as("klStaff").doc(`${B}/staffPrivate/st-me`).get())).toBe(true);
