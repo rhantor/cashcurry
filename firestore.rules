@@ -290,6 +290,35 @@ service cloud.firestore {
       let u = userData();
       return isAuth() && u.companyId == c && (u.role in companyRoles() || (isBranchAdmin(u) && inBranch(u, b)));
     }
+    // ── chat (4.4) ──
+    function canChatGroups(c) { return mayInCompany(c, leadRoles()); }
+    function canSeeChat(c, chat) {
+      let u = userData();
+      return u.companyId == c && (
+        chat.kind == 'company' ||
+        (chat.kind == 'branch' && (u.role in companyRoles() || u.get('branchId', null) == chat.get('branchId', ''))) ||
+        ((chat.kind == 'group' || chat.kind == 'direct') && request.auth.uid in chat.get('members', [])));
+    }
+    function canSeeChatId(c, chatId) {
+      return canSeeChat(c, get(/databases/$(database)/documents/companies/$(c)/chats/$(chatId)).data);
+    }
+    function sameCompany(uid, c) {
+      return get(/databases/$(database)/documents/users/$(uid)).data.get('companyId', '') == c;
+    }
+    // The company chat, a branch's chat, a personal chat between two people of
+    // the company, or a group made by management — each with its fixed id/shape.
+    function isNewChat(c, chatId) {
+      let d = request.resource.data;
+      let u = userData();
+      let m = d.get('members', []);
+      return u.companyId == c && (
+        (d.kind == 'company' && chatId == 'company') ||
+        (d.kind == 'branch' && chatId == 'branch_' + d.branchId && canSeeChat(c, d)) ||
+        (d.kind == 'direct' && m.size() == 2 && request.auth.uid in m && m[0] < m[1] &&
+          chatId == 'dm_' + m[0] + '_' + m[1] && sameCompany(m[0], c) && sameCompany(m[1], c)) ||
+        (d.kind == 'group' && canChatGroups(c) && request.auth.uid in m && d.createdBy == request.auth.uid)
+      );
+    }
     function canCatalogView(c)        { return mayInCompany(c, leadRoles().concat(['inCharge', 'accountant', 'supervisor'])); }
     function canCatalogManage(c)      { return mayInCompany(c, leadRoles().concat(['accountant'])); }
     function canBranchLoans(c)        { return mayInCompany(c, leadRoles().concat(['accountant'])); }
@@ -421,6 +450,50 @@ service cloud.firestore {
         match /prefs/{doc} {
           allow read, write: if isAuth() && request.auth.uid == uid;
         }
+      }
+
+      // ── Chat (roadmap 4.4, lib/chat/model.js) ──────────────────────────────
+      // Company chat: everyone in the company. Branch chat: that branch's people
+      // and the company roles. Groups (made by management) and personal chats:
+      // their members. Your own message can be changed or deleted for 15 minutes.
+      match /chats/{chatId} {
+        allow get: if isAuth() && canSeeChat(companyId, resource.data);
+        // listing: only the groups and personal chats you're in (members array-contains you)
+        allow list: if belongsToCompany(companyId) && request.auth.uid in resource.data.members;
+        allow create: if isAuth() && isNewChat(companyId, chatId);
+        allow update: if isAuth() && canSeeChat(companyId, resource.data) && (
+          // a new message moves the chat up the list
+          changedKeys().hasOnly(['lastMessage', 'updatedAt']) ||
+          // management renames a group or changes who is in it
+          (resource.data.kind == 'group' && canChatGroups(companyId) &&
+            changedKeys().hasOnly(['name', 'members', 'updatedAt']))
+        );
+        allow delete: if isAuth() && resource.data.kind == 'group' && canChatGroups(companyId) &&
+          canSeeChat(companyId, resource.data);
+
+        match /messages/{messageId} {
+          allow read: if isAuth() && canSeeChatId(companyId, chatId);
+          allow create: if isAuth() && canSeeChatId(companyId, chatId) &&
+            request.resource.data.byUid == request.auth.uid &&
+            request.resource.data.createdAt == request.time &&
+            request.resource.data.get('deleted', false) == false;
+          allow update: if isAuth() && resource.data.byUid == request.auth.uid &&
+            resource.data.get('deleted', false) == false &&
+            request.time < resource.data.createdAt + duration.value(15, 'm') &&
+            changedKeys().hasOnly(['text', 'files', 'editedAt', 'deleted']);
+        }
+
+        // when each person last looked
+        match /reads/{uid} {
+          allow read: if isAuth() && canSeeChatId(companyId, chatId);
+          allow write: if isAuth() && request.auth.uid == uid && canSeeChatId(companyId, chatId);
+        }
+      }
+
+      // Who can be messaged: names and roles only, kept by the server from users/{uid}.
+      match /chatPeople/{uid} {
+        allow read: if belongsToCompany(companyId);
+        allow write: if false;
       }
 
       // ── Notifications (Company Level) ──────────────────────────────────────
@@ -647,9 +720,11 @@ service cloud.firestore {
           allow delete: if canAdvancesApprove(companyId, branchId);
         }
 
-        // ── Chat Messages ───────────────────────────────────────────────────
+        // ── Old branch chat — read-only; chat moved to companies/{c}/chats (4.4,
+        // `npm run chat:migrate` copies these across) ────────────────────────
         match /chat_messages/{messageId} {
-          allow read, write: if isBranchMember(companyId, branchId);
+          allow read: if isBranchMember(companyId, branchId);
+          allow write: if false;
         }
 
         // ── Attendance (Shared Kiosk) ────────────────────────────────────────
