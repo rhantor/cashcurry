@@ -167,30 +167,7 @@ service cloud.firestore {
     function isCancel() {
       return resource.data.get('status', '') == 'pending' &&
         request.resource.data.get('status', '') == 'cancelled' &&
-        changedKeys().hasOnly(['status', 'awaiting', 'cancelledBy', 'updatedAt']);
-    }
-
-    // Requests engine (roadmap 4.2, lib/requests/model.js): an advance or
-    // staff loan above the branch's limit (settings.requests.ownerApprovalAbove,
-    // 0 = no limit) becomes approved only by a company role.
-    function ownerApprovalAbove(c, b) {
-      let path = /databases/$(database)/documents/companies/$(c)/branches/$(b)/settings/settings;
-      return exists(path) ? get(path).data.get('requests', {}).get('ownerApprovalAbove', 0) : 0;
-    }
-    function keepsOwnerStep(c, b) {
-      let after = request.resource.data;
-      let becomesApproved = after.get('status', '') in ['approved', 'closed'] &&
-        (resource == null || resource.data.get('status', '') == 'pending');
-      let limit = ownerApprovalAbove(c, b);
-      return !becomesApproved || !(limit > 0 && after.get('amount', 0) > limit) ||
-        userData().role in companyRoles();
-    }
-
-    // The approval limit itself is the company's to set, not the branch's.
-    function keepsApprovalLimit() {
-      return resource == null ||
-        request.resource.data.get('requests', {}).get('ownerApprovalAbove', 0) ==
-          resource.data.get('requests', {}).get('ownerApprovalAbove', 0);
+        changedKeys().hasOnly(['status', 'cancelledBy', 'updatedAt']);
     }
 
     // Paying out: an approved, unpaid request gets paidOut — and nothing else
@@ -240,9 +217,8 @@ service cloud.firestore {
     // Money and date settings (opening balances, currency, time zone, day
     // cut-off) are enforced here too: a manager's save may not change them.
     function canWriteBranchSettings(companyId, branchId) {
-      return (canMoneySettings(companyId, branchId) ||
-        (canBranchSettings(companyId, branchId) && (resource == null || keepsMoneySettings()))) &&
-        (userData().role in companyRoles() || keepsApprovalLimit());
+      return canMoneySettings(companyId, branchId) ||
+        (canBranchSettings(companyId, branchId) && (resource == null || keepsMoneySettings()));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -308,6 +284,11 @@ service cloud.firestore {
         u.role in ['owner', 'superAdmin', 'superadmin'] ||
         (isBranchAdmin(u) && inBranch(u, b))
       );
+    }
+    // who gets which notifications (4.3): company roles anywhere, a branch admin in their branch
+    function canNotificationsManage(c, b) {
+      let u = userData();
+      return isAuth() && u.companyId == c && (u.role in companyRoles() || (isBranchAdmin(u) && inBranch(u, b)));
     }
     function canCatalogView(c)        { return mayInCompany(c, leadRoles().concat(['inCharge', 'accountant', 'supervisor'])); }
     function canCatalogManage(c)      { return mayInCompany(c, leadRoles().concat(['accountant'])); }
@@ -428,13 +409,26 @@ service cloud.firestore {
         match /fcmTokens/{token} {
           allow read, write: if isAuth() && request.auth.uid == uid;
         }
+
+        // Their notifications (4.3): written only by the server (Cloud
+        // Functions); the person reads them, marks them read, clears them.
+        match /inbox/{id} {
+          allow read, delete: if isAuth() && request.auth.uid == uid;
+          allow update: if isAuth() && request.auth.uid == uid && changedKeys().hasOnly(['readAt']);
+        }
+
+        // Their own choices, e.g. kinds of notification they muted
+        match /prefs/{doc} {
+          allow read, write: if isAuth() && request.auth.uid == uid;
+        }
       }
 
       // ── Notifications (Company Level) ──────────────────────────────────────
       match /notifications/{docId} {
         allow read: if belongsToCompany(companyId);
-        // anyone in the company may raise one (staff requests do); afterwards only "read" changes
-        allow create: if belongsToCompany(companyId);
+        // Old shared feed: read-only now — notifications are written by the
+        // server to each person's inbox (4.3). Before, anyone could post here.
+        allow create: if false;
         allow update: if belongsToCompany(companyId) && changedKeys().hasOnly(['read', 'readAt', 'updatedAt']);
         allow delete: if isOfficeMember(companyId);
       }
@@ -516,7 +510,15 @@ service cloud.firestore {
         // ── Branch Settings ─────────────────────────────────────────────────
         match /settings/{docId} {   // Fixed typo from branchSettings to settings!
           allow read: if canRead(companyId, branchId);
-          allow write: if canWriteBranchSettings(companyId, branchId);
+          // settings/notifications has its own rule below — not for managers
+          allow write: if docId != 'notifications' && canWriteBranchSettings(companyId, branchId);
+        }
+
+        // Who gets which notifications at this branch (4.3, lib/notify/model.js):
+        // chosen by owner, super admin, gm or the branch admin.
+        match /settings/notifications {
+          allow read: if canRead(companyId, branchId);
+          allow write: if canNotificationsManage(companyId, branchId);
         }
 
         // ── Branch Admins ─────────────────────────────────────────────────────
@@ -596,17 +598,16 @@ service cloud.firestore {
         // ── Staff Loans (Branch Level) ───────────────────────────────────────
         match /loans/{docId} {
           // Anyone at the branch may ASK (pending, unpaid) and cancel their own while
-          // it waits. branchAdmin / manager (and company roles) approve or reject, or
-          // record one handed over on the spot — above the branch's limit only a
-          // company role may make it approved (keepsOwnerStep).
+          // it waits. branchAdmin / manager (and company roles) approve or reject —
+          // one approval is enough — or record one handed over on the spot.
           // A payer (cashier and up) marks an approved one paid — once, changing
           // nothing else. Payroll instalments: whoever enters salaries. Staff read
           // only their own (isOwnRequest).
           allow read: if canAdvancesPayOut(companyId, branchId) || canReportsView(companyId, branchId) ||
             (isBranchMember(companyId, branchId) && isOwnRequest());
-          allow create: if (canAdvancesApprove(companyId, branchId) && keepsOwnerStep(companyId, branchId)) ||
+          allow create: if canAdvancesApprove(companyId, branchId) ||
             (isBranchMember(companyId, branchId) && isNewRequest());
-          allow update: if (canAdvancesApprove(companyId, branchId) && keepsOwnerStep(companyId, branchId)) ||
+          allow update: if canAdvancesApprove(companyId, branchId) ||
             (canAdvancesPayOut(companyId, branchId) && isPayOut()) ||
             (canSalariesEnter(companyId, branchId) && isBookkeeping()) ||
             (isBranchMember(companyId, branchId) && isOwnRequest() && isCancel());
@@ -630,17 +631,16 @@ service cloud.firestore {
         // ── Staff Advances ───────────────────────────────────────────────────
         match /advances/{docId} {
           // Anyone at the branch may ASK (pending, unpaid) and cancel their own while
-          // it waits. branchAdmin / manager (and company roles) approve or reject, or
-          // record one handed over on the spot — above the branch's limit only a
-          // company role may make it approved (keepsOwnerStep).
+          // it waits. branchAdmin / manager (and company roles) approve or reject —
+          // one approval is enough — or record one handed over on the spot.
           // A payer (cashier and up) marks an approved one paid — once, changing
           // nothing else. Payroll instalments: whoever enters salaries. Staff read
           // only their own (isOwnRequest).
           allow read: if canAdvancesPayOut(companyId, branchId) || canReportsView(companyId, branchId) ||
             (isBranchMember(companyId, branchId) && isOwnRequest());
-          allow create: if (canAdvancesApprove(companyId, branchId) && keepsOwnerStep(companyId, branchId)) ||
+          allow create: if canAdvancesApprove(companyId, branchId) ||
             (isBranchMember(companyId, branchId) && isNewRequest());
-          allow update: if (canAdvancesApprove(companyId, branchId) && keepsOwnerStep(companyId, branchId)) ||
+          allow update: if canAdvancesApprove(companyId, branchId) ||
             (canAdvancesPayOut(companyId, branchId) && isPayOut()) ||
             (canSalariesEnter(companyId, branchId) && isBookkeeping()) ||
             (isBranchMember(companyId, branchId) && isOwnRequest() && isCancel());

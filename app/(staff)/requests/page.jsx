@@ -6,7 +6,6 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import { CalendarPlus, HandCoins } from "lucide-react";
 import { db } from "@/lib/firebase";
 import useSession from "@/app/hooks/useSession";
-import useApprovalPolicy from "@/lib/requests/useApprovalPolicy";
 import { Button, Skeleton } from "@/app/components/ui";
 import MyRequests from "@/app/components/requests/MyRequests";
 import AdvanceAskSheet from "@/app/components/requests/AdvanceAskSheet";
@@ -29,7 +28,6 @@ export default function RequestsPage() {
   }, [user?.uid, user?.companyId, user?.branchId, user?.staffId]);
 
   const me = user ? { ...user, staffId: user.staffId || lookedUpStaffId } : null;
-  const policy = useApprovalPolicy(user?.companyId, user?.branchId);
   const where_ = { companyId: user?.companyId, branchId: user?.branchId };
 
   if (!me) return <div className="space-y-3 p-4">{[0, 1].map((i) => <Skeleton key={i} className="h-28" rounded="rounded-2xl" />)}</div>;
@@ -40,9 +38,9 @@ export default function RequestsPage() {
         <Button icon={HandCoins} onClick={() => setSheet("advance")}>Ask for advance</Button>
         <Button variant="secondary" icon={CalendarPlus} onClick={() => setSheet("leave")}>Ask for leave</Button>
       </div>
-      <MyRequests {...where_} user={me} policy={policy} />
-      <AdvanceAskSheet open={sheet === "advance"} onClose={() => setSheet(null)} {...where_} user={me} policy={policy} />
-      <LeaveSheet open={sheet === "leave"} onClose={() => setSheet(null)} {...where_} user={me} policy={policy} />
+      <MyRequests {...where_} user={me} />
+      <AdvanceAskSheet open={sheet === "advance"} onClose={() => setSheet(null)} {...where_} user={me} />
+      <LeaveSheet open={sheet === "leave"} onClose={() => setSheet(null)} {...where_} user={me} />
     </div>
   );
 }

@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, MessageCircle, FileText, LogOut, User } from "lucide-react";
+import NotificationBell from "@/app/components/notifications/NotificationBell";
 
 export default function StaffLayout({ children }) {
   const pathname = usePathname();
@@ -29,8 +30,9 @@ export default function StaffLayout({ children }) {
       
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex flex-col w-64 border-r border-gray-200 bg-white">
-        <div className="p-6 border-b border-gray-100">
+        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
            <div className="font-extrabold text-2xl text-blue-600 tracking-tight">Staff Portal</div>
+           <NotificationBell />
         </div>
         <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
           {navItems.map(item => {
@@ -61,9 +63,12 @@ export default function StaffLayout({ children }) {
         {/* Mobile Header (Hidden on Desktop) */}
         <header className="md:hidden bg-white border-b border-gray-200 px-4 py-3 flex justify-between items-center shadow-sm shrink-0 z-40">
           <div className="font-bold text-xl text-blue-600 tracking-tight">Work Media</div>
-          <button onClick={handleLogout} className="p-2 text-gray-500 hover:text-red-500 rounded-full hover:bg-red-50 transition" title="Logout">
-            <LogOut size={20} />
-          </button>
+          <div className="flex items-center gap-1">
+            <NotificationBell />
+            <button onClick={handleLogout} className="p-2 text-gray-500 hover:text-red-500 rounded-full hover:bg-red-50 transition" title="Logout">
+              <LogOut size={20} />
+            </button>
+          </div>
         </header>
 
         {/* Scrollable Content */}

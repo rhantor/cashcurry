@@ -21,254 +21,43 @@ setGlobalOptions({
   timeoutSeconds: 60,
 });
 
-async function notifyRoles({
-  companyId,
-  title,
-  body,
-  link = "/",
-  roles = ["owner", "gm", "manager", "branchAdmin"],
-  writeInbox = true,
-}) {
-  console.log("[notifyRoles] start", { companyId, roles });
+// ─────────────────────────────────────────────────────────────────────────────
+// 🔔 NOTIFICATIONS (roadmap 4.3) — who is told what: lib/notify/model.js.
+// Requests are told at once; sales and costs once a day, never per entry.
+// ─────────────────────────────────────────────────────────────────────────────
+const notify = require("./notify")({ db, fcm, FieldValue });
 
-  // 1) users are under /companies/{companyId}/users
-  const usersSnap = await db
-    .collection("companies")
-    .doc(companyId)
-    .collection("users")
-    .where("role", "in", roles)
-    .get();
-
-  const uids = usersSnap.docs.map((d) => d.id);
-  console.log("[notifyRoles] recipients uids:", uids);
-
-  if (!uids.length) {
-    console.log("[notifyRoles] no recipients found");
-    return;
-  }
-
-  // 2) optional in-app inbox at /companies/{companyId}/users/{uid}/inbox
-  if (writeInbox) {
-    const createdAt = FieldValue.serverTimestamp();
-    const batch = db.batch();
-    for (const uid of uids) {
-      const ref = db.doc(
-        `companies/${companyId}/users/${uid}/inbox/${
-          db.collection("_").doc().id
-        }`
-      );
-      batch.set(ref, { title, body, link, createdAt, readAt: null });
-    }
-    await batch.commit();
-    console.log("[notifyRoles] inbox written");
-  }
-
-  // 3) gather tokens from /companies/{companyId}/users/{uid}/fcmTokens/{token}
-  const tokenSnaps = await Promise.all(
-    uids.map((uid) =>
-      db.collection(`companies/${companyId}/users/${uid}/fcmTokens`).get()
-    )
-  );
-  const tokens = tokenSnaps
-    .flatMap((s) => s.docs.map((d) => d.id))
-    .filter(Boolean);
-  console.log("[notifyRoles] tokens found:", tokens.length);
-
-  if (!tokens.length) {
-    console.log(
-      "[notifyRoles] no tokens — ensure devices registered under this company"
-    );
-    return;
-  }
-
-  // 4) send push and log per-token results
-  const res = await fcm.sendEachForMulticast({
-    tokens,
-    notification: { title, body },
-    data: { link, companyId },
-  });
-
-  console.log(
-    "[notifyRoles] success:",
-    res.successCount,
-    "failure:",
-    res.failureCount
-  );
-
-  // Clean invalid tokens to reduce noise next time
-  const INVALID = new Set([
-    "messaging/registration-token-not-registered",
-    "messaging/invalid-argument",
-  ]);
-  const bad = [];
-  res.responses.forEach((r, i) => {
-    if (!r.success) {
-      console.warn(
-        "[notifyRoles] send error",
-        tokens[i],
-        r.error?.code,
-        r.error?.message
-      );
-      if (r.error && INVALID.has(r.error.code)) bad.push(tokens[i]);
+const requestTrigger = (collection, type) =>
+  onDocumentWritten(`companies/{companyId}/branches/{branchId}/${collection}/{id}`, async (event) => {
+    const { companyId, branchId, id } = event.params;
+    const before = event.data?.before?.exists ? event.data.before.data() : null;
+    const after = event.data?.after?.exists ? event.data.after.data() : null;
+    try {
+      await notify.onRequest({ companyId, branchId, type, id, before, after });
+    } catch (err) {
+      console.error(`[notify ${collection}]`, companyId, branchId, id, err);
     }
   });
-  if (bad.length) {
-    // remove from each user's subcollection
-    await Promise.all(
-      uids.map(async (uid) => {
-        const col = db.collection(
-          `companies/${companyId}/users/${uid}/fcmTokens`
-        );
-        await Promise.all(
-          bad.map((t) =>
-            col
-              .doc(t)
-              .delete()
-              .catch(() => {})
-          )
-        );
-      })
-    );
-    console.log("[notifyRoles] cleaned invalid tokens:", bad.length);
+
+exports.notifyAdvances = requestTrigger("advances", "advance");
+exports.notifyStaffLoans = requestTrigger("loans", "staffLoan");
+exports.notifyLeaves = requestTrigger("leaves", "leave");
+
+exports.notifyPurchaseOrders = onDocumentWritten("companies/{companyId}/branches/{branchId}/requisitions/{id}", async (event) => {
+  const { companyId, branchId, id } = event.params;
+  const before = event.data?.before?.exists ? event.data.before.data() : null;
+  const after = event.data?.after?.exists ? event.data.after.data() : null;
+  try {
+    await notify.onPurchaseOrder({ companyId, branchId, id, before, after });
+  } catch (err) {
+    console.error("[notify requisitions]", companyId, branchId, id, err);
   }
-}
+});
 
-// 🔔 sales trigger (kept same; uses the fixed notifyRoles)
-exports.onSalesCreated = onDocumentCreated(
-  "companies/{companyId}/branches/{branchId}/sales/{saleId}",
-  async (event) => {
-    const { companyId, branchId } = event.params;
-    const d = event.data?.data() || {};
-
-    const amount = Number(d.total ?? d.amount ?? 0);
-    const amountStr = isFinite(amount)
-      ? `RM ${amount.toFixed(2)}`
-      : "a new entry";
-
-    let dateStr = "";
-    if (typeof d.date === "string") dateStr = d.date;
-    else if (d.date?.toDate)
-      dateStr = d.date.toDate().toISOString().slice(0, 10);
-
-    const title = "New Sales Entry";
-    const body = dateStr
-      ? `${amountStr} on ${dateStr}`
-      : `Sales recorded: ${amountStr}`;
-    const link = `/reports/sales-report?branch=${branchId}`;
-
-    console.log("[onSalesCreated] firing", {
-      companyId,
-      branchId,
-      amount,
-      dateStr,
-    });
-    await notifyRoles({
-      companyId,
-      title,
-      body,
-      link,
-      roles: ["owner", "gm", "manager", "branchAdmin"],
-      writeInbox: true,
-    });
-  }
-);
-// helpers reused by all triggers
-const toRM = (v) => {
-  const n = Number(v ?? 0);
-  return Number.isFinite(n) ? `RM ${n.toFixed(2)}` : "a new entry";
-};
-
-const toISODate = (d) => {
-  if (!d) return "";
-  if (typeof d === "string") return d;
-  if (d?.toDate) return d.toDate().toISOString().slice(0, 10);
-  return "";
-};
-
-const buildBody = ({ amount, dateStr, prefix }) =>
-  dateStr ? `${prefix}${amount} on ${dateStr}` : `${prefix}${amount}`;
-
-// 🔔 cost trigger
-exports.onCostCreated = onDocumentCreated(
-  "companies/{companyId}/branches/{branchId}/costs/{costId}", // change "costs" if your collection name differs
-  async (event) => {
-    const { companyId, branchId } = event.params;
-    const d = event.data?.data() || {};
-
-    // try common field names
-    const amount = toRM(d.total ?? d.amount ?? d.costAmount);
-    const dateStr = toISODate(d.date ?? d.txnDate ?? d.createdAt);
-    const category = d.category || d.type || d.costType || "";
-    const vendor = d.vendor || d.supplier || "";
-
-    const title = "New Cost Entry";
-    const details =
-      [category, vendor].filter(Boolean).join(" • ") || "Cost recorded";
-    const body = buildBody({ amount, dateStr, prefix: `${details}: ` });
-
-    const link = `/reports/cost-report?branch=${branchId}`;
-
-    console.log("[onCostCreated] firing", {
-      companyId,
-      branchId,
-      amount,
-      dateStr,
-      category,
-      vendor,
-    });
-    await notifyRoles({
-      companyId,
-      title,
-      body,
-      link,
-      roles: ["owner", "gm", "manager", "branchAdmin", "accountant"],
-      writeInbox: true,
-    });
-  }
-);
-
-// 🔔 advance trigger (staff advance / loan advance)
-exports.onAdvanceCreated = onDocumentCreated(
-  "companies/{companyId}/branches/{branchId}/advances/{advanceId}", // change if different (e.g., "advanceEntries")
-  async (event) => {
-    const { companyId, branchId } = event.params;
-    const d = event.data?.data() || {};
-
-    const amount = toRM(d.amount ?? d.advanceAmount ?? d.total);
-    const dateStr = toISODate(d.date ?? d.advanceDate ?? d.createdAt);
-
-    // who received it?
-    const staff =
-      d.staffName ||
-      d.employeeName ||
-      d.userName ||
-      d.staffId ||
-      d.employeeId ||
-      "";
-
-    const title = "New Advance Entry";
-    const who = staff ? `to ${staff}` : "recorded";
-    const body = buildBody({ amount, dateStr, prefix: `Advance ${who}: ` });
-
-    const link = `/reports/advance-report?branch=${branchId}`;
-
-    console.log("[onAdvanceCreated] firing", {
-      companyId,
-      branchId,
-      amount,
-      dateStr,
-      staff,
-    });
-    await notifyRoles({
-      companyId,
-      title,
-      body,
-      link,
-      roles: ["owner", "gm", "manager", "branchAdmin", "accountant"],
-      writeInbox: true,
-    });
-  }
-);
+// Every hour; each branch's summary goes out at its own time on its own clock.
+exports.notifyDailySummary = onSchedule({ schedule: "0 * * * *", timeZone: "UTC", timeoutSeconds: 540 }, async () => {
+  await notify.dailySummaries(new Date());
+});
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 📋 AUDIT LOGGING
@@ -429,41 +218,3 @@ exports.summaryNightly = onSchedule(
   }
 );
 
-// 🔔 cash deposit trigger (bank deposit)
-exports.onDepositCreated = onDocumentCreated(
-  "companies/{companyId}/branches/{branchId}/deposits/{depositId}",
-  async (event) => {
-    const { companyId, branchId } = event.params;
-    const d = event.data?.data() || {};
-
-    const amount = toRM(d.amount ?? d.depositAmount ?? d.total);
-    const dateStr = toISODate(d.date ?? d.depositDate ?? d.createdAt);
-
-    const method = d.method || d.channel || d.bank || d.accountName || "";
-    const ref = d.reference || d.ref || d.slipNo || "";
-
-    const title = "New Cash Deposit";
-    const pieces = [method, ref].filter(Boolean).join(" • ");
-    const prefix = pieces ? `${pieces}: ` : "";
-    const body = buildBody({ amount, dateStr, prefix });
-
-    const link = `/reports/deposit-report?branch=${branchId}`;
-
-    console.log("[onDepositCreated] firing", {
-      companyId,
-      branchId,
-      amount,
-      dateStr,
-      method,
-      ref,
-    });
-    await notifyRoles({
-      companyId,
-      title,
-      body,
-      link,
-      roles: ["owner", "gm", "manager", "branchAdmin", "accountant"],
-      writeInbox: true,
-    });
-  }
-);

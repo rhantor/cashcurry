@@ -6,9 +6,8 @@ import useSession from "@/app/hooks/useSession";
 import ProviderWrapper from "@/lib/redux/store/Provider";
 import AppShell from "./components/shell/AppShell";
 import { Loader, UIProvider } from "./components/ui";
-import AutoAskAfterLogin from "@/app/components/notifications/AutoAskAfterLogin";
+import NotificationsProvider from "@/app/components/notifications/NotificationsProvider";
 import RegionSync from "@/app/components/region/RegionSync";
-import { registerFcm } from "@/lib/notifications/registerFcm"; // real push
 
 export default function ClientLayoutWrapper({ children }) {
   const router = useRouter();
@@ -23,8 +22,6 @@ export default function ClientLayoutWrapper({ children }) {
   // that would be refused by the database rules.
   const isLoading = status === "loading";
 
-  // 3) Register FCM token once we know user + companyId (real push)
-  //    This hook must NOT be behind a conditional return.
   const authPages = ["/login", "/signup", "/signup/verify", "/reset-password"];
   // No sidebar/top bar on these (the staff app, the kiosk, and the /ui design preview).
   const staffPages = ["/staff-portal", "/requests", "/chat", "/kiosk", "/profile", "/ui"];
@@ -37,22 +34,6 @@ export default function ClientLayoutWrapper({ children }) {
     if (status === "signedOut" && !isAuthPage) router.replace("/login");
   }, [status, isAuthPage, router]);
 
-  useEffect(() => {
-    // safe to early-return *inside* the effect
-    if (!isLoggedIn || isAuthPage) return;
-
-    const companyId = user?.companyId;
-    const uid = user?.uid;
-    if (!companyId || !uid) return;
-
-    (async () => {
-      try {
-        await registerFcm({ companyId, uid });
-      } catch (e) {
-        console.warn("registerFcm error:", e);
-      }
-    })();
-  }, [isLoggedIn, isAuthPage, user]);
 
   // ---- early return AFTER hooks are declared
   if (isLoading) {
@@ -79,23 +60,25 @@ export default function ClientLayoutWrapper({ children }) {
         {/* Active branch's time zone, day cut-off and currency, for every screen */}
         {isLoggedIn && !isAuthPage && <RegionSync />}
 
-        {/* Ask permission + show personalized welcome once per session after login */}
-        {isLoggedIn && !isAuthPage && (
-          <React.Suspense fallback={null}>
-            <AutoAskAfterLogin enabled user={user} />
-          </React.Suspense>
-        )}
-
-        {isAuthPage || isStaffPage ? (
+        {isAuthPage ? (
           <div className="min-h-screen bg-background">
             <React.Suspense fallback={<Loader />}>{children}</React.Suspense>
           </div>
         ) : (
-          <AppShell onSignOut={logout}>
-            {/* No spinner here: the top progress bar shows the page is coming,
-                and each page brings its own skeleton (one loading look, not two). */}
-            <React.Suspense fallback={null}>{children}</React.Suspense>
-          </AppShell>
+          // the signed-in person's notifications: the bell, and a toast for a new one
+          <NotificationsProvider user={isLoggedIn ? user : null}>
+            {isStaffPage ? (
+              <div className="min-h-screen bg-background">
+                <React.Suspense fallback={<Loader />}>{children}</React.Suspense>
+              </div>
+            ) : (
+              <AppShell onSignOut={logout}>
+                {/* No spinner here: the top progress bar shows the page is coming,
+                    and each page brings its own skeleton (one loading look, not two). */}
+                <React.Suspense fallback={null}>{children}</React.Suspense>
+              </AppShell>
+            )}
+          </NotificationsProvider>
         )}
       </UIProvider>
     </ProviderWrapper>
