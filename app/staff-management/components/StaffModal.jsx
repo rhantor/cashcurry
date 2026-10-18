@@ -1,5 +1,6 @@
 'use client'
 
+import { DatePicker, Select } from '@/app/components/ui'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import imageCompression from 'browser-image-compression'
 import {
@@ -166,13 +167,13 @@ export default function StaffModal ({
 
   const inputClass = useCallback(
     name => `
-      w-full bg-white border rounded-xl px-3 py-2.5 text-sm text-black/80 outline-none transition-colors
+      w-full bg-surface border rounded-xl px-3 py-2.5 text-sm text-fg outline-none transition-colors
       ${
         errors[name] && touched[name]
-          ? 'border-red-300 focus:border-red-500'
-          : 'border-black/10 focus:border-[var(--color-primary)]'
+          ? 'border-danger/30 focus:border-danger'
+          : 'border-line focus:border-brand/30'
       }
-      placeholder:text-black/35
+      placeholder:text-subtle
     `,
     [errors, touched]
   )
@@ -295,24 +296,24 @@ export default function StaffModal ({
       onClick={onClose}
     >
       <div
-        className='bg-[var(--color-background)] border border-black/10 w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl animate-in zoom-in-95 duration-200'
+        className='bg-bg border border-line w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl shadow-2xl animate-in zoom-in-95 duration-200'
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
-        <div className='flex items-center justify-between px-6 py-5 border-b border-black/10'>
-          <h2 className='text-lg font-extrabold text-[color:var(--color-accent)] tracking-tight'>
+        <div className='flex items-center justify-between px-6 py-5 border-b border-line'>
+          <h2 className='text-lg font-extrabold text-brand tracking-tight'>
             {mode === 'edit' ? 'Edit Staff Member' : 'Add New Staff'}
           </h2>
           <button
             onClick={onClose}
-            className='p-2 text-black/40 hover:text-black/80 transition-colors rounded-xl hover:bg-black/5'
+            className='p-2 text-subtle hover:text-fg transition-colors rounded-xl hover:bg-surface-2'
           >
             <X size={20} />
           </button>
         </div>
 
         {/* Tabs */}
-        <div className='px-3 border-b border-black/10 flex gap-1 overflow-x-auto'>
+        <div className='px-3 border-b border-line flex gap-1 overflow-x-auto'>
           {TABS.map(({ key, label, Icon }) => {
             const active = activeTab === key
             const err = tabHasError(key)
@@ -323,8 +324,8 @@ export default function StaffModal ({
                 onClick={() => setActiveTab(key)}
                 className={`relative flex items-center gap-2 px-4 py-3 text-sm font-bold whitespace-nowrap border-b-2 -mb-px transition-colors ${
                   active
-                    ? 'border-[var(--color-primary)] text-[color:var(--color-primary-dark)]'
-                    : 'border-transparent text-black/45 hover:text-black/70'
+                    ? 'border-brand/30 text-brand'
+                    : 'border-transparent text-muted hover:text-fg'
                 }`}
               >
                 <Icon size={16} />
@@ -341,28 +342,28 @@ export default function StaffModal ({
           {activeTab === 'personal' && (
             <div className='space-y-8'>
               <div>
-                <div className='flex items-center gap-2 mb-4 pb-2 border-b border-black/10'>
-                  <User size={16} className='text-[var(--color-primary)]' />
-                  <h3 className='text-xs font-extrabold uppercase tracking-wider text-black/55'>
+                <div className='flex items-center gap-2 mb-4 pb-2 border-b border-line'>
+                  <User size={16} className='text-brand' />
+                  <h3 className='text-xs font-extrabold uppercase tracking-wider text-muted'>
                     Personal Information
                   </h3>
                 </div>
 
                 <div className='flex items-center gap-4 mb-4'>
                   <div
-                    className={`w-20 h-20 rounded-full border-2 border-dashed flex items-center justify-center overflow-hidden bg-[var(--color-surface)] flex-shrink-0 ${
-                      photoPreview ? 'border-[var(--color-primary)]' : 'border-black/15'
+                    className={`w-20 h-20 rounded-full border-2 border-dashed flex items-center justify-center overflow-hidden bg-surface-2 flex-shrink-0 ${
+                      photoPreview ? 'border-brand/30' : 'border-line'
                     }`}
                   >
                     {photoPreview ? (
                       <img src={photoPreview} alt='Preview' className='w-full h-full object-cover' />
                     ) : (
-                      <Camera className='text-black/35' size={24} />
+                      <Camera className='text-subtle' size={24} />
                     )}
                   </div>
 
                   <div className='flex flex-col gap-1'>
-                    <label className='text-sm font-extrabold text-[var(--color-primary-dark)] cursor-pointer hover:underline w-fit'>
+                    <label className='text-sm font-extrabold text-brand cursor-pointer hover:underline w-fit'>
                       {photoPreview ? 'Change Photo' : 'Upload Photo'}
                       <input
                         type='file'
@@ -376,19 +377,19 @@ export default function StaffModal ({
                     {photoPreview && (
                       <button
                         onClick={removePhoto}
-                        className='text-xs text-red-600 hover:text-red-700 text-left font-bold w-fit'
+                        className='text-xs text-danger hover:text-danger text-left font-bold w-fit'
                         type='button'
                       >
                         Remove Photo
                       </button>
                     )}
 
-                    <span className='text-[11px] text-black/45 font-semibold'>
+                    <span className='text-[11px] text-muted font-semibold'>
                       JPG / PNG · auto-compress above {PHOTO_TARGET_MAX_MB}MB
                     </span>
 
                     {errorMessage && (
-                      <span className='text-[11px] text-red-600 font-bold'>{errorMessage}</span>
+                      <span className='text-[11px] text-danger font-bold'>{errorMessage}</span>
                     )}
                   </div>
                 </div>
@@ -419,24 +420,24 @@ export default function StaffModal ({
 
                 <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
                   <Field label='Gender'>
-                    <select name='gender' value={form.gender} onChange={change} className={inputClass('gender')}>
+                    <Select name='gender' value={form.gender} onChange={change} invalid={!!(errors.gender && touched.gender)} className='h-11'>
                       <option value=''>— Select —</option>
                       <option value='male'>Male</option>
                       <option value='female'>Female</option>
                       <option value='other'>Other</option>
-                    </select>
+                    </Select>
                   </Field>
 
                   <Field label='Date of Birth'>
-                    <input type='date' name='dob' value={form.dob} onChange={change} className={inputClass('dob')} />
+                    <DatePicker max={new Date().toISOString().slice(0, 10)} value={form.dob} onChange={v => change({ target: { name: 'dob', value: v } })} invalid={!!(errors.dob && touched.dob)} />
                   </Field>
                 </div>
               </div>
 
               <div>
-                <div className='flex items-center gap-2 mb-4 pb-2 border-b border-black/10'>
-                  <CreditCard size={16} className='text-[var(--color-primary)]' />
-                  <h3 className='text-xs font-extrabold uppercase tracking-wider text-black/55'>
+                <div className='flex items-center gap-2 mb-4 pb-2 border-b border-line'>
+                  <CreditCard size={16} className='text-brand' />
+                  <h3 className='text-xs font-extrabold uppercase tracking-wider text-muted'>
                     Identity Documents
                   </h3>
                 </div>
@@ -467,14 +468,14 @@ export default function StaffModal ({
                 </div>
 
                 <Field label='Nationality'>
-                  <select name='nationality' value={form.nationality} onChange={change} className={inputClass('nationality')}>
+                  <Select name='nationality' value={form.nationality} onChange={change} invalid={!!(errors.nationality && touched.nationality)} className='h-11'>
                     <option value=''>— Select —</option>
                     {COUNTRIES.map(c => (
                       <option key={c.value} value={c.value}>
                         {c.label}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                 </Field>
               </div>
             </div>
@@ -484,9 +485,9 @@ export default function StaffModal ({
           {activeTab === 'contact' && (
             <div className='space-y-8'>
               <div>
-                <div className='flex items-center gap-2 mb-4 pb-2 border-b border-black/10'>
-                  <Phone size={16} className='text-[var(--color-primary)]' />
-                  <h3 className='text-xs font-extrabold uppercase tracking-wider text-black/55'>
+                <div className='flex items-center gap-2 mb-4 pb-2 border-b border-line'>
+                  <Phone size={16} className='text-brand' />
+                  <h3 className='text-xs font-extrabold uppercase tracking-wider text-muted'>
                     Contact Details
                   </h3>
                 </div>
@@ -517,8 +518,8 @@ export default function StaffModal ({
                   </Field>
                 </div>
 
-                <div className='bg-[var(--color-surface)]/60 p-4 rounded-2xl border border-black/10'>
-                  <p className='text-xs text-black/50 mb-3 font-extrabold'>Emergency Contact (Optional)</p>
+                <div className='bg-surface-2/60 p-4 rounded-2xl border border-line'>
+                  <p className='text-xs text-muted mb-3 font-extrabold'>Emergency Contact (Optional)</p>
                   <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
                     <Field label='Name'>
                       <input
@@ -544,9 +545,9 @@ export default function StaffModal ({
               </div>
 
               <div>
-                <div className='flex items-center gap-2 mb-4 pb-2 border-b border-black/10'>
-                  <MapPin size={16} className='text-[var(--color-primary)]' />
-                  <h3 className='text-xs font-extrabold uppercase tracking-wider text-black/55'>
+                <div className='flex items-center gap-2 mb-4 pb-2 border-b border-line'>
+                  <MapPin size={16} className='text-brand' />
+                  <h3 className='text-xs font-extrabold uppercase tracking-wider text-muted'>
                     Current Address
                   </h3>
                 </div>
@@ -583,14 +584,14 @@ export default function StaffModal ({
 
                   <div className='grid grid-cols-2 gap-4'>
                     <Field label='State'>
-                      <select name='state' value={form.state} onChange={change} className={inputClass('state')}>
+                      <Select name='state' value={form.state} onChange={change} invalid={!!(errors.state && touched.state)} className='h-11'>
                         <option value=''>— Select —</option>
                         {STATES_MY.map(s => (
                           <option key={s} value={s}>
                             {s}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                     </Field>
                     <Field label='Country'>
                       <input name='country' value={form.country} onChange={change} className={inputClass('country')} placeholder='Malaysia' />
@@ -605,22 +606,22 @@ export default function StaffModal ({
           {activeTab === 'job' && (
             <div className='space-y-8'>
               <div>
-                <div className='flex items-center gap-2 mb-4 pb-2 border-b border-black/10'>
-                  <Briefcase size={16} className='text-[var(--color-primary)]' />
-                  <h3 className='text-xs font-extrabold uppercase tracking-wider text-black/55'>
+                <div className='flex items-center gap-2 mb-4 pb-2 border-b border-line'>
+                  <Briefcase size={16} className='text-brand' />
+                  <h3 className='text-xs font-extrabold uppercase tracking-wider text-muted'>
                     Employment Details
                   </h3>
                 </div>
 
                 <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4'>
                   <Field label='Role' required error={errors.role}>
-                    <select name='role' value={form.role} onChange={change} onBlur={blur} className={inputClass('role')}>
+                    <Select name='role' value={form.role} onChange={change} onBlur={blur} invalid={!!(errors.role && touched.role)} className='h-11'>
                       {ROLES.map(r => (
                         <option key={r.value} value={r.value}>
                           {r.label}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </Field>
 
                   <Field label='Department'>
@@ -629,7 +630,7 @@ export default function StaffModal ({
                 </div>
 
                 <Field label='Start Date' className='mb-4'>
-                  <input type='date' name='startDate' value={form.startDate} onChange={change} className={inputClass('startDate')} />
+                  <DatePicker value={form.startDate} onChange={v => change({ target: { name: 'startDate', value: v } })} invalid={!!(errors.startDate && touched.startDate)} />
                 </Field>
 
                 <Field label='Notes / Remarks'>
@@ -649,14 +650,14 @@ export default function StaffModal ({
           {/* ─── ATTENDANCE ───────────────────────────────────────── */}
           {activeTab === 'attendance' && (
             <div className='space-y-6'>
-              <div className='flex items-center gap-2 mb-2 pb-2 border-b border-black/10'>
-                <Clock size={16} className='text-[var(--color-primary)]' />
-                <h3 className='text-xs font-extrabold uppercase tracking-wider text-black/55'>
+              <div className='flex items-center gap-2 mb-2 pb-2 border-b border-line'>
+                <Clock size={16} className='text-brand' />
+                <h3 className='text-xs font-extrabold uppercase tracking-wider text-muted'>
                   Kiosk & Attendance
                 </h3>
               </div>
 
-              <label className='flex items-start gap-3 p-3 bg-amber-50/70 border border-amber-100 rounded-xl cursor-pointer'>
+              <label className='flex items-start gap-3 p-3 bg-warning-soft/70 border border-amber-100 rounded-xl cursor-pointer'>
                 <input
                   type='checkbox'
                   name='fixedSalaryNoAttendance'
@@ -665,8 +666,8 @@ export default function StaffModal ({
                   className='w-5 h-5 mt-0.5 accent-amber-500'
                 />
                 <div className='flex flex-col'>
-                  <span className='text-sm font-bold text-amber-800'>Fixed monthly salary (no attendance)</span>
-                  <span className='text-[11px] text-amber-700/80'>
+                  <span className='text-sm font-bold text-warning'>Fixed monthly salary (no attendance)</span>
+                  <span className='text-[11px] text-warning/80'>
                     For owners/salaried staff. Payroll pays the flat Basic Salary and skips this person when importing hours from attendance.
                   </span>
                 </div>
@@ -690,38 +691,38 @@ export default function StaffModal ({
                 </Field>
               </div>
 
-              <div className='p-4 bg-gray-50 rounded-2xl border border-gray-100'>
-                <h3 className='text-xs font-extrabold uppercase tracking-wider text-blue-600 mb-4'>
+              <div className='p-4 bg-surface-2/60 rounded-2xl border border-line'>
+                <h3 className='text-xs font-extrabold uppercase tracking-wider text-info mb-4'>
                   Attendance Rules
                 </h3>
 
                 <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4'>
                   <Field label='Employment Type'>
-                    <select name='employmentType' value={form.employmentType} onChange={change} className={inputClass('employmentType')}>
+                    <Select name='employmentType' value={form.employmentType} onChange={change} invalid={!!(errors.employmentType && touched.employmentType)} className='h-11'>
                       <option value='full-time'>Full-time (Salary + OT)</option>
                       <option value='part-time'>Part-time (Hourly Only)</option>
-                    </select>
+                    </Select>
                   </Field>
 
                   <Field label='Attendance Period'>
-                    <select name='attendancePeriod' value={form.attendancePeriod} onChange={change} className={inputClass('attendancePeriod')}>
+                    <Select name='attendancePeriod' value={form.attendancePeriod} onChange={change} invalid={!!(errors.attendancePeriod && touched.attendancePeriod)} className='h-11'>
                       <option value='weekly'>Weekly (Mon-Sun)</option>
                       <option value='monthly'>Monthly (1st-End)</option>
-                    </select>
+                    </Select>
                   </Field>
                 </div>
 
                 {shiftsEnabled && (
-                  <div className='mb-4 p-3 bg-white border border-gray-200 rounded-xl'>
+                  <div className='mb-4 p-3 bg-surface border border-line rounded-xl'>
                     <div className='flex items-center justify-between mb-3'>
-                      <h4 className='text-[11px] font-extrabold uppercase tracking-wider text-blue-600'>
+                      <h4 className='text-[11px] font-extrabold uppercase tracking-wider text-info'>
                         Shift Times
                       </h4>
                       {staffShiftWindow && (
-                        <span className='inline-flex items-center gap-1.5 text-[11px] font-bold text-gray-500'>
+                        <span className='inline-flex items-center gap-1.5 text-[11px] font-bold text-muted'>
                           {staffShiftWindow.hours.toFixed(2)}h paid
                           {shiftIsOvernight && (
-                            <span className='inline-flex items-center gap-1 text-indigo-600'>
+                            <span className='inline-flex items-center gap-1 text-info'>
                               <MoonStar size={12} /> overnight
                             </span>
                           )}
@@ -760,7 +761,7 @@ export default function StaffModal ({
                       </Field>
                     </div>
 
-                    <p className='text-[10px] text-gray-400 mt-2'>
+                    <p className='text-[10px] text-subtle mt-2'>
                       {staffShift
                         ? 'Lateness and OT are measured against these times. Arriving well before the start needs approval to count as OT.'
                         : 'Leave blank for no fixed shift — OT then simply starts after the daily hours below. An end time earlier than the start means the shift crosses midnight.'}
@@ -779,14 +780,14 @@ export default function StaffModal ({
                       className={inputClass('basicHoursPerDay')}
                       placeholder='8'
                     />
-                    <p className='text-[10px] text-gray-400 mt-1'>
+                    <p className='text-[10px] text-subtle mt-1'>
                       {staffShift
                         ? 'Overridden by the shift times above.'
                         : 'Daily OT starts after this amount.'}
                     </p>
                   </Field>
 
-                  <div className='flex flex-col gap-3 p-3 bg-white border border-gray-200 rounded-xl'>
+                  <div className='flex flex-col gap-3 p-3 bg-surface border border-line rounded-xl'>
                     <label className='flex items-center gap-3 cursor-pointer'>
                       <input
                         type='checkbox'
@@ -796,13 +797,13 @@ export default function StaffModal ({
                         className='w-5 h-5 accent-blue-600'
                       />
                       <div className='flex flex-col'>
-                        <span className='text-sm font-bold text-gray-800'>Eligible for Paid Break</span>
-                        <span className='text-[10px] text-gray-500'>Adds +1 hour per work day</span>
+                        <span className='text-sm font-bold text-fg'>Eligible for Paid Break</span>
+                        <span className='text-[10px] text-muted'>Adds +1 hour per work day</span>
                       </div>
                     </label>
 
                     {form.hasPaidBreak && (
-                      <div className='mt-2 pt-3 border-t border-gray-100 flex flex-col gap-3'>
+                      <div className='mt-2 pt-3 border-t border-line flex flex-col gap-3'>
                         <label className='flex items-center gap-3 cursor-pointer group'>
                           <input
                             type='checkbox'
@@ -812,20 +813,20 @@ export default function StaffModal ({
                             className='w-4 h-4 accent-amber-500'
                           />
                           <div className='flex flex-col'>
-                            <span className='text-xs font-bold text-gray-700'>Require Full Shift</span>
-                            <span className='text-[10px] text-gray-400'>Only get bonus if worked enough hours</span>
+                            <span className='text-xs font-bold text-fg'>Require Full Shift</span>
+                            <span className='text-[10px] text-subtle'>Only get bonus if worked enough hours</span>
                           </div>
                         </label>
 
                         {form.requireFullShiftForBreak && (
                           <div className='flex items-center gap-2'>
-                            <span className='text-[11px] text-gray-500 whitespace-nowrap'>Min. Hours:</span>
+                            <span className='text-[11px] text-muted whitespace-nowrap'>Min. Hours:</span>
                             <input
                               type='number'
                               name='fullShiftHours'
                               value={form.fullShiftHours}
                               onChange={change}
-                              className='w-16 h-8 px-2 text-xs font-bold border border-gray-200 rounded-lg outline-none focus:ring-1 focus:ring-amber-500'
+                              className='w-16 h-8 px-2 text-xs font-bold border border-line rounded-lg outline-none focus:ring-1 focus:ring-warning'
                               placeholder='7.5'
                             />
                           </div>
@@ -841,9 +842,9 @@ export default function StaffModal ({
           {/* ─── PAYROLL ──────────────────────────────────────────── */}
           {activeTab === 'payroll' && (
             <div className='space-y-6'>
-              <div className='flex items-center gap-2 mb-2 pb-2 border-b border-black/10'>
-                <Wallet size={16} className='text-[var(--color-primary)]' />
-                <h3 className='text-xs font-extrabold uppercase tracking-wider text-black/55'>
+              <div className='flex items-center gap-2 mb-2 pb-2 border-b border-line'>
+                <Wallet size={16} className='text-brand' />
+                <h3 className='text-xs font-extrabold uppercase tracking-wider text-muted'>
                   Compensation & Payroll
                 </h3>
               </div>
@@ -868,11 +869,11 @@ export default function StaffModal ({
 
               <div className='grid grid-cols-1 sm:grid-cols-3 gap-4'>
                 <Field label='Pay Mode'>
-                  <select name='salaryMode' value={form.salaryMode || ''} onChange={change} className={inputClass('salaryMode')}>
+                  <Select name='salaryMode' value={form.salaryMode || ''} onChange={change} invalid={!!(errors.salaryMode && touched.salaryMode)} className='h-11'>
                     <option value=''>Branch default</option>
                     <option value='hours'>Hours-based</option>
                     <option value='days'>Days-based</option>
-                  </select>
+                  </Select>
                 </Field>
 
                 <Field label='Std Hours / Month'>
@@ -886,11 +887,11 @@ export default function StaffModal ({
 
               {payrollConfig?.statutoryDeductions?.length > 0 && (
                 <div>
-                  <p className='text-xs font-semibold text-black/50 uppercase tracking-wider mb-2'>
+                  <p className='text-xs font-semibold text-muted uppercase tracking-wider mb-2'>
                     Deduction Overrides
                   </p>
-                  <div className='border border-black/10 rounded-xl overflow-hidden'>
-                    <div className='grid grid-cols-12 gap-2 px-3 py-2 bg-black/5 text-[10px] font-bold uppercase text-black/40'>
+                  <div className='border border-line rounded-xl overflow-hidden'>
+                    <div className='grid grid-cols-12 gap-2 px-3 py-2 bg-surface-2 text-[10px] font-bold uppercase text-subtle'>
                       <div className='col-span-1'>On</div>
                       <div className='col-span-3'>Name</div>
                       <div className='col-span-4'>Employee % override</div>
@@ -909,7 +910,7 @@ export default function StaffModal ({
                         }))
                       }
                       return (
-                        <div key={ded.key} className='grid grid-cols-12 gap-2 items-center px-3 py-2 border-t border-black/5 text-sm'>
+                        <div key={ded.key} className='grid grid-cols-12 gap-2 items-center px-3 py-2 border-t border-line text-sm'>
                           <div className='col-span-1'>
                             <input
                               type='checkbox'
@@ -918,9 +919,9 @@ export default function StaffModal ({
                               className='w-4 h-4 accent-mint-600'
                             />
                           </div>
-                          <div className='col-span-3 text-xs text-black/70 font-medium'>
+                          <div className='col-span-3 text-xs text-fg font-medium'>
                             {ded.name}
-                            <span className='block text-[10px] text-black/30'>{ded.employeeRate}% / {ded.employerRate}%</span>
+                            <span className='block text-[10px] text-subtle'>{ded.employeeRate}% / {ded.employerRate}%</span>
                           </div>
                           <div className='col-span-4'>
                             <div className='relative'>
@@ -933,9 +934,9 @@ export default function StaffModal ({
                                 onChange={e => setOverride({ employeeRateOverride: e.target.value === '' ? null : parseFloat(e.target.value) })}
                                 placeholder={`${ded.employeeRate} (default)`}
                                 disabled={!isEnabled}
-                                className='w-full border border-black/10 rounded-lg pl-2 pr-5 py-1 text-xs focus:ring-1 focus:ring-mint-400 outline-none disabled:opacity-40'
+                                className='w-full border border-line rounded-lg pl-2 pr-5 py-1 text-xs focus:ring-1 focus:ring-[var(--cc-ring)] outline-none disabled:opacity-40'
                               />
-                              <span className='absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-black/30'>%</span>
+                              <span className='absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-subtle'>%</span>
                             </div>
                           </div>
                           <div className='col-span-4'>
@@ -949,16 +950,16 @@ export default function StaffModal ({
                                 onChange={e => setOverride({ employerRateOverride: e.target.value === '' ? null : parseFloat(e.target.value) })}
                                 placeholder={`${ded.employerRate} (default)`}
                                 disabled={!isEnabled}
-                                className='w-full border border-black/10 rounded-lg pl-2 pr-5 py-1 text-xs focus:ring-1 focus:ring-mint-400 outline-none disabled:opacity-40'
+                                className='w-full border border-line rounded-lg pl-2 pr-5 py-1 text-xs focus:ring-1 focus:ring-[var(--cc-ring)] outline-none disabled:opacity-40'
                               />
-                              <span className='absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-black/30'>%</span>
+                              <span className='absolute right-1.5 top-1/2 -translate-y-1/2 text-[10px] text-subtle'>%</span>
                             </div>
                           </div>
                         </div>
                       )
                     })}
                   </div>
-                  <p className='text-[10px] text-black/30 mt-1'>
+                  <p className='text-[10px] text-subtle mt-1'>
                     Leave blank to use branch default rates. Uncheck to exclude this staff from a deduction.
                   </p>
                 </div>
@@ -968,11 +969,11 @@ export default function StaffModal ({
         </div>
 
         {/* Footer */}
-        <div className='flex items-center justify-end gap-3 px-6 py-4 border-t border-black/10 bg-[var(--color-surface)]'>
+        <div className='flex items-center justify-end gap-3 px-6 py-4 border-t border-line bg-surface-2'>
           <button
             onClick={onClose}
             disabled={saving}
-            className='px-5 py-2.5 rounded-xl border border-black/10 text-black/70 font-extrabold text-sm hover:bg-black/5 disabled:opacity-60'
+            className='px-5 py-2.5 rounded-xl border border-line text-fg font-extrabold text-sm hover:bg-surface-2 disabled:opacity-60'
           >
             Cancel
           </button>
@@ -980,7 +981,7 @@ export default function StaffModal ({
           <button
             onClick={handleSave}
             disabled={!canSubmit}
-            className='px-6 py-2.5 rounded-xl bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] text-white font-extrabold text-sm transition-all flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed min-w-[160px] justify-center shadow-lg shadow-[color:var(--color-primary)]/20'
+            className='px-6 py-2.5 rounded-xl bg-brand hover:brightness-105 text-brand-fg font-extrabold text-sm transition-all flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed min-w-[160px] justify-center shadow-lg shadow-[color:var(--color-primary)]/20'
           >
             {saving ? (
               <Loader2 size={16} className='animate-spin' />

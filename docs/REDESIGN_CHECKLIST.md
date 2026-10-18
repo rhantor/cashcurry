@@ -40,9 +40,9 @@ computer, has its own loading look, and its old modals are redone too.
 - ✅ `/loans/loan-summary` Loan summary
 
 ## 3.4.5 Staff and attendance
-- ⬜ `/staff-management` Staff management
-- ⬜ `/attendance-log` Attendance log
-- ⬜ `/kiosk`, `/kiosk/[branchId]` Kiosk (replaced later by 4.8)
+- ✅ `/staff-management` Staff management — staff / basic pay / app-login tiles, list (cards on a phone), detail sheet, copyable login, kit dates and selects; phone check accepts 012-345 6789
+- ✅ `/attendance-log` Attendance log — day view by person (in now / left, punch chips, didn't-come list), month table with totals, punch sheet with photo and delete
+- ⏸ `/kiosk`, `/kiosk/[branchId]` Kiosk (replaced by 4.8)
 
 ## 3.4.6 Payroll
 - ✅ `/payroll` Run payroll — month stepper, draft → finalized → paid steps, tap-to-open payslip cards, next step in a bottom bar, mark-paid sheet, opens on ?period=
