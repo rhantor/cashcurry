@@ -166,6 +166,16 @@ describe("who you are cannot be forged", () => {
     await assertSucceeds(as("owner").doc("usernames/hire1").set({ uid: "hire1", email: "h@t.test", companyId: CO }));
   });
 
+  it("a staff login lookup (phone / IC hash) can be fetched by its key, never listed or written", async () => {
+    await env.withSecurityRulesDisabled((ctx) => ctx.firestore().doc("staffLogins/abc123").set({ uid: "klStaff", email: "klStaff@t.test" }));
+    await assertSucceeds(as(null).doc("staffLogins/abc123").get());
+    await assertFails(as(null).collection("staffLogins").get());
+    await assertFails(as("owner").collection("staffLogins").get());
+    await assertFails(as("owner").doc("staffLogins/abc123").set({ uid: "owner", email: "owner@t.test" }));
+    await assertFails(as("klStaff").doc("staffLogins/new").set({ uid: "klStaff", email: "klStaff@t.test" }));
+    await assertFails(as("owner").doc("staffLogins/abc123").delete());
+  });
+
   it("only members can join a company's user list", async () => {
     await assertFails(as("outsider").doc(`companies/${CO}/users/outsider`).set({ role: "owner" }));
   });

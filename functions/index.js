@@ -93,6 +93,23 @@ exports.notifyIssueComments = onDocumentCreated("companies/{companyId}/branches/
   }
 });
 
+// Staff log in with their phone or IC number: keep those lookups in step
+// when a manager changes either (docs/STAFF_APP.md).
+const staffLoginTrigger = (col) =>
+  onDocumentWritten(`companies/{companyId}/branches/{branchId}/${col}/{staffId}`, async (event) => {
+    const before = event.data?.before?.exists ? event.data.before.data() : {};
+    const after = event.data?.after?.exists ? event.data.after.data() : {};
+    const changed = ["phone", "uid", "icNumber", "passportNumber", "loginEmail"].some((k) => before[k] !== after[k]);
+    if (!changed) return;
+    try {
+      await notify.onStaffLogin(event.params);
+    } catch (err) {
+      console.error("[staffLogins]", event.params, err);
+    }
+  });
+exports.staffLoginsFromStaff = staffLoginTrigger("staff");
+exports.staffLoginsFromPrivate = staffLoginTrigger("staffPrivate");
+
 // Every hour; each branch's summary goes out at its own time on its own clock.
 exports.notifyDailySummary = onSchedule({ schedule: "0 * * * *", timeZone: "UTC", timeoutSeconds: 540 }, async () => {
   await notify.dailySummaries(new Date());

@@ -18,12 +18,8 @@ const isPassport = v => /^[A-Za-z0-9]{6,20}$/.test(String(v || '').trim())
 export const RULES = {
   firstName: v => (!String(v || '').trim() ? 'First name is required' : null),
   lastName: v => (!String(v || '').trim() ? 'Last name is required' : null),
-  email: v =>
-    !String(v || '').trim()
-      ? 'Email is required'
-      : !isEmail(v)
-      ? 'Invalid email'
-      : null,
+  // optional: staff log in with their phone or IC number and a PIN (docs/STAFF_APP.md)
+  email: v => (String(v || '').trim() && !isEmail(v) ? 'Invalid email' : null),
   phone: v =>
     !String(v || '').trim()
       ? 'Phone is required'

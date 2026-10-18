@@ -7,7 +7,8 @@ import {
   useAddStaffMutation,
   useUpdateStaffMutation,
   useDeleteStaffMutation,
-  useGenerateStaffLoginMutation
+  useGenerateStaffLoginMutation,
+  useResetStaffPinMutation
 } from '@/lib/redux/api/staffApiSlice'
 import { useGetSingleBranchQuery } from '@/lib/redux/api/branchApiSlice'
 import { useGetBranchSettingsQuery } from '@/lib/redux/api/branchSettingsApiSlice'
@@ -71,6 +72,7 @@ export default function StaffManagementPage () {
   const [updateStaff] = useUpdateStaffMutation()
   const [deleteStaff] = useDeleteStaffMutation()
   const [generateAuth] = useGenerateStaffLoginMutation()
+  const [resetPin] = useResetStaffPinMutation()
 
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
@@ -145,14 +147,23 @@ export default function StaffManagementPage () {
         staffId: staff.id,
         firstName: staff.firstName,
         lastName: staff.lastName,
-        email: staff.email,
-        icNumber: staff.icNumber
+        email: staff.email
       }).unwrap()
-      setGeneratedCreds({ ...res, name: fullName(staff) })
+      setGeneratedCreds({ ...res, name: fullName(staff), made: true })
     } catch (err) {
       toast.error(err?.message || "Couldn't make the login")
     } finally {
       setGeneratingFor(null)
+    }
+  }
+
+  const handleResetPin = async staff => {
+    if (!(await confirmDialog({ title: `New PIN for ${fullName(staff)}?`, message: 'Their old PIN stops working and their phones are signed out. You will see the new PIN once, to give them.', confirmLabel: 'Make a new PIN' }))) return
+    try {
+      const res = await resetPin({ companyId, branchId, staffId: staff.id }).unwrap()
+      setGeneratedCreds({ ...res, name: fullName(staff), made: false })
+    } catch (err) {
+      toast.error(err?.message || "Couldn't reset the PIN")
     }
   }
 
@@ -217,6 +228,7 @@ export default function StaffManagementPage () {
               { label: 'Open', icon: Eye, onSelect: () => setDetailTarget(s) },
               { label: 'Edit', icon: Pencil, onSelect: () => openEdit(s) },
               !s.uid && { label: generatingFor === s.id ? 'Making the login…' : 'Make a staff app login', icon: KeyRound, onSelect: () => handleGenerateLogin(s) },
+              s.uid && { label: 'Reset PIN', icon: KeyRound, onSelect: () => handleResetPin(s) },
               'divider',
               { label: 'Delete', icon: Trash2, danger: true, onSelect: () => handleDelete(s) }
             ].filter(Boolean)}
@@ -319,7 +331,7 @@ export default function StaffManagementPage () {
       <Sheet
         open={!!generatedCreds}
         onClose={() => setGeneratedCreds(null)}
-        title='Staff app login made'
+        title={generatedCreds?.made ? 'Staff app login made' : 'New PIN made'}
         description={generatedCreds?.name ? `For ${generatedCreds.name}` : undefined}
         footer={
           <div className='flex justify-end'>
@@ -329,9 +341,9 @@ export default function StaffManagementPage () {
       >
         {generatedCreds && (
           <div className='space-y-3'>
-            <p className='text-sm text-muted'>Give these to them in person or by private message. The password is only shown now.</p>
-            <CopyLine label='Sign-in' value={generatedCreds.email} />
-            <CopyLine label='Password' value={generatedCreds.password} />
+            <p className='text-sm text-muted'>Give these to them in person. The PIN is only shown now — they can change it in the staff app.</p>
+            <CopyLine label='Log in with' value={generatedCreds.phone ? `${generatedCreds.phone}${generatedCreds.byIc ? ' (or their IC number)' : ''}` : generatedCreds.email} />
+            <CopyLine label='PIN' value={generatedCreds.pin} />
           </div>
         )}
       </Sheet>

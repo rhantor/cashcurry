@@ -259,6 +259,26 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
     }
   }
 
+  /**
+   * A staff record (or its private half) changed: if it has a login, keep the
+   * phone / IC lookups (staffLogins) in step — old numbers stop working,
+   * new ones start (docs/STAFF_APP.md).
+   */
+  async function onStaffLogin({ companyId, branchId, staffId }) {
+    const branch = db.doc(`companies/${companyId}/branches/${branchId}`);
+    const [s, p] = await Promise.all([branch.collection("staff").doc(staffId).get(), branch.collection("staffPrivate").doc(staffId).get()]);
+    if (!s.exists) return;
+    const staff = s.data();
+    if (!staff.uid) return;
+    const priv = p.exists ? p.data() : {};
+    const keys = await N.loginKeys({ phone: staff.phone, ic: priv.icNumber || priv.passportNumber });
+    const old = await db.collection("staffLogins").where("uid", "==", staff.uid).get();
+    const batch = db.batch();
+    old.docs.filter((d) => !keys.includes(d.id)).forEach((d) => batch.delete(d.ref));
+    keys.forEach((k) => batch.set(db.collection("staffLogins").doc(k), { uid: staff.uid, email: staff.loginEmail || "" }));
+    await batch.commit();
+  }
+
   /** users/{uid} changed: keep the chat directory (names and roles only) in step. */
   async function onUser({ uid, before, after }) {
     if (before?.companyId && before.companyId !== after?.companyId) await db.doc(`companies/${before.companyId}/chatPeople/${uid}`).delete().catch(() => {});
@@ -271,5 +291,5 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
     });
   }
 
-  return { deliver, onRequest, onPurchaseOrder, dailySummaries, onChatMessage, onUser, onIssue, onIssueComment };
+  return { deliver, onRequest, onPurchaseOrder, dailySummaries, onChatMessage, onUser, onIssue, onIssueComment, onStaffLogin };
 };
