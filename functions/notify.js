@@ -76,6 +76,8 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
       notification: { title: message.title, body: message.body },
       data: { link: link || "/", companyId, type, ...(tag ? { tag } : {}) },
       webpush: { fcmOptions: { link: link || "/" } },
+      // the staff Android app (Capacitor): show at once; one line per chat / thing
+      android: { priority: "high", notification: tag ? { tag } : {} },
     });
     // forget devices that no longer exist
     await Promise.all(res.responses.map((r, i) => (!r.success && INVALID_TOKEN.has(r.error?.code) ? tokens[i].ref.delete().catch(() => {}) : null)));

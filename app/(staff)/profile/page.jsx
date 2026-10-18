@@ -11,6 +11,7 @@ import useSession from "@/app/hooks/useSession";
 import { Avatar, Skeleton, Switch, cn, confirmDialog, toast } from "@/app/components/ui";
 import { signOut } from "@/lib/session";
 import { enablePush, pushState } from "@/lib/notifications/push";
+import { fingerprintAvailable, isNativeApp, lockEnabled, nativePushState, setFingerprintLock, startNativePush } from "@/lib/native";
 import { removeMyPhoto, saveMyPhoto } from "@/lib/staff/self";
 import { ROLES } from "@/app/staff-management/lib/constants";
 import { useMyStaff } from "../useStaffApp";
@@ -85,8 +86,15 @@ export default function MePage() {
   const fileRef = useRef(null);
 
   const prefsPath = user?.companyId && user?.uid ? `companies/${user.companyId}/users/${user.uid}/prefs/notifications` : null;
+  // In the Android app: its own push permission, and the fingerprint lock
+  const [fp, setFp] = useState({ native: false, available: false, on: false });
   useEffect(() => {
-    pushState().then(setPush);
+    if (isNativeApp()) {
+      nativePushState().then(setPush).catch(() => setPush("unavailable"));
+      fingerprintAvailable().then((available) => setFp({ native: true, available, on: lockEnabled() }));
+    } else {
+      pushState().then(setPush);
+    }
   }, []);
   useEffect(() => {
     if (!prefsPath) return;
@@ -127,7 +135,12 @@ export default function MePage() {
 
   const turnOnPush = async () => {
     if (push !== "off") return;
-    setPush(await enablePush({ companyId: user.companyId, uid: user.uid }));
+    const where = { companyId: user.companyId, uid: user.uid };
+    setPush(fp.native ? await startNativePush({ ...where, ask: true }) : await enablePush(where));
+  };
+
+  const toggleFingerprint = async (on) => {
+    if (await setFingerprintLock(on)) setFp((f) => ({ ...f, on }));
   };
 
   const toggleKind = async (type, on) => {
@@ -209,7 +222,16 @@ export default function MePage() {
 
       <Card title="Signing in">
         {staff && <Row icon={KeyRound} label="Change PIN" value="The 6 digits you sign in with" onClick={() => setSheet("pin")} />}
-        <Row icon={Fingerprint} label="Fingerprint" value="In the Android app" right={<span className="rounded-full bg-surface-2 px-2 py-0.5 text-[11px] font-medium text-muted">Soon</span>} />
+        {fp.native ? (
+          <Row
+            icon={Fingerprint}
+            label="Unlock with fingerprint"
+            value={fp.available ? "Asked when you open the app" : "Set up a fingerprint in your phone's settings first"}
+            right={<Switch checked={fp.on} disabled={!fp.available} onChange={toggleFingerprint} />}
+          />
+        ) : (
+          <Row icon={Fingerprint} label="Fingerprint" value="In the Cash Curry Android app" />
+        )}
       </Card>
 
       <Card title="Notifications">

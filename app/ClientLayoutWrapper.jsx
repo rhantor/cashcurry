@@ -8,6 +8,7 @@ import AppShell from "./components/shell/AppShell";
 import { Loader, UIProvider } from "./components/ui";
 import NotificationsProvider from "@/app/components/notifications/NotificationsProvider";
 import RegionSync from "@/app/components/region/RegionSync";
+import NativeBridge from "@/app/components/native/NativeBridge";
 
 export default function ClientLayoutWrapper({ children }) {
   const router = useRouter();
@@ -60,6 +61,8 @@ export default function ClientLayoutWrapper({ children }) {
       <UIProvider>
         {/* Active branch's time zone, day cut-off and currency, for every screen */}
         {isLoggedIn && !isAuthPage && <RegionSync />}
+        {/* the staff Android app: fingerprint lock, push, back button (nothing in a browser) */}
+        <NativeBridge />
 
         {isAuthPage ? (
           <div className="min-h-screen bg-background">
