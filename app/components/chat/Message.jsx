@@ -8,28 +8,69 @@ import { format } from "date-fns";
 import { Check, CheckCheck, Clock3, CornerUpLeft, Download, EyeOff, FileText, Forward, MoreHorizontal, Pencil, ShieldX, SmilePlus, Trash2 } from "lucide-react";
 import { Avatar, Menu, Popover, cn } from "@/app/components/ui";
 import { REACTIONS, canChangeMessage, canForward, reactionSummary, timeOf } from "@/lib/chat/model";
+import { blocks } from "@/lib/chat/format";
 
 const size = (b) => (b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
-const LINK = /(https?:\/\/[^\s]+)/g;
 // a steady colour per person for names in groups
 const NAME_TONES = ["text-brand", "text-info", "text-warning", "text-danger", "text-success"];
 const toneOf = (uid = "") => NAME_TONES[[...uid].reduce((a, c) => a + c.charCodeAt(0), 0) % NAME_TONES.length];
 
-function Text({ text }) {
+// one line of formatted words (lib/chat/format.js) — drawn as elements, never HTML
+function Pieces({ pieces, mine }) {
+  return pieces.map((p, i) => {
+    if (p.link)
+      return (
+        <a key={i} href={p.text} target="_blank" rel="noopener noreferrer" className="break-all underline underline-offset-2">
+          {p.text}
+        </a>
+      );
+    let el = p.text;
+    if (p.code) el = <code className={cn("rounded px-1 py-px font-mono text-[12.5px]", mine ? "bg-white/20" : "bg-surface-2 text-fg")}>{el}</code>;
+    if (p.strike) el = <s className="opacity-80">{el}</s>;
+    if (p.italic) el = <em>{el}</em>;
+    if (p.bold) el = <strong className="font-semibold">{el}</strong>;
+    return <span key={i}>{el}</span>;
+  });
+}
+
+function Text({ text, mine }) {
   return (
-    <p className="whitespace-pre-wrap break-words text-[14px] leading-relaxed">
-      {String(text)
-        .split(LINK)
-        .map((part, i) =>
-          /^https?:\/\//.test(part) ? (
-            <a key={i} href={part} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">
-              {part}
-            </a>
-          ) : (
-            part
-          )
-        )}
-    </p>
+    <div className="space-y-1 break-words text-[14px] leading-relaxed">
+      {blocks(text).map((b, i) => {
+        if (b.type === "ul" || b.type === "ol") {
+          const List = b.type === "ul" ? "ul" : "ol";
+          return (
+            <List key={i} start={b.start} className={cn("space-y-0.5 pl-5", b.type === "ul" ? "list-disc" : "list-decimal", mine ? "marker:text-white/70" : "marker:text-brand")}>
+              {b.items.map((it, j) => (
+                <li key={j} className="pl-0.5">
+                  <Pieces pieces={it} mine={mine} />
+                </li>
+              ))}
+            </List>
+          );
+        }
+        if (b.type === "quote")
+          return (
+            <blockquote key={i} className={cn("border-l-[3px] pl-2.5 italic", mine ? "border-white/60 text-white/90" : "border-brand/60 text-muted")}>
+              {b.lines.map((l, j) => (
+                <span key={j} className="block">
+                  <Pieces pieces={l} mine={mine} />
+                </span>
+              ))}
+            </blockquote>
+          );
+        return (
+          <p key={i} className="whitespace-pre-wrap">
+            {b.lines.map((l, j) => (
+              <span key={j}>
+                {j > 0 && "\n"}
+                <Pieces pieces={l} mine={mine} />
+              </span>
+            ))}
+          </p>
+        );
+      })}
+    </div>
   );
 }
 
@@ -114,14 +155,14 @@ export default function Message({ msg, me, showName, showAvatar, first, status, 
           className={cn(
             "space-y-1.5 rounded-2xl shadow-sm",
             onlyPhotos ? "p-1" : "px-3 py-2",
-            mine ? "rounded-br-md bg-brand text-white" : "rounded-bl-md bg-surface text-fg ring-1 ring-line/70",
+            msg.deleted ? "rounded-bl-md rounded-br-md bg-surface/60" : mine ? "rounded-br-md bg-brand text-white" : "rounded-bl-md bg-surface text-fg ring-1 ring-line/70",
             // a run of messages from one person stacks neatly
             !first && (mine ? "rounded-tr-md" : "rounded-tl-md"),
             msg.deleted && "bg-transparent text-subtle shadow-none ring-1 ring-line"
           )}
         >
           {msg.deleted ? (
-            <p className="text-sm italic">{msg.removedBy?.name ? `Removed by ${msg.removedBy.name}` : "Message deleted"}</p>
+            <p className="text-sm italic text-muted">{msg.removedBy?.name ? `Removed by ${msg.removedBy.name}` : "Message deleted"}</p>
           ) : (
             <>
               {msg.forwarded && (
@@ -136,7 +177,7 @@ export default function Message({ msg, me, showName, showAvatar, first, status, 
                 </div>
               )}
               {msg.files?.length > 0 && <Files files={msg.files} mine={mine} onOpenPhoto={onOpenPhoto} />}
-              {msg.text && <Text text={msg.text} />}
+              {msg.text && <Text text={msg.text} mine={mine} />}
             </>
           )}
           <span className={cn("flex items-center justify-end gap-1 text-[10px]", onlyPhotos ? "px-1.5 pb-0.5" : "-mb-0.5", mine && !msg.deleted ? "text-white/75" : "text-subtle")}>

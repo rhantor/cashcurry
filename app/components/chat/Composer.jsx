@@ -5,9 +5,10 @@
 // above as thumbnails; a reply or an edit in progress shows as a card with a
 // coloured edge. Enter sends on a computer; Shift+Enter is a new line.
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
-import { Check, CornerUpLeft, FileText, Paperclip, Pencil, SendHorizontal, Smile, X } from "lucide-react";
+import { Bold, Check, Code, CornerUpLeft, FileText, Italic, List, ListOrdered, Paperclip, Pencil, SendHorizontal, Smile, Strikethrough, TextQuote, Type, X } from "lucide-react";
 import { Popover, cn, toast } from "@/app/components/ui";
 import { checkFiles, previewOf } from "@/lib/chat/model";
+import { toggleList, toggleMark } from "@/lib/chat/format";
 import StickerPicker from "./StickerPicker";
 
 const isTouch = () => typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
@@ -40,12 +41,24 @@ function EmojiPicker({ onPick, disabled }) {
   );
 }
 
+// the formatting buttons: what each does to the selected words
+const TOOLS = [
+  { label: "Bold", icon: Bold, keys: "Ctrl+B", mark: "*" },
+  { label: "Italic", icon: Italic, keys: "Ctrl+I", mark: "_" },
+  { label: "Strikethrough", icon: Strikethrough, mark: "~" },
+  { label: "Code", icon: Code, mark: "`" },
+  { label: "Bulleted list", icon: List, list: "ul" },
+  { label: "Numbered list", icon: ListOrdered, list: "ol" },
+  { label: "Quote", icon: TextQuote, quote: true },
+];
+
 const Composer = forwardRef(function Composer({ onSend, onSaveEdit, onSticker, user, replyTo, editing, onCancel, disabled }, ref) {
   const [text, setText] = useState("");
   const [files, setFiles] = useState([]);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState(0);
   const [focused, setFocused] = useState(false);
+  const [tools, setTools] = useState(false);
   const area = useRef(null);
   const picker = useRef(null);
 
@@ -89,6 +102,31 @@ const Composer = forwardRef(function Composer({ onSend, onSaveEdit, onSticker, u
     requestAnimationFrame(() => {
       el?.focus();
       el?.setSelectionRange(at + e.length, at + e.length);
+    });
+  };
+
+  // apply a formatting button to the selection, keeping the selection
+  const apply = (tool) => {
+    const el = area.current;
+    const start = el?.selectionStart ?? text.length;
+    const end = el?.selectionEnd ?? text.length;
+    let r;
+    if (tool.mark) r = toggleMark(text, start, end, tool.mark);
+    else if (tool.list) r = toggleList(text, start, end, tool.list);
+    else {
+      // quote: "> " at the start of each selected line (or off again)
+      const ls = text.lastIndexOf("\n", start - 1) + 1;
+      const nl = text.indexOf("\n", end);
+      const le = nl === -1 ? text.length : nl;
+      const lines = text.slice(ls, le).split("\n");
+      const off = lines.every((l) => /^\s*>\s?/.test(l));
+      const next = lines.map((l) => (off ? l.replace(/^\s*>\s?/, "") : `> ${l}`)).join("\n");
+      r = { text: text.slice(0, ls) + next + text.slice(le), start: ls, end: ls + next.length };
+    }
+    setText(r.text);
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(r.start, r.end);
     });
   };
 
@@ -183,6 +221,26 @@ const Composer = forwardRef(function Composer({ onSend, onSaveEdit, onSticker, u
           </div>
         )}
 
+        {/* formatting */}
+        {tools && (
+          <div className="flex items-center gap-0.5 overflow-x-auto border-b border-line/70 px-2 pt-1.5 pb-1 [scrollbar-width:none]">
+            {TOOLS.map((t) => (
+              <button
+                key={t.label}
+                type="button"
+                title={t.keys ? `${t.label} (${t.keys})` : t.label}
+                aria-label={t.label}
+                onMouseDown={(e) => e.preventDefault()} // keep the selection in the text box
+                onClick={() => apply(t)}
+                className="flex size-8 shrink-0 items-center justify-center rounded-lg text-muted transition-colors hover:bg-surface hover:text-fg"
+              >
+                <t.icon className="size-4" />
+              </button>
+            ))}
+            <span className="ml-auto hidden shrink-0 pr-1 text-[10px] text-subtle sm:block">*bold* _italic_ ~strike~ `code`</span>
+          </div>
+        )}
+
         {/* the line you type on */}
         <div className="flex items-end gap-0.5 p-1.5">
           {!editing && (
@@ -195,6 +253,17 @@ const Composer = forwardRef(function Composer({ onSend, onSaveEdit, onSticker, u
             </>
           )}
           <EmojiPicker onPick={insert} disabled={disabled} />
+          <button
+            type="button"
+            aria-label={tools ? "Hide formatting" : "Formatting"}
+            aria-pressed={tools}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setTools((v) => !v)}
+            disabled={disabled}
+            className={cn(ICON, tools && "bg-surface text-brand")}
+          >
+            <Type className="size-[18px]" />
+          </button>
           <textarea
             ref={area}
             rows={1}
@@ -212,6 +281,28 @@ const Composer = forwardRef(function Composer({ onSend, onSaveEdit, onSticker, u
               }
             }}
             onKeyDown={(e) => {
+              const mod = e.ctrlKey || e.metaKey;
+              if (mod && (e.key === "b" || e.key === "i")) {
+                e.preventDefault();
+                apply(TOOLS[e.key === "b" ? 0 : 1]);
+                return;
+              }
+              // Enter in a list carries the list on to the next line
+              if (e.key === "Enter" && e.shiftKey) {
+                const el = e.currentTarget;
+                const ls = text.lastIndexOf("\n", el.selectionStart - 1) + 1;
+                const line = text.slice(ls, el.selectionStart);
+                const m = /^(\s*)([-•]|(\d{1,3})[.)])\s+(.*)$/.exec(line);
+                if (m) {
+                  e.preventDefault();
+                  const bullet = m[3] ? `${Number(m[3]) + 1}. ` : `${m[2]} `;
+                  // an empty item ends the list
+                  const r = m[4] ? { text: text.slice(0, el.selectionStart) + "\n" + m[1] + bullet + text.slice(el.selectionEnd), at: el.selectionStart + 1 + m[1].length + bullet.length } : { text: text.slice(0, ls) + text.slice(el.selectionEnd), at: ls };
+                  setText(r.text);
+                  requestAnimationFrame(() => el.setSelectionRange(r.at, r.at));
+                  return;
+                }
+              }
               if (e.key === "Enter" && !e.shiftKey && !isTouch()) {
                 e.preventDefault();
                 send();
