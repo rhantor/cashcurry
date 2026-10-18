@@ -6,7 +6,7 @@ import { Check, Search, Trash2 } from "lucide-react";
 import { Avatar, Button, Field, Input, Sheet, cn, confirmDialog, toast } from "@/app/components/ui";
 import { roleLabel } from "@/lib/authz/permissions";
 import { createGroup, deleteGroup, forwardMessage, openDirect, saveLabels, updateGroup } from "@/lib/chat/client";
-import { LABEL_COLORS, previewOf, removeLabel, toggleLabel } from "@/lib/chat/model";
+import { LABEL_COLORS, labelOf, previewOf, removeLabel, toggleLabel } from "@/lib/chat/model";
 
 function PeoplePicker({ people, me, selected, onToggle, single }) {
   const [q, setQ] = useState("");
@@ -208,7 +208,7 @@ export function ForwardSheet({ msg, onClose, user, chats, people = [], onSent })
 export function LabelsSheet({ open, onClose, user, chat, prefs }) {
   const [name, setName] = useState("");
   const [color, setColor] = useState(LABEL_COLORS[5]);
-  const on = prefs.chats?.[chat?.id] || [];
+  const current = chat ? labelOf(chat.id, prefs) : null; // one label per chat
   const save = (next) => saveLabels(user.companyId, user.uid, next).catch((e) => toast.error("Couldn't save", { description: e?.message }));
 
   const create = () => {
@@ -230,7 +230,7 @@ export function LabelsSheet({ open, onClose, user, chat, prefs }) {
       open={open}
       onClose={onClose}
       title={chat ? `Labels · ${chat.title || "this chat"}` : "Your labels"}
-      description={chat ? "Tick the labels this chat has — only you see your labels." : "Make, and delete, the labels you sort your chats with — only you see them."}
+      description={chat ? "Pick this chat's label (one per chat) — tap it again to take it off. Only you see your labels." : "Make, and delete, the labels you sort your chats with — only you see them."}
     >
       <div className="space-y-4">
         {prefs.labels.length > 0 && (
@@ -238,7 +238,7 @@ export function LabelsSheet({ open, onClose, user, chat, prefs }) {
             {prefs.labels.map((l) => (
               <li key={l.id} className="flex items-center gap-3 px-3 py-2">
                 <button type="button" onClick={() => chat && save({ ...prefs, chats: toggleLabel(prefs, chat.id, l.id) })} className="flex flex-1 items-center gap-3 text-left">
-                  {chat && <span className={cn("flex size-5 items-center justify-center rounded-md border", on.includes(l.id) ? "border-brand bg-brand text-white" : "border-line")}>{on.includes(l.id) && <Check className="size-3.5" />}</span>}
+                  {chat && <span className={cn("flex size-5 items-center justify-center rounded-full border-2", current?.id === l.id ? "border-brand" : "border-line")}>{current?.id === l.id && <span className="size-2.5 rounded-full bg-brand" />}</span>}
                   <span className="size-3 rounded-full" style={{ background: l.color }} />
                   <span className="text-sm font-semibold text-fg">{l.name}</span>
                 </button>

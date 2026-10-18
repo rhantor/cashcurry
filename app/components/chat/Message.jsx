@@ -5,11 +5,11 @@
 // react, reply, forward — and edit / delete your own within 15 minutes.
 import { useState } from "react";
 import { format } from "date-fns";
-import { Check, CheckCheck, Clock3, CornerUpLeft, Download, EyeOff, FileText, Forward, MoreHorizontal, Pencil, ShieldX, SmilePlus, Trash2 } from "lucide-react";
+import { Check, CheckCheck, Clock3, CornerUpLeft, Download, EyeOff, FileText, Forward, MoreHorizontal, Pencil, Share2, ShieldX, SmilePlus, Trash2 } from "lucide-react";
 import { Avatar, Menu, Popover, cn } from "@/app/components/ui";
 import { REACTIONS, canChangeMessage, canForward, reactionSummary, timeOf } from "@/lib/chat/model";
 import { blocks } from "@/lib/chat/format";
-import { downloadFile } from "@/lib/chat/client";
+import { downloadFile, shareMessage } from "@/lib/chat/client";
 
 const size = (b) => (b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 // a steady colour per person for names in groups
@@ -127,6 +127,7 @@ export default function Message({ msg, me, showName, showAvatar, first, status, 
   const items = [
     !msg.deleted && { label: "Reply", icon: CornerUpLeft, onSelect: () => onReply(msg) },
     canForward(msg) && { label: "Forward", icon: Forward, onSelect: () => onForward(msg) },
+    canForward(msg) && !msg.sticker && { label: "Share to WhatsApp…", icon: Share2, onSelect: () => shareMessage(msg) },
     changeable && msg.text && { label: "Edit", icon: Pencil, onSelect: () => onEdit(msg) },
     changeable && { label: "Delete for everyone", icon: Trash2, danger: true, onSelect: () => onDelete(msg) },
     // management, for anyone's message (or their own after 15 minutes)

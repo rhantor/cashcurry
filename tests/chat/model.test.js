@@ -101,13 +101,15 @@ describe("stickers and labels", () => {
     expect(isStickerFile({ type: "application/pdf", size: 10 })).toBe(false);
     expect(previewOf({ sticker: { id: "ok" } })).toBe("Sticker");
   });
-  it("labels: on and off a chat, shown in the order made, deleted everywhere", () => {
+  it("labels: one per chat — picking another replaces it, picking it again takes it off; deleted everywhere", () => {
     const prefs = { labels: [{ id: "a", name: "Urgent" }, { id: "b", name: "Supplier" }], chats: {} };
-    expect(toggleLabel({ ...prefs, chats: toggleLabel(prefs, "c1", "b") }, "c1", "a")).toEqual({ c1: ["b", "a"] });
-    const on = { ...prefs, chats: { c1: ["b", "a"], c2: ["a"] } };
-    expect(labelsOf("c1", on).map((l) => l.name)).toEqual(["Urgent", "Supplier"]);
-    expect(toggleLabel(on, "c2", "a")).toEqual({ c1: ["b", "a"] });
-    expect(removeLabel(on, "a")).toEqual({ labels: [{ id: "b", name: "Supplier" }], chats: { c1: ["b"] } });
+    const one = { ...prefs, chats: toggleLabel(prefs, "c1", "b") };
+    expect(one.chats).toEqual({ c1: ["b"] });
+    expect(toggleLabel(one, "c1", "a")).toEqual({ c1: ["a"] }); // replaces
+    expect(toggleLabel(one, "c1", "b")).toEqual({}); // off again
+    // older data with several: only the first counts
+    expect(labelsOf("c1", { ...prefs, chats: { c1: ["b", "a"] } }).map((l) => l.name)).toEqual(["Supplier"]);
+    expect(removeLabel({ ...prefs, chats: { c1: ["a"], c2: ["b"] } }, "a")).toEqual({ labels: [{ id: "b", name: "Supplier" }], chats: { c2: ["b"] } });
   });
 });
 
