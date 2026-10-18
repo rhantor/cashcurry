@@ -45,7 +45,9 @@ describe("the owner's decisions", () => {
   });
 
   it("staff only use the staff app", () => {
-    for (const cap of Object.keys(CAN)) expect(can("staff", cap)).toBe(cap === "staffApp.use");
+    // the staff app — which includes reporting an issue (4.5)
+    const STAFF = ["staffApp.use", "issues.raise"];
+    for (const cap of Object.keys(CAN)) expect(can("staff", cap), cap).toBe(STAFF.includes(cap));
     expect(canOpen("staff", "/payroll")).toBe(false);
     expect(canOpen("staff", "/purchases/order-guides")).toBe(false);
     expect(canOpen("staff", "/staff-portal")).toBe(true);
@@ -104,7 +106,7 @@ describe("the menu", () => {
 
   it("each role's menu, at a glance", () => {
     const top = (r) => navFor(r).flatMap((s) => s.items.map((i) => i.label));
-    expect(top("cashier")).toEqual(["Entries", "My Requests", "Loans", "Support"]); // chat: its own workspace, from the top bar // Loans: the staff loan tracker, to hand out approved ones
+    expect(top("cashier")).toEqual(["Entries", "My Requests", "Issues", "Loans", "Support"]); // chat: its own workspace, from the top bar // Loans: the staff loan tracker, to hand out approved ones
     expect(top("staff")).toEqual([]);
     expect(top("owner")).toContain("Staff Management");
     expect(top("owner")).toContain("Payroll");

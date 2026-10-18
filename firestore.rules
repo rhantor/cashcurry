@@ -290,6 +290,20 @@ service cloud.firestore {
       let u = userData();
       return isAuth() && u.companyId == c && (u.role in companyRoles() || (isBranchAdmin(u) && inBranch(u, b)));
     }
+    // ── issues (4.5, lib/issues/model.js) ──
+    function canIssuesSeeAll(c, b) { return may(c, b, officeBranchRoles()); }
+    function canIssuesManage(c, b) { return may(c, b, leadRoles().concat(['inCharge'])); }
+    function isIssueParty(d) {
+      return d.get('reporterUid', '') == request.auth.uid || d.get('assigneeUid', '') == request.auth.uid;
+    }
+    function canSeeIssue(c, b, d) {
+      return canIssuesSeeAll(c, b) || (isBranchMember(c, b) && isIssueParty(d));
+    }
+    // the fields that move when work is done on an issue (not who it's for, not what it is)
+    function isIssueWork() {
+      return changedKeys().hasOnly(['status', 'resolution', 'resolvedBy', 'resolvedAt', 'updatedAt', 'lastActivityAt', 'watchers']);
+    }
+
     // ── chat (4.4) ──
     function canChatGroups(c) { return mayInCompany(c, leadRoles()); }
     function canSeeChat(c, chat) {
@@ -705,6 +719,40 @@ service cloud.firestore {
             (canSalariesEnter(companyId, branchId) && isBookkeeping()) ||
             (isBranchMember(companyId, branchId) && isOwnRequest() && isCancel());
           allow delete: if canAdvancesApprove(companyId, branchId);
+        }
+
+        // ── Issues (roadmap 4.5) ────────────────────────────────────────────
+        // Everyone at the branch raises them; office roles see the branch's,
+        // staff the ones they raised or were given. Management (and in-charge)
+        // assign, close, reopen and delete; the assignee starts and resolves;
+        // the reporter reopens a resolved one.
+        match /issues/{issueId} {
+          allow get: if canSeeIssue(companyId, branchId, resource.data);
+          allow list: if canIssuesSeeAll(companyId, branchId) ||
+            (isBranchMember(companyId, branchId) &&
+              (resource.data.reporterUid == request.auth.uid || resource.data.assigneeUid == request.auth.uid));
+          allow create: if isBranchMember(companyId, branchId) &&
+            request.resource.data.reporterUid == request.auth.uid &&
+            (canIssuesManage(companyId, branchId) ||
+              (request.resource.data.status == 'open' && request.resource.data.get('assigneeUid', null) == null));
+          allow update: if canIssuesManage(companyId, branchId) ||
+            (resource.data.get('assigneeUid', '') == request.auth.uid && isIssueWork() &&
+              request.resource.data.status in ['in_progress', 'resolved']) ||
+            (resource.data.reporterUid == request.auth.uid && resource.data.status == 'resolved' &&
+              request.resource.data.status == 'open' && isIssueWork()) ||
+            (canSeeIssue(companyId, branchId, resource.data) &&
+              changedKeys().hasOnly(['lastActivityAt', 'watchers', 'updatedAt']));
+          allow delete: if canIssuesManage(companyId, branchId);
+
+          // its discussion: whoever can see the issue reads and writes, as themselves
+          match /comments/{commentId} {
+            allow read: if canSeeIssue(companyId, branchId,
+              get(/databases/$(database)/documents/companies/$(companyId)/branches/$(branchId)/issues/$(issueId)).data);
+            allow create: if canSeeIssue(companyId, branchId,
+                get(/databases/$(database)/documents/companies/$(companyId)/branches/$(branchId)/issues/$(issueId)).data) &&
+              request.resource.data.byUid == request.auth.uid &&
+              request.resource.data.createdAt == request.time;
+          }
         }
 
         // ── Leave requests (roadmap 4.2) ────────────────────────────────────

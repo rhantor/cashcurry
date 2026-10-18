@@ -27,6 +27,7 @@ export const sidebarItems = [
   { label: "Requested Panel", section: "Daily work", icon: "MdOutlineRequestPage", path: "/requested-panel" },
   // Their own requests — for those who ask but don't approve.
   { label: "My Requests", section: "Daily work", icon: "MdOutlineFactCheck", path: "/supervisor-panel", hideIf: "advances.approve" },
+  { label: "Issues", section: "Daily work", icon: "MdOutlineReportProblem", path: "/issues" },
   {
     label: "Attendance",
     section: "Daily work",

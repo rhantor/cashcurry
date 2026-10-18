@@ -53,6 +53,7 @@ const PROBES = {
   "catalog.view": (u) => as(u).doc(`companies/${CO}/vendors/v1`).get(),
   "catalog.manage": (u) => as(u).doc(`companies/${CO}/vendors/v-${u}`).set({ name: "V" }),
   "branchSettings.manage": (u) => as(u).doc(`${B}/settings/settings`).update({ "basic.phone": `p-${u}` }),
+  "issues.manage": (u) => as(u).doc(`${B}/issues/i-${u}`).update({ priority: "urgent" }),
   "chat.groups": (u) => as(u).collection(`companies/${CO}/chats`).add({ kind: "group", name: "G", members: [u], createdBy: u }),
   "notifications.manage": (u) => as(u).doc(`${B}/settings/notifications`).set({ recipients: { "daily.sales": [u] } }),
   "moneySettings.manage": (u) => as(u).doc(`${B}/settings/settings`).update({ "financeSales.openingBalance": USERS.indexOf(u) + 1000 }),
@@ -80,6 +81,7 @@ beforeEach(async () => {
     await d.doc(`${B}/staffPrivate/st1`).set({ staffId: "st1", basicSalary: "1800", bankAccountNumber: "999" });
     await d.doc(`${B}/staffPrivate/st-me`).set({ staffId: "st-me", basicSalary: "1500" });
     await d.doc(`${B}/attendance/other`).set({ staffId: "st1", date: "2026-10-10", type: "in" });
+    for (const uid of Object.keys(PEOPLE)) await d.doc(`${B}/issues/i-${uid}`).set({ title: "x", status: "open", priority: "normal", reporterUid: "someoneElse" });
     await d.doc(`companies/${CO}/vendors/v1`).set({ name: "V" });
     await d.doc(`${B}/settings/settings`).set({ basic: { phone: "1" }, financeSales: { openingBalance: 1, currency: "MYR" } });
     for (const u of USERS) {

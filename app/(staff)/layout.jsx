@@ -3,7 +3,7 @@ import { signOut } from "@/lib/session";
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, MessageCircle, FileText, LogOut, User } from "lucide-react";
+import { Home, MessageCircle, FileText, LogOut, TriangleAlert, User } from "lucide-react";
 import NotificationBell from "@/app/components/notifications/NotificationBell";
 import useSession from "@/app/hooks/useSession";
 import { useChats } from "@/app/components/chat/useChat";
@@ -27,6 +27,7 @@ export default function StaffLayout({ children }) {
     { label: "Home", href: "/staff-portal", icon: Home },
     { label: "Requests", href: "/requests", icon: FileText },
     { label: "Chat", href: "/messages", icon: MessageCircle },
+    { label: "Issues", href: "/my-issues", icon: TriangleAlert },
     { label: "Profile", href: "/profile", icon: User },
   ];
 
