@@ -40,7 +40,7 @@ computer, has its own loading look, and its old modals are redone too.
 - ✅ `/loans/loan-summary` Loan summary
 
 ## 3.4.5 Staff and attendance
-- ⬜ `/staff-management` Staff management
+- ✅ `/staff-management` Staff management — staff / basic pay / app-login tiles, list (cards on a phone), detail sheet, copyable login, kit dates and selects; phone check accepts 012-345 6789
 - ⬜ `/attendance-log` Attendance log
 - ⬜ `/kiosk`, `/kiosk/[branchId]` Kiosk (replaced later by 4.8)
 

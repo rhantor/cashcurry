@@ -11,12 +11,12 @@ export default function Field ({
 }) {
   return (
     <div className={`flex flex-col gap-1.5 ${className}`}>
-      <label className='text-xs font-bold text-[color:var(--color-accent)]/80 uppercase tracking-wide'>
-        {label} {required && <span className='text-red-600'>*</span>}
+      <label className='text-xs font-semibold text-muted'>
+        {label} {required && <span className='text-danger'>*</span>}
       </label>
       {children}
       {error && (
-        <span className='text-[11px] text-red-600 mt-0.5'>{error}</span>
+        <span className='text-[11px] text-danger mt-0.5'>{error}</span>
       )}
     </div>
   )

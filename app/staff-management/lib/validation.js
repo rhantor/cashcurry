@@ -2,8 +2,13 @@
 
 const isEmail = v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(v || '').trim())
 
-const isMyPhone = v =>
-  /^(\+?60)?1[0-9]{8,9}$/.test(String(v || '').replace(/[\s-]/g, ''))
+// A Malaysian mobile as people write it — 012-345 6789, 0123456789,
+// +60 12-345 6789, 60123456789 — or any number in international form
+// (+880…, +977…) for staff using a home SIM.
+const isMyPhone = v => {
+  const d = String(v || '').replace(/[\s\-()]/g, '')
+  return /^(\+?60|0)?1[0-9]{8,9}$/.test(d) || /^\+[1-9][0-9]{7,14}$/.test(d)
+}
 
 const isIcNo = v =>
   /^\d{6}-?\d{2}-?\d{4}$/.test(String(v || '').replace(/\s/g, ''))
@@ -23,7 +28,7 @@ export const RULES = {
     !String(v || '').trim()
       ? 'Phone is required'
       : !isMyPhone(v)
-      ? 'Invalid MY phone (+60)'
+      ? 'Enter a mobile number, e.g. 012-345 6789'
       : null,
   role: v => (!v ? 'Select a role' : null),
   pinCode: v => (!/^\d{4}$/.test(String(v || '')) ? 'PIN must be exactly 4 digits' : null),
