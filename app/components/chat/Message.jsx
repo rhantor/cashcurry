@@ -5,7 +5,7 @@
 // react, reply, forward — and edit / delete your own within 15 minutes.
 import { useState } from "react";
 import { format } from "date-fns";
-import { Check, CheckCheck, Clock3, CornerUpLeft, Download, EyeOff, FileText, Forward, MoreHorizontal, Pencil, SmilePlus, Trash2 } from "lucide-react";
+import { Check, CheckCheck, Clock3, CornerUpLeft, Download, EyeOff, FileText, Forward, MoreHorizontal, Pencil, ShieldX, SmilePlus, Trash2 } from "lucide-react";
 import { Avatar, Menu, Popover, cn } from "@/app/components/ui";
 import { REACTIONS, canChangeMessage, canForward, reactionSummary, timeOf } from "@/lib/chat/model";
 
@@ -77,7 +77,7 @@ function Ticks({ status }) {
   return <Check className="size-3.5" />;
 }
 
-export default function Message({ msg, me, showName, showAvatar, first, status, seenNote, peopleById = {}, onReply, onEdit, onDelete, onHide, onForward, onReact, onOpenPhoto }) {
+export default function Message({ msg, me, showName, showAvatar, first, status, seenNote, peopleById = {}, canRemove, onReply, onEdit, onDelete, onRemove, onHide, onForward, onReact, onOpenPhoto }) {
   const [picking, setPicking] = useState(false);
   const mine = msg.byUid === me;
   const at = timeOf(msg.createdAt);
@@ -89,6 +89,8 @@ export default function Message({ msg, me, showName, showAvatar, first, status, 
     canForward(msg) && { label: "Forward", icon: Forward, onSelect: () => onForward(msg) },
     changeable && msg.text && { label: "Edit", icon: Pencil, onSelect: () => onEdit(msg) },
     changeable && { label: "Delete for everyone", icon: Trash2, danger: true, onSelect: () => onDelete(msg) },
+    // management, for anyone's message (or their own after 15 minutes)
+    !changeable && canRemove && !msg.deleted && { label: "Remove for everyone", icon: ShieldX, danger: true, onSelect: () => onRemove(msg) },
     { label: "Delete for me", icon: EyeOff, danger: true, onSelect: () => onHide(msg) },
   ].filter(Boolean);
   const sticker = !msg.deleted && msg.sticker;
@@ -119,7 +121,7 @@ export default function Message({ msg, me, showName, showAvatar, first, status, 
           )}
         >
           {msg.deleted ? (
-            <p className="text-sm italic">Message deleted</p>
+            <p className="text-sm italic">{msg.removedBy?.name ? `Removed by ${msg.removedBy.name}` : "Message deleted"}</p>
           ) : (
             <>
               {msg.forwarded && (

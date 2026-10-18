@@ -110,3 +110,13 @@ describe("stickers and labels", () => {
     expect(removeLabel(on, "a")).toEqual({ labels: [{ id: "b", name: "Supplier" }], chats: { c1: ["b"] } });
   });
 });
+
+import { canRemoveForEveryone } from "@/lib/chat/model";
+describe("removing for everyone", () => {
+  it("management, in group chats only — never personal chats", () => {
+    expect(canRemoveForEveryone("manager", { kind: "group" })).toBe(true);
+    expect(canRemoveForEveryone("owner", { kind: "branch" })).toBe(true);
+    expect(canRemoveForEveryone("owner", { kind: "direct" })).toBe(false);
+    expect(canRemoveForEveryone("cashier", { kind: "group" })).toBe(false);
+  });
+});

@@ -195,7 +195,10 @@ service firebase.storage {
       allow read: if canSeeChat(companyId, chatId);
       allow create: if request.auth.uid == uid && canSeeChat(companyId, chatId) &&
         request.resource.size <= 32 * 1024 * 1024;
-      allow delete: if request.auth.uid == uid;
+      // your own files; management also removes others' (with the message) outside personal chats
+      allow delete: if request.auth.uid == uid ||
+        (canSeeChat(companyId, chatId) && !chatId.matches('dm_.*') &&
+          (isCompanyRole(userData()) || isBranchAdmin(userData()) || userData().role == 'manager'));
     }
 
     // Company chat stickers: stickers/{companyId}/{filename} — an image up to

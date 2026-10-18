@@ -7,8 +7,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowLeft, BellOff, Bell, Building2, Globe2, MoreVertical, Settings2, Tag, Users } from "lucide-react";
 import { Avatar, Button, Menu, Skeleton, cn, confirmDialog, toast } from "@/app/components/ui";
-import { canMakeGroups, chatTitle, dayLabel, seenBy, timeOf } from "@/lib/chat/model";
-import { deleteMessage, editMessage, hideMessage, markRead, react, sendMessage, sendSticker, setChatMuted } from "@/lib/chat/client";
+import { canMakeGroups, canRemoveForEveryone, chatTitle, dayLabel, seenBy, timeOf } from "@/lib/chat/model";
+import { deleteMessage, editMessage, hideMessage, markRead, react, removeMessage, sendMessage, sendSticker, setChatMuted } from "@/lib/chat/client";
+import { personName } from "@/lib/people";
 import { useMessages, useReads } from "./useChat";
 import Message from "./Message";
 import Composer from "./Composer";
@@ -109,6 +110,12 @@ export default function Conversation({ chat, user, peopleById, branchName, muted
     } catch (e) {
       toast.error("Couldn't delete", { description: e?.code === "permission-denied" ? "Messages can be deleted for 15 minutes after sending." : e?.message });
     }
+  };
+  // management removes anyone's message for everyone (not in personal chats)
+  const canRemove = canRemoveForEveryone(user.role, chat);
+  const removeForAll = async (m) => {
+    if (!(await confirmDialog({ title: "Remove for everyone?", message: `Everyone in this chat will see “Removed by ${personName(user) || "you"}” instead${m.byName ? ` of ${m.byName}'s message` : ""}.`, confirmLabel: "Remove", danger: true }))) return;
+    removeMessage(companyId, chat.id, m, user).catch((e) => toast.error("Couldn't remove", { description: e?.message }));
   };
   // "Delete for me": gone from your view only; the others still see it
   const hide = async (m) => {
@@ -243,6 +250,8 @@ export default function Conversation({ chat, user, peopleById, branchName, muted
                   }}
                   onDelete={remove}
                   onHide={hide}
+                  canRemove={canRemove}
+                  onRemove={removeForAll}
                   onForward={onForward}
                   onReact={onReact}
                   onOpenPhoto={(list, start) => setPhotos({ list, start })}

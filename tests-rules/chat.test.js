@@ -106,6 +106,17 @@ describe("messages", () => {
     expect(await ok(db("kumar").doc(`${C}/dm_ali_kumar`).update({ lastMessage: { text: "hi" }, updatedAt: serverTimestamp() }))).toBe(true);
     expect(await ok(db("kumar").doc(`${C}/dm_ali_kumar`).update({ members: ["kumar", "rahim"] }))).toBe(false);
   });
+  it("management removes anyone's message in group chats — not in personal chats; others can't", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const d = ctx.firestore();
+      await d.doc(`${C}/g1/messages/a1`).set({ ...msg("ali"), createdAt: Timestamp.fromMillis(Date.now() - 3 * 3600 * 1000) });
+      await d.doc(`${C}/dm_ali_kumar/messages/a2`).set({ ...msg("ali"), createdAt: Timestamp.now() });
+    });
+    const remove = (uid) => ({ deleted: true, text: "", files: [], editedAt: serverTimestamp(), removedBy: { uid, name: uid } });
+    expect(await ok(db("klManager").doc(`${C}/g1/messages/a1`).update(remove("klManager")))).toBe(true); // hours later: fine
+    expect(await ok(db("owner").doc(`${C}/dm_ali_kumar/messages/a2`).update(remove("owner")))).toBe(false); // personal: no
+    expect(await ok(db("kumar").doc(`${C}/dm_ali_kumar/messages/a2`).update(remove("kumar")))).toBe(false); // not management
+  });
   it("anyone in the chat reacts — only with their own reaction, and only that changes", async () => {
     const m = `${C}/dm_ali_kumar/messages/old`; // reacting has no 15-minute limit
     expect(await ok(db("kumar").doc(m).update({ "reactions.kumar": "👍" }))).toBe(true);
