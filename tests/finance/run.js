@@ -101,9 +101,14 @@ export function branchCharts(dataset, branchId, filter) {
 export async function companyCharts(dataset, filter) {
   useDataset(dataset, null);
   const { result, unmount } = renderHook(() => useCompanyData(filter));
-  await waitFor(() => {
-    if (result.current.loading) throw new Error("still loading");
-  });
+  // The full company backup can take more than waitFor's default 1s while the
+  // machine is busy (dev server, emulators) — that made this test flaky.
+  await waitFor(
+    () => {
+      if (result.current.loading) throw new Error("still loading");
+    },
+    { timeout: 20_000 }
+  );
   const out = Object.fromEntries(COMPANY_CHARTS.map((k) => [k, result.current[k]]));
   unmount();
   return centsDeep(out);
@@ -131,9 +136,14 @@ export function branchDashboard(dataset, branchId, filter) {
 export async function companyDashboard(dataset, filter) {
   useDataset(dataset, null);
   const { result, unmount } = renderHook(() => useCompanyData(filter));
-  await waitFor(() => {
-    if (result.current.loading) throw new Error("still loading");
-  });
+  // The full company backup can take more than waitFor's default 1s while the
+  // machine is busy (dev server, emulators) — that made this test flaky.
+  await waitFor(
+    () => {
+      if (result.current.loading) throw new Error("still loading");
+    },
+    { timeout: 20_000 }
+  );
   const out = pick(result.current, COMPANY_DASHBOARD_KEYS);
   unmount();
   return out;

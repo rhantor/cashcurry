@@ -1,7 +1,6 @@
 "use client";
 import { format } from "date-fns";
 import { personName } from "@/lib/people";
-import { DatePicker } from "@/app/components/ui";
 import { formatMoney } from "@/lib/region/currency";
 import { businessToday } from "@/lib/region";
 import React, { useMemo, useState } from "react";
@@ -23,12 +22,8 @@ import {
 import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
 import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
 import { useGetCompanyDetailsQuery } from "@/lib/redux/api/authApiSlice";
-import ProofUpload from "@/app/components/entry/ProofUpload";
-import Sheet from "@/app/components/purchases/Sheet";
-import QtyStepper from "@/app/components/purchases/QtyStepper";
-import MoneyInput from "@/app/components/purchases/MoneyInput";
 import ConfirmSheet from "@/app/components/purchases/ConfirmSheet";
-import ItemFilterBar, { filterItems } from "@/app/components/purchases/ItemFilterBar";
+import { filterItems } from "@/app/components/purchases/ItemFilterBar";
 import useToast from "@/app/components/purchases/useToast";
 import { uploadInvoiceFile } from "@/utils/storage/uploadInvoice";
 import useCurrency from "@/app/hooks/useCurrency";
@@ -40,7 +35,6 @@ import {
   Ban,
   Pencil,
   Plus,
-  X,
   CheckCircle,
   XCircle,
   Paperclip,
@@ -48,6 +42,10 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { OrdersContext } from "./OrdersContext";
+import EditOrderSheet from "./components/EditOrderSheet";
+import ReceiveSheet from "./components/ReceiveSheet";
+import { lineTotal } from "./shared";
 
 const STATUS_STYLE = {
   Pending: "bg-warning-soft text-warning",
@@ -73,8 +71,6 @@ const APPROVER_ROLES = new Set(["owner", "gm", "superAdmin", "superadmin", "bran
 
 const normalizeStatus = (status) => status || "Pending";
 
-const lineTotal = (row, qtyKey = "requestedQty", priceKey = "estPrice") =>
-  Number(row?.[qtyKey] || 0) * Number(row?.[priceKey] || 0);
 const sumLines = (rows = [], qtyKey, priceKey) =>
   rows.reduce((acc, row) => acc + lineTotal(row, qtyKey, priceKey), 0);
 
@@ -527,6 +523,7 @@ export default function PurchaseOrdersPage() {
     "w-11 h-11 flex items-center justify-center rounded-xl text-muted bg-surface-2/60 active:bg-surface-2 transition-colors";
 
   return (
+    <OrdersContext.Provider value={{ receiving, ready, companyId, branchId, user, currency, fmtMoney, router, dispatch, toastOk, toastError, toastNode, args, companyArgs, orders, ordersLoading, vendors, catalog, branchSettings, branch, company, requireApproval, canApprove, invoiceFile, setInvoiceFile, invoicePreview, setInvoicePreview, uploadPct, setUploadPct, uploading, setUploading, busy, selectedOrder, setSelectedOrder, statusFilter, setStatusFilter, search, setSearch, visibleOrders, openReceiveSheet, setOpenReceiveSheet, receiveData, setReceiveData, handleOpenReceive, updateReceiveRow, receiveTotal, handleReceiveOrder, openEditSheet, setOpenEditSheet, editData, setEditData, showPicker, setShowPicker, pickSearch, setPickSearch, pickCategory, setPickCategory, confirmReapproval, setConfirmReapproval, canEdit, canCancel, handleOpenEdit, updateEditRow, removeEditRow, addableItems, pickableItems, handleAddEditRow, editTotal, saveEdit, handleSaveEdit, pendingAction, setPendingAction, runStatusChange, handleSend, confirmPendingAction, actionCopy, printing, setPrinting, exportPDF }}>
     <div className="mx-auto max-w-7xl space-y-4 px-4 py-5 pb-24">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
@@ -768,284 +765,9 @@ export default function PurchaseOrdersPage() {
         )}
       </div>
 
-      {/* ------------------------------ Edit sheet ------------------------------ */}
-      <Sheet
-        open={openEditSheet && !!selectedOrder}
-        title="Edit Order"
-        subtitle={selectedOrder?.vendorName}
-        onClose={() => setOpenEditSheet(false)}
-        maxWidth="max-w-2xl"
-        footer={
-          <div className="flex items-center gap-3">
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-subtle uppercase tracking-wide">New total</p>
-              <p className="text-xl font-bold text-fg tabular-nums truncate">
-                {fmtMoney(editTotal)}
-              </p>
-            </div>
-            <button
-              onClick={handleSaveEdit}
-              disabled={busy}
-              className="flex-1 min-h-[52px] rounded-2xl bg-brand text-brand-fg font-bold text-base
-                         active:brightness-95 disabled:opacity-40 transition-colors"
-            >
-              Save Changes
-            </button>
-          </div>
-        }
-      >
-        <p className="text-sm text-muted mb-4">
-          Change amounts or prices, add items, or remove what you no longer need. Anything left at zero is
-          dropped.
-        </p>
+      <EditOrderSheet />
 
-        <div className="space-y-2.5">
-          {editData.items.map((item) => (
-            <div key={item.itemId} className="rounded-2xl border border-line bg-surface p-3.5">
-              <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="min-w-0">
-                  <p className="font-semibold text-fg text-[15px] leading-snug">{item.name}</p>
-                  <p className="text-xs text-muted mt-0.5">
-                    {item.category ? `${item.category} · ` : ""}
-                    {fmtMoney(lineTotal(item))} total
-                  </p>
-                </div>
-                <button
-                  onClick={() => removeEditRow(item.itemId)}
-                  aria-label={`Remove ${item.name}`}
-                  className="w-9 h-9 -mt-1 -mr-1 shrink-0 flex items-center justify-center rounded-full
-                             text-subtle active:bg-danger-soft active:text-danger transition-colors"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                <div>
-                  <p className="text-xs font-medium text-muted mb-1.5">Amount</p>
-                  <QtyStepper
-                    value={item.requestedQty}
-                    onChange={(v) => updateEditRow(item.itemId, "requestedQty", v)}
-                    unit={item.unit}
-                    size="sm"
-                  />
-                </div>
-                <MoneyInput
-                  label={`Price per ${item.unit}`}
-                  value={item.estPrice}
-                  onChange={(v) => updateEditRow(item.itemId, "estPrice", v)}
-                  currency={currency}
-                  size="sm"
-                />
-              </div>
-            </div>
-          ))}
-
-          {editData.items.length === 0 && (
-            <p className="py-8 text-center text-muted">No items left — add one below.</p>
-          )}
-        </div>
-
-        <div className="mt-5 pt-5 border-t border-line space-y-4">
-          {/* A dropdown of a couple of hundred products is unusable on a phone,
-              so adding is a searchable, category-filtered list instead. */}
-          <div>
-            <button
-              onClick={() => setShowPicker((v) => !v)}
-              disabled={!addableItems.length}
-              className="w-full min-h-[48px] rounded-2xl border border-dashed border-line text-fg
-                         font-semibold flex items-center justify-center gap-2 active:bg-surface-2/60
-                         disabled:opacity-40 transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-              {!addableItems.length
-                ? "Nothing left to add"
-                : showPicker
-                ? "Done adding"
-                : `Add an item (${addableItems.length} available)`}
-            </button>
-
-            {showPicker && addableItems.length > 0 && (
-              <div className="mt-3 space-y-3">
-                <ItemFilterBar
-                  items={addableItems}
-                  search={pickSearch}
-                  onSearchChange={setPickSearch}
-                  category={pickCategory}
-                  onCategoryChange={setPickCategory}
-                  placeholder="Find an item to add…"
-                />
-
-                <div className="max-h-72 overflow-y-auto rounded-2xl border border-line divide-y divide-line">
-                  {pickableItems.map((item) => (
-                    <button
-                      key={item.id}
-                      onClick={() => handleAddEditRow(item)}
-                      className="w-full flex items-center gap-3 p-3.5 text-left active:bg-brand-soft transition-colors"
-                    >
-                      <span className="min-w-0 flex-1">
-                        <span className="block font-semibold text-fg text-[15px] truncate">
-                          {item.name}
-                        </span>
-                        <span className="block text-xs text-muted mt-0.5">
-                          {item.category || "Uncategorized"} · {item.unit}
-                        </span>
-                      </span>
-                      <span className="w-9 h-9 shrink-0 flex items-center justify-center rounded-full bg-brand-soft text-brand">
-                        <Plus className="w-4 h-4" />
-                      </span>
-                    </button>
-                  ))}
-                  {pickableItems.length === 0 && (
-                    <p className="py-8 text-center text-sm text-muted">Nothing matches that filter.</p>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-fg mb-1.5">Note for the supplier</label>
-            <textarea
-              rows={2}
-              value={editData.notes}
-              onChange={(e) => setEditData((p) => ({ ...p, notes: e.target.value }))}
-              placeholder="e.g. Please deliver before noon"
-              className="w-full p-3 text-[15px] border border-line rounded-2xl bg-surface-2/60
-                         focus:bg-surface focus:border-brand focus:ring-2 focus:ring-[var(--cc-ring)]/20 outline-none
-                         transition-colors"
-            />
-          </div>
-        </div>
-      </Sheet>
-
-      {/* ----------------------------- Receive sheet ---------------------------- */}
-      <Sheet
-        open={openReceiveSheet && !!selectedOrder}
-        title="Goods Arrived"
-        subtitle={selectedOrder?.vendorName}
-        onClose={() => setOpenReceiveSheet(false)}
-        maxWidth="max-w-2xl"
-        footer={
-          <div className="space-y-2">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-xs font-semibold text-subtle uppercase tracking-wide">Invoice total</p>
-              <p className="text-xl font-bold text-fg tabular-nums">
-                {fmtMoney(receiveTotal)}
-              </p>
-            </div>
-            <button
-              onClick={handleReceiveOrder}
-              disabled={busy || !invoiceFile}
-              className="w-full min-h-[52px] rounded-2xl bg-brand text-brand-fg font-bold text-base
-                         active:brightness-95 disabled:opacity-40 transition-colors"
-            >
-              {uploading
-                ? `Uploading photo ${Math.round(uploadPct)}%`
-                : receiving
-                ? "Saving…"
-                : !invoiceFile
-                ? "Add the invoice photo first"
-                : "Confirm & Create Bill"}
-            </button>
-          </div>
-        }
-      >
-        <div className="space-y-4">
-          <div className="rounded-2xl bg-brand-soft border border-brand/20 p-3.5">
-            <p className="text-sm text-brand leading-relaxed">
-              Check what actually turned up and what the supplier charged. Saving this creates the bill you will
-              pay later.
-            </p>
-          </div>
-
-          {/* Invoice photo is required, so it leads rather than hides at the bottom. */}
-          <ProofUpload
-            label="Photo of the invoice"
-            hint="So anyone can check these prices against the supplier's paper later."
-            pdf
-            required
-            pageDrop={false}
-            shrink={{ maxMB: 0.6, maxSide: 1600 }}
-            file={invoiceFile}
-            preview={invoicePreview}
-            progress={uploadPct}
-            onPick={(f, url) => {
-              setInvoiceFile(f);
-              setInvoicePreview(f && !/pdf/i.test(f.type) ? url : null);
-            }}
-            onRemove={() => {
-              setInvoiceFile(null);
-              setInvoicePreview(null);
-            }}
-          />
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <label className="block">
-              <span className="block text-sm font-semibold text-fg mb-1.5">Invoice number</span>
-              <input
-                value={receiveData.invoiceNo}
-                onChange={(e) => setReceiveData((p) => ({ ...p, invoiceNo: e.target.value }))}
-                placeholder="INV-12345"
-                className="w-full min-h-[48px] px-4 text-[15px] border border-line rounded-2xl bg-surface-2/60
-                           focus:bg-surface focus:border-brand focus:ring-2 focus:ring-[var(--cc-ring)]/20 outline-none
-                           transition-colors"
-              />
-            </label>
-            <div>
-              <span className="block text-sm font-semibold text-fg mb-1.5">Invoice date</span>
-              <DatePicker size="lg" value={receiveData.invoiceDate} onChange={(v) => setReceiveData((p) => ({ ...p, invoiceDate: v }))} />
-            </div>
-          </div>
-
-          <div className="space-y-2.5">
-            {receiveData.items.map((item) => {
-              const short = Number(item.receivedQty || 0) !== Number(item.requestedQty || 0);
-              return (
-                <div
-                  key={item.itemId}
-                  className={`rounded-2xl border p-3.5 ${
-                    short ? "border-warning/30 bg-warning-soft/40" : "border-line bg-surface"
-                  }`}
-                >
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div className="min-w-0">
-                      <p className="font-semibold text-fg text-[15px] leading-snug">{item.name}</p>
-                      <p className="text-xs text-muted mt-0.5">
-                        Ordered {item.requestedQty} {item.unit}
-                        {short && <span className="text-warning font-semibold ml-1.5">· amount differs</span>}
-                      </p>
-                    </div>
-                    <p className="text-base font-bold text-fg tabular-nums shrink-0">
-                      {fmtMoney(lineTotal(item, "receivedQty", "finalPrice"))}
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                    <div>
-                      <p className="text-xs font-medium text-muted mb-1.5">Actually received</p>
-                      <QtyStepper
-                        value={item.receivedQty}
-                        onChange={(v) => updateReceiveRow(item.itemId, "receivedQty", v)}
-                        unit={item.unit}
-                        size="sm"
-                        tone={short ? "warn" : "default"}
-                      />
-                    </div>
-                    <MoneyInput
-                      label={`Price charged per ${item.unit}`}
-                      value={item.finalPrice}
-                      onChange={(v) => updateReceiveRow(item.itemId, "finalPrice", v)}
-                      currency={currency}
-                      size="sm"
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </Sheet>
+      <ReceiveSheet />
 
       <ConfirmSheet
         open={!!pendingAction}
@@ -1068,5 +790,6 @@ export default function PurchaseOrdersPage() {
 
       {toastNode}
     </div>
+    </OrdersContext.Provider>
   );
 }
