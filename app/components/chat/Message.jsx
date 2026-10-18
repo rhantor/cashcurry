@@ -5,7 +5,7 @@
 // react, reply, forward — and edit / delete your own within 15 minutes.
 import { useState } from "react";
 import { format } from "date-fns";
-import { Check, CheckCheck, Clock3, CornerUpLeft, Download, FileText, Forward, MoreHorizontal, Pencil, SmilePlus, Trash2 } from "lucide-react";
+import { Check, CheckCheck, Clock3, CornerUpLeft, Download, EyeOff, FileText, Forward, MoreHorizontal, Pencil, SmilePlus, Trash2 } from "lucide-react";
 import { Avatar, Menu, Popover, cn } from "@/app/components/ui";
 import { REACTIONS, canChangeMessage, canForward, reactionSummary, timeOf } from "@/lib/chat/model";
 
@@ -77,7 +77,7 @@ function Ticks({ status }) {
   return <Check className="size-3.5" />;
 }
 
-export default function Message({ msg, me, showName, showAvatar, first, status, seenNote, peopleById = {}, onReply, onEdit, onDelete, onForward, onReact, onOpenPhoto }) {
+export default function Message({ msg, me, showName, showAvatar, first, status, seenNote, peopleById = {}, onReply, onEdit, onDelete, onHide, onForward, onReact, onOpenPhoto }) {
   const [picking, setPicking] = useState(false);
   const mine = msg.byUid === me;
   const at = timeOf(msg.createdAt);
@@ -88,7 +88,8 @@ export default function Message({ msg, me, showName, showAvatar, first, status, 
     !msg.deleted && { label: "Reply", icon: CornerUpLeft, onSelect: () => onReply(msg) },
     canForward(msg) && { label: "Forward", icon: Forward, onSelect: () => onForward(msg) },
     changeable && msg.text && { label: "Edit", icon: Pencil, onSelect: () => onEdit(msg) },
-    changeable && { label: "Delete", icon: Trash2, danger: true, onSelect: () => onDelete(msg) },
+    changeable && { label: "Delete for everyone", icon: Trash2, danger: true, onSelect: () => onDelete(msg) },
+    { label: "Delete for me", icon: EyeOff, danger: true, onSelect: () => onHide(msg) },
   ].filter(Boolean);
   const sticker = !msg.deleted && msg.sticker;
   const onlyPhotos = !msg.deleted && !msg.text && msg.files?.length > 0 && msg.files.every((f) => String(f.type).startsWith("image/")) && !msg.replyTo && !msg.forwarded;
@@ -162,8 +163,8 @@ export default function Message({ msg, me, showName, showAvatar, first, status, 
         {seenNote && <span className="mt-0.5 px-1 text-[10px] text-subtle">{seenNote}</span>}
       </div>
 
-      {!msg.deleted && (
-        <div className="flex items-center gap-0.5 self-center opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
+      <div className="flex items-center gap-0.5 self-center opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
+        {!msg.deleted && (
           <Popover
             align={mine ? "end" : "start"}
             open={picking}
@@ -194,9 +195,10 @@ export default function Message({ msg, me, showName, showAvatar, first, status, 
               </div>
             )}
           </Popover>
+        )}
           <Menu
             align={mine ? "end" : "start"}
-            width={170}
+            width={190}
             items={items}
             trigger={(p) => (
               <button {...p} type="button" aria-label="Message options" className="rounded-lg p-1 text-subtle hover:bg-surface-2 hover:text-fg">
@@ -204,8 +206,7 @@ export default function Message({ msg, me, showName, showAvatar, first, status, 
               </button>
             )}
           />
-        </div>
-      )}
+      </div>
     </div>
   );
 }

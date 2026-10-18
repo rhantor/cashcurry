@@ -8,7 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowLeft, BellOff, Bell, Building2, Globe2, MoreVertical, Settings2, Tag, Users } from "lucide-react";
 import { Avatar, Button, Menu, Skeleton, cn, confirmDialog, toast } from "@/app/components/ui";
 import { canMakeGroups, chatTitle, dayLabel, seenBy, timeOf } from "@/lib/chat/model";
-import { deleteMessage, editMessage, markRead, react, sendMessage, sendSticker, setChatMuted } from "@/lib/chat/client";
+import { deleteMessage, editMessage, hideMessage, markRead, react, sendMessage, sendSticker, setChatMuted } from "@/lib/chat/client";
 import { useMessages, useReads } from "./useChat";
 import Message from "./Message";
 import Composer from "./Composer";
@@ -28,8 +28,14 @@ const RUN_GAP = 5 * 60 * 1000; // messages within 5 minutes from one person read
 export default function Conversation({ chat, user, peopleById, branchName, muted, onBack, onManage, onForward, onLabels }) {
   const companyId = user.companyId;
   const me = user.uid;
-  const { messages, loading, hasMore, more } = useMessages(companyId, chat.id);
+  const { messages: all, loading, hasMore, more } = useMessages(companyId, chat.id);
   const reads = useReads(companyId, chat.id);
+  // without the ones this person deleted for themselves
+  const hiddenKey = (reads[me]?.hidden || []).join(",");
+  const messages = useMemo(() => {
+    const hidden = new Set(hiddenKey.split(","));
+    return all.filter((m) => !hidden.has(m.id));
+  }, [all, hiddenKey]);
   const [replyTo, setReplyTo] = useState(null);
   const [editing, setEditing] = useState(null);
   const [dragging, setDragging] = useState(false);
@@ -97,12 +103,17 @@ export default function Conversation({ chat, user, peopleById, branchName, muted
   };
 
   const remove = async (m) => {
-    if (!(await confirmDialog({ title: "Delete this message?", message: "Everyone will see “Message deleted”.", confirmLabel: "Delete", danger: true }))) return;
+    if (!(await confirmDialog({ title: "Delete for everyone?", message: "Everyone in this chat will see “Message deleted” instead.", confirmLabel: "Delete for everyone", danger: true }))) return;
     try {
       await deleteMessage(companyId, chat.id, m);
     } catch (e) {
       toast.error("Couldn't delete", { description: e?.code === "permission-denied" ? "Messages can be deleted for 15 minutes after sending." : e?.message });
     }
+  };
+  // "Delete for me": gone from your view only; the others still see it
+  const hide = async (m) => {
+    if (!(await confirmDialog({ title: "Delete for me?", message: "It goes from your chat only — the others still see it.", confirmLabel: "Delete for me", danger: true }))) return;
+    hideMessage(companyId, chat.id, me, m.id).catch((e) => toast.error("Couldn't delete", { description: e?.message }));
   };
   const onReact = (m, emoji) => react(companyId, chat.id, m.id, me, emoji).catch((e) => toast.error("Couldn't react", { description: e?.message }));
 
@@ -231,6 +242,7 @@ export default function Conversation({ chat, user, peopleById, branchName, muted
                     setEditing(x);
                   }}
                   onDelete={remove}
+                  onHide={hide}
                   onForward={onForward}
                   onReact={onReact}
                   onOpenPhoto={(list, start) => setPhotos({ list, start })}
