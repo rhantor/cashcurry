@@ -1,206 +1,128 @@
 "use client";
 
-import React from "react";
-import { Select } from '@/app/components/ui';
-import { Clock, MoonStar } from 'lucide-react';
-import Field from '../Field';
+import { useState } from 'react';
+import { Clock, Eye, EyeOff, KeyRound, MoonStar, Shuffle } from 'lucide-react';
 import { useStaffFormContext } from "../StaffFormContext";
+import { Choice, Row, Section, TextField, ToggleRow, decimal, digits } from '../parts';
+
+const EMPLOYMENT = [
+  { value: 'full-time', label: 'Full-time · salary + OT' },
+  { value: 'part-time', label: 'Part-time · by the hour' },
+];
+const PERIODS = [
+  { value: 'weekly', label: 'Weekly (Mon–Sun)' },
+  { value: 'monthly', label: 'Monthly (1st–end)' },
+];
+
+/** A random 4-digit kiosk PIN. */
+const newPin = () => String(crypto.getRandomValues(new Uint16Array(1))[0] % 10000).padStart(4, '0');
 
 export default function AttendanceTab() {
-  const { shiftsEnabled, form, errors, touched, activeTab, staffShift, staffShiftWindow, shiftIsOvernight, change, blur, inputClass } = useStaffFormContext();
+  const { shiftsEnabled, staffShift, staffShiftWindow, shiftIsOvernight, change } = useStaffFormContext();
+  const [showPin, setShowPin] = useState(false);
+  const makePin = () => {
+    change({ target: { name: 'pinCode', value: newPin() } });
+    setShowPin(true);
+  };
+
   return (
-    <>
-          {/* ─── ATTENDANCE ───────────────────────────────────────── */}
-          {activeTab === 'attendance' && (
-            <div className='space-y-6'>
-              <div className='flex items-center gap-2 mb-2 pb-2 border-b border-line'>
-                <Clock size={16} className='text-brand' />
-                <h3 className='text-xs font-extrabold uppercase tracking-wider text-muted'>
-                  Kiosk & Attendance
-                </h3>
-              </div>
+    <div className='space-y-8'>
+      <Section icon={KeyRound} title='Clocking in' description='They type this PIN at the attendance kiosk.'>
+        <Row>
+          <TextField
+            name='pinCode'
+            label='Kiosk PIN (4 digits)'
+            required
+            type={showPin ? 'text' : 'password'}
+            inputMode='numeric'
+            maxLength={4}
+            clean={digits}
+            placeholder='••••'
+            className='[&_input]:tracking-[0.5em] [&_input]:font-semibold'
+            suffix={
+              <span className='flex items-center'>
+                <button
+                  type='button'
+                  onClick={() => setShowPin(s => !s)}
+                  aria-label={showPin ? 'Hide PIN' : 'Show PIN'}
+                  className='rounded-lg p-2 text-muted hover:bg-surface-2 hover:text-fg'
+                >
+                  {showPin ? <EyeOff className='size-4' /> : <Eye className='size-4' />}
+                </button>
+                <button
+                  type='button'
+                  onClick={makePin}
+                  title='Make one up'
+                  aria-label='Make up a PIN'
+                  className='rounded-lg p-2 text-muted hover:bg-surface-2 hover:text-fg'
+                >
+                  <Shuffle className='size-4' />
+                </button>
+              </span>
+            }
+            hint='Tap the shuffle button to make one up.'
+          />
+        </Row>
+        <ToggleRow
+          name='fixedSalaryNoAttendance'
+          tone='warning'
+          title='Fixed monthly salary, no attendance'
+          description='For owners and salaried staff: payroll pays the basic salary as it is and skips them when bringing in hours.'
+        />
+      </Section>
 
-              <label className='flex items-start gap-3 p-3 bg-warning-soft/70 border border-amber-100 rounded-xl cursor-pointer'>
-                <input
-                  type='checkbox'
-                  name='fixedSalaryNoAttendance'
-                  checked={!!form.fixedSalaryNoAttendance}
-                  onChange={e => change({ target: { name: 'fixedSalaryNoAttendance', value: e.target.checked } })}
-                  className='w-5 h-5 mt-0.5 accent-amber-500'
-                />
-                <div className='flex flex-col'>
-                  <span className='text-sm font-bold text-warning'>Fixed monthly salary (no attendance)</span>
-                  <span className='text-[11px] text-warning/80'>
-                    For owners/salaried staff. Payroll pays the flat Basic Salary and skips this person when importing hours from attendance.
-                  </span>
-                </div>
-              </label>
+      <Section icon={Clock} title='Hours and overtime'>
+        <Choice name='employmentType' label='Works' options={EMPLOYMENT} />
+        <Choice name='attendancePeriod' label='Hours are added up' options={PERIODS} />
 
-              <div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-                <Field label='Kiosk PIN Code (4 Digits)' required error={errors.pinCode}>
-                  <input
-                    type='password'
-                    maxLength={4}
-                    name='pinCode'
-                    value={form.pinCode}
-                    onChange={e => {
-                      const val = e.target.value.replace(/\D/g, '')
-                      change({ target: { name: 'pinCode', value: val } })
-                    }}
-                    onBlur={blur}
-                    className={inputClass('pinCode')}
-                    placeholder='1234'
-                  />
-                </Field>
-              </div>
-
-              <div className='p-4 bg-surface-2/60 rounded-2xl border border-line'>
-                <h3 className='text-xs font-extrabold uppercase tracking-wider text-info mb-4'>
-                  Attendance Rules
-                </h3>
-
-                <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4'>
-                  <Field label='Employment Type'>
-                    <Select name='employmentType' value={form.employmentType} onChange={change} invalid={!!(errors.employmentType && touched.employmentType)} className='h-11'>
-                      <option value='full-time'>Full-time (Salary + OT)</option>
-                      <option value='part-time'>Part-time (Hourly Only)</option>
-                    </Select>
-                  </Field>
-
-                  <Field label='Attendance Period'>
-                    <Select name='attendancePeriod' value={form.attendancePeriod} onChange={change} invalid={!!(errors.attendancePeriod && touched.attendancePeriod)} className='h-11'>
-                      <option value='weekly'>Weekly (Mon-Sun)</option>
-                      <option value='monthly'>Monthly (1st-End)</option>
-                    </Select>
-                  </Field>
-                </div>
-
-                {shiftsEnabled && (
-                  <div className='mb-4 p-3 bg-surface border border-line rounded-xl'>
-                    <div className='flex items-center justify-between mb-3'>
-                      <h4 className='text-[11px] font-extrabold uppercase tracking-wider text-info'>
-                        Shift Times
-                      </h4>
-                      {staffShiftWindow && (
-                        <span className='inline-flex items-center gap-1.5 text-[11px] font-bold text-muted'>
-                          {staffShiftWindow.hours.toFixed(2)}h paid
-                          {shiftIsOvernight && (
-                            <span className='inline-flex items-center gap-1 text-info'>
-                              <MoonStar size={12} /> overnight
-                            </span>
-                          )}
-                        </span>
-                      )}
-                    </div>
-
-                    <div className='grid grid-cols-1 sm:grid-cols-3 gap-4'>
-                      <Field label='Shift Start'>
-                        <input
-                          type='time'
-                          name='shiftStart'
-                          value={form.shiftStart || ''}
-                          onChange={change}
-                          className={inputClass('shiftStart')}
-                        />
-                      </Field>
-                      <Field label='Shift End'>
-                        <input
-                          type='time'
-                          name='shiftEnd'
-                          value={form.shiftEnd || ''}
-                          onChange={change}
-                          className={inputClass('shiftEnd')}
-                        />
-                      </Field>
-                      <Field label='Unpaid Break (Min)'>
-                        <input
-                          type='number'
-                          name='shiftBreakMinutes'
-                          value={form.shiftBreakMinutes ?? ''}
-                          onChange={change}
-                          className={inputClass('shiftBreakMinutes')}
-                          placeholder='0'
-                        />
-                      </Field>
-                    </div>
-
-                    <p className='text-[10px] text-subtle mt-2'>
-                      {staffShift
-                        ? 'Lateness and OT are measured against these times. Arriving well before the start needs approval to count as OT.'
-                        : 'Leave blank for no fixed shift — OT then simply starts after the daily hours below. An end time earlier than the start means the shift crosses midnight.'}
-                    </p>
-                  </div>
-                )}
-
-                <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 items-end'>
-                  <Field label='Basic Hours Per Day'>
-                    <input
-                      type='number'
-                      name='basicHoursPerDay'
-                      value={form.basicHoursPerDay}
-                      onChange={change}
-                      disabled={!!staffShift}
-                      className={inputClass('basicHoursPerDay')}
-                      placeholder='8'
-                    />
-                    <p className='text-[10px] text-subtle mt-1'>
-                      {staffShift
-                        ? 'Overridden by the shift times above.'
-                        : 'Daily OT starts after this amount.'}
-                    </p>
-                  </Field>
-
-                  <div className='flex flex-col gap-3 p-3 bg-surface border border-line rounded-xl'>
-                    <label className='flex items-center gap-3 cursor-pointer'>
-                      <input
-                        type='checkbox'
-                        name='hasPaidBreak'
-                        checked={form.hasPaidBreak}
-                        onChange={e => change({ target: { name: 'hasPaidBreak', value: e.target.checked } })}
-                        className='w-5 h-5 accent-blue-600'
-                      />
-                      <div className='flex flex-col'>
-                        <span className='text-sm font-bold text-fg'>Eligible for Paid Break</span>
-                        <span className='text-[10px] text-muted'>Adds +1 hour per work day</span>
-                      </div>
-                    </label>
-
-                    {form.hasPaidBreak && (
-                      <div className='mt-2 pt-3 border-t border-line flex flex-col gap-3'>
-                        <label className='flex items-center gap-3 cursor-pointer group'>
-                          <input
-                            type='checkbox'
-                            name='requireFullShiftForBreak'
-                            checked={form.requireFullShiftForBreak}
-                            onChange={e => change({ target: { name: 'requireFullShiftForBreak', value: e.target.checked } })}
-                            className='w-4 h-4 accent-amber-500'
-                          />
-                          <div className='flex flex-col'>
-                            <span className='text-xs font-bold text-fg'>Require Full Shift</span>
-                            <span className='text-[10px] text-subtle'>Only get bonus if worked enough hours</span>
-                          </div>
-                        </label>
-
-                        {form.requireFullShiftForBreak && (
-                          <div className='flex items-center gap-2'>
-                            <span className='text-[11px] text-muted whitespace-nowrap'>Min. Hours:</span>
-                            <input
-                              type='number'
-                              name='fullShiftHours'
-                              value={form.fullShiftHours}
-                              onChange={change}
-                              className='w-16 h-8 px-2 text-xs font-bold border border-line rounded-lg outline-none focus:ring-1 focus:ring-warning'
-                              placeholder='7.5'
-                            />
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+        {shiftsEnabled && (
+          <div className='space-y-4 rounded-2xl border border-line p-4'>
+            <div className='flex items-center justify-between gap-2'>
+              <p className='text-sm font-semibold text-fg'>Shift</p>
+              {staffShiftWindow && (
+                <span className='inline-flex items-center gap-1.5 rounded-full bg-surface-2 px-2.5 py-1 text-xs font-medium text-muted'>
+                  {staffShiftWindow.hours.toFixed(2)} h paid
+                  {shiftIsOvernight && (
+                    <span className='inline-flex items-center gap-1 text-info'>
+                      <MoonStar className='size-3' aria-hidden='true' /> overnight
+                    </span>
+                  )}
+                </span>
+              )}
             </div>
-          )}
-    </>
+            <Row cols={3}>
+              <TextField name='shiftStart' label='Starts' type='time' />
+              <TextField name='shiftEnd' label='Ends' type='time' />
+              <TextField name='shiftBreakMinutes' label='Unpaid break' inputMode='numeric' clean={digits} placeholder='0' suffix={<span className='pr-2 text-sm text-subtle'>min</span>} />
+            </Row>
+            <p className='text-xs text-subtle'>
+              {staffShift
+                ? 'Lateness and OT are counted against these times. Coming in well before the start needs approval to count as OT.'
+                : 'Leave empty for no fixed shift — OT then starts after the daily hours below. An end earlier than the start means the shift crosses midnight.'}
+            </p>
+          </div>
+        )}
+
+        <Row>
+          <TextField
+            name='basicHoursPerDay'
+            label='Normal hours a day'
+            inputMode='decimal'
+            clean={decimal}
+            disabled={!!staffShift}
+            placeholder='8'
+            hint={staffShift ? 'Set by the shift times above.' : 'OT starts after this many hours.'}
+          />
+        </Row>
+
+        <ToggleRow name='hasPaidBreak' title='Paid break' description='Adds 1 paid hour for each day worked.'>
+          <ToggleRow name='requireFullShiftForBreak' title='Only after a full shift' description='The paid hour counts only on days they work long enough.'>
+            <Row>
+              <TextField name='fullShiftHours' label='At least' inputMode='decimal' clean={decimal} placeholder='7.5' suffix={<span className='pr-2 text-sm text-subtle'>hours</span>} />
+            </Row>
+          </ToggleRow>
+        </ToggleRow>
+      </Section>
+    </div>
   );
 }
