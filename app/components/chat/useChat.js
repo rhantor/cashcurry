@@ -169,3 +169,17 @@ export function useChatLabels(companyId, uid) {
   }, [companyId, uid]);
   return prefs;
 }
+
+/** The company's branches ({ id, name }), followed live — names for branch chats. */
+export function useBranchList(companyId) {
+  const [branches, setBranches] = useState([]);
+  useEffect(() => {
+    if (!companyId) return;
+    return onSnapshot(
+      collection(db, "companies", companyId, "branches"),
+      (s) => setBranches(s.docs.map((d) => ({ id: d.id, name: d.data().name || d.id }))),
+      () => setBranches([])
+    );
+  }, [companyId]);
+  return branches;
+}

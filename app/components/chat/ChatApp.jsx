@@ -74,13 +74,14 @@ function ChatRow({ chat, active, muted, labels = [], onOpen, me }) {
   );
 }
 
-export default function ChatApp({ user, branches = [], className }) {
+export default function ChatApp({ user, branches = [], allBranches, className }) {
   const router = useRouter();
   const params = useSearchParams();
   const { chats, ready } = useChats(user, branches);
   const people = useChatPeople(user?.companyId);
   const peopleById = useMemo(() => Object.fromEntries(people.map((p) => [p.uid, p])), [people]);
-  const branchNames = useMemo(() => Object.fromEntries(branches.map((b) => [b.id, b.name])), [branches]);
+  // names from every branch the company has, so a chat is never shown as just "Branch"
+  const branchNames = useMemo(() => Object.fromEntries((allBranches || branches).map((b) => [b.id, b.name])), [allBranches, branches]);
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState("all");
   const [sheet, setSheet] = useState(null); // "direct" | "group" | "manage"
@@ -200,7 +201,7 @@ export default function ChatApp({ user, branches = [], className }) {
       {sheet === "group" && <GroupSheet open onClose={() => setSheet(null)} user={user} people={people} onSaved={(id) => id && open(id)} />}
       {sheet === "manage" && active?.kind === "group" && <GroupSheet open onClose={() => setSheet(null)} user={user} people={people} chat={active} onSaved={(id) => open(id)} />}
       <LabelsSheet open={sheet === "labels"} onClose={() => setSheet(null)} user={user} chat={active} prefs={labelPrefs} />
-      {forwarding && <ForwardSheet msg={forwarding} onClose={() => setForwarding(null)} user={user} chats={titled} onSent={(id) => id && open(id)} />}
+      {forwarding && <ForwardSheet msg={forwarding} onClose={() => setForwarding(null)} user={user} chats={titled} people={people} onSent={(id) => id && open(id)} />}
     </div>
   );
 }

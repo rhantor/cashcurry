@@ -136,17 +136,25 @@ export function GroupSheet({ open, onClose, user, people, chat, onSaved }) {
 }
 
 /** Forward a message to one or more chats. chats: [{ id, title, kind }] */
-export function ForwardSheet({ msg, onClose, user, chats, onSent }) {
+export function ForwardSheet({ msg, onClose, user, chats, people = [], onSent }) {
   const [q, setQ] = useState("");
-  const [picked, setPicked] = useState([]);
+  const [picked, setPicked] = useState([]); // chat ids, or "person:<uid>" for someone with no chat yet
   const [busy, setBusy] = useState(false);
-  const list = chats.filter((c) => !q.trim() || c.title.toLowerCase().includes(q.trim().toLowerCase()));
+  // everyone in the company, not only those already chatted with
+  const targets = useMemo(() => {
+    const withChat = new Set(chats.filter((c) => c.kind === "direct").flatMap((c) => c.members || []));
+    const newPeople = people.filter((p) => p.uid !== user.uid && !withChat.has(p.uid)).map((p) => ({ id: `person:${p.uid}`, title: p.name, person: p, sub: roleLabel(p.role) }));
+    return [...chats, ...newPeople];
+  }, [chats, people, user.uid]);
+  const list = targets.filter((c) => !q.trim() || c.title.toLowerCase().includes(q.trim().toLowerCase()));
   const send = async () => {
     setBusy(true);
     try {
-      await forwardMessage(user.companyId, msg, picked, user);
-      toast.success(picked.length === 1 ? "Forwarded" : `Forwarded to ${picked.length} chats`);
-      onSent?.(picked.length === 1 ? picked[0] : null);
+      // a personal chat is started for anyone picked who has none yet
+      const ids = await Promise.all(picked.map((id) => (id.startsWith("person:") ? openDirect(user.companyId, user, targets.find((t) => t.id === id).person) : id)));
+      await forwardMessage(user.companyId, msg, ids, user);
+      toast.success(ids.length === 1 ? "Forwarded" : `Forwarded to ${ids.length} chats`);
+      onSent?.(ids.length === 1 ? ids[0] : null);
       onClose();
     } catch (e) {
       toast.error("Couldn't forward", { description: e?.message });
@@ -169,7 +177,7 @@ export function ForwardSheet({ msg, onClose, user, chats, onSent }) {
       <div className="space-y-2">
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-subtle" />
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search chats" className="pl-9" />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search chats and people" className="pl-9" />
         </div>
         <ul className="max-h-[50vh] divide-y divide-line overflow-y-auto rounded-xl border border-line">
           {list.map((c) => {
@@ -178,7 +186,10 @@ export function ForwardSheet({ msg, onClose, user, chats, onSent }) {
               <li key={c.id}>
                 <button type="button" onClick={() => setPicked((p) => (on ? p.filter((x) => x !== c.id) : [...p, c.id]))} className={cn("flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-surface-2", on && "bg-brand-soft/50")}>
                   <Avatar name={c.title} size="sm" />
-                  <span className="min-w-0 flex-1 truncate text-sm font-semibold text-fg">{c.title}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-semibold text-fg">{c.title}</span>
+                    {c.sub && <span className="text-xs text-muted">{c.sub}</span>}
+                  </span>
                   <span className={cn("flex size-5 items-center justify-center rounded-md border", on ? "border-brand bg-brand text-white" : "border-line")}>{on && <Check className="size-3.5" />}</span>
                 </button>
               </li>
