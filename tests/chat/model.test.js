@@ -73,3 +73,52 @@ describe("who is pushed a new message", () => {
     expect(chatTitle({ kind: "direct", members: ["ali", "kumar"] }, "ali", { kumar: { name: "Kumar Raj" } })).toBe("Kumar Raj");
   });
 });
+
+import { REACTIONS, canForward, reactionSummary } from "@/lib/chat/model";
+describe("reactions and forwarding", () => {
+  it("one reaction each, counted in the usual order, mine marked", () => {
+    expect(reactionSummary({ a: "😂", b: "👍", c: "👍" }, "c")).toEqual([
+      { emoji: "👍", count: 2, mine: true, who: ["b", "c"] },
+      { emoji: "😂", count: 1, mine: false, who: ["a"] },
+    ]);
+    expect(REACTIONS).toHaveLength(6);
+  });
+  it("a deleted or empty message isn't forwarded", () => {
+    expect(canForward({ text: "hi" })).toBe(true);
+    expect(canForward({ files: [{ name: "a.pdf" }] })).toBe(true);
+    expect(canForward({ text: "hi", deleted: true })).toBe(false);
+    expect(canForward({ text: " " })).toBe(false);
+  });
+});
+
+import { STICKER_PACK, isStickerFile, labelsOf, removeLabel, toggleLabel } from "@/lib/chat/model";
+describe("stickers and labels", () => {
+  it("the Cash Curry pack ships with the app; company stickers are images up to 1 MB", () => {
+    expect(STICKER_PACK.length).toBe(12);
+    expect(STICKER_PACK[0]).toMatchObject({ id: "thanks", url: "/stickers/thanks.svg", pack: "cashcurry" });
+    expect(isStickerFile({ type: "image/png", size: 1024 * 1024 })).toBe(true);
+    expect(isStickerFile({ type: "image/png", size: 1024 * 1024 + 1 })).toBe(false);
+    expect(isStickerFile({ type: "application/pdf", size: 10 })).toBe(false);
+    expect(previewOf({ sticker: { id: "ok" } })).toBe("Sticker");
+  });
+  it("labels: one per chat — picking another replaces it, picking it again takes it off; deleted everywhere", () => {
+    const prefs = { labels: [{ id: "a", name: "Urgent" }, { id: "b", name: "Supplier" }], chats: {} };
+    const one = { ...prefs, chats: toggleLabel(prefs, "c1", "b") };
+    expect(one.chats).toEqual({ c1: ["b"] });
+    expect(toggleLabel(one, "c1", "a")).toEqual({ c1: ["a"] }); // replaces
+    expect(toggleLabel(one, "c1", "b")).toEqual({}); // off again
+    // older data with several: only the first counts
+    expect(labelsOf("c1", { ...prefs, chats: { c1: ["b", "a"] } }).map((l) => l.name)).toEqual(["Supplier"]);
+    expect(removeLabel({ ...prefs, chats: { c1: ["a"], c2: ["b"] } }, "a")).toEqual({ labels: [{ id: "b", name: "Supplier" }], chats: { c2: ["b"] } });
+  });
+});
+
+import { canRemoveForEveryone } from "@/lib/chat/model";
+describe("removing for everyone", () => {
+  it("management, in group chats only — never personal chats", () => {
+    expect(canRemoveForEveryone("manager", { kind: "group" })).toBe(true);
+    expect(canRemoveForEveryone("owner", { kind: "branch" })).toBe(true);
+    expect(canRemoveForEveryone("owner", { kind: "direct" })).toBe(false);
+    expect(canRemoveForEveryone("cashier", { kind: "group" })).toBe(false);
+  });
+});

@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Building2, LogOut, Search } from "lucide-react";
+import { Building2, LogOut, MessagesSquare, Search } from "lucide-react";
 import { Avatar, LogoMark, Menu, cn } from "@/app/components/ui";
 import BranchSwitcher from "./BranchSwitcher";
 
@@ -11,7 +11,7 @@ import NotificationBell from "@/app/components/notifications/NotificationBell";
  * The bar above every page: where you are, search (Ctrl+K), the branch, and you.
  * On phones it keeps to the essentials; the rest lives in the bottom bar.
  */
-export default function TopBar({ page, user, isCompany, branches, activeBranchId, branchName, onSwitchBranch, onSearch, onSignOut }) {
+export default function TopBar({ page, user, isCompany, branches, activeBranchId, branchName, onSwitchBranch, onSearch, onSignOut, chatUnread = 0 }) {
   const crumb = page?.parent || page?.section;
   // Phones have no room for the branch box, so the branch sits under the
   // title — except on company-wide pages, which show every branch.
@@ -81,6 +81,19 @@ export default function TopBar({ page, user, isCompany, branches, activeBranchId
           )
         )}
 
+        {/* chat lives in its own workspace (4.4) */}
+        <Link
+          href="/messages"
+          aria-label={chatUnread ? `Chat, ${chatUnread} unread` : "Chat"}
+          className="relative inline-flex size-9 items-center justify-center rounded-xl text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+        >
+          <MessagesSquare className="size-[18px]" />
+          {chatUnread > 0 && (
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold leading-none text-white tabular-nums">
+              {chatUnread > 99 ? "99+" : chatUnread}
+            </span>
+          )}
+        </Link>
         <NotificationBell />
 
         <Menu

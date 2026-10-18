@@ -26,7 +26,7 @@ export default function StaffLayout({ children }) {
   const navItems = [
     { label: "Home", href: "/staff-portal", icon: Home },
     { label: "Requests", href: "/requests", icon: FileText },
-    { label: "Chat", href: "/chat", icon: MessageCircle },
+    { label: "Chat", href: "/messages", icon: MessageCircle },
     { label: "Profile", href: "/profile", icon: User },
   ];
 
@@ -51,7 +51,7 @@ export default function StaffLayout({ children }) {
                >
                  <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
                  <span className="flex-1">{item.label}</span>
-                 {item.href === "/chat" && unread > 0 && <span className="rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white">{unread}</span>}
+                 {item.href === "/messages" && unread > 0 && <span className="rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white">{unread}</span>}
                </Link>
              )
           })}
@@ -99,7 +99,7 @@ export default function StaffLayout({ children }) {
               <Icon size={22} strokeWidth={isActive ? 2.5 : 2} className={isActive ? "drop-shadow-sm" : ""} />
               <span className="relative text-[10px] mt-1 font-semibold">
                 {item.label}
-                {item.href === "/chat" && unread > 0 && <span className="absolute -right-2 -top-5 size-2.5 rounded-full bg-red-500" />}
+                {item.href === "/messages" && unread > 0 && <span className="absolute -right-2 -top-5 size-2.5 rounded-full bg-red-500" />}
               </span>
             </Link>
           );

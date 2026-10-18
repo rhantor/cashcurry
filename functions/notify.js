@@ -183,19 +183,34 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
     if (!chatSnap.exists) return;
     const chat = chatSnap.data();
     const all = await people(companyId);
-    const uids = N.chatAudience(chat, all, m.byUid);
+    const muted = await prefs(companyId, N.chatAudience(chat, all, m.byUid));
+    // not those who muted this chat (or chat altogether)
+    const uids = Object.keys(muted).filter((u) => !(muted[u].mutedChats || []).includes(chatId) && !(muted[u].muted || []).includes("chat"));
+    if (!uids.length) return;
     const preview = N.previewOf(m);
-    const staffUids = new Set(all.filter((p) => p.role === "staff").map((p) => p.uid));
     const branchNames = chat.kind === "branch" ? { [chat.branchId]: (await db.doc(`companies/${companyId}/branches/${chat.branchId}`).get()).data()?.name } : {};
-    const title = (uid) => (chat.kind === "direct" ? m.byName || "New message" : `${m.byName || "Someone"} · ${N.chatTitle(chat, uid, {}, branchNames)}`);
-    const muted = (u, pref) => (pref.mutedChats || []).includes(chatId);
-    // staff open the staff portal's chat; everyone else the office one
-    for (const group of [uids.filter((u) => staffUids.has(u)), uids.filter((u) => !staffUids.has(u))]) {
-      if (!group.length) continue;
-      const link = `${staffUids.has(group[0]) ? "/chat" : "/branch-chat"}?c=${chatId}`;
-      // one title for direct chats; group/branch titles don't depend on the reader
-      await deliver({ companyId, branchId: chat.branchId || null, uids: group, type: "chat", message: { title: title(group[0]), body: preview }, link, ref: `chats/${chatId}`, inbox: false, tag: `chat-${chatId}`, muted });
-    }
+    const name = chat.kind === "direct" ? m.byName || "New message" : N.chatTitle(chat, null, {}, branchNames);
+    const link = `/messages?c=${chatId}`;
+
+    // The bell: one line per chat, counting what's new since the person last
+    // opened it (opening the chat marks it read — lib/chat/client.js markRead).
+    const refs = uids.map((u) => db.doc(`companies/${companyId}/users/${u}/inbox/chat_${chatId}`));
+    const before = await db.getAll(...refs);
+    const batch = db.batch();
+    before.forEach((snap, i) => {
+      const prev = snap.exists ? snap.data() : null;
+      const count = prev && !prev.readAt ? (prev.count || 1) + 1 : 1;
+      const line = chat.kind === "direct" ? preview : `${m.byName || "Someone"}: ${preview}`;
+      batch.set(refs[i], {
+        type: "chat", title: name, body: count > 1 ? `${count} new messages · ${line}` : line, count,
+        link, branchId: chat.branchId || null, ref: `chats/${chatId}`, createdAt: FieldValue.serverTimestamp(), readAt: null,
+      });
+    });
+    await batch.commit();
+
+    // the push: one per message, replacing the last one from this chat on the device
+    const title = chat.kind === "direct" ? name : `${m.byName || "Someone"} · ${name}`;
+    await deliver({ companyId, branchId: chat.branchId || null, uids, type: "chat", message: { title, body: preview }, link, ref: `chats/${chatId}`, inbox: false, tag: `chat-${chatId}` });
   }
 
   /** users/{uid} changed: keep the chat directory (names and roles only) in step. */

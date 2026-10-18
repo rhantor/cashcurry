@@ -477,10 +477,23 @@ service cloud.firestore {
             request.resource.data.byUid == request.auth.uid &&
             request.resource.data.createdAt == request.time &&
             request.resource.data.get('deleted', false) == false;
-          allow update: if isAuth() && resource.data.byUid == request.auth.uid &&
-            resource.data.get('deleted', false) == false &&
-            request.time < resource.data.createdAt + duration.value(15, 'm') &&
-            changedKeys().hasOnly(['text', 'files', 'editedAt', 'deleted']);
+          allow update: if isAuth() && (
+            (resource.data.byUid == request.auth.uid &&
+              resource.data.get('deleted', false) == false &&
+              request.time < resource.data.createdAt + duration.value(15, 'm') &&
+              changedKeys().hasOnly(['text', 'files', 'editedAt', 'deleted'])) ||
+            // management removes any message for everyone in the company, branch and
+            // group chats (never personal ones) — shown as "Removed by …"
+            (canChatGroups(companyId) && canSeeChatId(companyId, chatId) &&
+              get(/databases/$(database)/documents/companies/$(companyId)/chats/$(chatId)).data.kind != 'direct' &&
+              resource.data.get('deleted', false) == false &&
+              request.resource.data.deleted == true &&
+              request.resource.data.removedBy.uid == request.auth.uid &&
+              changedKeys().hasOnly(['text', 'files', 'editedAt', 'deleted', 'removedBy'])) ||
+            // anyone in the chat reacts — changing only their own reaction
+            (canSeeChatId(companyId, chatId) && changedKeys().hasOnly(['reactions']) &&
+              request.resource.data.reactions.diff(resource.data.get('reactions', {})).affectedKeys().hasOnly([request.auth.uid]))
+          );
         }
 
         // when each person last looked
@@ -488,6 +501,13 @@ service cloud.firestore {
           allow read: if isAuth() && canSeeChatId(companyId, chatId);
           allow write: if isAuth() && request.auth.uid == uid && canSeeChatId(companyId, chatId);
         }
+      }
+
+      // The company's own chat stickers (4.4): everyone uses them; management adds and removes them.
+      match /stickers/{stickerId} {
+        allow read: if belongsToCompany(companyId);
+        allow create: if canChatGroups(companyId) && request.resource.data.createdBy == request.auth.uid;
+        allow delete: if canChatGroups(companyId);
       }
 
       // Who can be messaged: names and roles only, kept by the server from users/{uid}.

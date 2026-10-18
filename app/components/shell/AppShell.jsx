@@ -48,7 +48,7 @@ export default function AppShell({ onSignOut, children }) {
   // …and chats with something new (4.4)
   const chatBranches = useMemo(() => (isCompany ? branches : myBranch && branchId ? [{ id: branchId, name: myBranch.name }] : []), [isCompany, branches, myBranch, branchId]);
   const chat = useChats(user, chatBranches);
-  const badges = useMemo(() => ({ "/requested-panel": pending.total, "/branch-chat": chat.unread }), [pending.total, chat.unread]);
+  const badges = useMemo(() => ({ "/requested-panel": pending.total }), [pending.total]);
   const { data: company } = useGetCompanyDetailsQuery(companyId ?? skipToken);
 
   // Owners/GMs with no branch chosen yet start in their default branch (or the first).
@@ -127,6 +127,7 @@ export default function AppShell({ onSignOut, children }) {
           onSwitchBranch={switchBranch}
           onSearch={() => setSearching(true)}
           onSignOut={onSignOut}
+          chatUnread={chat.unread}
         />
         {/* Keyed by branch: switching branch opens the page fresh for it. */}
         <main key={branchId || "none"} className="pb-24 lg:pb-0">

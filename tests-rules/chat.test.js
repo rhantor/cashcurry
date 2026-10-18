@@ -106,6 +106,24 @@ describe("messages", () => {
     expect(await ok(db("kumar").doc(`${C}/dm_ali_kumar`).update({ lastMessage: { text: "hi" }, updatedAt: serverTimestamp() }))).toBe(true);
     expect(await ok(db("kumar").doc(`${C}/dm_ali_kumar`).update({ members: ["kumar", "rahim"] }))).toBe(false);
   });
+  it("management removes anyone's message in group chats — not in personal chats; others can't", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const d = ctx.firestore();
+      await d.doc(`${C}/g1/messages/a1`).set({ ...msg("ali"), createdAt: Timestamp.fromMillis(Date.now() - 3 * 3600 * 1000) });
+      await d.doc(`${C}/dm_ali_kumar/messages/a2`).set({ ...msg("ali"), createdAt: Timestamp.now() });
+    });
+    const remove = (uid) => ({ deleted: true, text: "", files: [], editedAt: serverTimestamp(), removedBy: { uid, name: uid } });
+    expect(await ok(db("klManager").doc(`${C}/g1/messages/a1`).update(remove("klManager")))).toBe(true); // hours later: fine
+    expect(await ok(db("owner").doc(`${C}/dm_ali_kumar/messages/a2`).update(remove("owner")))).toBe(false); // personal: no
+    expect(await ok(db("kumar").doc(`${C}/dm_ali_kumar/messages/a2`).update(remove("kumar")))).toBe(false); // not management
+  });
+  it("anyone in the chat reacts — only with their own reaction, and only that changes", async () => {
+    const m = `${C}/dm_ali_kumar/messages/old`; // reacting has no 15-minute limit
+    expect(await ok(db("kumar").doc(m).update({ "reactions.kumar": "👍" }))).toBe(true);
+    expect(await ok(db("kumar").doc(m).update({ "reactions.ali": "😂" }))).toBe(false);
+    expect(await ok(db("kumar").doc(m).update({ "reactions.kumar": "❤️", text: "changed" }))).toBe(false);
+    expect(await ok(db("rahim").doc(m).update({ "reactions.rahim": "👍" }))).toBe(false);
+  });
   it("seen is each person's own", async () => {
     expect(await ok(db("kumar").doc(`${C}/dm_ali_kumar/reads/kumar`).set({ at: serverTimestamp() }))).toBe(true);
     expect(await ok(db("kumar").doc(`${C}/dm_ali_kumar/reads/ali`).set({ at: serverTimestamp() }))).toBe(false);
@@ -124,5 +142,27 @@ describe("chat files", () => {
   });
   it("up to 32 MB a file", async () => {
     expect(await ok(put("ali", `chat/${CO}/company/ali/big.pdf`, 32 * 1024 * 1024 + 1))).toBe(false);
+  });
+});
+
+describe("stickers and labels", () => {
+  it("management adds company stickers; everyone in the company sees them", async () => {
+    expect(await ok(db("klManager").collection(`companies/${CO}/stickers`).add({ name: "Logo", url: "x", createdBy: "klManager" }))).toBe(true);
+    expect(await ok(db("klCashier").collection(`companies/${CO}/stickers`).add({ name: "Mine", url: "x", createdBy: "klCashier" }))).toBe(false);
+    expect(await ok(db("ali").collection(`companies/${CO}/stickers`).get())).toBe(true);
+    expect(await ok(db("stranger").collection(`companies/${CO}/stickers`).get())).toBe(false);
+  });
+  it("sticker images: management uploads an image up to 1 MB; the company opens them", async () => {
+    const put = (uid, name, bytes, type = "image/png") => files(uid).ref(`stickers/${CO}/${name}`).put(new Uint8Array(bytes), { contentType: type });
+    expect(await ok(put("klManager", "logo.png", 100))).toBe(true);
+    expect(await ok(put("klManager", "big.png", 1024 * 1024 + 1))).toBe(false);
+    expect(await ok(put("klManager", "doc.pdf", 100, "application/pdf"))).toBe(false);
+    expect(await ok(put("ali", "mine.png", 100))).toBe(false);
+    expect(await ok(files("ali").ref(`stickers/${CO}/logo.png`).getDownloadURL())).toBe(true);
+  });
+  it("labels are each person's own", async () => {
+    const mine = `companies/${CO}/users/ali/prefs/chatLabels`;
+    expect(await ok(db("ali").doc(mine).set({ labels: [{ id: "a", name: "Urgent" }], chats: {} }))).toBe(true);
+    expect(await ok(db("kumar").doc(mine).get())).toBe(false);
   });
 });

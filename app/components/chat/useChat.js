@@ -7,7 +7,7 @@ import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, where } fr
 import { db } from "@/lib/firebase";
 import { isCompanyRole } from "@/lib/authz/permissions";
 import { COMPANY_CHAT, PAGE_SIZE, branchChatId, isUnread, timeOf } from "@/lib/chat/model";
-import { chatDoc, chatsCol, ensureChat, messagesCol, readsCol } from "@/lib/chat/client";
+import { chatDoc, chatsCol, ensureChat, labelsDoc, messagesCol, readsCol, stickersCol } from "@/lib/chat/client";
 
 /** Everyone in the company who can be messaged: [{ uid, name, role, branchId }]. */
 export function useChatPeople(companyId) {
@@ -85,7 +85,8 @@ export function useChats(user, branches = []) {
     const stops = idsKey.split(",").map((id) =>
       onSnapshot(
         doc(readsCol(companyId, id), uid),
-        (s) => setReads((r) => ({ ...r, [id]: s.exists() ? s.data() : null })),
+        // "estimate": a read mark just written counts at once (not as "never" until the server answers)
+        (s) => setReads((r) => ({ ...r, [id]: s.exists() ? s.data({ serverTimestamps: "estimate" }) : null })),
         () => {}
       )
     );
@@ -95,7 +96,8 @@ export function useChats(user, branches = []) {
   const list = useMemo(
     () =>
       chats
-        .map((c) => ({ ...c, unread: isUnread(c, reads[c.id], uid) }))
+        // unread only once we know when this person last looked — not while that is still loading
+        .map((c) => ({ ...c, unread: c.id in reads && isUnread(c, reads[c.id], uid) }))
         .sort((a, b) => timeOf(b.lastMessage?.at || b.updatedAt) - timeOf(a.lastMessage?.at || a.updatedAt)),
     [chats, reads, uid]
   );
@@ -114,9 +116,9 @@ export function useMessages(companyId, chatId) {
     setLoading(true);
     return onSnapshot(
       query(messagesCol(companyId, chatId), orderBy("createdAt", "desc"), limit(count)),
-      { includeMetadataChanges: false },
+      { includeMetadataChanges: true }, // so "sending…" turns into ✓ when the server has it
       (s) => {
-        setMessages(s.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) })).reverse());
+        setMessages(s.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }), pending: d.metadata.hasPendingWrites })).reverse());
         setHasMore(s.size >= count);
         setLoading(false);
       },
@@ -138,4 +140,46 @@ export function useReads(companyId, chatId) {
     );
   }, [companyId, chatId]);
   return reads;
+}
+
+/** The company's own stickers, newest last. */
+export function useCompanyStickers(companyId) {
+  const [stickers, setStickers] = useState([]);
+  useEffect(() => {
+    if (!companyId) return;
+    return onSnapshot(
+      query(stickersCol(companyId), orderBy("createdAt")),
+      (s) => setStickers(s.docs.map((d) => ({ id: d.id, ...d.data(), pack: "company" }))),
+      () => setStickers([])
+    );
+  }, [companyId]);
+  return stickers;
+}
+
+/** This person's chat labels: { labels: [{ id, name, color }], chats: { chatId: [ids] } }. */
+export function useChatLabels(companyId, uid) {
+  const [prefs, setPrefs] = useState({ labels: [], chats: {} });
+  useEffect(() => {
+    if (!companyId || !uid) return;
+    return onSnapshot(
+      labelsDoc(companyId, uid),
+      (s) => setPrefs(s.exists() ? { labels: s.data().labels || [], chats: s.data().chats || {} } : { labels: [], chats: {} }),
+      () => {}
+    );
+  }, [companyId, uid]);
+  return prefs;
+}
+
+/** The company's branches ({ id, name }), followed live — names for branch chats. */
+export function useBranchList(companyId) {
+  const [branches, setBranches] = useState([]);
+  useEffect(() => {
+    if (!companyId) return;
+    return onSnapshot(
+      collection(db, "companies", companyId, "branches"),
+      (s) => setBranches(s.docs.map((d) => ({ id: d.id, name: d.data().name || d.id }))),
+      () => setBranches([])
+    );
+  }, [companyId]);
+  return branches;
 }
