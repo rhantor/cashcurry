@@ -23,7 +23,8 @@
     "requests:leaves": "node scripts/leave-split.mjs",
     "chat:people": "node scripts/chat-people.mjs",
     "chat:migrate": "node scripts/chat-migrate.mjs",
-    "staff:logins": "node scripts/staff-logins.mjs"
+    "staff:logins": "node scripts/staff-logins.mjs",
+    "payslips:copy": "node scripts/payslip-copies.mjs"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.8.2",

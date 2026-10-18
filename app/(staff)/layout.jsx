@@ -1,107 +1,128 @@
 "use client";
-import { signOut } from "@/lib/session";
-import React from "react";
+// The staff app's frame (roadmap 4.6): a bottom bar on phones (the Android
+// app and the iPhone home-screen app), a side bar on wider screens. Same
+// colours and parts as the office app.
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, MessageCircle, FileText, LogOut, TriangleAlert, User } from "lucide-react";
+import { motion } from "framer-motion";
+import { Home, MessageCircle, FileText, TriangleAlert, User, Wallet, LogOut } from "lucide-react";
 import NotificationBell from "@/app/components/notifications/NotificationBell";
 import useSession from "@/app/hooks/useSession";
 import { useChats } from "@/app/components/chat/useChat";
+import { Avatar, LogoMark, cn } from "@/app/components/ui";
+import { signOut } from "@/lib/session";
+import { useMyStaff } from "./useStaffApp";
+
+const NAV = [
+  { label: "Home", href: "/staff-portal", icon: Home },
+  { label: "Pay", href: "/my-pay", icon: Wallet },
+  { label: "Requests", href: "/requests", icon: FileText },
+  { label: "Chat", href: "/messages", icon: MessageCircle },
+  { label: "Issues", href: "/my-issues", icon: TriangleAlert, wide: true }, // phones: from Home
+  { label: "Me", href: "/profile", icon: User },
+];
+
+const TITLES = { "/staff-portal": "Home", "/my-pay": "My pay", "/requests": "Requests", "/my-issues": "Issues", "/profile": "Me" };
 
 export default function StaffLayout({ children }) {
   const pathname = usePathname();
   const { user } = useSession();
+  const { staff } = useMyStaff(user);
   // chats with something new (4.4)
   const { unread } = useChats(user, user?.branchId ? [{ id: user.branchId }] : []);
+  const name = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.username || "";
 
   const handleLogout = async () => {
     try {
-      await signOut(); // session: Firebase sign-out, cached profile and cookies
+      await signOut(); // Firebase sign-out, cached profile and cookies
     } catch (e) {
       console.error(e);
     }
     window.location.href = "/login";
   };
 
-  const navItems = [
-    { label: "Home", href: "/staff-portal", icon: Home },
-    { label: "Requests", href: "/requests", icon: FileText },
-    { label: "Chat", href: "/messages", icon: MessageCircle },
-    { label: "Issues", href: "/my-issues", icon: TriangleAlert },
-    { label: "Profile", href: "/profile", icon: User },
-  ];
+  const badge = (href) => href === "/messages" && unread > 0;
 
   return (
-    <div className="flex h-screen bg-gray-50 font-sans overflow-hidden">
-      
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:flex flex-col w-64 border-r border-gray-200 bg-white">
-        <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-           <div className="font-extrabold text-2xl text-blue-600 tracking-tight">Staff Portal</div>
-           <NotificationBell />
+    <div className="flex h-[100dvh] overflow-hidden bg-bg text-fg">
+      {/* Side bar (wider screens) */}
+      <aside className="hidden w-64 shrink-0 flex-col border-r border-line bg-surface md:flex">
+        <div className="flex items-center justify-between gap-2 px-5 py-5">
+          <div className="flex items-center gap-2.5">
+            <LogoMark size={32} />
+            <div className="leading-tight">
+              <p className="text-sm font-semibold">Cash Curry</p>
+              <p className="text-xs text-muted">Staff</p>
+            </div>
+          </div>
+          <NotificationBell />
         </div>
-        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1">
-          {navItems.map(item => {
-             const isActive = pathname === item.href;
-             const Icon = item.icon;
-             return (
-               <Link 
-                 key={item.href} 
-                 href={item.href} 
-                 className={`flex items-center gap-3 px-3 py-3 rounded-xl transition ${isActive ? "bg-blue-50 text-blue-600 font-semibold" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"}`}
-               >
-                 <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
-                 <span className="flex-1">{item.label}</span>
-                 {item.href === "/messages" && unread > 0 && <span className="rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white">{unread}</span>}
-               </Link>
-             )
+        <nav className="flex-1 space-y-1 overflow-y-auto px-3">
+          {NAV.map(({ label, href, icon: Icon }) => {
+            const active = pathname === href;
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={cn(
+                  "relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors",
+                  active ? "text-brand" : "text-muted hover:bg-surface-2 hover:text-fg"
+                )}
+              >
+                {active && <motion.span layoutId="staff-nav" className="absolute inset-0 rounded-xl bg-brand-soft" transition={{ type: "spring", stiffness: 520, damping: 34 }} />}
+                <Icon className="relative size-5" strokeWidth={active ? 2.4 : 2} />
+                <span className="relative flex-1">{label}</span>
+                {badge(href) && <span className="relative rounded-full bg-danger px-1.5 text-[11px] font-bold text-white">{unread}</span>}
+              </Link>
+            );
           })}
         </nav>
-        <div className="p-4 border-t border-gray-100">
-           <button onClick={handleLogout} className="flex items-center gap-3 px-3 py-3 w-full rounded-xl text-gray-500 font-medium hover:text-red-600 hover:bg-red-50 transition">
-             <LogOut size={20}/> <span>Log out</span>
-           </button>
+        <div className="border-t border-line p-3">
+          <Link href="/profile" className="flex items-center gap-3 rounded-xl px-2 py-2 hover:bg-surface-2">
+            <Avatar name={name} src={staff?.photoUrl} size="md" />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold">{name}</span>
+              <span className="block truncate text-xs text-muted">{staff?.department || staff?.role || "Staff"}</span>
+            </span>
+          </Link>
+          <button onClick={handleLogout} className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted transition hover:bg-danger/10 hover:text-danger">
+            <LogOut className="size-5" /> Sign out
+          </button>
         </div>
       </aside>
 
-      {/* Main Column */}
-      <div className="flex-1 flex flex-col min-h-0 bg-gray-50">
-        
-        {/* Mobile Header (Hidden on Desktop) */}
-        <header className="md:hidden bg-white border-b border-gray-200 px-4 py-3 flex justify-between items-center shadow-sm shrink-0 z-40">
-          <div className="font-bold text-xl text-blue-600 tracking-tight">Work Media</div>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        {/* Top bar (phones) */}
+        <header className="z-40 flex shrink-0 items-center justify-between border-b border-line bg-surface/90 px-4 pb-2.5 pt-[max(0.625rem,env(safe-area-inset-top))] backdrop-blur md:hidden">
+          <div className="flex items-center gap-2">
+            <LogoMark size={28} />
+            <span className="text-base font-semibold">{TITLES[pathname] || "Cash Curry"}</span>
+          </div>
           <div className="flex items-center gap-1">
             <NotificationBell />
-            <button onClick={handleLogout} className="p-2 text-gray-500 hover:text-red-500 rounded-full hover:bg-red-50 transition" title="Logout">
-              <LogOut size={20} />
-            </button>
+            <Link href="/profile" aria-label="Me">
+              <Avatar name={name} src={staff?.photoUrl} size="sm" />
+            </Link>
           </div>
         </header>
 
-        {/* Scrollable Content */}
-        <main className="flex-1 overflow-y-auto relative w-full scroll-smooth">
-          <div className="max-w-lg mx-auto md:max-w-3xl w-full pt-0 md:pt-8 md:px-8 pb-24 md:pb-8">
-            {children}
-          </div>
+        <main className="relative min-h-0 w-full flex-1 overflow-y-auto">
+          <div className="mx-auto w-full max-w-2xl pb-28 md:max-w-3xl md:px-6 md:pb-10 md:pt-6">{children}</div>
         </main>
       </div>
 
-      {/* Mobile Bottom Nav */}
-      <nav className="fixed bottom-0 w-full bg-white border-t border-gray-200 flex justify-around items-center pb-safe z-50 md:hidden shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href;
-          const Icon = item.icon;
+      {/* Bottom bar (phones) */}
+      <nav className="fixed inset-x-0 bottom-0 z-50 flex border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
+        {NAV.filter((n) => !n.wide).map(({ label, href, icon: Icon }) => {
+          const active = pathname === href;
           return (
-            <Link 
-              key={item.href} 
-              href={item.href}
-              className={`flex flex-col items-center py-3 px-4 w-full transition-all duration-200 ${isActive ? "text-blue-600 translate-y-[-2px]" : "text-gray-400 hover:text-gray-900"}`}
-            >
-              <Icon size={22} strokeWidth={isActive ? 2.5 : 2} className={isActive ? "drop-shadow-sm" : ""} />
-              <span className="relative text-[10px] mt-1 font-semibold">
-                {item.label}
-                {item.href === "/messages" && unread > 0 && <span className="absolute -right-2 -top-5 size-2.5 rounded-full bg-red-500" />}
+            <Link key={href} href={href} className={cn("relative flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium", active ? "text-brand" : "text-muted")}>
+              <span className="relative flex h-8 w-14 items-center justify-center">
+                {active && <motion.span layoutId="staff-tab" className="absolute inset-0 rounded-full bg-brand-soft" transition={{ type: "spring", stiffness: 520, damping: 34 }} />}
+                <Icon className="relative size-5" strokeWidth={active ? 2.4 : 2} />
+                {badge(href) && <span className="absolute right-2.5 top-0.5 size-2.5 rounded-full bg-danger ring-2 ring-surface" />}
               </span>
+              {label}
             </Link>
           );
         })}

@@ -689,6 +689,11 @@ service cloud.firestore {
           allow read: if canStaffView(companyId, branchId) ||
             (isBranchMember(companyId, branchId) && resource.data.get('uid', '') == request.auth.uid);
           allow write: if canStaffManage(companyId, branchId);
+          // The person themselves, from the staff app's settings (docs/STAFF_APP.md):
+          // their contact number and photo only — never name, job, pay or PINs.
+          allow update: if isBranchMember(companyId, branchId) &&
+            resource.data.get('uid', '') == request.auth.uid &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['phone', 'photoUrl', 'updatedAt']);
         }
 
         // Pay, IC, bank and personal details, apart from the staff record
@@ -697,6 +702,20 @@ service cloud.firestore {
           allow read: if canStaffPay(companyId, branchId) ||
             (isBranchMember(companyId, branchId) && userData().get('staffId', '') == staffId);
           allow write: if canStaffManage(companyId, branchId);
+          // The person themselves: their emergency contact only.
+          allow create: if isBranchMember(companyId, branchId) && userData().get('staffId', '') == staffId &&
+            request.resource.data.keys().hasOnly(['emergencyContactName', 'emergencyContactPhone', 'updatedAt']);
+          allow update: if isBranchMember(companyId, branchId) && userData().get('staffId', '') == staffId &&
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['emergencyContactName', 'emergencyContactPhone', 'updatedAt']);
+
+          // Each person's own copy of their payslips (lib/payroll/payslipCopy.js),
+          // written when payroll is finalized or paid, removed when reverted —
+          // so staff see their slips without seeing the run's totals.
+          match /payslips/{runId} {
+            allow read: if canPayrollView(companyId, branchId) ||
+              (isBranchMember(companyId, branchId) && userData().get('staffId', '') == staffId);
+            allow write: if canPayrollManage(companyId, branchId);
+          }
         }
 
         // ── Salaries ─────────────────────────────────────────────────────────
