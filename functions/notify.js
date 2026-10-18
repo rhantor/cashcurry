@@ -44,33 +44,37 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
 
   // ── sending ────────────────────────────────────────────────────────────────
   /** One message to some people: their inbox, then a push to their devices. */
-  async function deliver({ companyId, branchId, uids, type, message, link, ref }) {
+  // inbox: false for chat — messages are seen in the chat, not the bell.
+  // muted(uid, prefs) can drop more people (e.g. a chat they muted).
+  async function deliver({ companyId, branchId, uids, type, message, link, ref, inbox = true, tag, muted: mutedToo }) {
     const to = [...new Set(uids)].filter(Boolean);
     if (!to.length || !message) return 0;
     const muted = await prefs(companyId, to);
-    const list = N.withoutMuted(to, type, muted);
+    const list = N.withoutMuted(to, type, muted).filter((u) => !mutedToo?.(u, muted[u] || {}));
     if (!list.length) return 0;
 
-    const batch = db.batch();
-    for (const uid of list) {
-      batch.set(db.collection(`companies/${companyId}/users/${uid}/inbox`).doc(), {
-        type, title: message.title, body: message.body, link: link || "/", branchId: branchId || null,
-        ref: ref || null, createdAt: FieldValue.serverTimestamp(), readAt: null,
-      });
+    if (inbox) {
+      const batch = db.batch();
+      for (const uid of list) {
+        batch.set(db.collection(`companies/${companyId}/users/${uid}/inbox`).doc(), {
+          type, title: message.title, body: message.body, link: link || "/", branchId: branchId || null,
+          ref: ref || null, createdAt: FieldValue.serverTimestamp(), readAt: null,
+        });
+      }
+      await batch.commit();
     }
-    await batch.commit();
 
     const tokenSnaps = await Promise.all(list.map((uid) => db.collection(`companies/${companyId}/users/${uid}/fcmTokens`).get()));
     const tokens = tokenSnaps.flatMap((s, i) => s.docs.map((d) => ({ token: d.id, ref: d.ref, uid: list[i] })));
     if (IN_EMULATOR) {
-      console.log(`[notify] ${type} → ${list.length} inbox(es), push skipped in the emulator: ${message.title} — ${message.body}`);
+      console.log(`[notify] ${type} → ${list.length} ${inbox ? "inbox(es)" : "person(s), push only"}, push skipped in the emulator: ${message.title} — ${message.body}`);
       return list.length;
     }
     if (!tokens.length) return list.length;
     const res = await fcm.sendEachForMulticast({
       tokens: tokens.map((t) => t.token),
       notification: { title: message.title, body: message.body },
-      data: { link: link || "/", companyId, type },
+      data: { link: link || "/", companyId, type, ...(tag ? { tag } : {}) },
       webpush: { fcmOptions: { link: link || "/" } },
     });
     // forget devices that no longer exist
@@ -171,5 +175,40 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
     }
   }
 
-  return { deliver, onRequest, onPurchaseOrder, dailySummaries };
+  // ── chat (4.4) ─────────────────────────────────────────────────────────────
+  /** A message was sent: a push to everyone who can see the chat, except the sender and those who muted it. */
+  async function onChatMessage({ companyId, chatId, message: m }) {
+    if (!m || m.deleted) return;
+    const chatSnap = await db.doc(`companies/${companyId}/chats/${chatId}`).get();
+    if (!chatSnap.exists) return;
+    const chat = chatSnap.data();
+    const all = await people(companyId);
+    const uids = N.chatAudience(chat, all, m.byUid);
+    const preview = N.previewOf(m);
+    const staffUids = new Set(all.filter((p) => p.role === "staff").map((p) => p.uid));
+    const branchNames = chat.kind === "branch" ? { [chat.branchId]: (await db.doc(`companies/${companyId}/branches/${chat.branchId}`).get()).data()?.name } : {};
+    const title = (uid) => (chat.kind === "direct" ? m.byName || "New message" : `${m.byName || "Someone"} · ${N.chatTitle(chat, uid, {}, branchNames)}`);
+    const muted = (u, pref) => (pref.mutedChats || []).includes(chatId);
+    // staff open the staff portal's chat; everyone else the office one
+    for (const group of [uids.filter((u) => staffUids.has(u)), uids.filter((u) => !staffUids.has(u))]) {
+      if (!group.length) continue;
+      const link = `${staffUids.has(group[0]) ? "/chat" : "/branch-chat"}?c=${chatId}`;
+      // one title for direct chats; group/branch titles don't depend on the reader
+      await deliver({ companyId, branchId: chat.branchId || null, uids: group, type: "chat", message: { title: title(group[0]), body: preview }, link, ref: `chats/${chatId}`, inbox: false, tag: `chat-${chatId}`, muted });
+    }
+  }
+
+  /** users/{uid} changed: keep the chat directory (names and roles only) in step. */
+  async function onUser({ uid, before, after }) {
+    if (before?.companyId && before.companyId !== after?.companyId) await db.doc(`companies/${before.companyId}/chatPeople/${uid}`).delete().catch(() => {});
+    if (!after?.companyId) return;
+    await db.doc(`companies/${after.companyId}/chatPeople/${uid}`).set({
+      name: N.personName(after) || after.username || after.userName || "—",
+      role: after.role || "",
+      branchId: after.branchId || null,
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  }
+
+  return { deliver, onRequest, onPurchaseOrder, dailySummaries, onChatMessage, onUser };
 };

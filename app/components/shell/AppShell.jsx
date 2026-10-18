@@ -13,6 +13,7 @@ import TopBar from "./TopBar";
 import MobileNav from "./MobileNav";
 import CommandPalette, { rememberPage } from "./CommandPalette";
 import usePendingRequests from "./usePendingRequests";
+import { useChats } from "@/app/components/chat/useChat";
 
 const COLLAPSE_KEY = "cc-nav-collapsed";
 
@@ -38,12 +39,16 @@ export default function AppShell({ onSignOut, children }) {
 
   // ── counts on menu items: requests waiting for approval ──
   const pending = usePendingRequests({ companyId, branchId, role });
-  const badges = useMemo(() => ({ "/requested-panel": pending.total }), [pending.total]);
 
   // ── branches ──
   const { data: branchList = [] } = useGetBranchesQuery(isCompany && companyId ? companyId : skipToken);
   const branches = useMemo(() => branchList.map((b) => ({ id: b.id, name: b.name, address: b.address })), [branchList]);
   const { data: myBranch } = useGetSingleBranchQuery(!isCompany && companyId && branchId ? { companyId, branchId } : skipToken);
+
+  // …and chats with something new (4.4)
+  const chatBranches = useMemo(() => (isCompany ? branches : myBranch && branchId ? [{ id: branchId, name: myBranch.name }] : []), [isCompany, branches, myBranch, branchId]);
+  const chat = useChats(user, chatBranches);
+  const badges = useMemo(() => ({ "/requested-panel": pending.total, "/branch-chat": chat.unread }), [pending.total, chat.unread]);
   const { data: company } = useGetCompanyDetailsQuery(companyId ?? skipToken);
 
   // Owners/GMs with no branch chosen yet start in their default branch (or the first).

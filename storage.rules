@@ -178,6 +178,27 @@ service firebase.storage {
     }
 
     // ─────────────────────────────────────────────────────────────────────────
+    // Chat files (roadmap 4.4): chat/{companyId}/{chatId}/{uid}/{filename}
+    // Whoever can see the chat (firestore.rules canSeeChat) opens its files;
+    // each person uploads only into their own folder, up to 32 MB a file.
+    // ─────────────────────────────────────────────────────────────────────────
+    function canSeeChat(companyId, chatId) {
+      let u = userData();
+      let chat = firestore.get(/databases/(default)/documents/companies/$(companyId)/chats/$(chatId)).data;
+      return isAuth() && u.companyId == companyId && (
+        chat.kind == 'company' ||
+        (chat.kind == 'branch' && (isCompanyRole(u) || u.get('branchId', null) == chat.get('branchId', ''))) ||
+        ((chat.kind == 'group' || chat.kind == 'direct') && request.auth.uid in chat.get('members', [])));
+    }
+
+    match /chat/{companyId}/{chatId}/{uid}/{filename} {
+      allow read: if canSeeChat(companyId, chatId);
+      allow create: if request.auth.uid == uid && canSeeChat(companyId, chatId) &&
+        request.resource.size <= 32 * 1024 * 1024;
+      allow delete: if request.auth.uid == uid;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
     // Deny all other paths
     // ─────────────────────────────────────────────────────────────────────────
     match /{allPaths=**} {

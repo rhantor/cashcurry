@@ -54,6 +54,25 @@ exports.notifyPurchaseOrders = onDocumentWritten("companies/{companyId}/branches
   }
 });
 
+// Chat (4.4): a push for each new message; the directory of who can be messaged.
+exports.notifyChatMessage = onDocumentCreated("companies/{companyId}/chats/{chatId}/messages/{id}", async (event) => {
+  const { companyId, chatId } = event.params;
+  try {
+    await notify.onChatMessage({ companyId, chatId, message: event.data?.data() });
+  } catch (err) {
+    console.error("[notify chat]", companyId, chatId, err);
+  }
+});
+exports.chatPeople = onDocumentWritten("users/{uid}", async (event) => {
+  const before = event.data?.before?.exists ? event.data.before.data() : null;
+  const after = event.data?.after?.exists ? event.data.after.data() : null;
+  try {
+    await notify.onUser({ uid: event.params.uid, before, after });
+  } catch (err) {
+    console.error("[chatPeople]", event.params.uid, err);
+  }
+});
+
 // Every hour; each branch's summary goes out at its own time on its own clock.
 exports.notifyDailySummary = onSchedule({ schedule: "0 * * * *", timeZone: "UTC", timeoutSeconds: 540 }, async () => {
   await notify.dailySummaries(new Date());

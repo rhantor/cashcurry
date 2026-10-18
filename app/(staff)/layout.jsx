@@ -5,9 +5,14 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, MessageCircle, FileText, LogOut, User } from "lucide-react";
 import NotificationBell from "@/app/components/notifications/NotificationBell";
+import useSession from "@/app/hooks/useSession";
+import { useChats } from "@/app/components/chat/useChat";
 
 export default function StaffLayout({ children }) {
   const pathname = usePathname();
+  const { user } = useSession();
+  // chats with something new (4.4)
+  const { unread } = useChats(user, user?.branchId ? [{ id: user.branchId }] : []);
 
   const handleLogout = async () => {
     try {
@@ -45,7 +50,8 @@ export default function StaffLayout({ children }) {
                  className={`flex items-center gap-3 px-3 py-3 rounded-xl transition ${isActive ? "bg-blue-50 text-blue-600 font-semibold" : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"}`}
                >
                  <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
-                 <span>{item.label}</span>
+                 <span className="flex-1">{item.label}</span>
+                 {item.href === "/chat" && unread > 0 && <span className="rounded-full bg-red-500 px-1.5 text-[11px] font-bold text-white">{unread}</span>}
                </Link>
              )
           })}
@@ -91,7 +97,10 @@ export default function StaffLayout({ children }) {
               className={`flex flex-col items-center py-3 px-4 w-full transition-all duration-200 ${isActive ? "text-blue-600 translate-y-[-2px]" : "text-gray-400 hover:text-gray-900"}`}
             >
               <Icon size={22} strokeWidth={isActive ? 2.5 : 2} className={isActive ? "drop-shadow-sm" : ""} />
-              <span className="text-[10px] mt-1 font-semibold">{item.label}</span>
+              <span className="relative text-[10px] mt-1 font-semibold">
+                {item.label}
+                {item.href === "/chat" && unread > 0 && <span className="absolute -right-2 -top-5 size-2.5 rounded-full bg-red-500" />}
+              </span>
             </Link>
           );
         })}

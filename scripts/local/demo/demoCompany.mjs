@@ -304,6 +304,8 @@ export function buildDemoCompany(today = new Date()) {
     companyCols: {
       loans,
       users: users.filter((u) => !u.branchId).map(({ id, role, userName, email, createdAt: c }) => ({ id, role, userName, email, createdAt: c })),
+      // who can be messaged in chat (4.4) — on a real project the chatPeople function keeps it
+      chatPeople: users.map(({ id, role, name, branchId }) => ({ id, name, role, branchId: branchId || null })),
     },
     branches,
   };
