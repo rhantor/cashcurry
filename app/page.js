@@ -20,7 +20,7 @@ import { AllPages, Attention, HomeSection, QuickActions } from "@/app/components
 import { personName } from "@/lib/people";
 const ROLE = {
   owner: "Owner", gm: "General manager", superAdmin: "Super admin", branchAdmin: "Branch admin",
-  manager: "Manager", accountant: "Accountant", cashier: "Cashier", supervisor: "Supervisor",
+  manager: "Manager", inCharge: "In charge", accountant: "Accountant", cashier: "Cashier", supervisor: "Supervisor",
 };
 
 /**

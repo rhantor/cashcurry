@@ -1,5 +1,5 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   useGetAdvanceEntriesQuery,
   useUpdateAdvanceEntryMutation,
@@ -26,12 +26,13 @@ import { serverTimestamp } from "firebase/firestore";
 import AdvanceRequests from "./AdvanceRequests";
 import LoanRequests from "./LoanRequests";
 import OtRequests from "./OtRequests";
-import { getSessionUser } from "@/lib/session";
 import { confirmDialog, promptDialog } from "@/app/components/ui/notify";
 import { Skeleton, Tabs } from "@/app/components/ui";
 import { CountBadge } from "@/app/components/shell/SideNav";
 
 import { personName } from "@/lib/people";
+import { can } from "@/lib/authz/permissions";
+import useSession from "@/app/hooks/useSession";
 // Rejecting can't be taken back from here, so it asks first.
 const sureToReject = (what) => confirmDialog({ title: `Reject this ${what}?`, message: "The person who asked will see it as rejected.", confirmLabel: "Reject", danger: true });
 
@@ -41,10 +42,9 @@ const sureToReject = (what) => confirmDialog({ title: `Reject this ${what}?`, me
  * other branches and repayments sent back, and early overtime from the kiosk.
  */
 export default function RequestedPanel() {
-  const [companyId, setCompanyId] = useState(null);
-  const [branchId, setBranchId] = useState(null);
+  // the branch being viewed: a branch user's own, or the one a company role picked
+  const { user, companyId, branchId } = useSession();
   const [activeTab, setActiveTab] = useState("advance");
-  const [user, setUser] = useState(null);
 
   // local action states
   const [advWorkingId, setAdvWorkingId] = useState(null);
@@ -54,18 +54,6 @@ export default function RequestedPanel() {
   const [otWorkingId, setOtWorkingId] = useState(null);
   const [otErrorMsg, setOtErrorMsg] = useState("");
 
-  useEffect(() => {
-    const storedUser = getSessionUser();
-    if (!storedUser) return;
-    try {
-      const parsed = storedUser;
-      setCompanyId(parsed.companyId);
-      setBranchId(parsed.branchId);
-      setUser(parsed);
-    } catch (error) {
-      console.error("Failed to parse user from localStorage:", error);
-    }
-  }, []);
 
   // Branch directory
   const { data: branches } = useGetBranchesBasicQuery(companyId, {
@@ -144,13 +132,8 @@ export default function RequestedPanel() {
   );
 
   // Permissions
-  const canApproveLoans =
-    user?.role === "manager" ||
-    user?.role === "accountant" ||
-    user?.role === "branchAdmin" ||
-    user?.role === "superAdmin" ||
-    user?.role === "owner" ||
-    user?.role === "gm";
+  // approvers per the roles matrix — the accountant asks and pays out, but doesn't approve
+  const canApproveLoans = can(user?.role, "advances.approve");
 
   // ---- Handlers ----
   const handleAdvanceAction = async (req, action) => {

@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { format, isValid, parseISO } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { CalendarClock, ChevronDown, HandCoins, Search, Users, Wallet } from "lucide-react";
@@ -7,20 +7,13 @@ import { useGetStaffLoansQuery, useEditStaffLoanTermsMutation } from "@/lib/redu
 import LoanTermsModal from "@/app/components/common/LoanTermsModal";
 import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/lib/region/currency";
-import { getSessionUser } from "@/lib/session";
 import { Avatar, Badge, Button, Card, EmptyState, Input, Skeleton, Tabs, cn, toast } from "@/app/components/ui";
 
 import { personName } from "@/lib/people";
+import useSession from "@/app/hooks/useSession";
+import { can } from "@/lib/authz/permissions";
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
-function getUser() {
-  if (typeof window === "undefined") return {};
-  try {
-    return getSessionUser() || {};
-  } catch {
-    return {};
-  }
-}
 const monthText = (m) => {
   const d = m ? parseISO(`${m}-01`) : null;
   return d && isValid(d) ? format(d, "MMM yyyy") : m || "";
@@ -158,11 +151,10 @@ function LoanCard({ loan, money, onEditTerms, canEdit, flat = false }) {
  * changing them — a different amount for a month or moving it on.
  */
 export default function StaffLoansPage() {
-  const user = getUser();
-  const { companyId, branchId, role } = user;
+  const { user, companyId, branchId, role } = useSession();
   const currency = useCurrency();
   const money = (v) => formatMoney(v, currency);
-  const canEdit = ["owner", "gm", "superAdmin", "branchAdmin", "manager"].includes(role);
+  const canEdit = can(role, "advances.approve"); // changing instalments: those who approve
 
   const { data: loanList = [], isLoading, isError } = useGetStaffLoansQuery({ companyId, branchId }, { skip: !companyId || !branchId, refetchOnMountOrArgChange: true });
   const [editStaffLoanTerms, { isLoading: saving }] = useEditStaffLoanTermsMutation();

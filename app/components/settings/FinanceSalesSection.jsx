@@ -4,6 +4,7 @@ import SettingsSection from "./SettingsSection";
 import { FieldRow, NumberField, TextField } from "./fields";
 import TendersEditor from "./TendersEditor";
 import { formatMoney } from "@/lib/region";
+import { can } from "@/lib/authz/permissions";
 
 export default function FinanceSalesSection({ role, value, onChange }) {
   const v = value || {};
@@ -16,7 +17,8 @@ export default function FinanceSalesSection({ role, value, onChange }) {
     onChange({ ...v, depositDefaults: { ...deposit, ...p } });
 
   // Permission: Only Admin and Accountant can edit Opening Balance
-  const canEditBalance = role === "branchAdmin" || role === "accountant";
+  // opening balances, currency: owner, superAdmin and branchAdmin (roles matrix)
+  const canEditBalance = can(role, "moneySettings.manage");
 
   return (
     <SettingsSection role={role} sectionKey="financeSales">

@@ -22,6 +22,7 @@ import { computeAttendance, formatHours as fmtHours, toLocalDateStr } from "@/li
 import { shiftsEnabled } from "@/lib/attendance/shifts";
 import { getSessionUser } from "@/lib/session";
 import { toast, confirmDialog } from "@/app/components/ui/notify";
+import { can } from "@/lib/authz/permissions";
 
 export default function AttendanceLogPage() {
   const [user, setUser] = useState(null);
@@ -220,6 +221,10 @@ export default function AttendanceLogPage() {
   const hereNow = byStaff.filter((g) => g.inNow).length;
   const notIn = staffList.filter((s) => !byStaff.some((g) => g.staffId === s.id));
 
+  // adding, changing and deleting punches: branchAdmin, manager and company roles;
+  // the in-charge and supervisors see the log (roles matrix)
+  const canManage = can(user?.role, "attendance.manage");
+
   const openAdd = (staffId = "") => {
     const s = staffList.find((x) => x.id === staffId);
     setEditModal({ mode: "add", punch: { date: selectedDate, type: "in", staffId, staffName: s ? `${s.firstName} ${s.lastName}` : "" } });
@@ -309,9 +314,11 @@ export default function AttendanceLogPage() {
           <Button variant="secondary" icon={Download} loading={isExporting} onClick={handleExport}>
             Time card
           </Button>
-          <Button icon={Plus} onClick={() => openAdd()}>
-            Add a punch
-          </Button>
+          {canManage && (
+            <Button icon={Plus} onClick={() => openAdd()}>
+              Add a punch
+            </Button>
+          )}
         </div>
       </div>
 
@@ -364,7 +371,7 @@ export default function AttendanceLogPage() {
             </div>
           ) : byStaff.length === 0 ? (
             <Card>
-              <EmptyState icon={Clock} title={`No punches on ${niceDay}`} description="Punches from the kiosk show here as staff come and go. Add one by hand if someone forgot." action={<Button icon={Plus} onClick={() => openAdd()}>Add a punch</Button>} />
+              <EmptyState icon={Clock} title={`No punches on ${niceDay}`} description="Punches from the kiosk show here as staff come and go. Add one by hand if someone forgot." action={canManage && <Button icon={Plus} onClick={() => openAdd()}>Add a punch</Button>} />
             </Card>
           ) : (
             <Card className="divide-y divide-line overflow-hidden p-0">
@@ -382,7 +389,8 @@ export default function AttendanceLogPage() {
                       <button
                         key={x.id}
                         type="button"
-                        onClick={() => setEditModal({ mode: "edit", punch: x })}
+                        onClick={canManage ? () => setEditModal({ mode: "edit", punch: x }) : undefined}
+                        disabled={!canManage}
                         className={cn(
                           "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold tabular-nums transition-colors hover:brightness-95",
                           x.type === "in" ? "border-success/30 bg-success-soft text-success" : "border-warning/30 bg-warning-soft text-warning"
@@ -394,9 +402,9 @@ export default function AttendanceLogPage() {
                         {x.isManual && <span className="text-[10px] font-medium opacity-70">by hand</span>}
                       </button>
                     ))}
-                    <button type="button" onClick={() => openAdd(g.staffId)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-muted hover:bg-surface-2 hover:text-fg" aria-label={`Add a punch for ${g.name}`}>
+                    {canManage && <button type="button" onClick={() => openAdd(g.staffId)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-muted hover:bg-surface-2 hover:text-fg" aria-label={`Add a punch for ${g.name}`}>
                       <Plus className="size-3" /> Add
-                    </button>
+                    </button>}
                   </div>
                 </div>
               ))}

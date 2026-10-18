@@ -188,8 +188,9 @@ describe("who can see what", () => {
     await assertFails(as("pjAdmin").doc(`${B()}/sales/s1`).get());
   });
 
-  it("monthly summaries: readable like the branch's finances, written only by the server", async () => {
-    await assertSucceeds(as("klCashier").doc(`${B()}/summaries/2026-09`).get());
+  it("monthly summaries: read by those who see the reports, written only by the server", async () => {
+    await assertSucceeds(as("klAccountant").doc(`${B()}/summaries/2026-09`).get());
+    await assertFails(as("klCashier").doc(`${B()}/summaries/2026-09`).get()); // the cashier doesn't see the books (4.1)
     await assertSucceeds(as("owner").doc(`${B("pj")}/summaries/2026-09`).get());
     await assertFails(as("klStaff").doc(`${B()}/summaries/2026-09`).get());
     await assertFails(as("klManager").doc(`${B("pj")}/summaries/2026-09`).get());

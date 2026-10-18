@@ -6,7 +6,7 @@ import { FileSpreadsheet, Archive, ArchiveRestore, Pencil, Store, DownloadCloud,
 import { useItemsContext } from "../ItemsContext";
 
 export default function ItemList() {
-  const { branchId, vendorNameById, money, branchNameById, scope, setScope, active, setOpenAdd, search, handlePullToBranch, setItemToDrop, setItemToRetire, handleOpenEdit, handleRestore, itemsByCategory, busy } = useItemsContext();
+  const { canManage, branchId, vendorNameById, money, branchNameById, scope, setScope, active, setOpenAdd, search, handlePullToBranch, setItemToDrop, setItemToRetire, handleOpenEdit, handleRestore, itemsByCategory, busy } = useItemsContext();
   return (
     <>
       {busy ? (
@@ -98,7 +98,7 @@ export default function ItemList() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-1 shrink-0 -mr-1.5 -mt-1">
+                        {canManage && <div className="flex items-center gap-1 shrink-0 -mr-1.5 -mt-1">
                           {item.isActive === false ? (
                             <button
                               onClick={() => handleRestore(item)}
@@ -138,12 +138,12 @@ export default function ItemList() {
                               </button>
                             </>
                           )}
-                        </div>
+                        </div>}
                       </div>
 
                       {/* The pull action gets its own full-width row — it is the
                           reason anyone opens the All items tab. */}
-                      {!here && branchId && item.isActive !== false && (
+                      {canManage && !here && branchId && item.isActive !== false && (
                         <button
                           onClick={() => handlePullToBranch(item)}
                           className="mt-3 w-full min-h-[44px] rounded-xl bg-brand text-white font-semibold text-sm

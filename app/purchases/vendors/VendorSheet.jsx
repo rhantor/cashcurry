@@ -72,9 +72,11 @@ export default function VendorSheet({ open, vendor, companyId, branchId, onClose
           />
           <div className="flex gap-1.5">
             <ExportVendorOverviewBtn companyId={companyId} branchId={branchId} vendor={v} />
-            <Button size="sm" variant="secondary" icon={Pencil} onClick={() => onEdit(v)}>
-              Edit
-            </Button>
+            {onEdit && (
+              <Button size="sm" variant="secondary" icon={Pencil} onClick={() => onEdit(v)}>
+                Edit
+              </Button>
+            )}
           </div>
         </div>
 

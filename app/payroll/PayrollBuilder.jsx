@@ -29,7 +29,8 @@ import { computeAttendance } from '@/lib/attendance/computeHours'
 import { startOfMonth, endOfMonth, addDays, subDays, format } from 'date-fns'
 import { skipToken } from '@reduxjs/toolkit/query'
 import PayrollPrintView from './components/PayrollPrintView'
-import { getSessionUser } from '@/lib/session'
+import useResolvedCompanyBranch from '@/utils/useResolvedCompanyBranch'
+import { can } from '@/lib/authz/permissions'
 import { confirmDialog, toast } from "@/app/components/ui/notify";
 import { Banknote, Building2, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock, FileSpreadsheet, FileText, Lock, MoreHorizontal, Printer, Save, Search, Trash2, Undo2, Users, Wallet } from 'lucide-react'
 import { Button, Card, DatePicker, EmptyState, Field, Input, Menu, Sheet, Skeleton, cn } from '@/app/components/ui'
@@ -72,11 +73,10 @@ function buildDefaultInputs () {
 // ─── Main PayrollBuilder ───────────────────────────────────────────────────────
 
 export default function PayrollBuilder () {
-  const [companyId, setCompanyId]   = useState(null)
-  const [branchId, setBranchId]     = useState(null)
-  const [currentUser, setCurrentUser] = useState({})
-  const [role, setRole]             = useState(null)
-  const [authReady, setAuthReady]   = useState(false)
+  // the branch being viewed: a branch user's own, or the one a company role picked
+  const { ready: authReady, user: sessionUser, companyId, branchId } = useResolvedCompanyBranch()
+  const currentUser = sessionUser || {}
+  const role = sessionUser?.role || null
 
   const currency = useCurrency()
   const money = n => formatMoney(Number(n) || 0, currency)
@@ -95,17 +95,11 @@ export default function PayrollBuilder () {
   const [printTarget, setPrintTarget] = useState(null) // { mode: 'single'|'all', slip? }
 
   useEffect(() => {
-    const u = (getSessionUser() || {})
-    setCompanyId(u.companyId || null)
-    setBranchId(u.branchId  || null)
-    setCurrentUser(u)
-    setRole(u.role || null)
     const asked = new URLSearchParams(window.location.search).get('period')
     if (/^\d{4}-(0[1-9]|1[0-2])$/.test(asked || '')) {
       setYear(Number(asked.slice(0, 4)))
       setMonth(Number(asked.slice(5, 7)))
     }
-    setAuthReady(true)
   }, [])
 
   const skip = !companyId || !branchId
@@ -183,7 +177,7 @@ export default function PayrollBuilder () {
 
   const payrollConfig = branchSettings?.payroll || null
 
-  const isAdminOrManager = role === 'branchAdmin' || role === 'manager'
+  const isAdminOrManager = can(role, 'payroll.manage') // roles matrix: branchAdmin, manager, company roles
 
   const filteredStaff = useMemo(() => {
     if (!searchTerm) return staffList
@@ -613,7 +607,7 @@ export default function PayrollBuilder () {
         full={false}
         icon={Lock}
         tone='warning'
-        title='Payroll is for branch admins and managers'
+        title='Payroll is run by branch admins, managers and the owner'
         message='Ask your branch admin if a payslip needs changing.'
         actions={[{ label: 'Go home', href: '/', primary: true }]}
       />

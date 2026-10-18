@@ -18,6 +18,7 @@ import MoneyInput from '@/app/components/entry/MoneyInput'
 import StaffPicker, { staffName } from '@/app/components/entry/StaffPicker'
 import { Chip, PaidFromChoice } from '@/app/components/entry/Choices'
 import { EntryLayout, EntrySection, SummaryLine } from '@/app/components/entry/EntryLayout'
+import { can } from '@/lib/authz/permissions'
 
 const ADVANCE_TYPES = [
   { value: 'salary', label: 'Salary advance' },
@@ -506,7 +507,7 @@ export default function AdvanceLoanEntry () {
   const money = v => formatMoney(v, currency)
   const [tab, setTab] = useState('advance')
   const { data: staff = [], isLoading: staffLoading } = useGetStaffListQuery({ companyId, branchId }, { skip: !companyId || !branchId })
-  const manager = role === 'branchAdmin' || role === 'manager'
+  const manager = can(role, 'advances.approve') // approvers record one handed over on the spot
 
   const head = <Head companyId={companyId} branchId={branchId} user={user} manager={manager} tab={tab} setTab={setTab} />
   const props = { head, staff, staffLoading, companyId, branchId, manager, money, currency }

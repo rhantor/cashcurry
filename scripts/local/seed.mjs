@@ -183,7 +183,7 @@ for (const u of users) {
   });
 }
 
-const roleOrder = ["owner", "superAdmin", "gm", "branchAdmin", "manager", "accountant", "supervisor", "cashier", "staff"];
+const roleOrder = ["owner", "superAdmin", "gm", "branchAdmin", "manager", "inCharge", "accountant", "supervisor", "cashier", "staff"];
 accounts.sort((a, b) => roleOrder.indexOf(a.role) - roleOrder.indexOf(b.role) || a.branch.localeCompare(b.branch));
 fs.writeFileSync(
   path.join(LOCAL_DIR, "DEV_ACCOUNTS.md"),

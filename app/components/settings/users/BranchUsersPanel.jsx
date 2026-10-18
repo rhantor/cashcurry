@@ -3,12 +3,11 @@
 import React from "react";
 import RoleBadge from "./RoleBadge";
 import IconButton from "./IconButton";
+import { can } from "@/lib/authz/permissions";
 import { Pencil, Trash2, Plus } from "lucide-react";
 
-const canShowActions = (role) => {
-  const r = String(role || "").toLowerCase();
-  return r === "owner" || r === "gm" || r === "superadmin";
-};
+// changing users: owner and super admin (roles matrix, company.manage — the database rule says the same)
+const canShowActions = (role) => can(role, "company.manage");
 
 export default function BranchUsersPanel({
   branches = [],
