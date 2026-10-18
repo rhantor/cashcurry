@@ -1,76 +1,45 @@
 import { NextResponse } from "next/server";
-import crypto from "node:crypto";
-import { adminAuth, adminDb } from "@/lib/server/firebaseAdmin";
 import admin from "firebase-admin";
-import { can, isCompanyRole } from "@/lib/authz/permissions";
+import { adminAuth, adminDb } from "@/lib/server/firebaseAdmin";
+import { staffManager, staffRecord, writeStaffLogins } from "@/lib/server/staffAccess";
+import { isPin, randomPin } from "@/lib/staffLogin";
 
-// Creates a staff member's login and links it to their staff record.
-//
-// Runs with full database access (Admin SDK), so it checks the caller itself:
-// whoever the roles matrix lets manage staff ("staff.manage": owner, super
-// admin and GM of the company; branch admin and manager of that branch). Before, anyone on the internet could call it and
-// create a login inside any company — with the staff member's IC number, or
-// "password123", as the password.
-
-
-/** A temporary password the staff member is asked to change: 10 chars, no look-alikes. */
-function temporaryPassword() {
-  const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
-  return Array.from(crypto.randomBytes(10), (b) => alphabet[b % alphabet.length]).join("");
-}
+// Creates a staff member's login and links it to their staff record
+// (docs/STAFF_APP.md). They log in with their phone or IC number and a
+// 6-digit PIN; email is optional (without one the login gets a placeholder
+// address). Runs with full database access (Admin SDK), so it checks the
+// caller itself: whoever the roles matrix lets manage staff at this branch.
 
 const fail = (status, error) => NextResponse.json({ error }, { status });
 
 export async function POST(req) {
   try {
-    if (!adminAuth || !adminDb) return fail(500, "Server is not configured to create logins.");
-
-    // 1. Who is asking?
-    const token = (req.headers.get("authorization") || "").replace(/^Bearer\s+/i, "");
-    if (!token) return fail(401, "Sign in first.");
-    let caller;
-    try {
-      caller = await adminAuth.verifyIdToken(token);
-    } catch {
-      return fail(401, "Your session has expired. Sign in again.");
-    }
-    const callerDoc = await adminDb.collection("users").doc(caller.uid).get();
-    const me = callerDoc.exists ? callerDoc.data() : null;
-
-    const { companyId, branchId, staffId, firstName = "", lastName = "", email } = await req.json();
+    const { companyId, branchId, staffId, firstName = "", lastName = "", email, pin } = await req.json();
     if (!companyId || !branchId || !staffId) return fail(400, "Missing required identifiers");
 
-    // 2. May they create logins for this branch?
-    const allowed =
-      me &&
-      me.companyId === companyId &&
-      can(me.role, "staff.manage") &&
-      (isCompanyRole(me.role) || me.branchId === branchId);
-    if (!allowed) return fail(403, "Only the owner, a general manager, or this branch's admin or manager can create staff logins.");
+    const who = await staffManager(req, companyId, branchId);
+    if (who.error) return fail(who.status, who.error);
 
-    // 3. The staff record must exist in that branch, without a login yet.
-    const staffRef = adminDb.collection("companies").doc(companyId)
-      .collection("branches").doc(branchId)
-      .collection("staff").doc(staffId);
-    const staffSnap = await staffRef.get();
-    if (!staffSnap.exists) return fail(404, "Staff record not found in this branch.");
-    if (staffSnap.data().uid) return fail(409, "This staff member already has a login.");
+    // The staff record must exist in that branch, without a login yet.
+    const staff = await staffRecord(companyId, branchId, staffId);
+    if (!staff.exists) return fail(404, "Staff record not found in this branch.");
+    if (staff.data.uid) return fail(409, "This staff member already has a login.");
+    if (pin && !isPin(pin)) return fail(400, "The PIN must be 6 digits.");
 
-    // Firebase Auth needs an email; staff without one get a placeholder.
-    const finalEmail = email || `${staffId.toLowerCase()}@cashcurry.local`;
-    const password = temporaryPassword();
+    const finalEmail = (email || staff.data.email || "").trim() || `${staffId.toLowerCase()}@cashcurry.local`;
+    const loginPin = pin || randomPin();
 
     let userRecord;
     try {
       userRecord = await adminAuth.createUser({
         email: finalEmail,
         emailVerified: false,
-        password,
+        password: loginPin,
         displayName: `${firstName} ${lastName}`.trim() || undefined,
         disabled: false,
       });
     } catch (authError) {
-      return fail(400, authError.message || "Failed to create the login");
+      return fail(400, authError.code === "auth/email-already-exists" ? "That email already has a login." : authError.message || "Failed to create the login");
     }
     const { uid } = userRecord;
 
@@ -88,18 +57,17 @@ export async function POST(req) {
       // Which staff record this login is: the rules let staff read only rows
       // with this staffId (their own advances, punches…). Users cannot change it.
       staffId,
-      createdBy: caller.uid,
+      createdBy: who.caller.uid,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
     });
 
-    await staffRef.update({
-      uid,
-      loginEmail: finalEmail,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    await staff.ref.update({ uid, loginEmail: finalEmail, updatedAt: admin.firestore.FieldValue.serverTimestamp() });
 
-    // Shown once to the person who created it, to hand to the staff member.
-    return NextResponse.json({ success: true, uid, email: finalEmail, password });
+    // So the login page finds them by phone or IC number.
+    const ways = await writeStaffLogins({ uid, email: finalEmail, phone: staff.data.phone, ic: staff.private.icNumber || staff.private.passportNumber });
+
+    // Shown once to whoever created it, to hand to the staff member.
+    return NextResponse.json({ success: true, uid, email: finalEmail, pin: loginPin, phone: staff.data.phone || "", byIc: ways > 1 });
   } catch (error) {
     console.error("Generate login error:", error);
     return fail(500, "Internal Server Error");

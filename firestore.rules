@@ -368,6 +368,13 @@ service cloud.firestore {
 
     // Username → email lookup: must be publicly readable so login by username works
     // before the user is authenticated with Firebase Auth
+    // Staff log in with their phone or IC number (docs/STAFF_APP.md): the key is
+    // a hash of the number, the doc only { uid, email }; written by the server.
+    match /staffLogins/{key} {
+      allow get: if true;
+      allow list, write: if false;
+    }
+
     match /usernames/{username} {
       allow read: if true;          // Public: required for username-based login
       // Your own login, or a company admin adding someone to their company.

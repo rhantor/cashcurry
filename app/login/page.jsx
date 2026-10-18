@@ -1,5 +1,6 @@
 "use client";
 
+import { looksLikeStaffId } from "@/lib/staffLogin";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -25,9 +26,10 @@ const LOCAL_ACCOUNTS = (() => {
 })();
 
 /** Firebase's wording → something a person can act on. */
-const friendly = (message = "") => {
+const friendly = (message = "", staff = false) => {
   const m = message.toLowerCase();
-  if (/wrong-password|invalid-credential|invalid-login|user-not-found|not found|invalid username|invalid password|incorrect/.test(m)) return "That username or password isn't right.";
+  if (/no login with that phone or ic/.test(m)) return "No staff login with that phone or IC number. Ask your manager.";
+  if (/wrong-password|invalid-credential|invalid-login|user-not-found|not found|invalid username|invalid password|incorrect/.test(m)) return staff ? "That PIN isn't right." : "That username or password isn't right.";
   if (/too-many-requests/.test(m)) return "Too many tries. Wait a minute, then try again.";
   if (/metadata not found/.test(m)) return "This account's sign-up didn't finish. Go to Create an account and use the same email and password to finish it.";
   if (/network|offline|unavailable/.test(m)) return "Can't reach the server. Check the internet connection.";
@@ -89,6 +91,8 @@ function LocalAccounts({ onPick, disabled }) {
  */
 export default function LoginPage() {
   const [usernameOrEmail, setUsernameOrEmail] = useState("");
+  // a phone or IC number: a staff member, who logs in with a 6-digit PIN (docs/STAFF_APP.md)
+  const staffLogin = looksLikeStaffId(usernameOrEmail);
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
   const [caps, setCaps] = useState(false);
@@ -118,7 +122,7 @@ export default function LoginPage() {
       setDone(true);
       setTimeout(() => router.replace("/"), 650);
     } catch (err) {
-      fail(friendly(err.message));
+      fail(friendly(err.message, looksLikeStaffId(user)));
     }
   };
 
@@ -180,7 +184,7 @@ export default function LoginPage() {
             >
               <div>
                 <label htmlFor="login-user" className="mb-1.5 block text-xs font-semibold text-muted">
-                  Username or email
+                  Username, email, phone or IC
                 </label>
                 <FieldBox icon={UserRound} invalid={!!error}>
                   <input
@@ -190,7 +194,7 @@ export default function LoginPage() {
                     spellCheck={false}
                     value={usernameOrEmail}
                     onChange={(e) => setUsernameOrEmail(e.target.value)}
-                    placeholder="e.g. kl_manager"
+                    placeholder="e.g. kl_manager or 012-345 6789"
                     className="h-full min-w-0 flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-subtle"
                   />
                 </FieldBox>
@@ -199,11 +203,15 @@ export default function LoginPage() {
               <div>
                 <div className="mb-1.5 flex items-center justify-between">
                   <label htmlFor="login-pass" className="text-xs font-semibold text-muted">
-                    Password
+                    {staffLogin ? "PIN" : "Password"}
                   </label>
-                  <Link href="/reset-password" className="text-xs font-semibold text-brand hover:underline">
-                    Forgot it?
-                  </Link>
+                  {staffLogin ? (
+                    <span className="text-xs text-subtle">Forgot it? Ask your manager to reset it</span>
+                  ) : (
+                    <Link href="/reset-password" className="text-xs font-semibold text-brand hover:underline">
+                      Forgot it?
+                    </Link>
+                  )}
                 </div>
                 <FieldBox
                   icon={Lock}
@@ -223,11 +231,14 @@ export default function LoginPage() {
                     id="login-pass"
                     type={show ? "text" : "password"}
                     autoComplete="current-password"
+                    // staff (phone / IC) type a 6-digit PIN: the number pad on phones
+                    inputMode={staffLogin ? "numeric" : undefined}
+                    maxLength={staffLogin ? 6 : undefined}
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => setPassword(staffLogin ? e.target.value.replace(/\D/g, "") : e.target.value)}
                     onKeyUp={capsCheck}
                     onKeyDown={capsCheck}
-                    placeholder="••••••••"
+                    placeholder={staffLogin ? "6-digit PIN" : "••••••••"}
                     className="h-full min-w-0 flex-1 bg-transparent text-sm text-fg outline-none placeholder:text-subtle"
                   />
                 </FieldBox>
