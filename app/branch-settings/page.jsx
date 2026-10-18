@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Banknote, Building2, Clock, ReceiptText, Save, Settings2, TriangleAlert, Undo2, UserCog } from "lucide-react";
+import { Banknote, Bell, Building2, Clock, ReceiptText, Save, Settings2, TriangleAlert, Undo2, UserCog } from "lucide-react";
 import BasicInfoSection from "@/app/components/settings/BasicInfoSection";
 import RegionSection from "@/app/components/settings/RegionSection";
 import FinanceSalesSection from "@/app/components/settings/FinanceSalesSection";
@@ -11,6 +11,9 @@ import PurchasesSection from "@/app/components/settings/PurchasesSection";
 import OtherSection from "@/app/components/settings/OtherSection";
 import AttendanceSettingsSection from "@/app/components/settings/AttendanceSettingsSection";
 import PayrollSettingsSection from "@/app/components/settings/PayrollSettingsSection";
+import NotificationsSection from "@/app/components/settings/NotificationsSection";
+import useSession from "@/app/hooks/useSession";
+import { canManageNotifications } from "@/lib/notify/model";
 import StatusScreen from "@/app/components/common/StatusScreen";
 import { Button, Card, Skeleton, cn, toast } from "@/app/components/ui";
 import useBranchSettingsForm from "./useBranchSettingsForm";
@@ -21,6 +24,7 @@ const TABS = [
   { id: "operations", label: "Staff & spending", note: "Roles, loans, purchases", icon: UserCog },
   { id: "attendance", label: "Attendance", note: "Kiosk, shifts, pay cycle", icon: Clock },
   { id: "payroll", label: "Payroll", note: "Pay mode, OT, deductions", icon: ReceiptText },
+  { id: "notifications", label: "Notifications", note: "Who is told what", icon: Bell, only: canManageNotifications },
   { id: "advanced", label: "Advanced", note: "Everything else", icon: Settings2 },
 ];
 
@@ -51,7 +55,9 @@ const Heading = ({ title, note }) => (
  */
 export default function BranchSettingsPage() {
   const { role, form, setForm, save, discard, saving, saveError, loadError, isDirty } = useBranchSettingsForm();
+  const { companyId, branchId } = useSession();
   const [activeTab, setActiveTab] = useState("general");
+  const tabs = TABS.filter((t) => !t.only || t.only(role));
   const set = (group) => (v) => setForm((prev) => ({ ...prev, [group]: v }));
 
   const onSave = async () => {
@@ -76,14 +82,14 @@ export default function BranchSettingsPage() {
       </div>
     );
 
-  const tab = TABS.find((t) => t.id === activeTab);
+  const tab = tabs.find((t) => t.id === activeTab);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 pb-32 sm:px-6 sm:py-6">
       <div className="grid gap-6 md:grid-cols-[15rem_1fr]">
         {/* the groups */}
         <nav className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-1 [scrollbar-width:none] md:sticky md:top-20 md:mx-0 md:flex-col md:self-start md:overflow-visible md:px-0">
-          {TABS.map((t) => {
+          {tabs.map((t) => {
             const on = activeTab === t.id;
             return (
               <button
@@ -111,6 +117,13 @@ export default function BranchSettingsPage() {
 
         {/* the chosen group */}
         <motion.div key={activeTab} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2 }} className="min-w-0 space-y-6">
+          {activeTab === "notifications" && (
+            <>
+              <Heading title="Notifications" note="Who at this branch is told about each kind of thing. Requests are told at once; sales and costs once a day. Anyone can still turn off what they get, from the bell." />
+              <NotificationsSection companyId={companyId} branchId={branchId} />
+            </>
+          )}
+
           {activeTab === "general" && (
             <>
               <Heading title="General" note="The branch's name and contact details, its time zone, business day and money." />

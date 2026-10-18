@@ -3,7 +3,6 @@
 // member, which approves it at once.
 import { useState } from "react";
 import { useAddLeaveMutation } from "@/lib/redux/api/requestsApiSlice";
-import { useAddNotificationMutation } from "@/lib/redux/api/notificationApiSlice";
 import { LEAVE_KINDS, leaveDays } from "@/lib/requests/model";
 import { can } from "@/lib/authz/permissions";
 import { personName } from "@/lib/people";
@@ -24,7 +23,6 @@ export default function LeaveSheet({ open, onClose, companyId, branchId, user, s
   const [halfDay, setHalfDay] = useState(false);
   const [reason, setReason] = useState("");
   const [addLeave, { isLoading }] = useAddLeaveMutation();
-  const [notify] = useAddNotificationMutation();
 
   const end = to < from ? from : to;
   const days = leaveDays(from, end, halfDay);
@@ -45,7 +43,6 @@ export default function LeaveSheet({ open, onClose, companyId, branchId, user, s
           leaveKind: kind, from, to: end, halfDay: halfDay && from === end, reason: reason.trim(),
         },
       }).unwrap();
-      if (!approver) notify({ companyId, notification: { title: "New leave request", message: `${personName(user)} asked for ${days} day${days === 1 ? "" : "s"} of leave: ${reason.trim()}`, branchId, actionUrl: "/requested-panel" } }).catch(() => {});
       toast.success(approver ? "Leave recorded" : "Leave request sent", { description: `${days} day${days === 1 ? "" : "s"}${approver ? "" : " · waiting for approval"}` });
       setReason(""); setStaffId(""); setHalfDay(false);
       onClose?.();

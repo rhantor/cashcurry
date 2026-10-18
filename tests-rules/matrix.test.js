@@ -53,6 +53,7 @@ const PROBES = {
   "catalog.view": (u) => as(u).doc(`companies/${CO}/vendors/v1`).get(),
   "catalog.manage": (u) => as(u).doc(`companies/${CO}/vendors/v-${u}`).set({ name: "V" }),
   "branchSettings.manage": (u) => as(u).doc(`${B}/settings/settings`).update({ "basic.phone": `p-${u}` }),
+  "notifications.manage": (u) => as(u).doc(`${B}/settings/notifications`).set({ recipients: { "daily.sales": [u] } }),
   "moneySettings.manage": (u) => as(u).doc(`${B}/settings/settings`).update({ "financeSales.openingBalance": USERS.indexOf(u) + 1000 }),
 };
 

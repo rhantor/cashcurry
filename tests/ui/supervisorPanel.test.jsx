@@ -22,7 +22,6 @@ vi.mock("@/lib/redux/api/requestsApiSlice", () => ({
   useDecideRequestMutation: () => [decide],
   useAddLeaveMutation: () => [vi.fn(), { isLoading: false }],
 }));
-vi.mock("@/lib/redux/api/notificationApiSlice", () => ({ useAddNotificationMutation: () => [vi.fn()] }));
 
 const { default: SupervisorPanel } = await import("@/app/supervisor-panel/page.jsx");
 

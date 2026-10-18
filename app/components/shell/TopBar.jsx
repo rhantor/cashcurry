@@ -6,6 +6,7 @@ import { Avatar, LogoMark, Menu, cn } from "@/app/components/ui";
 import BranchSwitcher from "./BranchSwitcher";
 
 import { personName } from "@/lib/people";
+import NotificationBell from "@/app/components/notifications/NotificationBell";
 /**
  * The bar above every page: where you are, search (Ctrl+K), the branch, and you.
  * On phones it keeps to the essentials; the rest lives in the bottom bar.
@@ -79,6 +80,8 @@ export default function TopBar({ page, user, isCompany, branches, activeBranchId
             </span>
           )
         )}
+
+        <NotificationBell />
 
         <Menu
           align="end"

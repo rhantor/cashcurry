@@ -280,6 +280,10 @@ export function buildDemoCompany(today = new Date()) {
     cols[branchId].admins = USERS.filter(([role, , , b]) => role === "branchAdmin" && b === branchId).map(([role, username, name]) => ({
       id: uid(username), role, userName: username, fullName: name, email: emailOf(username), branchId, createdAt,
     }));
+    // the branch's other office users, as adding a branch user writes them (branches/{b}/users)
+    cols[branchId].users = USERS.filter(([role, , , b]) => b === branchId && !["branchAdmin", "staff"].includes(role)).map(([role, username, name]) => ({
+      id: uid(username), role, userName: username, fullName: name, email: emailOf(username), createdAt,
+    }));
     return {
       id: branchId,
       doc: { id: branchId, name: BRANCHES[branchId].name, code: BRANCHES[branchId].code, address: BRANCHES[branchId].address, contact: "", email: "", note: "Demo data" },

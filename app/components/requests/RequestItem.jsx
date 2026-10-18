@@ -2,7 +2,7 @@
 // One request of any type (lib/requests/model.js): who, what, how much or how
 // many days, where it has got to (who approved it, and their role), and
 // the buttons this person may use on it now.
-import { format, isValid, parseISO } from "date-fns";
+import { format, formatDistanceToNowStrict, isValid, parseISO } from "date-fns";
 import { Ban, Check, Clock3, HandCoins, X } from "lucide-react";
 import { Avatar, Badge, Button, Card, cn } from "@/app/components/ui";
 import { formatMoney } from "@/lib/region/currency";
@@ -14,6 +14,12 @@ const TYPE_TONE = { advance: "brand", staffLoan: "info", leave: "warning" };
 export const showDay = (v, pattern = "d MMM yyyy") => {
   const d = typeof v === "string" ? parseISO(v) : null;
   return d && isValid(d) ? format(d, pattern) : v || "";
+};
+
+/** "3 hours" — how long it has waited (only when the time is known, not just the day). */
+const since = (iso) => {
+  const d = parseISO(String(iso));
+  return isValid(d) && String(iso).length > 10 ? formatDistanceToNowStrict(d) : "";
 };
 
 /** "12 – 14 Nov 2026 · 3 days" */
@@ -54,10 +60,11 @@ function Trail({ req }) {
 
 /**
  * req: a request from toRequest · actions: what may be done now (actionsFor)
- * · onAction(action, req) · busy · currency · showWho (lists of
+ * · onAction(action, req) · busy · currency · branchName (when the list
+ * spans branches) · showWho (lists of
  * everyone's requests show the person; My requests too, for requests made for someone).
  */
-export default function RequestItem({ req, actions = [], onAction, busy, currency, showWho = true }) {
+export default function RequestItem({ req, actions = [], onAction, busy, currency, branchName, showWho = true }) {
   const type = REQUEST_TYPES[req.type];
   const stage = stageOf(req);
   const st = STAGES[stage] || STAGES.waiting;
@@ -65,6 +72,7 @@ export default function RequestItem({ req, actions = [], onAction, busy, currenc
   const facts = [
     isLeave ? { label: "When", value: leaveSpan(req) } : { label: "Date", value: showDay(req.date, "EEE, d MMM yyyy") },
     req.type === "staffLoan" && req.durationMonths ? { label: "Over", value: `${req.durationMonths} months` } : null,
+    stage === "waiting" && req.askedAt ? { label: "Waiting", value: since(req.askedAt) } : null,
     { label: "Asked by", value: req.createdBy?.name && req.createdBy.name !== req.staffName ? `${req.createdBy.name}${req.createdBy.role ? ` (${roleLabel(req.createdBy.role)})` : ""}` : "" },
   ].filter((f) => f?.value);
 
@@ -81,6 +89,11 @@ export default function RequestItem({ req, actions = [], onAction, busy, currenc
             <Badge tone={st.tone} className="px-2 py-px text-[10px]">
               {st.label}
             </Badge>
+            {branchName && (
+              <Badge tone="neutral" className="px-2 py-px text-[10px]">
+                {branchName}
+              </Badge>
+            )}
           </p>
           <dl className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-xs">
             {facts.map((f) => (

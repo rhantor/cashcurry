@@ -21,7 +21,7 @@ export default function useRequestActions({ companyId, branchId, user }) {
 
     setBusyId(req.id);
     try {
-      await decide({ companyId, branchId, type: sourceOf(req), id: req.id, action, user, reason }).unwrap();
+      await decide({ companyId, branchId: req.branchId || branchId, type: sourceOf(req), id: req.id, action, user, reason }).unwrap();
       if (action === "approve") {
         toast.success("Approved", {
           description: REQUEST_TYPES[req.type]?.money ? "It now waits to be paid out." : undefined,

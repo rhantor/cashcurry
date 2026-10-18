@@ -4,7 +4,6 @@
 // moves until it is approved and paid out.
 import { useState } from "react";
 import { useAddAdvanceEntryMutation } from "@/lib/redux/api/AdvanceApiSlice";
-import { useAddNotificationMutation } from "@/lib/redux/api/notificationApiSlice";
 import { newRequestFields } from "@/lib/requests/model";
 import { personName } from "@/lib/people";
 import { formatMoney } from "@/lib/region/currency";
@@ -18,7 +17,6 @@ export default function AdvanceAskSheet({ open, onClose, companyId, branchId, us
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
   const [addAdvance, { isLoading }] = useAddAdvanceEntryMutation();
-  const [notify] = useAddNotificationMutation();
 
   const save = async () => {
     const value = Number(amount) || 0;
@@ -41,8 +39,6 @@ export default function AdvanceAskSheet({ open, onClose, companyId, branchId, us
           createdBy: { uid: user.uid, name, role: user.role || "staff" },
         },
       }).unwrap();
-      // the approvers' bell (push notifications come with roadmap 4.3)
-      notify({ companyId, notification: { title: "New advance request", message: `${name} asked for ${formatMoney(value, currency)}: ${reason.trim()}`, branchId, actionUrl: "/requested-panel" } }).catch(() => {});
       toast.success("Request sent", { description: `${formatMoney(value, currency)} · waiting for approval` });
       setAmount(""); setReason("");
       onClose?.();

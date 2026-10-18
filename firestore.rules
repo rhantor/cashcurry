@@ -285,6 +285,11 @@ service cloud.firestore {
         (isBranchAdmin(u) && inBranch(u, b))
       );
     }
+    // who gets which notifications (4.3): company roles anywhere, a branch admin in their branch
+    function canNotificationsManage(c, b) {
+      let u = userData();
+      return isAuth() && u.companyId == c && (u.role in companyRoles() || (isBranchAdmin(u) && inBranch(u, b)));
+    }
     function canCatalogView(c)        { return mayInCompany(c, leadRoles().concat(['inCharge', 'accountant', 'supervisor'])); }
     function canCatalogManage(c)      { return mayInCompany(c, leadRoles().concat(['accountant'])); }
     function canBranchLoans(c)        { return mayInCompany(c, leadRoles().concat(['accountant'])); }
@@ -404,13 +409,26 @@ service cloud.firestore {
         match /fcmTokens/{token} {
           allow read, write: if isAuth() && request.auth.uid == uid;
         }
+
+        // Their notifications (4.3): written only by the server (Cloud
+        // Functions); the person reads them, marks them read, clears them.
+        match /inbox/{id} {
+          allow read, delete: if isAuth() && request.auth.uid == uid;
+          allow update: if isAuth() && request.auth.uid == uid && changedKeys().hasOnly(['readAt']);
+        }
+
+        // Their own choices, e.g. kinds of notification they muted
+        match /prefs/{doc} {
+          allow read, write: if isAuth() && request.auth.uid == uid;
+        }
       }
 
       // ── Notifications (Company Level) ──────────────────────────────────────
       match /notifications/{docId} {
         allow read: if belongsToCompany(companyId);
-        // anyone in the company may raise one (staff requests do); afterwards only "read" changes
-        allow create: if belongsToCompany(companyId);
+        // Old shared feed: read-only now — notifications are written by the
+        // server to each person's inbox (4.3). Before, anyone could post here.
+        allow create: if false;
         allow update: if belongsToCompany(companyId) && changedKeys().hasOnly(['read', 'readAt', 'updatedAt']);
         allow delete: if isOfficeMember(companyId);
       }
@@ -492,7 +510,15 @@ service cloud.firestore {
         // ── Branch Settings ─────────────────────────────────────────────────
         match /settings/{docId} {   // Fixed typo from branchSettings to settings!
           allow read: if canRead(companyId, branchId);
-          allow write: if canWriteBranchSettings(companyId, branchId);
+          // settings/notifications has its own rule below — not for managers
+          allow write: if docId != 'notifications' && canWriteBranchSettings(companyId, branchId);
+        }
+
+        // Who gets which notifications at this branch (4.3, lib/notify/model.js):
+        // chosen by owner, super admin, gm or the branch admin.
+        match /settings/notifications {
+          allow read: if canRead(companyId, branchId);
+          allow write: if canNotificationsManage(companyId, branchId);
         }
 
         // ── Branch Admins ─────────────────────────────────────────────────────

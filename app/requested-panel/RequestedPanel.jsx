@@ -27,7 +27,7 @@ import { Button, Skeleton, Tabs } from "@/app/components/ui";
 import { CountBadge } from "@/app/components/shell/SideNav";
 
 import { personName } from "@/lib/people";
-import { can } from "@/lib/authz/permissions";
+import { can, isCompanyRole } from "@/lib/authz/permissions";
 import useSession from "@/app/hooks/useSession";
 // Rejecting can't be taken back from here, so it asks first.
 const sureToReject = (what) => confirmDialog({ title: `Reject this ${what}?`, message: "The person who asked will see it as rejected.", confirmLabel: "Reject", danger: true });
@@ -57,9 +57,11 @@ export default function RequestedPanel() {
   const getBranchName = (id) => branches?.find((b) => b.id === id)?.name || id;
 
   // advances, staff loans and leave waiting — the inbox reads the same (cached) list
+  // (company roles: across every branch, as the inbox shows them first)
+  const allBranches = isCompanyRole(user?.role) && (branches?.length || 0) > 1 ? branches.map((b) => b.id) : null;
   const { data: waiting = [] } = useGetRequestsQuery(
-    { companyId, branchId, status: "pending" },
-    { skip: !companyId || !branchId, pollingInterval: 10000 }
+    { companyId, branchId, branchIds: allBranches, status: "pending" },
+    { skip: !companyId || (!branchId && !allBranches), pollingInterval: 15000 }
   );
   const [leaveOpen, setLeaveOpen] = useState(false);
   const { data: staff = [], isLoading: staffLoading } = useGetStaffListQuery({ companyId, branchId }, { skip: !companyId || !branchId || !leaveOpen });
@@ -241,7 +243,7 @@ export default function RequestedPanel() {
           <div className="flex justify-end">
             <Button variant="secondary" icon={CalendarPlus} onClick={() => setLeaveOpen(true)}>Record leave</Button>
           </div>
-          <RequestInbox companyId={companyId} branchId={branchId} user={user} />
+          <RequestInbox companyId={companyId} branchId={branchId} user={user} branches={branches || []} />
           <LeaveSheet open={leaveOpen} onClose={() => setLeaveOpen(false)} companyId={companyId} branchId={branchId} user={user} staff={staff} staffLoading={staffLoading} />
         </>
       )}
