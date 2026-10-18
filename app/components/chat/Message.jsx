@@ -113,7 +113,7 @@ export default function Message({ msg, me, showName, showAvatar, first, status, 
             <>
               {msg.forwarded && (
                 <p className={cn("flex items-center gap-1 text-[11px] italic", mine ? "text-white/80" : "text-muted")}>
-                  <Forward className="size-3" /> Forwarded{msg.forwarded.fromName ? ` from ${msg.forwarded.fromName}` : ""}
+                  <Forward className="size-3" /> Forwarded
                 </p>
               )}
               {msg.replyTo && (
