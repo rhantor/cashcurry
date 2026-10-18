@@ -10,10 +10,12 @@ import {
 } from "@/lib/redux/api/attendanceApiSlice";
 import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
 import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
-import { 
-  Clock, LogIn, LogOut, ChevronLeft, ChevronRight,
-  Camera, Download, List, LayoutGrid, Plus, Edit2, Trash2, Save, X as CloseIcon, Loader2
-} from "lucide-react";
+import { Clock, LogIn, LogOut, ChevronLeft, ChevronRight, Camera, Download, List, LayoutGrid, Plus, Trash2, Save, UserX } from "lucide-react";
+import { addMonths, format, parseISO } from "date-fns";
+import { Avatar, Badge, Button, Card, DataTable, DatePicker, EmptyState, Field, Input, Select, Sheet, Skeleton, Tabs, cn } from "@/app/components/ui";
+import { ChoiceCards } from "@/app/components/entry/Choices";
+import StatTiles from "@/app/components/purchases/StatTiles";
+import StatusScreen from "@/app/components/common/StatusScreen";
 import * as XLSX from "xlsx";
 import Cookies from "js-cookie";
 import { computeAttendance, formatHours as fmtHours, toLocalDateStr } from "@/lib/attendance/computeHours";
@@ -25,7 +27,6 @@ export default function AttendanceLogPage() {
   const [user, setUser] = useState(null);
   const [selectedDate, setSelectedDate] = useState(toLocalDateStr(new Date()));
   const [viewMode, setViewMode] = useState("daily"); // "daily" or "monthly"
-  const [photoModal, setPhotoModal] = useState(null);
   const [editModal, setEditModal] = useState(null); // { punch: null, mode: 'add' | 'edit' }
   const [isSaving, setIsSaving] = useState(false);
 
@@ -193,381 +194,323 @@ export default function AttendanceLogPage() {
   const sortedDaily = [...punches].sort((a, b) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
 
   const shiftDate = (days) => {
-    const d = new Date(selectedDate);
+    const d = parseISO(selectedDate); // local day — new Date("yyyy-MM-dd") is UTC
     d.setDate(d.getDate() + days);
     setSelectedDate(toLocalDateStr(d));
   };
 
-  if (!user) return <div className="p-8 text-center text-gray-400">Loading...</div>;
+  if (!user) return <Skeleton className="m-6 h-64" rounded="rounded-2xl" />;
+  if (!branchId) {
+    return <StatusScreen full={false} icon={Clock} tone="warning" title="Pick a branch first" message="Attendance is kept per branch — choose one from the top bar." />;
+  }
+
+  const today = toLocalDateStr(new Date());
+  const month = selectedDate.substring(0, 7);
+  const niceDay = format(parseISO(selectedDate), "EEEE, d MMM yyyy");
+  const niceMonth = format(parseISO(`${month}-01`), "MMMM yyyy");
+  const shiftMonth = (n) => setSelectedDate(toLocalDateStr(addMonths(parseISO(`${month}-01`), n)));
+
+  // the day's punches by person, in time order; whoever's last punch is "in" is still here
+  const byStaff = Object.values(
+    sortedDaily.reduce((acc, p) => {
+      (acc[p.staffId] = acc[p.staffId] || { staffId: p.staffId, name: p.staffName || "Unknown", punches: [] }).punches.push(p);
+      return acc;
+    }, {})
+  ).map((g) => ({ ...g, inNow: g.punches[g.punches.length - 1]?.type === "in" }));
+  const hereNow = byStaff.filter((g) => g.inNow).length;
+  const notIn = staffList.filter((s) => !byStaff.some((g) => g.staffId === s.id));
+
+  const openAdd = (staffId = "") => {
+    const s = staffList.find((x) => x.id === staffId);
+    setEditModal({ mode: "add", punch: { date: selectedDate, type: "in", staffId, staffName: s ? `${s.firstName} ${s.lastName}` : "" } });
+  };
+
+  const removePunch = async (punch) => {
+    const ok = await confirmDialog({
+      title: "Delete this punch?",
+      message: `${punch.staffName}'s ${punch.type === "in" ? "punch in" : "punch out"} at ${formatTime(punch.timestamp)} is removed, and their hours worked change to match.`,
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return false;
+    try {
+      await deletePunch({ companyId, branchId, punchId: punch.id }).unwrap();
+      toast.success("Punch deleted");
+      return true;
+    } catch (e) {
+      toast.error(e?.message ? `Couldn't delete it: ${e.message}` : "Couldn't delete it.");
+      return false;
+    }
+  };
+
+  const savePunch = async () => {
+    const p = editModal.punch;
+    setIsSaving(true);
+    try {
+      const timeStr = p.time || formatTime(p.timestamp);
+      const [h, m] = timeStr.split(":").map(Number);
+      const tsDate = parseISO(p.date); // the day on this device's clock, not UTC
+      tsDate.setHours(h, m, 0, 0);
+      const payload = { staffId: p.staffId, staffName: p.staffName, type: p.type, date: p.date, timestamp: tsDate.toISOString(), isManual: true };
+      if (editModal.mode === "add") await addPunch({ companyId, branchId, data: payload }).unwrap();
+      else await updatePunch({ companyId, branchId, punchId: p.id, data: payload }).unwrap();
+      toast.success(editModal.mode === "add" ? "Punch added" : "Punch saved");
+      setEditModal(null);
+    } catch (e) {
+      toast.error(e?.message ? `Couldn't save: ${e.message}` : "Couldn't save the punch.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const monthColumns = [
+    {
+      key: "name",
+      label: "Staff",
+      primary: true,
+      sortable: true,
+      render: (s) => (
+        <div className="min-w-0">
+          <p className="truncate font-semibold text-fg">{s.name}</p>
+          <p className="truncate text-[11px] font-normal text-muted">
+            {s.dept}
+            {shiftsOn && s.pendingOtDays > 0 && <span className="text-warning"> · {s.pendingOtDays} early OT waiting</span>}
+          </p>
+        </div>
+      ),
+    },
+    { key: "days", label: "Days", align: "right", sortable: true },
+    { key: "worked", label: "Worked", align: "right", sortable: true, render: (s) => formatHours(s.worked) },
+    { key: "basic", label: "Normal", align: "right", sortable: true, render: (s) => formatHours(s.basic) },
+    { key: "ot", label: "OT", align: "right", aside: true, sortable: true, render: (s) => <span className={cn(s.ot > 0 && "font-semibold text-warning")}>{formatHours(s.ot)} OT</span> },
+    ...(shiftsOn
+      ? [
+          {
+            key: "late",
+            label: "Late",
+            align: "right",
+            sortValue: (s) => s.lateMinutes,
+            render: (s) => (s.lateDays > 0 ? <span className="text-danger">{Math.round(s.lateMinutes)} min · {s.lateDays}d</span> : <span className="text-subtle">—</span>),
+          },
+        ]
+      : []),
+  ];
+
+  const p = editModal?.punch;
 
   return (
-    <div className="p-4 lg:p-8 max-w-6xl mx-auto">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-8">
+    <div className="mx-auto max-w-5xl space-y-4 px-4 py-5">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-black text-gray-900 flex items-center gap-2">
-            <Clock size={28} className="text-blue-600" />
-            Attendance Log
-          </h1>
-          <p className="text-sm text-gray-500 mt-1 font-medium">Professional time tracking and reporting</p>
+          <h1 className="text-2xl font-bold tracking-tight text-fg">Attendance</h1>
+          <p className="text-sm text-muted">Who punched in and out, and the hours that go to payroll.</p>
         </div>
-
-        <div className="flex items-center gap-3">
-          {/* View Toggle */}
-          <div className="flex bg-gray-100 p-1 rounded-xl border border-gray-200">
-            <button 
-              onClick={() => setViewMode("daily")}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === "daily" ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
-            >
-              <List size={14} /> Daily
-            </button>
-            <button 
-              onClick={() => setViewMode("monthly")}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${viewMode === "monthly" ? "bg-white text-blue-600 shadow-sm" : "text-gray-500 hover:text-gray-700"}`}
-            >
-              <LayoutGrid size={14} /> Monthly
-            </button>
-          </div>
-
-          <button
-            onClick={handleExport}
-            disabled={isExporting}
-            className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-emerald-200 transition-all disabled:opacity-50"
-          >
-            {isExporting ? <Loader2 size={18} className="animate-spin" /> : <Download size={18} />}
-            Time Card (.xlsx)
-          </button>
-
-          <button
-            onClick={() => setEditModal({ mode: "add", punch: { date: selectedDate, type: "in", staffId: "" } })}
-            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-lg shadow-blue-200 transition-all"
-          >
-            <Plus size={18} /> Add Manual
-          </button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" icon={Download} loading={isExporting} onClick={handleExport}>
+            Time card
+          </Button>
+          <Button icon={Plus} onClick={() => openAdd()}>
+            Add a punch
+          </Button>
         </div>
       </div>
 
-      {/* Date Navigator & Quick Stats */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 mb-8">
-        <div className="lg:col-span-4 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
-          <button onClick={() => shiftDate(-1)} className="p-2 rounded-xl hover:bg-gray-100 transition text-gray-600">
-            <ChevronLeft size={20} />
-          </button>
-          <div className="flex flex-col items-center">
-             <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-1">Select Date</span>
-             <input
-               type="date"
-               value={selectedDate}
-               onChange={(e) => setSelectedDate(e.target.value)}
-               className="border-none bg-transparent text-lg font-black text-gray-900 outline-none text-center"
-             />
-          </div>
-          <button
-            onClick={() => shiftDate(1)}
-            disabled={selectedDate === toLocalDateStr(new Date())}
-            className="p-2 rounded-xl hover:bg-gray-100 transition text-gray-600 disabled:opacity-30"
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Tabs
+          value={viewMode}
+          onChange={setViewMode}
+          tabs={[
+            { value: "daily", label: "Day", icon: List },
+            { value: "monthly", label: "Month", icon: LayoutGrid },
+          ]}
+        />
+        <div className="flex items-center gap-1 rounded-xl border border-line bg-surface p-1 shadow-card">
+          <Button size="icon" variant="ghost" className="size-9" aria-label={viewMode === "daily" ? "Day before" : "Month before"} onClick={() => (viewMode === "daily" ? shiftDate(-1) : shiftMonth(-1))}>
+            <ChevronLeft className="size-4" />
+          </Button>
+          {viewMode === "daily" ? (
+            <DatePicker value={selectedDate} onChange={(v) => v && setSelectedDate(v)} max={today} className="[&_button]:h-9 [&_button]:border-0 [&_button]:shadow-none" />
+          ) : (
+            <span className="min-w-[8.5rem] text-center text-sm font-semibold text-fg">{niceMonth}</span>
+          )}
+          <Button
+            size="icon"
+            variant="ghost"
+            className="size-9"
+            aria-label={viewMode === "daily" ? "Next day" : "Next month"}
+            disabled={viewMode === "daily" ? selectedDate >= today : month >= today.substring(0, 7)}
+            onClick={() => (viewMode === "daily" ? shiftDate(1) : shiftMonth(1))}
           >
-            <ChevronRight size={20} />
-          </button>
-        </div>
-
-        <div className="lg:col-span-8 grid grid-cols-3 gap-4">
-           {[
-             { label: "Active Today", val: new Set(sortedDaily.map(p => p.staffId)).size, color: "text-blue-600" },
-             { label: "Punch Ins", val: sortedDaily.filter(p => p.type === "in").length, color: "text-green-600" },
-             { label: "Total Punches", val: sortedDaily.length, color: "text-gray-400" }
-           ].map((s, i) => (
-             <div key={i} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm text-center">
-                <div className={`text-2xl font-black ${s.color}`}>{s.val}</div>
-                <div className="text-[10px] text-gray-500 font-bold uppercase mt-1 tracking-tight">{s.label}</div>
-             </div>
-           ))}
+            <ChevronRight className="size-4" />
+          </Button>
         </div>
       </div>
 
-      {/* Main Content Area */}
       {viewMode === "daily" ? (
-        // DAILY LOG VIEW
-        isLoadingDaily ? (
-          <div className="text-center py-20 text-gray-400 animate-pulse font-bold">Loading daily records...</div>
-        ) : sortedDaily.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-200">
-            <Clock size={48} className="mx-auto text-gray-200 mb-4" />
-            <p className="text-gray-400 font-bold">No attendance records for this date</p>
-          </div>
-        ) : (
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="grid grid-cols-12 gap-4 px-6 py-4 bg-gray-50 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">
-              <div className="col-span-4">Staff Member</div>
-              <div className="col-span-2">Type</div>
-              <div className="col-span-3">Time</div>
-              <div className="col-span-3">Photo Verification</div>
+        <>
+          <StatTiles
+            loading={isLoadingDaily}
+            tiles={[
+              { label: selectedDate === today ? "In now" : "Still in at the end", value: `${hereNow}`, note: `${byStaff.length} came in ${selectedDate === today ? "today" : "that day"}`, icon: LogIn, tone: "bg-success-soft text-success" },
+              { label: "Didn't punch in", value: `${notIn.length}`, note: notIn.length ? notIn.slice(0, 3).map((s) => s.firstName).join(", ") + (notIn.length > 3 ? "…" : "") : "Everyone came", icon: UserX, tone: notIn.length ? "bg-warning-soft text-warning" : "bg-surface-2 text-muted" },
+              { label: "Punches", value: `${sortedDaily.length}`, note: `${sortedDaily.filter((x) => x.isManual).length} added by hand`, icon: Clock, tone: "bg-surface-2 text-muted" },
+            ]}
+          />
+
+          {isLoadingDaily ? (
+            <div className="space-y-2">
+              <Skeleton className="h-16" rounded="rounded-2xl" />
+              <Skeleton className="h-16" rounded="rounded-2xl" />
             </div>
-
-            <div className="divide-y divide-gray-50">
-              {sortedDaily.map((punch) => (
-                <div key={punch.id} className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-gray-50/50 transition">
-                  <div className="col-span-4 font-black text-gray-900 truncate tracking-tight">{punch.staffName}</div>
-                  <div className="col-span-2">
-                    <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-black border ${
-                      punch.type === "in"
-                        ? "bg-green-50 text-green-600 border-green-100"
-                        : "bg-orange-50 text-orange-600 border-orange-100"
-                    }`}>
-                      {punch.type === "in" ? <LogIn size={10} /> : <LogOut size={10} />}
-                      {punch.type.toUpperCase()}
-                    </span>
-                  </div>
-                  <div className="col-span-3 text-gray-600 font-black tabular-nums flex items-center gap-2">
-                    {formatTime(punch.timestamp)}
-                    {punch.isManual && <span className="text-[9px] bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded">MANUAL</span>}
-                  </div>
-                  <div className="col-span-3 flex items-center gap-4">
-                    {punch.photoBase64 ? (
-                      <button
-                        onClick={() => setPhotoModal(punch)}
-                        className="flex items-center gap-1.5 text-blue-600 hover:text-blue-800 text-xs font-black"
-                      >
-                        <Camera size={14} /> SNAP
-                      </button>
-                    ) : (
-                      <span className="text-gray-300 text-[10px] font-bold italic">No photo</span>
-                    )}
-
-                    <div className="flex items-center gap-2 ml-auto">
-                      <button 
-                        onClick={() => setEditModal({ mode: "edit", punch })}
-                        className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-blue-600 transition-colors"
-                      >
-                        <Edit2 size={14} />
-                      </button>
-                      <button 
-                        onClick={async () => {
-                          if (await confirmDialog({ title: "Delete this punch?", message: "It is removed from the attendance log and from the hours worked.", danger: true })) {
-                            deletePunch({ companyId, branchId, punchId: punch.id });
-                          }
-                        }}
-                        className="p-1.5 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-red-600 transition-colors"
-                      >
-                        <Trash2 size={14} />
-                      </button>
+          ) : byStaff.length === 0 ? (
+            <Card>
+              <EmptyState icon={Clock} title={`No punches on ${niceDay}`} description="Punches from the kiosk show here as staff come and go. Add one by hand if someone forgot." action={<Button icon={Plus} onClick={() => openAdd()}>Add a punch</Button>} />
+            </Card>
+          ) : (
+            <Card className="divide-y divide-line overflow-hidden p-0">
+              {byStaff.map((g) => (
+                <div key={g.staffId} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:gap-4 sm:p-4">
+                  <div className="flex min-w-0 items-center gap-3 sm:w-56">
+                    <Avatar name={g.name} size="md" />
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-fg">{g.name}</p>
+                      {g.inNow ? <Badge tone="success" dot pulse={selectedDate === today}>In</Badge> : <Badge>Left</Badge>}
                     </div>
+                  </div>
+                  <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+                    {g.punches.map((x) => (
+                      <button
+                        key={x.id}
+                        type="button"
+                        onClick={() => setEditModal({ mode: "edit", punch: x })}
+                        className={cn(
+                          "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-semibold tabular-nums transition-colors hover:brightness-95",
+                          x.type === "in" ? "border-success/30 bg-success-soft text-success" : "border-warning/30 bg-warning-soft text-warning"
+                        )}
+                      >
+                        {x.type === "in" ? <LogIn className="size-3" /> : <LogOut className="size-3" />}
+                        {formatTime(x.timestamp)}
+                        {x.photoBase64 && <Camera className="size-3 opacity-70" />}
+                        {x.isManual && <span className="text-[10px] font-medium opacity-70">by hand</span>}
+                      </button>
+                    ))}
+                    <button type="button" onClick={() => openAdd(g.staffId)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-muted hover:bg-surface-2 hover:text-fg" aria-label={`Add a punch for ${g.name}`}>
+                      <Plus className="size-3" /> Add
+                    </button>
                   </div>
                 </div>
               ))}
-            </div>
-          </div>
-        )
+            </Card>
+          )}
+        </>
       ) : (
-        // MONTHLY SUMMARY VIEW
-        isLoadingMonthly ? (
-          <div className="text-center py-20 text-gray-400 animate-pulse font-bold">Aggregating monthly data...</div>
-        ) : monthlySummaries.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-3xl border border-dashed border-gray-200">
-             <LayoutGrid size={48} className="mx-auto text-gray-200 mb-4" />
-             <p className="text-gray-400 font-bold">No data found for {selectedDate.substring(0, 7)}</p>
-          </div>
-        ) : (
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="grid grid-cols-12 gap-4 px-6 py-4 bg-gray-900 text-[10px] font-black text-gray-400 uppercase tracking-widest">
-              <div className={`${shiftsOn ? "col-span-3" : "col-span-3"} text-white`}>Staff Member</div>
-              <div className={shiftsOn ? "col-span-1" : "col-span-2"}>Dept</div>
-              <div className="col-span-1 text-center font-black">Days</div>
-              <div className="col-span-2 text-right">Worked (H)</div>
-              <div className="col-span-2 text-right">Basic (H)</div>
-              <div className={`${shiftsOn ? "col-span-1" : "col-span-2"} text-right text-orange-400`}>OT (H)</div>
-              {shiftsOn && <div className="col-span-2 text-right text-red-400">Late</div>}
-            </div>
-            <div className="divide-y divide-gray-50">
-               {monthlySummaries.map(s => (
-                 <div key={s.id} className="grid grid-cols-12 gap-4 px-6 py-4 items-center hover:bg-blue-50/30 transition text-sm">
-                    <div className="col-span-3 font-black text-gray-900">
-                      {s.name}
-                      {shiftsOn && s.pendingOtDays > 0 && (
-                        <span className="ml-2 inline-block px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[10px] font-black align-middle">
-                          {s.pendingOtDays} OT pending
-                        </span>
-                      )}
-                    </div>
-                    <div className={`${shiftsOn ? "col-span-1" : "col-span-2"} text-xs text-gray-400 font-bold uppercase truncate`}>{s.dept}</div>
-                    <div className="col-span-1 text-center font-black text-gray-900">{s.days}</div>
-                    <div className="col-span-2 text-right font-bold text-gray-600">{formatHours(s.worked)}</div>
-                    <div className="col-span-2 text-right font-black text-blue-600">{formatHours(s.basic)}</div>
-                    <div className={`${shiftsOn ? "col-span-1" : "col-span-2"} text-right font-black text-orange-500`}>{formatHours(s.ot)}</div>
-                    {shiftsOn && (
-                      <div className="col-span-2 text-right">
-                        {s.lateDays > 0 ? (
-                          <span className="font-black text-red-600">
-                            {Math.round(s.lateMinutes)} min
-                            <span className="ml-1 text-[10px] font-bold text-red-400">
-                              ({s.lateDays}d)
-                            </span>
-                          </span>
-                        ) : (
-                          <span className="text-xs font-bold text-gray-300">—</span>
-                        )}
-                      </div>
-                    )}
-                 </div>
-               ))}
-            </div>
-          </div>
-        )
+        <DataTable
+          columns={monthColumns}
+          rows={monthlySummaries}
+          loading={isLoadingMonthly}
+          pageSize={0}
+          defaultSort={{ key: "name", dir: "asc" }}
+          empty={{ icon: LayoutGrid, title: `No punches in ${niceMonth}`, description: "The month's hours show here once staff punch in." }}
+          footer={
+            monthlySummaries.length
+              ? {
+                  name: "Total",
+                  days: monthlySummaries.reduce((n, s) => n + s.days, 0),
+                  worked: formatHours(monthlySummaries.reduce((n, s) => n + s.worked, 0)),
+                  ot: `${formatHours(monthlySummaries.reduce((n, s) => n + s.ot, 0))} OT`,
+                }
+              : null
+          }
+        />
       )}
 
-      {/* Edit/Add Modal */}
-      {editModal && (
-        <div className="fixed inset-0 z-[150] bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-md shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
-            <div className="p-6 border-b flex justify-between items-center bg-gray-50">
-              <h3 className="text-lg font-black text-gray-900">{editModal.mode === "add" ? "Add Manual Punch" : "Edit Punch Record"}</h3>
-              <button onClick={() => setEditModal(null)} className="text-gray-400 hover:text-gray-600 p-2"><CloseIcon size={20} /></button>
+      {/* add or change a punch */}
+      <Sheet
+        open={!!editModal}
+        onClose={() => setEditModal(null)}
+        title={editModal?.mode === "add" ? "Add a punch" : `${p?.staffName || "Punch"}`}
+        description={editModal?.mode === "add" ? "For when someone forgot to punch at the kiosk." : `${p?.type === "in" ? "Punch in" : "Punch out"} · ${p ? formatTime(p.timestamp) : ""}${p?.method ? ` · ${p.method}` : ""}`}
+        footer={
+          <div className="flex items-center justify-between gap-2">
+            {editModal?.mode === "edit" ? (
+              <Button
+                variant="ghost"
+                icon={Trash2}
+                className="text-danger hover:bg-danger-soft"
+                onClick={async () => {
+                  if (await removePunch(p)) setEditModal(null);
+                }}
+              >
+                Delete
+              </Button>
+            ) : (
+              <span />
+            )}
+            <div className="flex gap-2">
+              <Button variant="ghost" onClick={() => setEditModal(null)}>
+                Cancel
+              </Button>
+              <Button icon={Save} loading={isSaving} disabled={!p?.staffId || (!p?.time && !p?.timestamp)} onClick={savePunch}>
+                Save
+              </Button>
             </div>
-            
-            <div className="p-6 space-y-5">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-500 uppercase">Staff Member</label>
-                <select 
-                  className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800 focus:ring-2 focus:ring-blue-500 outline-none"
-                  value={editModal.punch.staffId}
+          </div>
+        }
+      >
+        {p && (
+          <div className="space-y-4">
+            {p.photoBase64 && (
+              <img src={p.photoBase64} alt={`${p.staffName} at the kiosk`} className="mx-auto max-h-64 rounded-2xl object-contain" />
+            )}
+            <Field label="Staff member">
+              {({ id }) => (
+                <Select
+                  id={id}
+                  value={p.staffId}
                   disabled={editModal.mode === "edit"}
                   onChange={(e) => {
-                    const s = staffList.find(x => x.id === e.target.value);
-                    setEditModal(prev => ({ ...prev, punch: { ...prev.punch, staffId: e.target.value, staffName: s ? `${s.firstName} ${s.lastName}` : "" } }))
+                    const s = staffList.find((x) => x.id === e.target.value);
+                    setEditModal((prev) => ({ ...prev, punch: { ...prev.punch, staffId: e.target.value, staffName: s ? `${s.firstName} ${s.lastName}` : "" } }));
                   }}
                 >
-                  <option value="">Select Staff...</option>
-                  {staffList.map(s => <option key={s.id} value={s.id}>{s.firstName} {s.lastName}</option>)}
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Date</label>
-                  <input 
-                    type="date" 
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800"
-                    value={editModal.punch.date}
-                    onChange={(e) => setEditModal(prev => ({ ...prev, punch: { ...prev.punch, date: e.target.value } }))}
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-bold text-gray-500 uppercase">Time</label>
-                  <input 
-                    type="time" 
-                    className="w-full bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5 text-sm font-bold text-slate-800"
-                    value={editModal.punch.time || (editModal.punch.timestamp?.seconds ? formatTime(editModal.punch.timestamp) : "")}
-                    onChange={(e) => setEditModal(prev => ({ ...prev, punch: { ...prev.punch, time: e.target.value } }))}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-gray-500 uppercase">Punch Type</label>
-                <div className="flex gap-2">
-                  {["in", "out"].map(t => (
-                    <button
-                      key={t}
-                      onClick={() => setEditModal(prev => ({ ...prev, punch: { ...prev.punch, type: t } }))}
-                      className={`flex-1 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest border transition-all ${
-                        editModal.punch.type === t 
-                          ? (t === "in" ? "bg-green-600 border-green-600 text-white shadow-lg shadow-green-100" : "bg-orange-600 border-orange-600 text-white shadow-lg shadow-orange-100")
-                          : "bg-white border-slate-200 text-slate-400 hover:border-slate-300"
-                      }`}
-                    >
-                      {t}
-                    </button>
+                  <option value="">Choose…</option>
+                  {staffList.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.firstName} {s.lastName}
+                    </option>
                   ))}
-                </div>
-              </div>
+                </Select>
+              )}
+            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Day">{() => <DatePicker value={p.date} max={today} onChange={(v) => setEditModal((prev) => ({ ...prev, punch: { ...prev.punch, date: v } }))} />}</Field>
+              <Field label="Time">
+                {({ id }) => (
+                  <Input
+                    id={id}
+                    type="time"
+                    value={p.time || (p.timestamp?.seconds ? formatTime(p.timestamp) : "")}
+                    onChange={(e) => setEditModal((prev) => ({ ...prev, punch: { ...prev.punch, time: e.target.value } }))}
+                  />
+                )}
+              </Field>
             </div>
-
-            <div className="p-6 bg-slate-50 border-t flex gap-3">
-              <button 
-                onClick={() => setEditModal(null)}
-                className="flex-1 py-3 rounded-xl bg-white border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button 
-                disabled={isSaving || !editModal.punch.staffId || !editModal.punch.time && !editModal.punch.timestamp}
-                onClick={async () => {
-                  setIsSaving(true);
-                  try {
-                    const timeStr = editModal.punch.time || formatTime(editModal.punch.timestamp);
-                    const [h, m] = timeStr.split(":").map(Number);
-                    const tsDate = new Date(editModal.punch.date);
-                    tsDate.setHours(h, m, 0, 0);
-                    
-                    const payload = {
-                      staffId: editModal.punch.staffId,
-                      staffName: editModal.punch.staffName,
-                      type: editModal.punch.type,
-                      date: editModal.punch.date,
-                      timestamp: tsDate.toISOString(),
-                      isManual: true
-                    };
-
-                    if (editModal.mode === "add") {
-                      await addPunch({ companyId, branchId, data: payload }).unwrap();
-                    } else {
-                      await updatePunch({ companyId, branchId, punchId: editModal.punch.id, data: payload }).unwrap();
-                    }
-                    setEditModal(null);
-                  } catch {
-                    toast.error("Save failed");
-                  } finally {
-                    setIsSaving(false);
-                  }
-                }}
-                className="flex-1 py-3 rounded-xl bg-gray-900 text-white font-bold hover:bg-black transition-all flex items-center justify-center gap-2"
-              >
-                {isSaving ? <Loader2 className="animate-spin" size={18} /> : <><Save size={18} /> Save Changes</>}
-              </button>
-            </div>
+            <Field label="In or out">
+              {() => (
+                <ChoiceCards
+                  value={p.type}
+                  onChange={(t) => setEditModal((prev) => ({ ...prev, punch: { ...prev.punch, type: t } }))}
+                  className="grid-cols-2"
+                  options={[
+                    { value: "in", title: "Punch in", note: "Started work", icon: LogIn, tone: "brand" },
+                    { value: "out", title: "Punch out", note: "Finished or a break", icon: LogOut, tone: "warning" },
+                  ]}
+                />
+              )}
+            </Field>
           </div>
-        </div>
-      )}
-
-      {/* Photo / Snapshot Modal */}
-      {photoModal && (
-        <div
-          className="fixed inset-0 z-[160] bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
-          onClick={() => setPhotoModal(null)}
-        >
-          <div
-            className="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="p-4 border-b flex justify-between items-center bg-gray-50">
-              <div>
-                <h3 className="text-base font-black text-gray-900">{photoModal.staffName}</h3>
-                <p className="text-xs text-gray-500 font-semibold flex items-center gap-2">
-                  <span className={photoModal.type === "in" ? "text-green-600" : "text-orange-600"}>
-                    {photoModal.type === "in" ? "Punch IN" : "Punch OUT"}
-                  </span>
-                  · {formatTime(photoModal.timestamp)}
-                  {photoModal.method && (
-                    <span className="uppercase bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded text-[9px] font-bold">
-                      {photoModal.method}
-                    </span>
-                  )}
-                </p>
-              </div>
-              <button onClick={() => setPhotoModal(null)} className="text-gray-400 hover:text-gray-600 p-2">
-                <CloseIcon size={20} />
-              </button>
-            </div>
-            <div className="bg-gray-900 flex items-center justify-center">
-              <img
-                src={photoModal.photoBase64}
-                alt={`${photoModal.staffName} snapshot`}
-                className="w-full h-auto object-contain max-h-[70vh]"
-              />
-            </div>
-          </div>
-        </div>
-      )}
+        )}
+      </Sheet>
     </div>
   );
 }
