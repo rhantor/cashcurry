@@ -1,0 +1,537 @@
+// exportPayroll: the helpers part (moved from exportPayroll.js unchanged).
+/**
+ * Payroll exporters — PDF (jsPDF + autoTable) and Excel (xlsx)
+ * Mirrors the PayrollSummaryTable layout: landscape sheet + per-dept grouping.
+ */
+
+import autoTable from 'jspdf-autotable'
+import { fmtAmt, periodLabel } from '@/utils/payrollCalculations'
+
+
+export const RM = v => `RM ${fmtAmt(v || 0)}`
+
+export const n2 = v => Number(v || 0).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+
+export const dash = v => (Number(v || 0) > 0 ? n2(v) : '-')
+
+export const num = v => Number(Number(v || 0).toFixed(2))
+
+// ─── Build column definitions ─────────────────────────────────────────────────
+
+export function buildCols (slips) {
+  const statKeys = []
+  const statNames = {}
+  for (const s of slips) {
+    for (const d of (s.statutory || [])) {
+      if (!statNames[d.key]) { statKeys.push(d.key); statNames[d.key] = d.name }
+    }
+  }
+  const tot = slips.reduce((a, s) => ({
+    otPay:          (a.otPay          || 0) + Number(s.otPay          || 0),
+    allowance:      (a.allowance      || 0) + Number(s.allowance      || 0),
+    advanceAmt:     (a.advanceAmt     || 0) + Number(s.advanceAmt     || 0),
+    loanAmt:        (a.loanAmt        || 0) + Number(s.loanAmt        || 0),
+    otherEarnings:  (a.otherEarnings  || 0) + Number(s.otherEarnings  || 0),
+    penalty:        (a.penalty        || 0) + Number(s.penalty        || 0),
+    otherDeductions:(a.otherDeductions|| 0) + Number(s.otherDeductions|| 0),
+    bonus:          (a.bonus          || 0) + Number(s.bonus          || 0),
+    phPay:          (a.phPay          || 0) + Number(s.phPay          || 0),
+  }), {})
+  return {
+    statKeys, statNames,
+    showOT:      tot.otPay          > 0,
+    showPH:      tot.phPay          > 0,
+    showBonus:   tot.bonus          > 0,
+    showAdvance: tot.advanceAmt     > 0,
+    showLoan:    tot.loanAmt        > 0,
+    showOtherE:  tot.otherEarnings  > 0,
+    showPenalty: tot.penalty        > 0,
+    showOtherD:  tot.otherDeductions > 0,
+  }
+}
+
+// Build header and a row array for one slip
+export function buildHeaders (cols) {
+  const h = ['#', 'Name', 'Designation', 'Basic / Rate', 'Earned Basic', 'Work Hrs']
+  if (cols.showOT) { h.push('OT Hrs'); h.push('OT Pay') }
+  if (cols.showPH) h.push('PH Pay')
+  h.push('Allowance')
+  if (cols.showBonus) h.push('Bonus')
+  cols.statKeys.forEach(k => h.push(cols.statNames[k]))
+  if (cols.showAdvance) h.push('Advance')
+  if (cols.showLoan)    h.push('Loan')
+  if (cols.showOtherE)  h.push('Other Earn.')
+  if (cols.showPenalty) h.push('Penalty')
+  if (cols.showOtherD)  h.push('Other Ded.')
+  h.push('Total Salary')
+  h.push('Net Pay')
+  h.push('Remarks')
+  return h
+}
+
+export function buildPDFHeaders (cols) {
+  const h1 = [
+    { content: 'Employee', colSpan: 2, styles: { halign: 'left' } },
+    'Designation', 'Basic/Rate', 'Basic Pay', 'Work Hrs'
+  ]
+  const h2 = [
+    { content: '#', styles: { halign: 'center' } },
+    { content: 'Name', styles: { halign: 'left' } },
+    'Role', 'amt / rate', 'RM', 'hrs'
+  ]
+
+  if (cols.showOT) {
+    h1.push({ content: 'Overtime', colSpan: 2 })
+    h2.push('OT hrs', 'OT Pay')
+  }
+  if (cols.showPH) {
+    h1.push('PH Pay')
+    h2.push('RM')
+  }
+  h1.push('Allowance')
+  h2.push('RM')
+  
+  if (cols.showBonus) {
+    h1.push({ content: 'Bonus', styles: { textColor: [22, 101, 52] } })
+    h2.push({ content: 'RM', styles: { textColor: [22, 101, 52] } })
+  }
+  cols.statKeys.forEach(k => {
+    h1.push({ content: cols.statNames[k], styles: { textColor: [153, 27, 27] } })
+    h2.push({ content: 'RM', styles: { textColor: [153, 27, 27] } })
+  })
+  if (cols.showAdvance) {
+    h1.push({ content: 'Advance', styles: { textColor: [153, 27, 27] } })
+    h2.push({ content: 'RM', styles: { textColor: [153, 27, 27] } })
+  }
+  if (cols.showLoan) {
+    h1.push({ content: 'Loan', styles: { textColor: [153, 27, 27] } })
+    h2.push({ content: 'RM', styles: { textColor: [153, 27, 27] } })
+  }
+  if (cols.showOtherE) {
+    h1.push({ content: 'Other Earn.', styles: { textColor: [22, 101, 52] } })
+    h2.push({ content: 'RM', styles: { textColor: [22, 101, 52] } })
+  }
+  if (cols.showPenalty) {
+    h1.push({ content: 'Penalty', styles: { textColor: [153, 27, 27] } })
+    h2.push({ content: 'RM', styles: { textColor: [153, 27, 27] } })
+  }
+  if (cols.showOtherD) {
+    h1.push({ content: 'Deduction', styles: { textColor: [153, 27, 27] } })
+    h2.push({ content: 'RM', styles: { textColor: [153, 27, 27] } })
+  }
+
+  h1.push(
+    { content: 'Total Salary', styles: { fontStyle: 'bold' } },
+    { content: 'Net Pay', styles: { fontStyle: 'bold', textColor: [22, 101, 52] } },
+    { content: 'Remarks', styles: { halign: 'left' } }
+  )
+  h2.push(
+    { content: 'RM', styles: { fontStyle: 'bold' } },
+    { content: 'RM', styles: { fontStyle: 'bold', textColor: [22, 101, 52] } },
+    { content: 'notes', styles: { halign: 'left', fontStyle: 'normal' } }
+  )
+
+  return [h1, h2]
+}
+
+export function buildRow (s, idx, cols) {
+  const isH = s.salaryMode === 'hours'
+  const remarks = [
+    s.loanAmt > 0 && `Loan: ${RM(s.loanAmt)}`,
+    s.penalty > 0 && s.penaltyNote && `Penalty: ${s.penaltyNote}`,
+    s.otherDeductionsNote && s.otherDeductions > 0 && s.otherDeductionsNote,
+    s.otherEarningsNote   && s.otherEarnings   > 0 && s.otherEarningsNote,
+    s.extraNote,
+  ].filter(Boolean).join(' | ')
+
+  const basicAndRate = `${n2(s.basicSalary)} / ${n2(isH ? (s.basicSalary / (s.standardHours || 208)) : (s.basicSalary / (s.workingDays || 26)))}`
+
+  const row = [
+    idx + 1,
+    s.staffName,
+    s.designation || '',
+    basicAndRate,
+    n2(s.basePay),
+    isH ? n2(s.workedHours) : `${s.workedDays || 0}d`,
+  ]
+  if (cols.showOT) { row.push(n2(s.otHours || 0)); row.push(n2(s.otPay || 0)) }
+  if (cols.showPH) row.push(n2(s.phPay || 0))
+  row.push(dash(s.allowance))
+  if (cols.showBonus) row.push(dash(s.bonus))
+  cols.statKeys.forEach(k => {
+    const f = (s.statutory || []).find(x => x.key === k)
+    row.push(dash(f?.employeeAmt))
+  })
+  if (cols.showAdvance) row.push(dash(s.advanceAmt))
+  if (cols.showLoan)    row.push(dash(s.loanAmt))
+  if (cols.showOtherE)  row.push(dash(s.otherEarnings))
+  if (cols.showPenalty) row.push(dash(s.penalty))
+  if (cols.showOtherD)  row.push(dash(s.otherDeductions))
+  row.push(n2(s.grossEarnings))
+  row.push(n2(s.netPay))
+  row.push(remarks)
+  return row
+}
+
+export function buildTotalRow (label, data, cols) {
+  const row = ['', label, '', '', n2(data.basePay), n2(data.workedHours)]
+  if (cols.showOT) { row.push(n2(data.otHours)); row.push(n2(data.otPay)) }
+  if (cols.showPH) row.push(n2(data.phPay || 0))
+  row.push(n2(data.allowance))
+  if (cols.showBonus) row.push(n2(data.bonus || 0))
+  cols.statKeys.forEach(k => row.push(n2(data.stat?.[k] || 0)))
+  if (cols.showAdvance) row.push(n2(data.advanceAmt))
+  if (cols.showLoan)    row.push(n2(data.loanAmt))
+  if (cols.showOtherE)  row.push(n2(data.otherEarnings))
+  if (cols.showPenalty) row.push(n2(data.penalty))
+  if (cols.showOtherD)  row.push(n2(data.otherDeductions))
+  row.push(n2(data.grossEarnings))
+  row.push(n2(data.netPay))
+  row.push('')
+  return row
+}
+
+// ─── Shared Payslip Drawing Helper ────────────────────────────────────────────
+
+export function drawPayslipToPDF (doc, slip, branchName = '', period = '', companyName = '') {
+  const currency = 'RM'
+  const fmt      = v => `${currency} ${fmtAmt(v || 0)}`
+  const isHours  = slip.salaryMode === 'hours'
+
+    // Header — left side: company + branch
+    let y = 12
+    if (companyName) {
+      doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139)
+      doc.text(companyName.toUpperCase(), 14, y)
+      y += 5
+    }
+    doc.setFontSize(16); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 41, 59)
+    const splitBranch = doc.splitTextToSize(branchName, 130)
+    doc.text(splitBranch, 14, y)
+    y += (splitBranch.length * 6)
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139)
+    doc.text('EMPLOYEE SALARY VOUCHER', 14, y)
+
+    // Header — right side
+    doc.setFontSize(10); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 41, 59)
+    doc.text('SALARY VOUCHER', 196, 12, { align: 'right' })
+    doc.setFontSize(8); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139)
+    doc.text(`No: ${period}-${(slip.staffId || '').slice(-4).toUpperCase()}`, 196, 18, { align: 'right' })
+    doc.text(`Period: ${periodLabel(period)}`, 196, 23, { align: 'right' })
+
+
+
+    const dividerY = y + 5
+    doc.setDrawColor(30, 41, 59); doc.setLineWidth(0.5)
+    doc.line(14, dividerY, 196, dividerY)
+    const afterHeader = dividerY + 4
+
+    // Employee info
+    const infoBody = [
+      [
+        { content: 'EMPLOYEE NAME', styles: { fontSize: 7, textColor: [148, 163, 184], fontStyle: 'normal' } },
+        { content: 'DESIGNATION', styles: { fontSize: 7, textColor: [148, 163, 184], fontStyle: 'normal' } },
+        { content: 'PAY MODE', styles: { fontSize: 7, textColor: [148, 163, 184], fontStyle: 'normal' } }
+      ],
+      [
+        { content: slip.staffName || '', styles: { fontSize: 9, fontStyle: 'bold' } },
+        { content: slip.designation || '—', styles: { fontSize: 9, fontStyle: 'bold' } },
+        { content: isHours ? 'Hourly (Monthly)' : 'Daily (Monthly)', styles: { fontSize: 9, fontStyle: 'bold' } }
+      ],
+      [
+        { content: 'BASIC SALARY', styles: { fontSize: 7, textColor: [148, 163, 184], fontStyle: 'normal' } },
+        { content: isHours ? 'STANDARD HOURS' : 'WORKING DAYS', styles: { fontSize: 7, textColor: [148, 163, 184], fontStyle: 'normal' } },
+        { content: isHours ? 'HOURLY RATE' : 'DAILY RATE', styles: { fontSize: 7, textColor: [148, 163, 184], fontStyle: 'normal' } }
+      ],
+      [
+        { content: fmt(slip.basicSalary), styles: { fontSize: 9, fontStyle: 'bold' } },
+        { content: isHours ? `${slip.standardHours || 208} hrs/month` : `${slip.workingDays || 26} days/month`, styles: { fontSize: 9, fontStyle: 'bold' } },
+        { content: isHours ? `${currency} ${fmtAmt(slip.basicSalary / (slip.standardHours || 208))}/hr` : `${currency} ${fmtAmt(slip.basicSalary / (slip.workingDays || 26))}/day`, styles: { fontSize: 9, fontStyle: 'bold' } }
+      ]
+    ]
+
+    autoTable(doc, {
+      startY: afterHeader,
+      body: infoBody,
+      theme: 'grid',
+      styles: { cellPadding: 3, textColor: [30, 41, 59], fillColor: [248, 250, 252], lineColor: [226, 232, 240], lineWidth: 0.1 },
+      tableWidth: 182,
+      margin: { left: 14 },
+    })
+    const afterInfo = doc.lastAutoTable.finalY
+
+    // Earnings
+    const earnings = [
+      [`Basic Pay${isHours && slip.workedHours < slip.standardHours ? ` (${slip.workedHours}/${slip.standardHours} hrs)` : !isHours && slip.workedDays < slip.workingDays ? ` (${slip.workedDays}/${slip.workingDays} days)` : ''}`, fmt(slip.basePay)],
+      ...(slip.allowance > 0     ? [['Allowance',                                    fmt(slip.allowance)]]     : []),
+      ...(slip.otPay > 0         ? [[`OT Pay (${slip.otHours || 0} hrs)`,             fmt(slip.otPay)]]         : []),
+      ...(slip.phPay > 0         ? [[`PH Pay`,                                        fmt(slip.phPay)]]         : []),
+      ...(slip.otherEarnings > 0 ? [[slip.otherEarningsNote || 'Other Earnings',      fmt(slip.otherEarnings)]] : []),
+    ]
+
+    autoTable(doc, {
+      startY: afterInfo + 6,
+      head: [
+        [{ content: 'EARNINGS', colSpan: 2, styles: { fillColor: [240, 253, 244], textColor: [22, 101, 52], fontStyle: 'bold', halign: 'left' } }],
+        [{ content: 'Description', styles: { fillColor: [248, 250, 252], textColor: [100, 116, 139] } }, { content: 'Amount', styles: { fillColor: [248, 250, 252], textColor: [100, 116, 139], halign: 'right' } }]
+      ],
+      body: [...earnings, [{ content: 'Gross Pay', styles: { fontStyle: 'bold', fillColor: [240, 253, 244], textColor: [22, 101, 52] } }, { content: fmt(slip.grossEarnings), styles: { fontStyle: 'bold', textColor: [22, 101, 52], fillColor: [240, 253, 244] } }]],
+      styles: { fontSize: 8.5, cellPadding: 3, lineColor: [241, 245, 249], lineWidth: 0.1 },
+      headStyles: { lineColor: [226, 232, 240], lineWidth: 0.1 },
+      columnStyles: { 0: { cellWidth: 55 }, 1: { halign: 'right', cellWidth: 33 } },
+      tableWidth: 88,
+      margin: { left: 14 },
+    })
+    const earningsY = doc.lastAutoTable.finalY
+
+    // Deductions
+    const deductions = [
+      ...(slip.statutory || []).map(s => [`${s.name} (${s.employeeRate}%)`, fmt(s.employeeAmt)]),
+      ...(slip.advanceAmt > 0      ? [['Salary Advance',                             fmt(slip.advanceAmt)]]      : []),
+      ...(slip.loanAmt > 0         ? [['Loan Repayment (EMI)',                       fmt(slip.loanAmt)]]         : []),
+      ...(slip.penalty > 0         ? [[slip.penaltyNote ? `Penalty (${slip.penaltyNote})` : 'Penalty', fmt(slip.penalty)]] : []),
+      ...(slip.otherDeductions > 0 ? [[slip.otherDeductionsNote || 'Other Deductions', fmt(slip.otherDeductions)]] : []),
+    ]
+
+    autoTable(doc, {
+      startY: afterInfo + 6,
+      head: [
+        [{ content: 'DEDUCTIONS', colSpan: 2, styles: { fillColor: [254, 242, 242], textColor: [153, 27, 27], fontStyle: 'bold', halign: 'left' } }],
+        [{ content: 'Description', styles: { fillColor: [248, 250, 252], textColor: [100, 116, 139] } }, { content: 'Amount', styles: { fillColor: [248, 250, 252], textColor: [100, 116, 139], halign: 'right' } }]
+      ],
+      body: deductions.length > 0
+        ? [...deductions, [{ content: 'Total Deductions', styles: { fontStyle: 'bold', fillColor: [254, 242, 242], textColor: [153, 27, 27] } }, { content: fmt(slip.totalDeductions), styles: { fontStyle: 'bold', textColor: [153, 27, 27], fillColor: [254, 242, 242] } }]]
+        : [[{ content: 'No deductions', colSpan: 2, styles: { halign: 'center', textColor: [148, 163, 184] } }]],
+      styles: { fontSize: 8.5, cellPadding: 3, lineColor: [241, 245, 249], lineWidth: 0.1 },
+      headStyles: { lineColor: [226, 232, 240], lineWidth: 0.1 },
+      columnStyles: { 0: { cellWidth: 55 }, 1: { halign: 'right', cellWidth: 33, textColor: [153, 27, 27] } },
+      tableWidth: 88,
+      margin: { left: 108 },
+    })
+
+    // Net Pay box
+    const netY = Math.max(doc.lastAutoTable.finalY, earningsY) + 8
+    doc.setDrawColor(30, 41, 59); doc.setLineWidth(0.7)
+    doc.rect(14, netY, 182, 16)
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139)
+    doc.text('NET PAY (TAKE HOME)', 20, netY + 6)
+    doc.setFontSize(8)
+    doc.text(`Gross ${fmt(slip.grossEarnings)} - Deductions ${fmt(slip.totalDeductions)}`, 20, netY + 12)
+    doc.setFontSize(16); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 41, 59)
+    doc.text(fmt(slip.netPay), 192, netY + 10, { align: 'right' })
+
+    // Extra Note
+    let afterNet = netY + 22
+    if (slip.extraNote) {
+      doc.setFillColor(254, 252, 232) // yellow-50
+      doc.setDrawColor(253, 230, 138) // yellow-200
+      doc.setLineWidth(0.1)
+      doc.rect(14, afterNet, 182, 12, 'FD')
+      doc.setFontSize(7); doc.setFont('helvetica', 'bold'); doc.setTextColor(180, 83, 9)
+      doc.text('REMARKS:', 18, afterNet + 8)
+      doc.setFont('helvetica', 'normal'); doc.setTextColor(146, 64, 14)
+      doc.text(slip.extraNote, 42, afterNet + 8)
+      afterNet += 16
+    }
+
+    // Signatures
+    const sigY = netY + 30
+    ;['Employee Signature', 'Accountant / HR', 'Authorized Signatory'].forEach((label, i) => {
+      const x = 14 + i * 63
+      doc.setLineWidth(0.3); doc.setDrawColor(148, 163, 184)
+      doc.line(x, sigY, x + 55, sigY)
+      doc.setFontSize(7.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139)
+      doc.text(label, x + 27, sigY + 5, { align: 'center' })
+    })
+
+    doc.setFontSize(7); doc.setTextColor(148, 163, 184)
+    doc.text(`${branchName} · ${periodLabel(period)} · Generated: ${new Date().toLocaleDateString()}`, 14, sigY + 16)
+}
+
+// ─── Cutting line for 2-per-page layout ───────────────────────────────────────
+
+export function drawCuttingLine (doc, y) {
+  const pw = doc.internal.pageSize.getWidth()
+  const midX = pw / 2
+
+  doc.setDrawColor(190, 190, 190)
+  doc.setLineWidth(0.15)
+
+  // Draw dashed line segments — left side
+  for (let x = 8; x < midX - 20; x += 4) {
+    doc.line(x, y, Math.min(x + 2, midX - 20), y)
+  }
+  // Draw dashed line segments — right side
+  for (let x = midX + 20; x < pw - 8; x += 4) {
+    doc.line(x, y, Math.min(x + 2, pw - 8), y)
+  }
+
+  // "CUT HERE" text centered
+  doc.setFontSize(6)
+  doc.setTextColor(190, 190, 190)
+  doc.setFont('helvetica', 'normal')
+  doc.text('CUT HERE', midX, y + 1.2, { align: 'center' })
+}
+
+// ─── Compact Payslip for 2-per-page layout ────────────────────────────────────
+
+export function drawCompactPayslipToPDF (doc, slip, branchName, period, companyName, offsetY) {
+  const currency = 'RM'
+  const fmt      = v => `${currency} ${fmtAmt(v || 0)}`
+  const isHours  = slip.salaryMode === 'hours'
+  const pw       = doc.internal.pageSize.getWidth()
+  const leftM    = 10
+  const rightEdge = pw - 10
+
+  // ── Header (left) ──
+  let y = offsetY
+  if (companyName) {
+    doc.setFontSize(6.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139)
+    doc.text(companyName.toUpperCase(), leftM, y)
+    y += 3.5
+  }
+  doc.setFontSize(11); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 41, 59)
+  doc.text(branchName, leftM, y)
+  y += 4
+  doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139)
+  doc.text('EMPLOYEE SALARY VOUCHER', leftM, y)
+
+  // ── Header (right) ──
+  doc.setFontSize(8); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 41, 59)
+  doc.text('SALARY VOUCHER', rightEdge, offsetY, { align: 'right' })
+  doc.setFontSize(6.5); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139)
+  doc.text(`No: ${period}-${(slip.staffId || '').slice(-4).toUpperCase()}`, rightEdge, offsetY + 4, { align: 'right' })
+  doc.text(`Period: ${periodLabel(period)}`, rightEdge, offsetY + 8, { align: 'right' })
+
+  y += 3
+  doc.setDrawColor(30, 41, 59); doc.setLineWidth(0.4)
+  doc.line(leftM, y, rightEdge, y)
+  y += 3
+
+  // ── Employee Info (compact 2-row × 5-col grid) ──
+  const infoBody = [
+    [
+      { content: 'EMPLOYEE NAME', styles: { fontSize: 5.5, textColor: [148, 163, 184], fontStyle: 'normal' } },
+      { content: 'DESIGNATION', styles: { fontSize: 5.5, textColor: [148, 163, 184], fontStyle: 'normal' } },
+      { content: 'BASIC SALARY', styles: { fontSize: 5.5, textColor: [148, 163, 184], fontStyle: 'normal' } },
+      { content: isHours ? 'STD HRS' : 'WORK DAYS', styles: { fontSize: 5.5, textColor: [148, 163, 184], fontStyle: 'normal' } },
+      { content: isHours ? 'HOURLY RATE' : 'DAILY RATE', styles: { fontSize: 5.5, textColor: [148, 163, 184], fontStyle: 'normal' } },
+    ],
+    [
+      { content: slip.staffName || '', styles: { fontSize: 7.5, fontStyle: 'bold' } },
+      { content: slip.designation || '—', styles: { fontSize: 7.5, fontStyle: 'bold' } },
+      { content: fmt(slip.basicSalary), styles: { fontSize: 7.5, fontStyle: 'bold' } },
+      { content: isHours ? `${slip.standardHours || 208} hrs` : `${slip.workingDays || 26} days`, styles: { fontSize: 7.5, fontStyle: 'bold' } },
+      { content: isHours
+        ? `${currency} ${fmtAmt(slip.basicSalary / (slip.standardHours || 208))}/hr`
+        : `${currency} ${fmtAmt(slip.basicSalary / (slip.workingDays || 26))}/day`,
+        styles: { fontSize: 7.5, fontStyle: 'bold' } },
+    ],
+  ]
+
+  autoTable(doc, {
+    startY: y,
+    body: infoBody,
+    theme: 'grid',
+    styles: { cellPadding: 1.5, textColor: [30, 41, 59], fillColor: [248, 250, 252], lineColor: [226, 232, 240], lineWidth: 0.1 },
+    tableWidth: rightEdge - leftM,
+    margin: { left: leftM },
+  })
+  const afterInfo = doc.lastAutoTable.finalY
+
+  // ── Earnings ──
+  const earnings = [
+    [`Basic Pay${isHours && slip.workedHours < slip.standardHours ? ` (${slip.workedHours}/${slip.standardHours}h)` : !isHours && slip.workedDays < slip.workingDays ? ` (${slip.workedDays}/${slip.workingDays}d)` : ''}`, fmt(slip.basePay)],
+    ...(slip.allowance > 0     ? [['Allowance',                            fmt(slip.allowance)]]     : []),
+    ...(slip.otPay > 0         ? [[`OT (${slip.otHours || 0}h)`,            fmt(slip.otPay)]]         : []),
+    ...(slip.phPay > 0         ? [['PH Pay',                                fmt(slip.phPay)]]         : []),
+    ...(slip.bonus > 0         ? [['Bonus',                                 fmt(slip.bonus)]]         : []),
+    ...(slip.otherEarnings > 0 ? [[slip.otherEarningsNote || 'Other Earn.', fmt(slip.otherEarnings)]] : []),
+  ]
+
+  const halfW = (rightEdge - leftM - 6) / 2
+
+  autoTable(doc, {
+    startY: afterInfo + 3,
+    head: [
+      [{ content: 'EARNINGS', colSpan: 2, styles: { fillColor: [240, 253, 244], textColor: [22, 101, 52], fontStyle: 'bold', halign: 'left', fontSize: 7 } }],
+    ],
+    body: [
+      ...earnings,
+      [{ content: 'Gross Pay', styles: { fontStyle: 'bold', fillColor: [240, 253, 244], textColor: [22, 101, 52] } },
+       { content: fmt(slip.grossEarnings), styles: { fontStyle: 'bold', textColor: [22, 101, 52], fillColor: [240, 253, 244] } }],
+    ],
+    styles: { fontSize: 7, cellPadding: 1.5, lineColor: [241, 245, 249], lineWidth: 0.1 },
+    headStyles: { lineColor: [226, 232, 240], lineWidth: 0.1 },
+    columnStyles: { 1: { halign: 'right', cellWidth: 28 } },
+    tableWidth: halfW,
+    margin: { left: leftM },
+  })
+  const earningsY = doc.lastAutoTable.finalY
+
+  // ── Deductions ──
+  const deductions = [
+    ...(slip.statutory || []).map(s => [`${s.name} (${s.employeeRate}%)`, fmt(s.employeeAmt)]),
+    ...(slip.advanceAmt > 0      ? [['Advance',                                                                  fmt(slip.advanceAmt)]]      : []),
+    ...(slip.loanAmt > 0         ? [['Loan (EMI)',                                                                fmt(slip.loanAmt)]]         : []),
+    ...(slip.penalty > 0         ? [[slip.penaltyNote ? `Penalty (${slip.penaltyNote})` : 'Penalty',              fmt(slip.penalty)]]         : []),
+    ...(slip.otherDeductions > 0 ? [[slip.otherDeductionsNote || 'Other Ded.',                                    fmt(slip.otherDeductions)]] : []),
+  ]
+
+  autoTable(doc, {
+    startY: afterInfo + 3,
+    head: [
+      [{ content: 'DEDUCTIONS', colSpan: 2, styles: { fillColor: [254, 242, 242], textColor: [153, 27, 27], fontStyle: 'bold', halign: 'left', fontSize: 7 } }],
+    ],
+    body: deductions.length > 0
+      ? [...deductions,
+         [{ content: 'Total Ded.', styles: { fontStyle: 'bold', fillColor: [254, 242, 242], textColor: [153, 27, 27] } },
+          { content: fmt(slip.totalDeductions), styles: { fontStyle: 'bold', textColor: [153, 27, 27], fillColor: [254, 242, 242] } }]]
+      : [[{ content: 'No deductions', colSpan: 2, styles: { halign: 'center', textColor: [148, 163, 184] } }]],
+    styles: { fontSize: 7, cellPadding: 1.5, lineColor: [241, 245, 249], lineWidth: 0.1 },
+    headStyles: { lineColor: [226, 232, 240], lineWidth: 0.1 },
+    columnStyles: { 1: { halign: 'right', cellWidth: 28, textColor: [153, 27, 27] } },
+    tableWidth: halfW,
+    margin: { left: leftM + halfW + 6 },
+  })
+
+  // ── Net Pay ──
+  const netY = Math.max(doc.lastAutoTable.finalY, earningsY) + 4
+  doc.setDrawColor(30, 41, 59); doc.setLineWidth(0.5)
+  doc.rect(leftM, netY, rightEdge - leftM, 11)
+  doc.setFontSize(7); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139)
+  doc.text('NET PAY (TAKE HOME)', leftM + 4, netY + 4.5)
+  doc.setFontSize(6)
+  doc.text(`Gross ${fmt(slip.grossEarnings)} - Ded. ${fmt(slip.totalDeductions)}`, leftM + 4, netY + 8.5)
+  doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 41, 59)
+  doc.text(fmt(slip.netPay), rightEdge - 4, netY + 7.5, { align: 'right' })
+
+  // ── Remarks (if any) ──
+  let afterNet = netY + 14
+  if (slip.extraNote) {
+    doc.setFillColor(254, 252, 232)
+    doc.setDrawColor(253, 230, 138)
+    doc.setLineWidth(0.1)
+    doc.rect(leftM, afterNet, rightEdge - leftM, 7, 'FD')
+    doc.setFontSize(5.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(180, 83, 9)
+    doc.text('NOTE:', leftM + 2, afterNet + 4.5)
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(146, 64, 14)
+    doc.text(slip.extraNote, leftM + 14, afterNet + 4.5)
+    afterNet += 9
+  }
+
+  // ── Signatures ──
+  const sigY = afterNet + 4
+  const sigGap = (rightEdge - leftM) / 3
+  ;['Employee', 'Accountant / HR', 'Authorized'].forEach((label, i) => {
+    const x = leftM + i * sigGap
+    doc.setLineWidth(0.2); doc.setDrawColor(148, 163, 184)
+    doc.line(x + 2, sigY, x + sigGap - 4, sigY)
+    doc.setFontSize(6); doc.setFont('helvetica', 'normal'); doc.setTextColor(100, 116, 139)
+    doc.text(label, x + sigGap / 2, sigY + 4, { align: 'center' })
+  })
+
+  // ── Footer ──
+  doc.setFontSize(5); doc.setTextColor(180, 180, 180)
+  doc.text(`${branchName} · ${periodLabel(period)} · ${new Date().toLocaleDateString()}`, leftM, sigY + 9)
+}
