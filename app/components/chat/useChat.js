@@ -7,7 +7,7 @@ import { collection, doc, getDocs, limit, onSnapshot, orderBy, query, where } fr
 import { db } from "@/lib/firebase";
 import { isCompanyRole } from "@/lib/authz/permissions";
 import { COMPANY_CHAT, PAGE_SIZE, branchChatId, isUnread, timeOf } from "@/lib/chat/model";
-import { chatDoc, chatsCol, ensureChat, messagesCol, readsCol } from "@/lib/chat/client";
+import { chatDoc, chatsCol, ensureChat, labelsDoc, messagesCol, readsCol, stickersCol } from "@/lib/chat/client";
 
 /** Everyone in the company who can be messaged: [{ uid, name, role, branchId }]. */
 export function useChatPeople(companyId) {
@@ -140,4 +140,32 @@ export function useReads(companyId, chatId) {
     );
   }, [companyId, chatId]);
   return reads;
+}
+
+/** The company's own stickers, newest last. */
+export function useCompanyStickers(companyId) {
+  const [stickers, setStickers] = useState([]);
+  useEffect(() => {
+    if (!companyId) return;
+    return onSnapshot(
+      query(stickersCol(companyId), orderBy("createdAt")),
+      (s) => setStickers(s.docs.map((d) => ({ id: d.id, ...d.data(), pack: "company" }))),
+      () => setStickers([])
+    );
+  }, [companyId]);
+  return stickers;
+}
+
+/** This person's chat labels: { labels: [{ id, name, color }], chats: { chatId: [ids] } }. */
+export function useChatLabels(companyId, uid) {
+  const [prefs, setPrefs] = useState({ labels: [], chats: {} });
+  useEffect(() => {
+    if (!companyId || !uid) return;
+    return onSnapshot(
+      labelsDoc(companyId, uid),
+      (s) => setPrefs(s.exists() ? { labels: s.data().labels || [], chats: s.data().chats || {} } : { labels: [], chats: {} }),
+      () => {}
+    );
+  }, [companyId, uid]);
+  return prefs;
 }

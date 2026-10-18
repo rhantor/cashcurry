@@ -90,3 +90,23 @@ describe("reactions and forwarding", () => {
     expect(canForward({ text: " " })).toBe(false);
   });
 });
+
+import { STICKER_PACK, isStickerFile, labelsOf, removeLabel, toggleLabel } from "@/lib/chat/model";
+describe("stickers and labels", () => {
+  it("the Cash Curry pack ships with the app; company stickers are images up to 1 MB", () => {
+    expect(STICKER_PACK.length).toBe(12);
+    expect(STICKER_PACK[0]).toMatchObject({ id: "thanks", url: "/stickers/thanks.svg", pack: "cashcurry" });
+    expect(isStickerFile({ type: "image/png", size: 1024 * 1024 })).toBe(true);
+    expect(isStickerFile({ type: "image/png", size: 1024 * 1024 + 1 })).toBe(false);
+    expect(isStickerFile({ type: "application/pdf", size: 10 })).toBe(false);
+    expect(previewOf({ sticker: { id: "ok" } })).toBe("Sticker");
+  });
+  it("labels: on and off a chat, shown in the order made, deleted everywhere", () => {
+    const prefs = { labels: [{ id: "a", name: "Urgent" }, { id: "b", name: "Supplier" }], chats: {} };
+    expect(toggleLabel({ ...prefs, chats: toggleLabel(prefs, "c1", "b") }, "c1", "a")).toEqual({ c1: ["b", "a"] });
+    const on = { ...prefs, chats: { c1: ["b", "a"], c2: ["a"] } };
+    expect(labelsOf("c1", on).map((l) => l.name)).toEqual(["Urgent", "Supplier"]);
+    expect(toggleLabel(on, "c2", "a")).toEqual({ c1: ["b", "a"] });
+    expect(removeLabel(on, "a")).toEqual({ labels: [{ id: "b", name: "Supplier" }], chats: { c1: ["b"] } });
+  });
+});

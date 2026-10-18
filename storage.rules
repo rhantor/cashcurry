@@ -198,6 +198,17 @@ service firebase.storage {
       allow delete: if request.auth.uid == uid;
     }
 
+    // Company chat stickers: stickers/{companyId}/{filename} — an image up to
+    // 1 MB, added by management (owner, super admin, gm, branch admin, manager).
+    match /stickers/{companyId}/{filename} {
+      allow read: if belongsToCompany(companyId);
+      allow create: if belongsToCompany(companyId) &&
+        (isCompanyRole(userData()) || isBranchAdmin(userData()) || userData().role == 'manager') &&
+        request.resource.size <= 1024 * 1024 && request.resource.contentType.matches('image/.*');
+      allow delete: if belongsToCompany(companyId) &&
+        (isCompanyRole(userData()) || isBranchAdmin(userData()) || userData().role == 'manager');
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Deny all other paths
     // ─────────────────────────────────────────────────────────────────────────

@@ -6,10 +6,11 @@ import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "re
 import { CornerUpLeft, FileText, Paperclip, Pencil, SendHorizontal, X } from "lucide-react";
 import { Button, cn, toast } from "@/app/components/ui";
 import { checkFiles, previewOf } from "@/lib/chat/model";
+import StickerPicker from "./StickerPicker";
 
 const isTouch = () => typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
 
-const Composer = forwardRef(function Composer({ onSend, onSaveEdit, replyTo, editing, onCancel, disabled }, ref) {
+const Composer = forwardRef(function Composer({ onSend, onSaveEdit, onSticker, user, replyTo, editing, onCancel, disabled }, ref) {
   const [text, setText] = useState("");
   const [files, setFiles] = useState([]);
   const [busy, setBusy] = useState(false);
@@ -114,6 +115,7 @@ const Composer = forwardRef(function Composer({ onSend, onSaveEdit, replyTo, edi
               <Paperclip className="size-5" />
             </button>
             <input ref={picker} type="file" multiple hidden onChange={(e) => (add(e.target.files || []), (e.target.value = ""))} />
+            {onSticker && <StickerPicker user={user} onPick={onSticker} disabled={disabled} />}
           </>
         )}
         <textarea

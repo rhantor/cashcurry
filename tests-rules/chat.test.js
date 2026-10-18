@@ -133,3 +133,25 @@ describe("chat files", () => {
     expect(await ok(put("ali", `chat/${CO}/company/ali/big.pdf`, 32 * 1024 * 1024 + 1))).toBe(false);
   });
 });
+
+describe("stickers and labels", () => {
+  it("management adds company stickers; everyone in the company sees them", async () => {
+    expect(await ok(db("klManager").collection(`companies/${CO}/stickers`).add({ name: "Logo", url: "x", createdBy: "klManager" }))).toBe(true);
+    expect(await ok(db("klCashier").collection(`companies/${CO}/stickers`).add({ name: "Mine", url: "x", createdBy: "klCashier" }))).toBe(false);
+    expect(await ok(db("ali").collection(`companies/${CO}/stickers`).get())).toBe(true);
+    expect(await ok(db("stranger").collection(`companies/${CO}/stickers`).get())).toBe(false);
+  });
+  it("sticker images: management uploads an image up to 1 MB; the company opens them", async () => {
+    const put = (uid, name, bytes, type = "image/png") => files(uid).ref(`stickers/${CO}/${name}`).put(new Uint8Array(bytes), { contentType: type });
+    expect(await ok(put("klManager", "logo.png", 100))).toBe(true);
+    expect(await ok(put("klManager", "big.png", 1024 * 1024 + 1))).toBe(false);
+    expect(await ok(put("klManager", "doc.pdf", 100, "application/pdf"))).toBe(false);
+    expect(await ok(put("ali", "mine.png", 100))).toBe(false);
+    expect(await ok(files("ali").ref(`stickers/${CO}/logo.png`).getDownloadURL())).toBe(true);
+  });
+  it("labels are each person's own", async () => {
+    const mine = `companies/${CO}/users/ali/prefs/chatLabels`;
+    expect(await ok(db("ali").doc(mine).set({ labels: [{ id: "a", name: "Urgent" }], chats: {} }))).toBe(true);
+    expect(await ok(db("kumar").doc(mine).get())).toBe(false);
+  });
+});

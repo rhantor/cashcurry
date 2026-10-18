@@ -10,10 +10,10 @@ import { doc, onSnapshot } from "firebase/firestore";
 import { BellOff, MessageSquarePlus, MessagesSquare, Search, UserRound, Users } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { Avatar, Input, Menu, Skeleton, cn } from "@/app/components/ui";
-import { canMakeGroups, chatTitle, timeOf } from "@/lib/chat/model";
-import { useChatPeople, useChats } from "./useChat";
+import { canMakeGroups, chatTitle, labelsOf, timeOf } from "@/lib/chat/model";
+import { useChatLabels, useChatPeople, useChats } from "./useChat";
 import Conversation, { chatIcon } from "./Conversation";
-import { DirectSheet, ForwardSheet, GroupSheet } from "./ChatSheets";
+import { DirectSheet, ForwardSheet, GroupSheet, LabelsSheet } from "./ChatSheets";
 
 const when = (t) => {
   if (!t) return "";
@@ -30,7 +30,7 @@ const FILTERS = [
   ["people", "People"],
 ];
 
-function ChatRow({ chat, active, muted, onOpen, me }) {
+function ChatRow({ chat, active, muted, labels = [], onOpen, me }) {
   const Icon = chatIcon(chat.kind);
   const last = chat.lastMessage;
   const who = last ? (last.byUid === me ? "You" : chat.kind === "direct" ? "" : String(last.byName || "").split(" ")[0]) : "";
@@ -59,6 +59,16 @@ function ChatRow({ chat, active, muted, onOpen, me }) {
           {muted && <BellOff className="size-3.5 shrink-0 text-subtle" />}
           {chat.unread && <span className="size-2.5 shrink-0 rounded-full bg-brand" />}
         </span>
+        {labels.length > 0 && (
+          <span className="mt-1 flex flex-wrap gap-1">
+            {labels.map((l) => (
+              <span key={l.id} className="inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[10px] font-semibold" style={{ background: `${l.color}1f`, color: l.color }}>
+                <span className="size-1.5 rounded-full" style={{ background: l.color }} />
+                {l.name}
+              </span>
+            ))}
+          </span>
+        )}
       </span>
     </button>
   );
@@ -76,6 +86,7 @@ export default function ChatApp({ user, branches = [], className }) {
   const [sheet, setSheet] = useState(null); // "direct" | "group" | "manage"
   const [forwarding, setForwarding] = useState(null);
   const [mutedChats, setMutedChats] = useState([]);
+  const labelPrefs = useChatLabels(user?.companyId, user?.uid);
   const openId = params.get("c");
 
   // the chats this person muted
@@ -100,7 +111,11 @@ export default function ChatApp({ user, branches = [], className }) {
   const shown = titled.filter(
     (c) =>
       (!q.trim() || c.title.toLowerCase().includes(q.trim().toLowerCase())) &&
-      (filter === "all" || (filter === "unread" && c.unread) || (filter === "groups" && c.kind !== "direct") || (filter === "people" && c.kind === "direct"))
+      (filter === "all" ||
+        (filter === "unread" && c.unread) ||
+        (filter === "groups" && c.kind !== "direct") ||
+        (filter === "people" && c.kind === "direct") ||
+        (labelPrefs.chats?.[c.id] || []).includes(filter))
   );
   const active = titled.find((c) => c.id === openId) || null;
 
@@ -131,13 +146,14 @@ export default function ChatApp({ user, branches = [], className }) {
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" className="h-10 rounded-full pl-9" />
         </div>
         <div className="flex gap-1.5 overflow-x-auto px-4 pb-2 [scrollbar-width:none]">
-          {FILTERS.map(([v, label]) => (
+          {[...FILTERS, ...labelPrefs.labels.map((l) => [l.id, l.name, l.color])].map(([v, label, color]) => (
             <button
               key={v}
               type="button"
               onClick={() => setFilter(v)}
               className={cn("shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition-colors", filter === v ? "bg-fg text-surface" : "bg-surface-2 text-muted hover:text-fg")}
             >
+              {color && <span className="mr-1 inline-block size-2 rounded-full" style={{ background: color }} />}
               {label}
               {v === "unread" && unreadCount > 0 && <span className="ml-1 tabular-nums">{unreadCount}</span>}
             </button>
@@ -147,7 +163,7 @@ export default function ChatApp({ user, branches = [], className }) {
           {!ready && !chats.length ? (
             [0, 1, 2, 3].map((i) => <Skeleton key={i} className="mx-2 my-1 h-14" rounded="rounded-2xl" />)
           ) : shown.length ? (
-            shown.map((c) => <ChatRow key={c.id} chat={c} me={user.uid} muted={mutedChats.includes(c.id)} active={c.id === openId} onOpen={() => open(c.id)} />)
+            shown.map((c) => <ChatRow key={c.id} chat={c} me={user.uid} muted={mutedChats.includes(c.id)} labels={labelsOf(c.id, labelPrefs)} active={c.id === openId} onOpen={() => open(c.id)} />)
           ) : (
             <p className="px-4 py-10 text-center text-sm text-muted">{filter === "unread" ? "You're all caught up." : "No chats here."}</p>
           )}
@@ -167,6 +183,7 @@ export default function ChatApp({ user, branches = [], className }) {
             onBack={() => open(null)}
             onManage={() => setSheet("manage")}
             onForward={setForwarding}
+            onLabels={() => setSheet("labels")}
           />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-3 bg-bg px-6 text-center">
@@ -182,6 +199,7 @@ export default function ChatApp({ user, branches = [], className }) {
       <DirectSheet open={sheet === "direct"} onClose={() => setSheet(null)} user={user} people={people} onOpened={open} />
       {sheet === "group" && <GroupSheet open onClose={() => setSheet(null)} user={user} people={people} onSaved={(id) => id && open(id)} />}
       {sheet === "manage" && active?.kind === "group" && <GroupSheet open onClose={() => setSheet(null)} user={user} people={people} chat={active} onSaved={(id) => open(id)} />}
+      <LabelsSheet open={sheet === "labels"} onClose={() => setSheet(null)} user={user} chat={active} prefs={labelPrefs} />
       {forwarding && <ForwardSheet msg={forwarding} onClose={() => setForwarding(null)} user={user} chats={titled} onSent={(id) => id && open(id)} />}
     </div>
   );

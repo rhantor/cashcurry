@@ -5,10 +5,10 @@
 // otherwise a "new messages" button takes you there. It's marked read while
 // it is on screen.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowLeft, BellOff, Bell, Building2, Globe2, MoreVertical, Settings2, Users } from "lucide-react";
+import { ArrowDown, ArrowLeft, BellOff, Bell, Building2, Globe2, MoreVertical, Settings2, Tag, Users } from "lucide-react";
 import { Avatar, Button, Menu, Skeleton, cn, confirmDialog, toast } from "@/app/components/ui";
 import { canMakeGroups, chatTitle, dayLabel, seenBy, timeOf } from "@/lib/chat/model";
-import { deleteMessage, editMessage, markRead, react, sendMessage, setChatMuted } from "@/lib/chat/client";
+import { deleteMessage, editMessage, markRead, react, sendMessage, sendSticker, setChatMuted } from "@/lib/chat/client";
 import { useMessages, useReads } from "./useChat";
 import Message from "./Message";
 import Composer from "./Composer";
@@ -25,7 +25,7 @@ function subtitle(chat, branchName) {
 
 const RUN_GAP = 5 * 60 * 1000; // messages within 5 minutes from one person read as one run
 
-export default function Conversation({ chat, user, peopleById, branchName, muted, onBack, onManage, onForward }) {
+export default function Conversation({ chat, user, peopleById, branchName, muted, onBack, onManage, onForward, onLabels }) {
   const companyId = user.companyId;
   const me = user.uid;
   const { messages, loading, hasMore, more } = useMessages(companyId, chat.id);
@@ -108,6 +108,7 @@ export default function Conversation({ chat, user, peopleById, branchName, muted
 
   const menu = [
     { label: muted ? "Turn notifications on" : "Mute notifications", icon: muted ? Bell : BellOff, onSelect: () => setChatMuted(companyId, me, chat.id, !muted).catch((e) => toast.error("Couldn't save", { description: e?.message })) },
+    onLabels && { label: "Labels", icon: Tag, onSelect: onLabels },
     chat.kind === "group" && canMakeGroups(user.role) && { label: "Manage group", icon: Settings2, onSelect: onManage },
   ].filter(Boolean);
 
@@ -264,6 +265,13 @@ export default function Conversation({ chat, user, peopleById, branchName, muted
           await sendMessage(companyId, chat.id, user, { text, files, replyTo, onProgress });
           setReplyTo(null);
           toBottom(true);
+        }}
+        user={user}
+        onSticker={(st) => {
+          atBottom.current = true;
+          sendSticker(companyId, chat.id, user, st)
+            .then(() => toBottom(true))
+            .catch((e) => toast.error("Couldn't send the sticker", { description: e?.message }));
         }}
         onSaveEdit={async (text) => {
           try {

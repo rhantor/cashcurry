@@ -495,6 +495,13 @@ service cloud.firestore {
         }
       }
 
+      // The company's own chat stickers (4.4): everyone uses them; management adds and removes them.
+      match /stickers/{stickerId} {
+        allow read: if belongsToCompany(companyId);
+        allow create: if canChatGroups(companyId) && request.resource.data.createdBy == request.auth.uid;
+        allow delete: if canChatGroups(companyId);
+      }
+
       // Who can be messaged: names and roles only, kept by the server from users/{uid}.
       match /chatPeople/{uid} {
         allow read: if belongsToCompany(companyId);

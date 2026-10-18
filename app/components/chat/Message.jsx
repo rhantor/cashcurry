@@ -90,6 +90,7 @@ export default function Message({ msg, me, showName, showAvatar, first, status, 
     changeable && msg.text && { label: "Edit", icon: Pencil, onSelect: () => onEdit(msg) },
     changeable && { label: "Delete", icon: Trash2, danger: true, onSelect: () => onDelete(msg) },
   ].filter(Boolean);
+  const sticker = !msg.deleted && msg.sticker;
   const onlyPhotos = !msg.deleted && !msg.text && msg.files?.length > 0 && msg.files.every((f) => String(f.type).startsWith("image/")) && !msg.replyTo && !msg.forwarded;
 
   return (
@@ -97,6 +98,15 @@ export default function Message({ msg, me, showName, showAvatar, first, status, 
       <div className="w-8 shrink-0">{!mine && showAvatar && <Avatar name={msg.byName} size="sm" />}</div>
       <div className={cn("flex min-w-0 max-w-[80%] flex-col sm:max-w-[62%]", mine ? "items-end" : "items-start")}>
         {!mine && showName && <span className={cn("mb-0.5 px-1 text-[11px] font-semibold", toneOf(msg.byUid))}>{msg.byName}</span>}
+        {sticker ? (
+          <div className={cn("flex flex-col", mine ? "items-end" : "items-start")}>
+            <img src={sticker.url} alt={sticker.name || "Sticker"} title={sticker.name} className="size-32 object-contain drop-shadow-sm sm:size-36" />
+            <span className="flex items-center gap-1 rounded-full bg-surface/80 px-1.5 text-[10px] text-subtle">
+              {at ? format(at, "h:mm a") : ""}
+              {mine && status && <Ticks status={status} />}
+            </span>
+          </div>
+        ) : (
         <div
           className={cn(
             "space-y-1.5 rounded-2xl shadow-sm",
@@ -132,6 +142,7 @@ export default function Message({ msg, me, showName, showAvatar, first, status, 
             {mine && !msg.deleted && status && <Ticks status={status} />}
           </span>
         </div>
+        )}
         {reactions.length > 0 && (
           <div className={cn("-mt-1.5 flex flex-wrap gap-1", mine ? "justify-end pr-1" : "pl-1")}>
             {reactions.map((r) => (
