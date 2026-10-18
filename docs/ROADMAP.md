@@ -189,7 +189,7 @@ rehearsed on the local copy first.
 - [ ] **Chat (4.4):** deploy `storage.rules` with `firestore.rules` (chat files). After the functions deploy:
       `npm run chat:people -- --project <id>` then `--write --confirm` (who can be messaged), and
       `npm run chat:migrate -- --project <id>` then `--write --confirm` (copies the old branch chat).
-      Set the storage bucket's CORS for the app's address (forwarding reads files in the browser):
+      Set the storage bucket's CORS for the app's address (forwarding and downloading read files in the browser):
       `gsutil cors set cors.json gs://pos-system-448bc.appspot.com` with origin https://<app domain>, method GET
 - [ ] Deploy Cloud Functions (`firebase deploy --only functions` builds the finance engine first). This
       removes the old rollup functions — confirm the deletion when the CLI asks

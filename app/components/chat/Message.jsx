@@ -9,6 +9,7 @@ import { Check, CheckCheck, Clock3, CornerUpLeft, Download, EyeOff, FileText, Fo
 import { Avatar, Menu, Popover, cn } from "@/app/components/ui";
 import { REACTIONS, canChangeMessage, canForward, reactionSummary, timeOf } from "@/lib/chat/model";
 import { blocks } from "@/lib/chat/format";
+import { downloadFile } from "@/lib/chat/client";
 
 const size = (b) => (b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
 // a steady colour per person for names in groups
@@ -90,22 +91,20 @@ function Files({ files, mine, onOpenPhoto }) {
         </div>
       )}
       {others.map((f) => (
-        <a
-          key={f.path || f.url}
-          href={f.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={cn("flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs transition-colors", mine ? "bg-white/15 hover:bg-white/25" : "bg-surface-2 hover:bg-line/60")}
-        >
-          <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-lg", mine ? "bg-white/20" : "bg-brand-soft text-brand")}>
-            <FileText className="size-[18px]" />
-          </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate font-semibold">{f.name}</span>
-            <span className="opacity-75">{size(f.size || 0)}</span>
-          </span>
-          <Download className="size-4 shrink-0 opacity-75" />
-        </a>
+        <div key={f.path || f.url} className={cn("flex items-center gap-1 rounded-xl text-xs transition-colors", mine ? "bg-white/15" : "bg-surface-2")}>
+          <a href={f.url} target="_blank" rel="noopener noreferrer" className="flex min-w-0 flex-1 items-center gap-3 rounded-xl py-2.5 pl-3 pr-1 hover:opacity-90">
+            <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-lg", mine ? "bg-white/20" : "bg-brand-soft text-brand")}>
+              <FileText className="size-[18px]" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-semibold">{f.name}</span>
+              <span className="opacity-75">{size(f.size || 0)}</span>
+            </span>
+          </a>
+          <button type="button" aria-label={`Download ${f.name}`} onClick={() => downloadFile(f)} className={cn("mr-1.5 rounded-lg p-2 transition-colors", mine ? "hover:bg-white/20" : "hover:bg-line/60")}>
+            <Download className="size-4" />
+          </button>
+        </div>
       ))}
     </div>
   );

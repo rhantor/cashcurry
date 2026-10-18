@@ -3,10 +3,12 @@
 // download, Esc or tap outside to close.
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronLeft, ChevronRight, Download, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Download, Loader2, X } from "lucide-react";
+import { downloadFile } from "@/lib/chat/client";
 
 export default function PhotoViewer({ photos, start = 0, onClose }) {
   const [i, setI] = useState(start);
+  const [saving, setSaving] = useState(false);
   const n = photos?.length || 0;
   useEffect(() => setI(start), [start, photos]);
   useEffect(() => {
@@ -25,9 +27,19 @@ export default function PhotoViewer({ photos, start = 0, onClose }) {
   return createPortal(
     <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/90" role="dialog" aria-modal="true" aria-label="Photo" onClick={onClose}>
       <div className="absolute right-3 top-3 flex gap-2" onClick={(e) => e.stopPropagation()}>
-        <a href={f.url} target="_blank" rel="noopener noreferrer" download={f.name} aria-label="Download" className={btn}>
-          <Download className="size-5" />
-        </a>
+        <button
+          type="button"
+          aria-label="Download"
+          disabled={saving}
+          onClick={async () => {
+            setSaving(true);
+            await downloadFile(f);
+            setSaving(false);
+          }}
+          className={btn}
+        >
+          {saving ? <Loader2 className="size-5 animate-spin" /> : <Download className="size-5" />}
+        </button>
         <button type="button" aria-label="Close" onClick={onClose} className={btn}>
           <X className="size-5" />
         </button>
