@@ -13,19 +13,19 @@ export default function SignaturesPanel() {
             <div className="space-y-4">
               
               {/* Authorized Signatory Details */}
-              <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-100 space-y-3 text-left">
-                <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5"><FileCheck className="w-4 h-4 text-mint-600" /> Employer Sign-Off Details</h3>
+              <div className="bg-surface-2/60/50 p-4 rounded-xl border border-line space-y-3 text-left">
+                <h3 className="text-xs font-bold text-fg flex items-center gap-1.5"><FileCheck className="w-4 h-4 text-brand" /> Employer Sign-Off Details</h3>
                 
                 <input 
                   type="text" 
-                  className="w-full text-xs font-medium border border-slate-200 p-2.5 rounded-lg text-black bg-white focus:ring-2" 
+                  className="w-full text-xs font-medium border border-line p-2.5 rounded-lg text-fg bg-surface focus:ring-2" 
                   placeholder="Manager's Full Name" 
                   value={signatory.name} 
                   onChange={(e) => setSignatory({...signatory, name: e.target.value})} 
                 />
                 <input 
                   type="text" 
-                  className="w-full text-xs font-medium border border-slate-200 p-2.5 rounded-lg text-black bg-white focus:ring-2" 
+                  className="w-full text-xs font-medium border border-line p-2.5 rounded-lg text-fg bg-surface focus:ring-2" 
                   placeholder="Designation (e.g. HR Director)" 
                   value={signatory.title} 
                   onChange={(e) => setSignatory({...signatory, title: e.target.value})} 
@@ -33,14 +33,14 @@ export default function SignaturesPanel() {
 
                 {/* Draw Signatory Signature */}
                 <div className="pt-2">
-                  <label className="block text-[9px] font-bold text-slate-400 uppercase mb-1">Employer Signature (Digital)</label>
+                  <label className="block text-[9px] font-bold text-subtle uppercase mb-1">Employer Signature (Digital)</label>
                   {signatorySignature ? (
-                    <div className="flex items-center gap-3 p-2 bg-white border border-slate-100 rounded-lg">
+                    <div className="flex items-center gap-3 p-2 bg-surface border border-line rounded-lg">
                       
-                      <img src={signatorySignature} alt="Employer Sign" className="h-10 w-24 object-contain border rounded bg-slate-50" />
+                      <img src={signatorySignature} alt="Employer Sign" className="h-10 w-24 object-contain border rounded bg-surface-2/60" />
                       <button 
                         onClick={() => setSignatorySignature(null)}
-                        className="text-xs font-semibold text-red-500 hover:text-red-600 flex items-center gap-1 cursor-pointer"
+                        className="text-xs font-semibold text-danger hover:text-danger flex items-center gap-1 cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" /> Remove
                       </button>
@@ -48,7 +48,7 @@ export default function SignaturesPanel() {
                   ) : (
                     <button
                       onClick={() => openSignaturePad("signatory")}
-                      className="w-full py-2 bg-white border border-dashed border-slate-200 hover:bg-mint-50 hover:text-mint-700 text-slate-600 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                      className="w-full py-2 bg-surface border border-dashed border-line hover:bg-brand-soft hover:text-brand text-muted text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <PenTool className="w-4 h-4" /> Draw Digital Signature
                     </button>
@@ -57,19 +57,19 @@ export default function SignaturesPanel() {
               </div>
 
               {/* Employee Signature Details */}
-              <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-100 space-y-3 text-left">
-                <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5"><User className="w-4 h-4 text-mint-600" /> Employee Signature (Digital)</h3>
-                <p className="text-[10px] text-slate-400 font-medium leading-normal">
+              <div className="bg-surface-2/60/50 p-4 rounded-xl border border-line space-y-3 text-left">
+                <h3 className="text-xs font-bold text-fg flex items-center gap-1.5"><User className="w-4 h-4 text-brand" /> Employee Signature (Digital)</h3>
+                <p className="text-[10px] text-subtle font-medium leading-normal">
                   If the candidate is signing in person (e.g. at a branch kiosk), they can sign directly on screen to be embedded into the contract immediately.
                 </p>
                 
                 {employeeSignature ? (
-                  <div className="flex items-center gap-3 p-2 bg-white border border-slate-100 rounded-lg">
+                  <div className="flex items-center gap-3 p-2 bg-surface border border-line rounded-lg">
                     
-                    <img src={employeeSignature} alt="Employee Sign" className="h-10 w-24 object-contain border rounded bg-slate-50" />
+                    <img src={employeeSignature} alt="Employee Sign" className="h-10 w-24 object-contain border rounded bg-surface-2/60" />
                     <button 
                       onClick={() => setEmployeeSignature(null)}
-                      className="text-xs font-semibold text-red-500 hover:text-red-600 flex items-center gap-1 cursor-pointer"
+                      className="text-xs font-semibold text-danger hover:text-danger flex items-center gap-1 cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" /> Remove
                     </button>
@@ -77,7 +77,7 @@ export default function SignaturesPanel() {
                 ) : (
                   <button
                     onClick={() => openSignaturePad("employee")}
-                    className="w-full py-2 bg-white border border-dashed border-slate-200 hover:bg-mint-50 hover:text-mint-700 text-slate-600 text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    className="w-full py-2 bg-surface border border-dashed border-line hover:bg-brand-soft hover:text-brand text-muted text-xs font-semibold rounded-lg flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
                   >
                     <PenTool className="w-4 h-4" /> Candidate Sign Here
                   </button>
@@ -85,27 +85,27 @@ export default function SignaturesPanel() {
               </div>
 
               {/* Corporate Stamp / Seal Upload */}
-              <div className="bg-slate-50/50 p-4 rounded-xl border border-slate-100 space-y-3 text-left">
-                <h3 className="text-xs font-bold text-slate-800 flex items-center gap-1.5"><Building className="w-4 h-4 text-mint-600" /> Official Corporate Stamp / Seal</h3>
-                <p className="text-[10px] text-slate-400 font-medium leading-normal">
+              <div className="bg-surface-2/60/50 p-4 rounded-xl border border-line space-y-3 text-left">
+                <h3 className="text-xs font-bold text-fg flex items-center gap-1.5"><Building className="w-4 h-4 text-brand" /> Official Corporate Stamp / Seal</h3>
+                <p className="text-[10px] text-subtle font-medium leading-normal">
                   Upload a transparent PNG stamp or seal image. It will be stamped over the employer signature block with a realistic offset.
                 </p>
 
                 {stamp ? (
-                  <div className="flex items-center gap-3 p-2 bg-white border border-slate-100 rounded-lg">
+                  <div className="flex items-center gap-3 p-2 bg-surface border border-line rounded-lg">
                     
-                    <img src={stamp} alt="Corporate Stamp" className="h-12 w-12 object-contain border rounded bg-slate-50" />
+                    <img src={stamp} alt="Corporate Stamp" className="h-12 w-12 object-contain border rounded bg-surface-2/60" />
                     <button 
                       onClick={() => setStamp(null)}
-                      className="text-xs font-semibold text-red-500 hover:text-red-600 flex items-center gap-1 cursor-pointer"
+                      className="text-xs font-semibold text-danger hover:text-danger flex items-center gap-1 cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" /> Remove Stamp
                     </button>
                   </div>
                 ) : (
-                  <label className="flex flex-col items-center justify-center border border-dashed border-slate-200 bg-white rounded-xl p-3 hover:bg-slate-50 transition-colors cursor-pointer group">
-                    <Upload className="w-4.5 h-4.5 text-slate-400 group-hover:text-mint-600 mb-1" />
-                    <span className="text-xs font-medium text-slate-600">Upload corporate stamp image</span>
+                  <label className="flex flex-col items-center justify-center border border-dashed border-line bg-surface rounded-xl p-3 hover:bg-surface-2 transition-colors cursor-pointer group">
+                    <Upload className="w-4.5 h-4.5 text-subtle group-hover:text-brand mb-1" />
+                    <span className="text-xs font-medium text-muted">Upload corporate stamp image</span>
                     <input type="file" accept="image/*" onChange={handleStampUpload} className="hidden" />
                   </label>
                 )}

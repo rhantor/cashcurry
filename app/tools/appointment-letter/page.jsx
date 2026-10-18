@@ -9,6 +9,8 @@ import { getSessionUser } from "@/lib/session";
 import { toast } from "@/app/components/ui/notify";
 import { TEMPLATES } from "./templates";
 import { buildLetterPdf } from "./buildLetterPdf";
+import useCurrency from "@/app/hooks/useCurrency";
+import { formatMoney } from "@/lib/region/currency";
 import { LetterContext } from "./LetterContext";
 import StylePanel from "./panels/StylePanel";
 import PartiesPanel from "./panels/PartiesPanel";
@@ -21,6 +23,7 @@ import SignaturePad from "./SignaturePad";
 
 
 export default function AppointmentLetterGenerator() {
+  const currency = useCurrency();
   const letterRef = useRef(null);
   const canvasRef = useRef(null);
   
@@ -264,15 +267,12 @@ export default function AppointmentLetterGenerator() {
     setAllowances(allowances.filter((_, i) => i !== index));
   };
 
+  // The branch's currency, in plain letters (RM, Tk…) — the same text goes into
+  // the PDF, whose fonts have no ৳ or ₹.
   const formatCurrency = (amount) => {
     const parsed = parseFloat(amount);
-    if (isNaN(parsed)) return "RM0.00";
-    
-    // Hourly rates show decimal, stipend/basic salary might be cleaner
-    if (templateType === "partTime") {
-      return `RM${parsed.toFixed(2)}/hour`;
-    }
-    return `RM${parsed.toFixed(2)}`;
+    const text = formatMoney(isNaN(parsed) ? 0 : parsed, currency, { plain: true });
+    return templateType === "partTime" ? `${text}/hour` : text;
   };
 
   // --- Draft Storage Logic ---
@@ -444,31 +444,31 @@ export default function AppointmentLetterGenerator() {
 
   return (
     <LetterContext.Provider value={{ letterRef, canvasRef, isGenerating, setIsGenerating, activeTab, setActiveTab, companyId, setCompanyId, branchId, setBranchId, skip, signatureModal, setSignatureModal, isDrawing, setIsDrawing, draftName, setDraftName, savedDrafts, setSavedDrafts, selectedDraft, setSelectedDraft, templateType, setTemplateType, logo, setLogo, stamp, setStamp, companyDetails, setCompanyDetails, letterMeta, setLetterMeta, employeeDetails, setEmployeeDetails, jobTerms, setJobTerms, allowances, setAllowances, signatory, setSignatory, clauses, setClauses, signatorySignature, setSignatorySignature, employeeSignature, setEmployeeSignature, stylingOptions, setStylingOptions, handleTemplateChange, handleLogoUpload, handleStampUpload, handleAllowanceChange, addAllowance, removeAllowance, formatCurrency, handleSaveDraft, handleLoadDraft, handleDeleteDraft, startDrawing, draw, stopDrawing, clearCanvas, openSignaturePad, saveSignature, handlePrint, fontClass }}>
-    <div className="min-h-screen bg-slate-50/60 p-4 md:p-6 flex flex-col xl:flex-row gap-6 print:bg-white print:p-0 print:m-0">
+    <div className="min-h-screen bg-surface-2/60/60 p-4 md:p-6 flex flex-col xl:flex-row gap-6 print:bg-surface print:p-0 print:m-0">
       
       {/* 1. Left Panel - Premium SaaS Dashboard Form */}
-      <div className="w-full xl:w-[460px] shrink-0 bg-white rounded-2xl border border-slate-100 shadow-sm flex flex-col h-fit xl:max-h-[92vh] print:hidden">
+      <div className="w-full xl:w-[460px] shrink-0 bg-surface rounded-2xl border border-line shadow-sm flex flex-col h-fit xl:max-h-[92vh] print:hidden">
         
         {/* Header bar */}
-        <div className="p-5 border-b border-slate-100 bg-slate-50/30 rounded-t-2xl flex items-center justify-between">
+        <div className="p-5 border-b border-line bg-surface-2/60/30 rounded-t-2xl flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-xl bg-mint-500 text-white shadow-sm shadow-mint-200">
+            <div className="p-2 rounded-xl bg-brand text-brand-fg shadow-sm shadow-mint-200">
               <FileText className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-800 tracking-tight">Contract Builder</h2>
-              <p className="text-[11px] text-slate-500 font-medium">Create premium corporate letters</p>
+              <h2 className="text-lg font-bold text-fg tracking-tight">Contract Builder</h2>
+              <p className="text-[11px] text-muted font-medium">Create premium corporate letters</p>
             </div>
           </div>
-          <span className="text-[10px] bg-mint-50 text-mint-700 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">v2.0</span>
+          <span className="text-[10px] bg-brand-soft text-brand px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">v2.0</span>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-slate-100 bg-slate-50/10 text-xs font-semibold overflow-x-auto select-none styled-scrollbar shrink-0">
+        <div className="flex border-b border-line bg-surface-2/60/10 text-xs font-semibold overflow-x-auto select-none styled-scrollbar shrink-0">
           <button 
             onClick={() => setActiveTab("style")}
             className={`flex-1 min-w-[75px] py-3 text-center border-b-2 transition-colors cursor-pointer ${
-              activeTab === "style" ? "border-mint-600 text-mint-700 bg-mint-50/10" : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50/50"
+              activeTab === "style" ? "border-brand text-brand bg-brand-soft/10" : "border-transparent text-muted hover:text-fg hover:bg-surface-2/50"
             }`}
           >
             <Palette className="w-3.5 h-3.5 mx-auto mb-1" />
@@ -477,7 +477,7 @@ export default function AppointmentLetterGenerator() {
           <button 
             onClick={() => setActiveTab("parties")}
             className={`flex-1 min-w-[75px] py-3 text-center border-b-2 transition-colors cursor-pointer ${
-              activeTab === "parties" ? "border-mint-600 text-mint-700 bg-mint-50/10" : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50/50"
+              activeTab === "parties" ? "border-brand text-brand bg-brand-soft/10" : "border-transparent text-muted hover:text-fg hover:bg-surface-2/50"
             }`}
           >
             <Building className="w-3.5 h-3.5 mx-auto mb-1" />
@@ -486,7 +486,7 @@ export default function AppointmentLetterGenerator() {
           <button 
             onClick={() => setActiveTab("terms")}
             className={`flex-1 min-w-[75px] py-3 text-center border-b-2 transition-colors cursor-pointer ${
-              activeTab === "terms" ? "border-mint-600 text-mint-700 bg-mint-50/10" : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50/50"
+              activeTab === "terms" ? "border-brand text-brand bg-brand-soft/10" : "border-transparent text-muted hover:text-fg hover:bg-surface-2/50"
             }`}
           >
             <Briefcase className="w-3.5 h-3.5 mx-auto mb-1" />
@@ -497,7 +497,7 @@ export default function AppointmentLetterGenerator() {
               <button 
                 onClick={() => setActiveTab("signatures")}
                 className={`flex-1 min-w-[75px] py-3 text-center border-b-2 transition-colors cursor-pointer ${
-                  activeTab === "signatures" ? "border-mint-600 text-mint-700 bg-mint-50/10" : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50/50"
+                  activeTab === "signatures" ? "border-brand text-brand bg-brand-soft/10" : "border-transparent text-muted hover:text-fg hover:bg-surface-2/50"
                 }`}
               >
                 <PenTool className="w-3.5 h-3.5 mx-auto mb-1" />
@@ -506,7 +506,7 @@ export default function AppointmentLetterGenerator() {
               <button 
                 onClick={() => setActiveTab("clauses")}
                 className={`flex-1 min-w-[75px] py-3 text-center border-b-2 transition-colors cursor-pointer ${
-                  activeTab === "clauses" ? "border-mint-600 text-mint-700 bg-mint-50/10" : "border-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-50/50"
+                  activeTab === "clauses" ? "border-brand text-brand bg-brand-soft/10" : "border-transparent text-muted hover:text-fg hover:bg-surface-2/50"
                 }`}
               >
                 <Layers className="w-3.5 h-3.5 mx-auto mb-1" />
@@ -532,14 +532,14 @@ export default function AppointmentLetterGenerator() {
         </div>
 
         {/* Footer print action button */}
-        <div className="p-5 border-t border-slate-100 bg-slate-50/20 rounded-b-2xl shrink-0">
+        <div className="p-5 border-t border-line bg-surface-2/60/20 rounded-b-2xl shrink-0">
           <button 
             onClick={handlePrint} 
             disabled={isGenerating}
-            className={`w-full text-white font-bold py-3.5 px-4 rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all duration-300 cursor-pointer ${
+            className={`w-full text-brand-fg font-bold py-3.5 px-4 rounded-xl shadow-sm flex items-center justify-center gap-2 transition-all duration-300 cursor-pointer ${
               isGenerating 
                 ? 'bg-slate-400 cursor-not-allowed' 
-                : 'bg-mint-600 hover:bg-mint-700 hover:shadow-md'
+                : 'bg-brand hover:brightness-105 hover:shadow-md'
             }`}
           >
             <Printer className="w-5 h-5" />

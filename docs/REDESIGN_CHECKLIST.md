@@ -70,7 +70,7 @@ computer, has its own loading look, and its old modals are redone too.
 - ✅ `/unauthorized` — made (was missing: people sent here got the 404)
 - ✅ Error and not-found screens (`app/error.jsx`, `app/not-found.jsx`, section `error.js` files)
 - ✅ `/tools/invoice-generator` Invoice generator (form restyled; the invoice itself stays white)
-- ⬜ `/tools/appointment-letter` Appointment letter (2.7k lines — 3.5)
+- ✅ `/tools/appointment-letter` Appointment letter — split into panels / preview / pdf / templates (same output), app colours, branch currency
 - ✅ `/support` Support (help page; NEXT_PUBLIC_SUPPORT_EMAIL shows the email button)
 - ⬜ `/branch-chat`, `/feeds` Branch chat and feeds (replaced later by 4.4)
 
