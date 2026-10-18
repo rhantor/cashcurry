@@ -1,14 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import { roleOptions, BRANCH_ASSIGNABLE, normalizeRole } from "@/lib/authz/permissions";
 
-const ROLE_OPTIONS = [
-  "branchAdmin",
-  "Supervisor",
-  "Accountant",
-  "Cashier",
-  "Waiter",
-  "Staff",
-];
 
 export default function EditBranchUserModal({
   open,
@@ -24,7 +17,7 @@ export default function EditBranchUserModal({
     if (open && user) {
       setFullName(user.fullName || user.name || user.userName || "");
       setEmail(user.email || "");
-      setRole(user.role || "");
+      setRole(normalizeRole(user.role) || "");
     }
   }, [open, user]);
 
@@ -83,9 +76,9 @@ export default function EditBranchUserModal({
               required
             >
               <option value="">Select a role</option>
-              {ROLE_OPTIONS.map((r) => (
-                <option key={r} value={r}>
-                  {r}
+              {roleOptions(BRANCH_ASSIGNABLE, user?.role).map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
                 </option>
               ))}
             </select>

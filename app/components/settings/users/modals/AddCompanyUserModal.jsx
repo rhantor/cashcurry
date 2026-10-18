@@ -2,13 +2,8 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import { roleOptions, COMPANY_ASSIGNABLE } from "@/lib/authz/permissions";
 
-const ROLE_OPTIONS = [
-  { value: "owner", label: "Owner" },
-  { value: "superAdmin", label: "Super Admin" },
-  { value: "gm", label: "General Manager" },
-  { value: "Supervisor", label: "Supervisor" },
-];
 
 export default function AddCompanyUserModal({
   open,
@@ -138,7 +133,7 @@ export default function AddCompanyUserModal({
               required
             >
               <option value="">Select a role</option>
-              {ROLE_OPTIONS.map((r) => (
+              {roleOptions(COMPANY_ASSIGNABLE, undefined).map((r) => (
                 <option key={r.value} value={r.value}>
                   {r.label}
                 </option>

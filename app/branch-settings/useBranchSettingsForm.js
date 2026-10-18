@@ -8,7 +8,7 @@ import {
   useUpdateBranchSettingsMutation,
 } from "@/lib/redux/api/branchSettingsApiSlice";
 import { BRANCH_LOCKED_FIELDS, BASIC_SETTINGS_FIELDS } from "./fieldMaps";
-import { getSessionUser } from "@/lib/session";
+import useSession from "@/app/hooks/useSession";
 
 function normalizeTenders(input = []) {
   return input.map((t, i) => {
@@ -29,18 +29,8 @@ function normalizeTenders(input = []) {
 }
 
 export default function useBranchSettingsForm() {
-  const [companyId, setCompanyId] = useState(null);
-  const [branchId, setBranchId] = useState(null);
-  const [role, setRole] = useState(null);
-
-  useEffect(() => {
-    const raw = getSessionUser();
-    if (!raw) return;
-    const u = raw;
-    setCompanyId(u.companyId);
-    setBranchId(u.branchId);
-    setRole(u.role);
-  }, []);
+  // the branch being viewed: a branch user's own, or the one a company role picked
+  const { companyId, branchId, role } = useSession();
 
   const skip = !companyId || !branchId;
   const { data: branch, error: branchError } = useGetSingleBranchQuery(

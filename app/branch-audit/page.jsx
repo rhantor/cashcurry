@@ -5,7 +5,7 @@ import { skipToken } from "@reduxjs/toolkit/query/react";
 import { useGetBranchAuditLogsQuery } from "@/lib/redux/api/auditApiSlice";
 import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
 import Pagination from "@/app/components/common/Pagination";
-import { hasRole } from "@/lib/authz/roles";
+import { can } from "@/lib/authz/permissions";
 import { getSessionUser } from "@/lib/session";
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -240,7 +240,6 @@ function DiffViewer({ before, after, action, details }) {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
-const ALLOWED_ROLES = ["branchAdmin", "manager"];
 const PAGE_SIZE = 15;
 
 export default function BranchAuditPage() {
@@ -263,7 +262,7 @@ export default function BranchAuditPage() {
 
   const companyId = user?.companyId ?? null;
   const branchId = user?.branchId ?? null;
-  const isAllowed = hasRole(user, ALLOWED_ROLES);
+  const isAllowed = can(user?.role, "audit.branch");
 
   const { data: branchData } = useGetSingleBranchQuery(
     companyId && branchId ? { companyId, branchId } : skipToken

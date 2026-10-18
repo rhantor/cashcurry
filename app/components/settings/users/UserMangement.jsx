@@ -32,7 +32,7 @@ import EditBranchUserModal from "./modals/EditBranchUserModal";
 import AddCompanyUserModal from "./modals/AddCompanyUserModal"; // <-- NEW
 
 // Helpers
-import { canManageAllBranches } from "@/utils/roles";
+import { can } from "@/lib/authz/permissions";
 import { sanitizeUpdates, normalizeRole } from "@/utils/sanitize";
 import { getSessionUser } from "@/lib/session";
 import { toast, confirmDialog } from "@/app/components/ui/notify";
@@ -106,7 +106,8 @@ export default function UserManagement() {
   );
 
   const loading = loadingCompany || loadingBranches;
-  const hasManageAll = canManageAllBranches(userRole);
+  // adding, changing and removing users: owner and superAdmin (roles matrix, company.manage)
+  const hasManageAll = can(userRole, "company.manage");
 
   // ----- Company users -----
   const openEditCompanyUser = (u) => setEditingCompanyUser(u);
@@ -325,7 +326,7 @@ export default function UserManagement() {
             { value: "branches", label: `Branches (${branches?.length || 0})` },
           ]}
         />
-        <span className="text-xs text-muted">{hasManageAll ? "You can look after every branch" : "Some changes need an owner"}</span>
+        <span className="text-xs text-muted">{hasManageAll ? "You can add and change users in every branch" : "Only the owner or a super admin can change users"}</span>
       </div>
 
       {/* Content */}

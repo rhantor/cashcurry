@@ -33,6 +33,7 @@ const USERS = [
   ["gm", "gm", "Demo General Manager", null],
   ["branchAdmin", "kl_admin", "KL Branch Admin", KL],
   ["manager", "kl_manager", "KL Manager", KL],
+  ["inCharge", "kl_incharge", "KL In Charge", KL],
   ["accountant", "kl_accountant", "KL Accountant", KL],
   ["supervisor", "kl_supervisor", "KL Supervisor", KL],
   ["cashier", "kl_cashier", "KL Cashier", KL],
@@ -225,12 +226,14 @@ export function buildDemoCompany(today = new Date()) {
   for (const s of STAFF) {
     push(s.branchId, "staff", {
       id: s.id, firstName: s.firstName, lastName: s.lastName, role: "staff", department: s.department,
-      employmentType: "full-time", basicSalary: s.basicSalary, allowance: "0", fixedSalaryNoAttendance: true,
+      employmentType: "full-time", fixedSalaryNoAttendance: true,
       startDate: "2026-01-01", nationality: "malaysian", country: "Malaysia", phone: "",
       companyId: COMPANY_ID, branchId: s.branchId, createdAt,
       // A staff login is linked both ways, as create-staff does it.
       ...(s.login ? { uid: uid(s.login), loginEmail: emailOf(s.login) } : {}),
     });
+    // pay apart from the record, readable only by those who see pay (lib/staffPrivate.js)
+    push(s.branchId, "staffPrivate", { id: s.id, staffId: s.id, basicSalary: s.basicSalary, allowance: "0" });
   }
 
   // Monthly totals, as the rollup Cloud Functions keep them.

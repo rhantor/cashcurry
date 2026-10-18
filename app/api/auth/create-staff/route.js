@@ -2,17 +2,16 @@ import { NextResponse } from "next/server";
 import crypto from "node:crypto";
 import { adminAuth, adminDb } from "@/lib/server/firebaseAdmin";
 import admin from "firebase-admin";
+import { can, isCompanyRole } from "@/lib/authz/permissions";
 
 // Creates a staff member's login and links it to their staff record.
 //
 // Runs with full database access (Admin SDK), so it checks the caller itself:
-// a signed-in owner / super admin of the company, or the branch admin /
-// manager of that branch. Before, anyone on the internet could call it and
+// whoever the roles matrix lets manage staff ("staff.manage": owner, super
+// admin and GM of the company; branch admin and manager of that branch). Before, anyone on the internet could call it and
 // create a login inside any company — with the staff member's IC number, or
 // "password123", as the password.
 
-const COMPANY_WIDE = ["owner", "superAdmin", "superadmin"];
-const BRANCH_MANAGERS = ["branchAdmin", "branchadmin", "manager"];
 
 /** A temporary password the staff member is asked to change: 10 chars, no look-alikes. */
 function temporaryPassword() {
@@ -45,8 +44,9 @@ export async function POST(req) {
     const allowed =
       me &&
       me.companyId === companyId &&
-      (COMPANY_WIDE.includes(me.role) || (BRANCH_MANAGERS.includes(me.role) && me.branchId === branchId));
-    if (!allowed) return fail(403, "Only the branch admin or a manager of this branch can create staff logins.");
+      can(me.role, "staff.manage") &&
+      (isCompanyRole(me.role) || me.branchId === branchId);
+    if (!allowed) return fail(403, "Only the owner, a general manager, or this branch's admin or manager can create staff logins.");
 
     // 3. The staff record must exist in that branch, without a login yet.
     const staffRef = adminDb.collection("companies").doc(companyId)

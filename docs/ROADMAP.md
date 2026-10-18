@@ -119,7 +119,7 @@ Needed before staff phones get direct access to the database (Phase 4).
 | # | Task | Status |
 |---|------|--------|
 | 4.0 | **Decision doc**: staff app technology (installable web app vs Android/iOS app via Capacitor like the POS), login method (email vs phone OTP — phone suits Bangladesh), shared code layout | ⏸ |
-| 4.1 | **Roles & permissions matrix** written down and enforced in one place (UI, routes, database rules) | ⬜ |
+| 4.1 | **Roles & permissions matrix** — `docs/ROLES.md`, agreed 18 Oct; one source (`lib/authz/permissions.js`) for the menu, page guard (deny by default), page checks and `firestore.rules`, with rules tests generated from it. New role in-charge. Fixed: branch roles read everyone's pay / IC / bank (now `staffPrivate`), pages open to anyone by address, cashier salary entry / gm vendors / owner payroll failing, staff writing purchase orders and notifications, any role deleting records, role pickers saving unknown roles | ✅ |
 | 4.2 | **Requests engine**: one model for advance, staff loan, leave, and later other types; approval chain by role; "mark paid" posts to finance (uses 1.4) | ⬜ |
 | 4.3 | **Approvals inbox** for managers (web + app) with push notifications | ⬜ |
 | 4.4 | **Chat**: branch/company/custom groups, personal messages, photos/files, read receipts, push. Replaces today's basic branch chat | ⬜ |
@@ -151,6 +151,11 @@ system and permissions, and plan its own improvements.
 Things that must happen on production at release time, in order. Each one is
 rehearsed on the local copy first.
 
+- [ ] **Roles matrix (4.1):** deploy the new `firestore.rules` and, right after, run
+      `npm run staff:private -- --project <id>` (report), then with `--write --confirm`.
+      Until it runs, existing staff records still carry pay / IC / bank on the record
+      (readable by branch roles); new and edited staff are split already. Check one
+      user of each role can sign in and open their menu.
 - [ ] Fix the backup export script first: it writes `{ id: doc.id, ...data }`, so any
       document with its own `id` field loses its real id (payroll salary entries —
       42 of them collapsed in the Sep 2026 backup). Export the id separately.
@@ -188,3 +193,6 @@ rehearsed on the local copy first.
 | Attendance: confirm the kiosk plan (4.8) after a one-branch pilot; liveness check on or off; which tablets | 4.8 |
 | Staff app technology and login method | 4.0 |
 | Separate staging Firebase project (recommended before Phase 4) | 4.x deploys |
+| Payroll: when a slip's deductions are more than its gross, net shows 0 but finalize marks the whole loan / advance instalment repaid. Mark only what was actually taken (carry the rest), or stop finalize with a warning? | 4.2 |
+| Staff email is required to add staff; many kitchen staff have none. Make it optional and make the staff-app login from the IC number? | 4.6 |
+| Purchases ideas, to choose from: send the order to the supplier on WhatsApp; supplier returns / credit notes; pay all of a vendor's overdue bills at once; due-soon reminders; vendor statement PDF | any time |

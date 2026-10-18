@@ -68,3 +68,6 @@ functions/node_modules/
 
 # npm run dev:phone writes this (firebase.json with emulators open to the Wi-Fi)
 .firebase.lan.json
+
+# emulator crash dumps (local data — never commit)
+firebase-export-*/

@@ -2,6 +2,7 @@
 import React from "react";
 import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
+import { roleOptions, BRANCH_ASSIGNABLE } from "@/lib/authz/permissions";
 
 const AssignBranchUserForm = ({
   branches,
@@ -104,10 +105,11 @@ const AssignBranchUserForm = ({
           required
         >
           <option value="">-- Select Role --</option>
-          <option value="manager">Manager</option>
-          <option value="accountant">Accountant</option>
-          <option value="supervisor">Supervisor</option>
-          <option value="cashier">Cashier</option>
+          {roleOptions(BRANCH_ASSIGNABLE).map((r) => (
+            <option key={r.value} value={r.value}>
+              {r.label}
+            </option>
+          ))}
         </select>
       </div>
 

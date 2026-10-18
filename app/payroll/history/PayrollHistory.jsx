@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useState } from 'react'
 import Link from 'next/link'
 import { skipToken } from '@reduxjs/toolkit/query'
 import {
@@ -14,7 +14,8 @@ import { useGetCompanyDetailsQuery } from '@/lib/redux/api/authApiSlice'
 import { useGetSingleBranchQuery } from '@/lib/redux/api/branchApiSlice'
 import { useGetStaffListQuery } from '@/lib/redux/api/staffApiSlice'
 import PayrollPrintView from '../components/PayrollPrintView'
-import { getSessionUser } from '@/lib/session'
+import useResolvedCompanyBranch from '@/utils/useResolvedCompanyBranch'
+import { can } from '@/lib/authz/permissions'
 import { toast, confirmDialog } from "@/app/components/ui/notify";
 import { format } from 'date-fns'
 import { CalendarDays, ChevronDown, Clock, Lock, Pencil, Plus, Printer, Trash2, Wallet } from 'lucide-react'
@@ -169,22 +170,12 @@ function RunRow ({ run, companyId, branchId, isAdminOrManager, setPrintTarget, m
 // ─── Main PayrollHistory ──────────────────────────────────────────────────────
 
 export default function PayrollHistory () {
-  const [companyId, setCompanyId] = useState(null)
-  const [branchId,  setBranchId]  = useState(null)
-  const [role, setRole] = useState(null)
-  const [authReady, setAuthReady] = useState(false)
+  const { ready: authReady, user, companyId, branchId } = useResolvedCompanyBranch()
+  const role = user?.role || null
   const [statusFilter, setStatusFilter] = useState('all')
   const [printTarget, setPrintTarget] = useState(null)
   const currency = useCurrency()
   const money = n => formatMoney(Number(n) || 0, currency)
-
-  useEffect(() => {
-    const u = (getSessionUser() || {})
-    setCompanyId(u.companyId || null)
-    setBranchId(u.branchId  || null)
-    setRole(u.role || null)
-    setAuthReady(true)
-  }, [])
 
   const skip = !companyId || !branchId
   const { data: runs = [], isLoading } = useGetPayrollRunsQuery(
@@ -197,7 +188,9 @@ export default function PayrollHistory () {
   const companyName = companyData?.name || ''
   const branchName  = branchDoc?.name || branchSettings?.basic?.name || 'Branch'
 
-  const isAdminOrManager = role === 'branchAdmin' || role === 'manager'
+  // the accountant sees payroll; branchAdmin, manager and company roles run it
+  const canSee = can(role, 'payroll.view')
+  const isAdminOrManager = can(role, 'payroll.manage')
 
   const sorted = [...runs].sort((a, b) => String(b.period).localeCompare(String(a.period)))
   const filtered = statusFilter === 'all' ? sorted : sorted.filter(r => r.status === statusFilter)
@@ -208,13 +201,13 @@ export default function PayrollHistory () {
 
   if (!authReady) return <Skeleton className='m-6 h-64' rounded='rounded-2xl' />
 
-  if (!isAdminOrManager) {
+  if (!canSee) {
     return (
       <StatusScreen
         full={false}
         icon={Lock}
         tone='warning'
-        title='Payroll is for branch admins and managers'
+        title='Payroll is for branch admins, managers, accountants and the owner'
         message='Ask your branch admin if you need a payslip.'
         actions={[{ label: 'Go home', href: '/', primary: true }]}
       />
@@ -228,9 +221,11 @@ export default function PayrollHistory () {
           <h1 className='text-2xl font-bold tracking-tight text-fg'>Payroll history</h1>
           <p className='text-sm text-muted'>Every month&apos;s payroll for this branch. Open one to see its payslips.</p>
         </div>
-        <Link href='/payroll' className='inline-flex h-10 items-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-brand-fg shadow-sm hover:brightness-105'>
-          <Plus className='size-4' /> Run payroll
-        </Link>
+        {isAdminOrManager && (
+          <Link href='/payroll' className='inline-flex h-10 items-center gap-2 rounded-xl bg-brand px-4 text-sm font-semibold text-brand-fg shadow-sm hover:brightness-105'>
+            <Plus className='size-4' /> Run payroll
+          </Link>
+        )}
       </div>
 
       {runs.length > 0 && (
@@ -263,7 +258,7 @@ export default function PayrollHistory () {
             icon={CalendarDays}
             title={runs.length ? 'Nothing here' : 'No payroll yet'}
             description={runs.length ? 'No month has that status.' : 'Run the first month’s payroll and it shows here.'}
-            action={!runs.length && (
+            action={!runs.length && isAdminOrManager && (
               <Link href='/payroll' className='inline-flex h-10 items-center rounded-xl bg-brand px-4 text-sm font-semibold text-brand-fg'>Run payroll</Link>
             )}
           />

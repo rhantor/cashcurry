@@ -1,8 +1,8 @@
 // components/settings/users/modals/AddBranchUserModal.jsx
 "use client";
 import React, { useEffect, useState } from "react";
+import { roleOptions, BRANCH_ASSIGNABLE } from "@/lib/authz/permissions";
 
-const ROLE_OPTIONS = ["manager", "accountant", "supervisor", "cashier"];
 
 export default function AddBranchUserModal({
   open,
@@ -130,9 +130,9 @@ export default function AddBranchUserModal({
               required
             >
               <option value="">Select a role</option>
-              {ROLE_OPTIONS.map((r) => (
-                <option key={r} value={r}>
-                  {r}
+              {roleOptions(BRANCH_ASSIGNABLE, undefined).map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
                 </option>
               ))}
             </select>

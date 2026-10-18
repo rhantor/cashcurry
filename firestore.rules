@@ -88,7 +88,7 @@ service cloud.firestore {
       return isAuth() && u.companyId == companyId && (
         u.role in ['owner', 'gm', 'superAdmin', 'superadmin'] ||
         (
-          (isBranchAdmin(u) || u.role in ['manager', 'accountant', 'supervisor']) &&
+          (isBranchAdmin(u) || u.role in ['manager', 'inCharge', 'accountant', 'supervisor']) &&
           inBranch(u, branchId)
         )
       );
@@ -209,11 +209,8 @@ service cloud.firestore {
     // Money and date settings (opening balances, currency, time zone, day
     // cut-off) are enforced here too: a manager's save may not change them.
     function canWriteBranchSettings(companyId, branchId) {
-      let u = userData();
-      return canManageSettings(companyId, branchId) ||
-        (isAuth() && u.companyId == companyId &&
-         u.role == 'manager' && inBranch(u, branchId) &&
-         (resource == null || keepsMoneySettings()));
+      return canMoneySettings(companyId, branchId) ||
+        (canBranchSettings(companyId, branchId) && (resource == null || keepsMoneySettings()));
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -225,6 +222,74 @@ service cloud.firestore {
     // signup flow (consuming a code = flipping used:false to used:true).
     function isPlatformAdmin() {
       return isAuth() && userData().get('platformAdmin', false) == true;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // The roles matrix (docs/ROLES.md, lib/authz/permissions.js — agreed
+    // 18 Oct 2026). One function per capability; tests-rules/matrix.test.js
+    // checks each against lib/authz/permissions.js, so the two can't drift.
+    // Company roles act in any branch of their company; branch roles only in
+    // their own. Old spellings (superadmin, branchadmin) count as the new ones.
+    // ─────────────────────────────────────────────────────────────────────────
+    function companyRoles() { return ['owner', 'superAdmin', 'superadmin', 'gm']; }
+    function leadRoles() { return ['branchAdmin', 'branchadmin', 'manager']; }
+    function officeBranchRoles() { return ['branchAdmin', 'branchadmin', 'manager', 'inCharge', 'accountant', 'supervisor', 'cashier']; }
+
+    // the signed-in user may act with `branchRoles` in this branch, or is a company role
+    function may(companyId, branchId, branchRoles) {
+      let u = userData();
+      return isAuth() && u.companyId == companyId && (
+        u.role in companyRoles() ||
+        (inBranch(u, branchId) && u.role in branchRoles)
+      );
+    }
+    // company-level records (vendors, items, branch loans): the role, in any branch
+    function mayInCompany(companyId, branchRoles) {
+      let u = userData();
+      return isAuth() && u.companyId == companyId && (u.role in companyRoles() || u.role in branchRoles);
+    }
+
+    function canReportsView(c, b)     { return may(c, b, leadRoles().concat(['inCharge', 'accountant'])); }
+    function canSalesEnter(c, b)      { return may(c, b, officeBranchRoles()); }
+    function canCostsEnter(c, b)      { return may(c, b, leadRoles().concat(['inCharge', 'accountant'])); }
+    function canCashBank(c, b)        { return may(c, b, leadRoles().concat(['accountant'])); }
+    function canSalariesEnter(c, b)   { return may(c, b, leadRoles().concat(['accountant'])); }
+    function canAdvancesRequest(c, b) { return may(c, b, officeBranchRoles()); }
+    function canAdvancesPayOut(c, b)  { return may(c, b, leadRoles().concat(['accountant', 'supervisor', 'cashier'])); }
+    function canAdvancesApprove(c, b) { return may(c, b, leadRoles()); }
+    function canPayrollView(c, b)     { return may(c, b, leadRoles().concat(['accountant'])); }
+    function canPayrollManage(c, b)   { return may(c, b, leadRoles()); }
+    function canStaffView(c, b)       { return may(c, b, officeBranchRoles()); }
+    function canStaffPay(c, b)        { return may(c, b, leadRoles().concat(['accountant'])); }
+    function canStaffManage(c, b)     { return may(c, b, leadRoles()); }
+    function canAttendanceView(c, b)  { return may(c, b, leadRoles().concat(['inCharge', 'supervisor'])); }
+    function canAttendanceManage(c, b){ return may(c, b, leadRoles()); }
+    function canKiosk(c, b)           { return may(c, b, leadRoles().concat(['inCharge', 'supervisor'])); }
+    function canRecordsDelete(c, b)   { return may(c, b, leadRoles()); }
+    function canPurchasesOrder(c, b)  { return may(c, b, leadRoles().concat(['inCharge', 'accountant', 'supervisor'])); }
+    function canPurchasesApprove(c, b){ return may(c, b, leadRoles().concat(['inCharge'])); }
+    function canPurchasesBills(c, b)  { return may(c, b, leadRoles().concat(['accountant'])); }
+    function canBranchSettings(c, b)  { return may(c, b, leadRoles()); }
+    function canMoneySettings(c, b) {
+      let u = userData();
+      return isAuth() && u.companyId == c && (
+        u.role in ['owner', 'superAdmin', 'superadmin'] ||
+        (isBranchAdmin(u) && inBranch(u, b))
+      );
+    }
+    function canCatalogView(c)        { return mayInCompany(c, leadRoles().concat(['inCharge', 'accountant', 'supervisor'])); }
+    function canCatalogManage(c)      { return mayInCompany(c, leadRoles().concat(['accountant'])); }
+    function canBranchLoans(c)        { return mayInCompany(c, leadRoles().concat(['accountant'])); }
+    function canPurchasesOrderAny(c)  { return mayInCompany(c, leadRoles().concat(['inCharge', 'accountant', 'supervisor'])); }
+    function isOfficeMember(c)        { return mayInCompany(c, officeBranchRoles()); }
+
+    // a purchase order change that approves, rejects or re-opens it (sending an
+    // approved order, or an edit that clears its approval, is not)
+    function isApprovalChange() {
+      let before = resource.data.get('status', '');
+      let after = request.resource.data.get('status', '');
+      return (after != before && (after in ['Approved', 'Rejected'] || before == 'Rejected')) ||
+        (changedKeys().hasAny(['approvedBy']) && request.resource.data.get('approvedBy', '') != '');
     }
     match /signupInvites/{code} {
       allow read: if true;
@@ -336,26 +401,26 @@ service cloud.firestore {
       // ── Notifications (Company Level) ──────────────────────────────────────
       match /notifications/{docId} {
         allow read: if belongsToCompany(companyId);
-        // Any member (including staff) can send a notification
-        allow write: if belongsToCompany(companyId);
+        // anyone in the company may raise one (staff requests do); afterwards only "read" changes
+        allow create: if belongsToCompany(companyId);
+        allow update: if belongsToCompany(companyId) && changedKeys().hasOnly(['read', 'readAt', 'updatedAt']);
+        allow delete: if isOfficeMember(companyId);
       }
 
       // ── Staff Loans (Company Level) ────────────────────────────────────────
       match /loans/{docId} {
-        allow read: if belongsToCompany(companyId);
-        allow write: if isAuth() && userData().companyId == companyId && (
-          isBranchAdmin(userData()) ||
-          userData().role in ['owner', 'manager', 'accountant', 'supervisor']
-        );
+        // branch-to-branch loans
+        allow read: if isOfficeMember(companyId);
+        allow write: if canBranchLoans(companyId);
       }
 
       // ── Vendors ────────────────────────────────────────────────────────────
       match /vendors/{vendorId} {
-        allow read: if belongsToCompany(companyId);
-        allow write: if isAuth() && userData().companyId == companyId && (
-          isBranchAdmin(userData()) ||
-          userData().role in ['owner', 'manager', 'accountant', 'supervisor']
-        );
+        allow read: if canCatalogView(companyId);
+        allow write: if canCatalogManage(companyId);
+        // receiving goods raises what the vendor is owed
+        allow update: if canPurchasesOrderAny(companyId) &&
+          changedKeys().hasOnly(['currentBalance', 'totalBilled', 'updatedAt']);
       }
 
       // ── POS: Customer DB (company-scoped so loyalty spans branches) ──────
@@ -371,11 +436,11 @@ service cloud.firestore {
       // ── Items Catalog ──────────────────────────────────────────────────────
       // Cashier+ can read for POS recipe lookups; create/update by supervisor+.
       match /items/{itemId} {
-        allow read: if belongsToCompany(companyId);
-        allow write: if isAuth() && userData().companyId == companyId && (
-          isBranchAdmin(userData()) ||
-          userData().role in ['owner', 'manager', 'accountant', 'supervisor', 'cashier']
-        );
+        allow read: if canCatalogView(companyId);
+        allow write: if canCatalogManage(companyId);
+        // receiving goods records what the branch paid
+        allow update: if canPurchasesOrderAny(companyId) &&
+          changedKeys().hasOnly(['lastPurchaseByBranch', 'lastPurchasePrice', 'lastPurchaseDate', 'updatedAt']);
       }
 
       // ── Company Manual Deductions ──────────────────────────────────────────
@@ -440,88 +505,94 @@ service cloud.firestore {
         // Written exclusively by Cloud Functions (Admin SDK bypasses these rules).
         // Any branch member can read — used by dashboards and reports.
         match /summaries/{month} {
-          allow read: if canRead(companyId, branchId);
+          allow read: if canReportsView(companyId, branchId);
           allow write: if false;
         }
 
         // ── Sales ───────────────────────────────────────────────────────────
         match /sales/{docId} {
-          allow read: if canRead(companyId, branchId);
-          allow write: if canWrite(companyId, branchId);
+          allow read, create, update: if canSalesEnter(companyId, branchId);
+          allow delete: if canRecordsDelete(companyId, branchId);
         }
 
         // ── Costs / Expenses ────────────────────────────────────────────────
         match /costs/{docId} {
-          allow read: if canRead(companyId, branchId);
-          allow write: if canWrite(companyId, branchId);
+          allow read, create, update: if canCostsEnter(companyId, branchId);
+          allow delete: if canRecordsDelete(companyId, branchId);
         }
 
         // ── Bank Deposits ────────────────────────────────────────────────────
         match /deposits/{docId} {
-          allow read: if canRead(companyId, branchId);
-          allow write: if canWrite(companyId, branchId);
+          allow read: if canCashBank(companyId, branchId) || canReportsView(companyId, branchId);
+          allow create, update: if canCashBank(companyId, branchId);
+          allow delete: if canRecordsDelete(companyId, branchId);
         }
 
         // ── Cash Withdrawals ─────────────────────────────────────────────────
         match /cashWithdrawals/{docId} {
-          allow read: if canRead(companyId, branchId);
-          allow write: if canWrite(companyId, branchId);
+          allow read: if canCashBank(companyId, branchId) || canReportsView(companyId, branchId);
+          allow create, update: if canCashBank(companyId, branchId);
+          allow delete: if canRecordsDelete(companyId, branchId);
         }
 
         // ── Staff List ───────────────────────────────────────────────────────
         // Owner can manage staff in any branch; branchAdmin/manager only in their own.
         match /staff/{docId} {
-          // Branch management reads the list; a staff member reads only their own
-          // record (it holds passport, bank and salary details).
-          allow read: if canRead(companyId, branchId) ||
+          allow read: if canStaffView(companyId, branchId) ||
             (isBranchMember(companyId, branchId) && resource.data.get('uid', '') == request.auth.uid);
-          allow write: if isAuth() && userData().companyId == companyId && (
-            userData().role == 'owner' ||
-            (
-              (isBranchAdmin(userData()) || userData().role == 'manager') &&
-              inBranch(userData(), branchId)
-            )
-          );
+          allow write: if canStaffManage(companyId, branchId);
+        }
+
+        // Pay, IC, bank and personal details, apart from the staff record
+        // (lib/staffPrivate.js): those who may see pay, and the person themselves.
+        match /staffPrivate/{staffId} {
+          allow read: if canStaffPay(companyId, branchId) ||
+            (isBranchMember(companyId, branchId) && userData().get('staffId', '') == staffId);
+          allow write: if canStaffManage(companyId, branchId);
         }
 
         // ── Salaries ─────────────────────────────────────────────────────────
         match /salaries/{docId} {
-          allow read: if canRead(companyId, branchId);
-          allow write: if canWrite(companyId, branchId);
+          // Salary payments are entries in the cash book: those who see the
+          // reports read them (the figures need them). Pay rates, bank and ID
+          // stay in staffPrivate; payslips in payrollRuns.
+          allow read: if canSalariesEnter(companyId, branchId) || canReportsView(companyId, branchId);
+          allow create, update: if canSalariesEnter(companyId, branchId);
+          allow delete: if canRecordsDelete(companyId, branchId);
         }
 
         // ── Staff Loans (Branch Level) ───────────────────────────────────────
         match /loans/{docId} {
-          // Anyone at the branch may ASK (pending, unpaid). A manager or branch
-          // admin approves or rejects, or records one handed over on the spot.
+          // Anyone at the branch may ASK (pending, unpaid). branchAdmin / manager (and
+          // company roles) approve or reject, or record one handed over on the spot.
           // A payer (cashier and up) marks an approved one paid — once, changing
-          // nothing else. Accountants/supervisors keep the books. Staff read
+          // nothing else. Payroll instalments: whoever enters salaries. Staff read
           // only their own (isOwnRequest).
-          allow read: if canRead(companyId, branchId) ||
+          allow read: if canAdvancesPayOut(companyId, branchId) || canReportsView(companyId, branchId) ||
             (isBranchMember(companyId, branchId) && isOwnRequest());
-          allow create: if isApprover(companyId, branchId) ||
+          allow create: if canAdvancesApprove(companyId, branchId) ||
             (isBranchMember(companyId, branchId) && isNewRequest());
-          allow update: if isApprover(companyId, branchId) ||
-            (isPayer(companyId, branchId) && isPayOut()) ||
-            (canWrite(companyId, branchId) && isBookkeeping());
-          allow delete: if isApprover(companyId, branchId);
+          allow update: if canAdvancesApprove(companyId, branchId) ||
+            (canAdvancesPayOut(companyId, branchId) && isPayOut()) ||
+            (canSalariesEnter(companyId, branchId) && isBookkeeping());
+          allow delete: if canAdvancesApprove(companyId, branchId);
         }
 
         // ── Staff Advances ───────────────────────────────────────────────────
         match /advances/{docId} {
-          // Anyone at the branch may ASK (pending, unpaid). A manager or branch
-          // admin approves or rejects, or records one handed over on the spot.
+          // Anyone at the branch may ASK (pending, unpaid). branchAdmin / manager (and
+          // company roles) approve or reject, or record one handed over on the spot.
           // A payer (cashier and up) marks an approved one paid — once, changing
-          // nothing else. Accountants/supervisors keep the books. Staff read
+          // nothing else. Payroll instalments: whoever enters salaries. Staff read
           // only their own (isOwnRequest).
-          allow read: if canRead(companyId, branchId) ||
+          allow read: if canAdvancesPayOut(companyId, branchId) || canReportsView(companyId, branchId) ||
             (isBranchMember(companyId, branchId) && isOwnRequest());
-          allow create: if isApprover(companyId, branchId) ||
+          allow create: if canAdvancesApprove(companyId, branchId) ||
             (isBranchMember(companyId, branchId) && isNewRequest());
-          allow update: if isApprover(companyId, branchId) ||
-            (isPayer(companyId, branchId) && isPayOut()) ||
-            (canWrite(companyId, branchId) && isBookkeeping());
-          allow delete: if isApprover(companyId, branchId);
+          allow update: if canAdvancesApprove(companyId, branchId) ||
+            (canAdvancesPayOut(companyId, branchId) && isPayOut()) ||
+            (canSalariesEnter(companyId, branchId) && isBookkeeping());
+          allow delete: if canAdvancesApprove(companyId, branchId);
         }
 
         // ── Chat Messages ───────────────────────────────────────────────────
@@ -531,38 +602,37 @@ service cloud.firestore {
 
         // ── Attendance (Shared Kiosk) ────────────────────────────────────────
         match /attendance/{docId} {
-          // Staff see their own punches (the staff app's hours and pay).
-          allow read: if canRead(companyId, branchId) ||
+          allow read: if canAttendanceView(companyId, branchId) || canPayrollManage(companyId, branchId) ||
             (isBranchMember(companyId, branchId) && isOwnStaffRecord());
-          allow write: if canWrite(companyId, branchId);
+          allow write: if canKiosk(companyId, branchId);
         }
 
         // ── Early-OT Requests (shift templates) ──────────────────────────────
         // Raised by the kiosk on an early punch-in, approved in the Requested
         // Panel. Same access shape as attendance.
         match /otRequests/{docId} {
-          allow read: if canRead(companyId, branchId) ||
+          allow read: if canAttendanceView(companyId, branchId) || canPayrollManage(companyId, branchId) ||
             (isBranchMember(companyId, branchId) && isOwnStaffRecord());
-          allow write: if canWrite(companyId, branchId);
+          allow write: if canKiosk(companyId, branchId);
         }
 
         // ── Vendor Bills ─────────────────────────────────────────────────────
         match /vendorBills/{docId} {
-          allow read: if canRead(companyId, branchId);
-          allow write: if canWrite(companyId, branchId);
+          allow read, update, delete: if canPurchasesBills(companyId, branchId);
+          // receiving goods against a purchase order raises the bill
+          allow create: if canPurchasesBills(companyId, branchId) || canPurchasesOrder(companyId, branchId);
         }
 
         // ── Vendor Payments ──────────────────────────────────────────────────
         match /vendorPayments/{docId} {
-          allow read: if canRead(companyId, branchId);
-          allow write: if canWrite(companyId, branchId);
+          allow read, write: if canPurchasesBills(companyId, branchId);
         }
 
         // ── Purchase Requisitions ────────────────────────────────────────────
         match /requisitions/{docId} {
-          allow read: if canRead(companyId, branchId);
-          allow write: if canWrite(companyId, branchId) ||
-                          isBranchMember(companyId, branchId);
+          allow read, create, delete: if canPurchasesOrder(companyId, branchId);
+          allow update: if canPurchasesApprove(companyId, branchId) ||
+            (canPurchasesOrder(companyId, branchId) && !isApprovalChange());
         }
 
         // ── Document number counters (PO numbers, etc.) ───────────────────────
@@ -570,30 +640,23 @@ service cloud.firestore {
         // allowed to raise the underlying document must be able to draw a
         // number, so this mirrors the requisitions write rule.
         match /counters/{seriesId} {
-          allow read: if canRead(companyId, branchId);
-          allow write: if canWrite(companyId, branchId) ||
-                          isBranchMember(companyId, branchId);
+          allow read, write: if canPurchasesOrder(companyId, branchId);
         }
 
         // ── POS: Order Guides ────────────────────────────────────────────────
         match /orderGuides/{docId} {
-          allow read: if canRead(companyId, branchId);
-          allow write: if canWrite(companyId, branchId);
+          allow read, write: if canPurchasesOrder(companyId, branchId);
         }
 
         // ── Payroll Runs ──────────────────────────────────────────────────────
         // branchAdmin / manager: full read+write on runs and slips for their branch
         match /payrollRuns/{runId} {
-          allow read:  if canRead(companyId, branchId);
-          allow write: if isAuth() && userData().companyId == companyId &&
-                          (isBranchAdmin(userData()) || userData().role == 'manager') &&
-                          inBranch(userData(), branchId);
+          allow read: if canPayrollView(companyId, branchId);
+          allow write: if canPayrollManage(companyId, branchId);
 
           match /slips/{slipId} {
-            allow read:  if canRead(companyId, branchId);
-            allow write: if isAuth() && userData().companyId == companyId &&
-                            (isBranchAdmin(userData()) || userData().role == 'manager') &&
-                            inBranch(userData(), branchId);
+            allow read: if canPayrollView(companyId, branchId);
+            allow write: if canPayrollManage(companyId, branchId);
           }
         }
 

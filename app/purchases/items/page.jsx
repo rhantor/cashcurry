@@ -16,9 +16,12 @@ import { Upload, FileSpreadsheet, Plus, DownloadCloud } from "lucide-react";
 import { ItemsContext } from "./ItemsContext";
 import ItemList from "./components/ItemList";
 import ItemSheets from "./components/ItemSheets";
+import { can } from "@/lib/authz/permissions";
 
 export default function ItemsCatalogPage() {
-  const { ready, companyId, branchId } = useResolvedCompanyBranch();
+  const { ready, companyId, branchId, user } = useResolvedCompanyBranch();
+  // adding, changing, retiring and stocking items (roles matrix: catalog.manage)
+  const canManage = can(user?.role, "catalog.manage");
   const { toastOk, toastError, toastNode } = useToast();
 
   // The whole company catalog is fetched once, including retired rows, and the
@@ -299,7 +302,7 @@ export default function ItemsCatalogPage() {
     }, {});
 
   return (
-    <ItemsContext.Provider value={{ busy, bulkAdding, dropping, retiring, ready, companyId, branchId, toastOk, toastError, toastNode, allItems, isLoading, isFetching, vendors, vendorNameById, currency, money, branches, allBranchIds, branchNameById, scope, setScope, active, retiredCount, branchItems, otherBranchCount, openAdd, setOpenAdd, addForm, setAddForm, editOpen, setEditOpen, editForm, setEditForm, search, setSearch, category, setCategory, fileInputRef, handleSaveNew, handlePullToBranch, itemToDrop, setItemToDrop, itemToRetire, setItemToRetire, confirmDropFromBranch, handleOpenEdit, handleSaveEdit, confirmRetire, handleRestore, importToBranchOnly, pendingImport, setPendingImport, handleFileUpload, runImport, downloadTemplate, itemsByCategory }}>
+    <ItemsContext.Provider value={{ canManage, busy, bulkAdding, dropping, retiring, ready, companyId, branchId, toastOk, toastError, toastNode, allItems, isLoading, isFetching, vendors, vendorNameById, currency, money, branches, allBranchIds, branchNameById, scope, setScope, active, retiredCount, branchItems, otherBranchCount, openAdd, setOpenAdd, addForm, setAddForm, editOpen, setEditOpen, editForm, setEditForm, search, setSearch, category, setCategory, fileInputRef, handleSaveNew, handlePullToBranch, itemToDrop, setItemToDrop, itemToRetire, setItemToRetire, confirmDropFromBranch, handleOpenEdit, handleSaveEdit, confirmRetire, handleRestore, importToBranchOnly, pendingImport, setPendingImport, handleFileUpload, runImport, downloadTemplate, itemsByCategory }}>
     <div className="mx-auto max-w-7xl space-y-4 px-4 py-5 pb-24">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
@@ -315,22 +318,26 @@ export default function ItemsCatalogPage() {
             ref={fileInputRef}
             onChange={handleFileUpload}
           />
-          <Menu
-            align="end"
-            width={240}
-            trigger={(p) => (
-              <Button {...p} variant="secondary" icon={FileSpreadsheet} disabled={busy}>
-                Excel
+          {canManage && (
+            <>
+              <Menu
+                align="end"
+                width={240}
+                trigger={(p) => (
+                  <Button {...p} variant="secondary" icon={FileSpreadsheet} disabled={busy}>
+                    Excel
+                  </Button>
+                )}
+                items={[
+                  { label: "Import items from Excel", icon: Upload, onSelect: () => fileInputRef.current?.click() },
+                  { label: "Download the template", icon: DownloadCloud, onSelect: downloadTemplate },
+                ]}
+              />
+              <Button icon={Plus} className="flex-1 sm:flex-none" disabled={!companyId || busy} onClick={() => setOpenAdd(true)}>
+                Add item
               </Button>
-            )}
-            items={[
-              { label: "Import items from Excel", icon: Upload, onSelect: () => fileInputRef.current?.click() },
-              { label: "Download the template", icon: DownloadCloud, onSelect: downloadTemplate },
-            ]}
-          />
-          <Button icon={Plus} className="flex-1 sm:flex-none" disabled={!companyId || busy} onClick={() => setOpenAdd(true)}>
-            Add item
-          </Button>
+            </>
+          )}
         </div>
       </div>
 

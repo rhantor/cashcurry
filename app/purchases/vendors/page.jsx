@@ -15,13 +15,15 @@ import VendorSheet from "./VendorSheet";
 import { exportVendorsExcel, exportVendorsPDF } from "./exportVendors";
 import { recountVendorTotals } from "./recountVendorTotals";
 import { niceDate } from "./parts";
+import { can, isCompanyRole } from "@/lib/authz/permissions";
 
-const SEES_ALL_BRANCHES = ["owner", "gm", "superAdmin"];
 
 /** The company's vendors: who is owed what, their details and bills. */
 export default function VendorsPage() {
   const { companyId, branchId } = useResolvedCompanyBranch();
   const { user } = useSession();
+  // adding, changing and removing vendors (roles matrix: catalog.manage)
+  const canManage = can(user?.role, "catalog.manage");
   const currency = useCurrency();
   const money = (v) => formatMoney(Number(v ?? 0), currency);
 
@@ -160,10 +162,14 @@ export default function VendorsPage() {
             )}
             items={[
               { label: "Open", icon: Eye, onSelect: () => setViewId(v.id) },
-              { label: "Edit", icon: Pencil, onSelect: () => setForm({ open: true, vendor: v }) },
-              { label: "Allow one more unpaid bill", icon: Plus, onSelect: () => allowOneMore(v) },
-              "divider",
-              { label: "Delete", icon: Trash2, danger: true, onSelect: () => remove(v) },
+              ...(canManage
+                ? [
+                    { label: "Edit", icon: Pencil, onSelect: () => setForm({ open: true, vendor: v }) },
+                    { label: "Allow one more unpaid bill", icon: Plus, onSelect: () => allowOneMore(v) },
+                    "divider",
+                    { label: "Delete", icon: Trash2, danger: true, onSelect: () => remove(v) },
+                  ]
+                : []),
             ]}
           />
         </span>
@@ -191,12 +197,14 @@ export default function VendorsPage() {
               { label: "Contacts (Excel)", icon: FileSpreadsheet, onSelect: exportAs(() => exportVendorsExcel(vendors, "directory")) },
               { label: "Contacts + money (Excel)", icon: FileSpreadsheet, onSelect: exportAs(() => exportVendorsExcel(vendors, "full")) },
               { label: "Money summary (PDF)", icon: FileText, onSelect: exportAs(() => exportVendorsPDF(vendors, currency)) },
-              ...(SEES_ALL_BRANCHES.includes(user?.role) ? ["divider", { label: "Recount vendor totals", icon: RefreshCcw, onSelect: recount }] : []),
+              ...(isCompanyRole(user?.role) ? ["divider", { label: "Recount vendor totals", icon: RefreshCcw, onSelect: recount }] : []),
             ]}
           />
-          <Button icon={Plus} disabled={!companyId} onClick={() => setForm({ open: true, vendor: null })}>
-            Add vendor
-          </Button>
+          {canManage && (
+            <Button icon={Plus} disabled={!companyId} onClick={() => setForm({ open: true, vendor: null })}>
+              Add vendor
+            </Button>
+          )}
         </div>
       </div>
 
@@ -223,7 +231,7 @@ export default function VendorsPage() {
                 icon: Store,
                 title: "No vendors yet",
                 description: "Add the suppliers you buy from, then save their bills.",
-                action: (
+                action: canManage && (
                   <Button icon={Plus} onClick={() => setForm({ open: true, vendor: null })}>
                     Add your first vendor
                   </Button>
@@ -239,8 +247,8 @@ export default function VendorsPage() {
         companyId={companyId}
         branchId={branchId}
         onClose={() => setViewId(null)}
-        onEdit={(v) => setForm({ open: true, vendor: v })}
-        onDelete={remove}
+        onEdit={canManage ? (v) => setForm({ open: true, vendor: v }) : undefined}
+        onDelete={canManage ? remove : undefined}
       />
     </div>
   );

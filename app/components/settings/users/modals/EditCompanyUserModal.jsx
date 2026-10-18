@@ -1,13 +1,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { normalizeRole } from "@/utils/sanitize";
+import { roleOptions, COMPANY_ASSIGNABLE, normalizeRole } from "@/lib/authz/permissions";
 
-const ROLE_OPTIONS = [
-  { value: "owner", label: "Owner" },
-  { value: "superAdmin", label: "Super Admin" },
-  { value: "gm", label: "General Manager" },
-  { value: "Supervisor", label: "Supervisor" },
-];
 
 export default function EditCompanyUserModal({
   open,
@@ -24,7 +18,7 @@ export default function EditCompanyUserModal({
   useEffect(() => {
     if (open && user) {
       setUserName(user.userName || "");
-      setRole(user.role || "");
+      setRole(normalizeRole(user.role) || "");
     }
   }, [open, user]);
 
@@ -73,7 +67,7 @@ export default function EditCompanyUserModal({
               required
             >
               <option value="">Select a role</option>
-              {ROLE_OPTIONS.map((r) => (
+              {roleOptions(COMPANY_ASSIGNABLE, user?.role).map((r) => (
                 <option key={r.value} value={r.value}>
                   {r.label}
                 </option>

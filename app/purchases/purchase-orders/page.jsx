@@ -46,6 +46,7 @@ import { OrdersContext } from "./OrdersContext";
 import EditOrderSheet from "./components/EditOrderSheet";
 import ReceiveSheet from "./components/ReceiveSheet";
 import { lineTotal } from "./shared";
+import { can } from "@/lib/authz/permissions";
 
 const STATUS_STYLE = {
   Pending: "bg-warning-soft text-warning",
@@ -67,7 +68,6 @@ const STATUS_HINT = {
 };
 
 /** Roles allowed to approve or reject a purchase order. */
-const APPROVER_ROLES = new Set(["owner", "gm", "superAdmin", "superadmin", "branchAdmin", "branchadmin", "manager"]);
 
 const normalizeStatus = (status) => status || "Pending";
 
@@ -100,7 +100,7 @@ export default function PurchaseOrdersPage() {
   // Approval is a per-branch policy, off by default — see PurchasesSection in
   // branch settings.
   const requireApproval = branchSettings?.purchases?.requirePoApproval === true;
-  const canApprove = APPROVER_ROLES.has(user?.role);
+  const canApprove = can(user?.role, "purchases.approve");
 
   const [updateOrder, { isLoading: updating }] = useUpdateRequisitionMutation();
   const [receiveOrder, { isLoading: receiving }] = useReceivePurchaseOrderMutation();
