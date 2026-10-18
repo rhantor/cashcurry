@@ -19,7 +19,8 @@
     "face:remove-data": "node scripts/remove-face-data.mjs",
     "staff:private": "node scripts/staff-private-split.mjs",
     "names:backfill": "node scripts/names-backfill.mjs",
-    "dev:phone": "node scripts/local/dev.mjs --lan"
+    "dev:phone": "node scripts/local/dev.mjs --lan",
+    "requests:leaves": "node scripts/leave-split.mjs"
   },
   "dependencies": {
     "@reduxjs/toolkit": "^2.8.2",

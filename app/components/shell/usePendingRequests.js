@@ -5,19 +5,20 @@ import { db } from "@/lib/firebase";
 import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { shiftsEnabled } from "@/lib/attendance/shifts";
-
-// Who approves requests (the roles that see the Requested Panel).
-const APPROVERS = ["manager", "branchAdmin"];
+import { can } from "@/lib/authz/permissions";
+import { canDecideStep } from "@/lib/requests/model";
 
 /**
- * How many requests wait for this branch's approval — the same three lists
- * the Requested Panel shows: advances and staff loans, loans asked of this
+ * How many requests wait for this person's decision — the same lists the
+ * Requested Panel shows: advances, staff loans and leave (only the step they
+ * may decide: a branch approver doesn't count those waiting for the owner),
+ * loans asked of this
  * branch by another branch, and early-OT (only when the branch runs shifts).
  * Live: the badge changes the moment a request arrives or is decided, and
  * only the pending records are read.
  */
 export default function usePendingRequests({ companyId, branchId, role }) {
-  const enabled = APPROVERS.includes(role) && !!companyId && !!branchId;
+  const enabled = can(role, "advances.approve") && !!companyId && !!branchId;
   const { data: settings } = useGetBranchSettingsQuery(enabled ? { companyId, branchId } : skipToken);
   const ot = enabled && shiftsEnabled(settings?.attendance);
   const [counts, setCounts] = useState({ requests: 0, loans: 0, ot: 0 });
@@ -29,8 +30,9 @@ export default function usePendingRequests({ companyId, branchId, role }) {
     }
     const base = ["companies", companyId, "branches", branchId];
     const pending = (ref) => query(ref, where("status", "==", "pending"));
-    const parts = { advances: 0, staffLoans: 0, loans: 0, ot: 0 };
-    const publish = () => setCounts({ requests: parts.advances + parts.staffLoans, loans: parts.loans, ot: parts.ot });
+    const parts = { advances: 0, staffLoans: 0, leaves: 0, loans: 0, ot: 0 };
+    const publish = () => setCounts({ requests: parts.advances + parts.staffLoans + parts.leaves, loans: parts.loans, ot: parts.ot });
+    const mine = (r) => canDecideStep(role, r.awaiting || "branch");
     const watch = (q, key, keep = () => true) =>
       onSnapshot(
         q,
@@ -44,14 +46,15 @@ export default function usePendingRequests({ companyId, branchId, role }) {
         }
       );
     const stops = [
-      watch(pending(collection(db, ...base, "advances")), "advances"),
-      watch(pending(collection(db, ...base, "loans")), "staffLoans"),
+      watch(pending(collection(db, ...base, "advances")), "advances", mine),
+      watch(pending(collection(db, ...base, "loans")), "staffLoans", mine),
+      watch(pending(collection(db, ...base, "leaves")), "leaves", mine),
       // Company-level loans between branches: only those asked of this branch.
       watch(pending(collection(db, "companies", companyId, "loans")), "loans", (l) => (l.requestedToBranchId ?? l.toBranchId) === branchId),
     ];
     if (ot) stops.push(watch(pending(collection(db, ...base, "otRequests")), "ot"));
     return () => stops.forEach((stop) => stop());
-  }, [enabled, companyId, branchId, ot]);
+  }, [enabled, companyId, branchId, ot, role]);
 
   return { ...counts, total: counts.requests + counts.loans + counts.ot };
 }

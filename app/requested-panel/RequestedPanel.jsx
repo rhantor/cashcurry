@@ -1,14 +1,12 @@
 "use client";
 import { useMemo, useState } from "react";
-import {
-  useGetAdvanceEntriesQuery,
-  useUpdateAdvanceEntryMutation,
-} from "@/lib/redux/api/AdvanceApiSlice";
-import {
-  useGetStaffLoansQuery,
-  useUpdateStaffLoanMutation,
-} from "@/lib/redux/api/staffLoanApiSlice";
 import PayOutQueue from "@/app/components/requests/PayOutQueue";
+import RequestInbox from "@/app/components/requests/RequestInbox";
+import LeaveSheet from "@/app/components/requests/LeaveSheet";
+import { useGetRequestsQuery } from "@/lib/redux/api/requestsApiSlice";
+import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
+import useApprovalPolicy from "@/lib/requests/useApprovalPolicy";
+import { CalendarPlus } from "lucide-react";
 import {
   useGetLoanEntriesQuery,
   useUpdateLoanEntryMutation,
@@ -23,11 +21,10 @@ import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlic
 import { useGetBranchesBasicQuery } from "@/lib/redux/api/branchApiSlice";
 import { shiftsEnabled } from "@/lib/attendance/shifts";
 import { serverTimestamp } from "firebase/firestore";
-import AdvanceRequests from "./AdvanceRequests";
 import LoanRequests from "./LoanRequests";
 import OtRequests from "./OtRequests";
 import { confirmDialog, promptDialog } from "@/app/components/ui/notify";
-import { Skeleton, Tabs } from "@/app/components/ui";
+import { Button, Skeleton, Tabs } from "@/app/components/ui";
 import { CountBadge } from "@/app/components/shell/SideNav";
 
 import { personName } from "@/lib/people";
@@ -38,7 +35,8 @@ const sureToReject = (what) => confirmDialog({ title: `Reject this ${what}?`, me
 
 /**
  * Requests waiting for a decision at this branch: advances, staff loans and
- * leave (with what's approved but not yet handed over on top), loans asked by
+ * leave through the requests engine (with what's approved but not yet handed
+ * over on top), loans asked by
  * other branches and repayments sent back, and early overtime from the kiosk.
  */
 export default function RequestedPanel() {
@@ -47,8 +45,6 @@ export default function RequestedPanel() {
   const [activeTab, setActiveTab] = useState("advance");
 
   // local action states
-  const [advWorkingId, setAdvWorkingId] = useState(null);
-  const [advErrorMsg, setAdvErrorMsg] = useState("");
   const [loanWorkingId, setLoanWorkingId] = useState(null);
   const [loanErrorMsg, setLoanErrorMsg] = useState("");
   const [otWorkingId, setOtWorkingId] = useState(null);
@@ -61,22 +57,14 @@ export default function RequestedPanel() {
   });
   const getBranchName = (id) => branches?.find((b) => b.id === id)?.name || id;
 
-  // Data queries (branch-scoped)
-  const {
-    data: advances,
-    isLoading: advLoading,
-    isError: advError,
-  } = useGetAdvanceEntriesQuery(
-    // Only what waits for a decision — not the whole history every 5 seconds.
+  // advances, staff loans and leave waiting — the inbox reads the same (cached) list
+  const { data: waiting = [] } = useGetRequestsQuery(
     { companyId, branchId, status: "pending" },
-    { skip: !companyId || !branchId, pollingInterval: 5000 }
+    { skip: !companyId || !branchId, pollingInterval: 10000 }
   );
-
-  // Staff loans requested by a cashier/supervisor wait here for approval too.
-  const { data: staffLoans } = useGetStaffLoansQuery(
-    { companyId, branchId, status: "pending" },
-    { skip: !companyId || !branchId, pollingInterval: 5000 }
-  );
+  const policy = useApprovalPolicy(companyId, branchId);
+  const [leaveOpen, setLeaveOpen] = useState(false);
+  const { data: staff = [], isLoading: staffLoading } = useGetStaffListQuery({ companyId, branchId }, { skip: !companyId || !branchId || !leaveOpen });
 
   const {
     data: loans,
@@ -104,21 +92,10 @@ export default function RequestedPanel() {
     { skip: !companyId || !branchId || !otTabEnabled, pollingInterval: 5000 }
   );
 
-  const [updateAdvance] = useUpdateAdvanceEntryMutation();
-  const [updateStaffLoan] = useUpdateStaffLoanMutation();
   const [updateOtRequest] = useUpdateOtRequestMutation();
   const [updateLoan] = useUpdateLoanEntryMutation();
   const [approveRepayment] = useApproveRepaymentWithAllocationMutation();
   const [rejectRepayment] = useRejectRepaymentEntryMutation();
-
-  // Pending filters (UI list props)
-  const pendingAdvances = useMemo(
-    () => [
-      ...(advances || []).filter((a) => a.status === "pending").map((a) => ({ ...a, kind: "advance" })),
-      ...(staffLoans || []).filter((l) => l.status === "pending").map((l) => ({ ...l, kind: "staffLoan" })),
-    ],
-    [advances, staffLoans]
-  );
 
   // Loans coming IN to this branch are already filtered by the API; just keep pending
   const pendingLoans = useMemo(
@@ -134,42 +111,6 @@ export default function RequestedPanel() {
   // Permissions
   // approvers per the roles matrix — the accountant asks and pays out, but doesn't approve
   const canApproveLoans = can(user?.role, "advances.approve");
-
-  // ---- Handlers ----
-  const handleAdvanceAction = async (req, action) => {
-    setAdvErrorMsg("");
-    if (!["approved", "rejected"].includes(action)) return;
-    if (action === "rejected" && !(await sureToReject(req.kind === "staffLoan" ? "staff loan" : "request"))) return;
-    setAdvWorkingId(req.id);
-    try {
-      const update = req.kind === "staffLoan" ? updateStaffLoan : updateAdvance;
-      await update({
-        companyId,
-        branchId,
-        id: req.id,
-        user: user,
-        data: {
-          status: action,
-          // Approval is not payment: no money moves until someone marks it paid
-          // (PayOutQueue). Set explicitly — older requests have no field, and
-          // an approved record without one counts as already paid.
-          paidOut: req.paidOut ?? null,
-          approvedBy: {
-            id: user?.uid || "",
-            name: personName(user) || "Unknown",
-            username: user?.username || "",
-            role: user?.role || "N/A",
-            timestamp: serverTimestamp(),
-          },
-        },
-      }).unwrap();
-    } catch (err) {
-      console.error(err);
-      setAdvErrorMsg("Failed to update advance request. Please try again.");
-    } finally {
-      setAdvWorkingId(null);
-    }
-  };
 
   const handleLoanAction = async (req, action) => {
     setLoanErrorMsg("");
@@ -288,7 +229,7 @@ export default function RequestedPanel() {
           value={currentTab}
           onChange={setActiveTab}
           tabs={[
-            { value: "advance", label: tab("Advances & staff loans", pendingAdvances.length) },
+            { value: "advance", label: tab("Staff requests", waiting.length) },
             { value: "loan", label: tab("Branch loans", pendingLoans.length) },
             ...(otTabEnabled ? [{ value: "ot", label: tab("Early OT", pendingOt.length) }] : []),
           ]}
@@ -298,14 +239,13 @@ export default function RequestedPanel() {
       {/* Panels */}
       {currentTab === "advance" && <PayOutQueue companyId={companyId} branchId={branchId} user={user} />}
       {currentTab === "advance" && (
-        <AdvanceRequests
-          loading={advLoading}
-          error={advError}
-          errorMsg={advErrorMsg}
-          items={pendingAdvances}
-          workingId={advWorkingId}
-          onAction={handleAdvanceAction}
-        />
+        <>
+          <div className="flex justify-end">
+            <Button variant="secondary" icon={CalendarPlus} onClick={() => setLeaveOpen(true)}>Record leave</Button>
+          </div>
+          <RequestInbox companyId={companyId} branchId={branchId} user={user} />
+          <LeaveSheet open={leaveOpen} onClose={() => setLeaveOpen(false)} companyId={companyId} branchId={branchId} user={user} policy={policy} staff={staff} staffLoading={staffLoading} />
+        </>
       )}
       {currentTab === "loan" && (
         <LoanRequests

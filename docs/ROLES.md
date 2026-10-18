@@ -94,6 +94,7 @@ Branch settings**, though the database lets the owner change staff and settings.
 | Pay-outs & bills (4.10) | A | A | A | A | A | A | E | E | E | — |
 | Cash ↔ bank | E | E | E | E | E | — | E | — | — | — |
 | Advances & staff loans | A | A | A | A | A | — | E (request, pay out) | E (request, pay out) | E (request, pay out) | own requests |
+| Leave requests (4.2) | A | A | A | A | A | V | V | V | — | own requests |
 | Salaries entry | E | E | E | E | E | — | E | — | — | — |
 | Payroll | M | M | M | M | M | — | V | — | — | own payslips |
 | Reports (money) | V | V | V | V | V | V (today) | V | — | — | — |
@@ -135,6 +136,15 @@ Rules that go with it:
 2. Company roles act in the branch they have picked; branch roles only in their own branch.
 3. Changes to money settings, deletes and approvals go to the audit log.
 4. A role that can't see pay can't see the pages that show it (payroll, salaries, staff detail).
+
+**Requests engine (4.2, 18 Oct 2026):** advances, staff loans and leave share one
+model (`lib/requests/model.js`). Whoever may approve advances (`advances.approve`)
+also approves leave; in-charge, accountant and supervisor see leave (to plan shifts
+and pay). Whoever asked may cancel while nothing is approved yet. Each branch has
+an **owner-approval limit** (Branch settings → Loans & advances, "Owner approves
+above"; 0 = off): an advance or staff loan above it needs a company role after the
+branch's approval, and only a company role may change the limit — both enforced in
+`firestore.rules` (`keepsOwnerStep`, `keepsApprovalLimit`).
 
 ## 4. Evidence
 
