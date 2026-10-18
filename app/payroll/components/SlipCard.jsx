@@ -197,6 +197,11 @@ export default function SlipCard ({ staff, name, inputs, setInputs, payrollConfi
               {calc.otherDeductions > 0 && (
                 <Line label={`Other${inputs.otherDeductionsNote ? ` (${inputs.otherDeductionsNote})` : ''}`} value={`− ${money(calc.otherDeductions)}`} tone='text-danger' />
               )}
+              {(calc.advanceDue > calc.advanceAmt || calc.loanDue > calc.loanAmt) && (
+                <p className='rounded-md bg-warning/10 px-2 py-1 text-warning'>
+                  Pay doesn&apos;t cover everything due — {money((calc.advanceDue - calc.advanceAmt) + (calc.loanDue - calc.loanAmt))} carries to next month.
+                </p>
+              )}
               <div className='mt-1.5 flex justify-between gap-3 border-t border-line pt-1.5 text-sm font-bold text-brand'>
                 <span>Net pay</span>
                 <span className='tabular-nums'>{money(calc.netPay)}</span>

@@ -24,6 +24,7 @@ import {
 } from '@/lib/redux/api/attendanceApiSlice'
 import { shiftsEnabled } from '@/lib/attendance/shifts'
 import { calcPayroll, fmtAmt, toPeriodKey, periodLabel } from '@/utils/payrollCalculations'
+import { allocateTaken } from '@/lib/payroll/repayments'
 import { exportPayrollToPDF, exportPayrollToExcel } from '@/utils/export/exportPayroll'
 import { computeAttendance } from '@/lib/attendance/computeHours'
 import { startOfMonth, endOfMonth, addDays, subDays, format } from 'date-fns'
@@ -294,22 +295,6 @@ export default function PayrollBuilder () {
         ? (parseFloat(inputs.allowanceOverride) || 0)
         : (parseFloat(staff.allowance) || 0)
 
-      // Build effective deductionMeta for loans:
-      // - No override → use loan items as-is
-      // - Override = 0 → skip all loan installments (don't mark any as paid)
-      // - Override > 0 with one loan → store the override amount so finalizePayrollRun
-      //   knows exactly how much was deducted (enables partial carry-over logic)
-      let effectiveLnItems = lnItems
-      if (inputs.loanOverride !== '') {
-        const overrideAmt = parseFloat(inputs.loanOverride) || 0
-        if (overrideAmt <= 0) {
-          effectiveLnItems = []
-        } else if (lnItems.length === 1) {
-          effectiveLnItems = [{ ...lnItems[0], amount: overrideAmt }]
-        }
-        // Multiple loans with a single override: can't split cleanly, keep originals
-      }
-
       const calc = calcPayroll(
         {
           basicSalary: parseFloat(staff.basicSalary) || 0,
@@ -343,9 +328,12 @@ export default function PayrollBuilder () {
         department:   staff.department  || staff.group || staff.role || '',
         calc,
         inputs: { ...inputs },
+        // Only what the slip actually takes (calcPayroll caps it to the pay;
+        // a manager can change the loan amount) — finalize marks exactly
+        // this repaid and carries the rest to next month.
         deductionMeta: {
-          advances: advItems,
-          loans:    effectiveLnItems,
+          advances: allocateTaken(advItems, calc.advanceAmt),
+          loans:    allocateTaken(lnItems, calc.loanAmt),
         },
       }
     })
