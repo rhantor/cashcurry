@@ -1,60 +1,34 @@
 "use client";
 
-import React from "react";
-import { DatePicker, Select } from '@/app/components/ui';
-import { Briefcase } from 'lucide-react';
-import Field from '../Field';
+import { Briefcase, NotebookPen } from 'lucide-react';
+import { DatePicker, Field } from '@/app/components/ui';
 import { ROLES } from '../../lib/constants';
 import { useStaffFormContext } from "../StaffFormContext";
+import { Choice, Row, Section, TextField } from '../parts';
+
+// Suggestions for the department box; anything else can be typed.
+const DEPARTMENTS = ['Kitchen', 'Front', 'Bar', 'Delivery', 'Cleaning', 'Office'];
 
 export default function JobTab() {
-  const { form, errors, touched, activeTab, change, blur, inputClass } = useStaffFormContext();
+  const { form, errors, change } = useStaffFormContext();
   return (
-    <>
-          {/* ─── JOB ──────────────────────────────────────────────── */}
-          {activeTab === 'job' && (
-            <div className='space-y-8'>
-              <div>
-                <div className='flex items-center gap-2 mb-4 pb-2 border-b border-line'>
-                  <Briefcase size={16} className='text-brand' />
-                  <h3 className='text-xs font-extrabold uppercase tracking-wider text-muted'>
-                    Employment Details
-                  </h3>
-                </div>
+    <div className='space-y-8'>
+      <Section icon={Briefcase} title='Their job'>
+        <Choice name='role' label='Role' required options={ROLES.filter(r => r.value)} />
+        <Row>
+          <TextField name='department' label='Department' placeholder='Kitchen' list='staff-departments' autoComplete='off' />
+          <Field label='Started on' error={errors.startDate}>
+            <DatePicker size='lg' value={form.startDate} onChange={v => change({ target: { name: 'startDate', value: v } })} />
+          </Field>
+        </Row>
+        <datalist id='staff-departments'>
+          {DEPARTMENTS.map(d => <option key={d} value={d} />)}
+        </datalist>
+      </Section>
 
-                <div className='grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4'>
-                  <Field label='Role' required error={errors.role}>
-                    <Select name='role' value={form.role} onChange={change} onBlur={blur} invalid={!!(errors.role && touched.role)} className='h-11'>
-                      {ROLES.map(r => (
-                        <option key={r.value} value={r.value}>
-                          {r.label}
-                        </option>
-                      ))}
-                    </Select>
-                  </Field>
-
-                  <Field label='Department'>
-                    <input name='department' value={form.department} onChange={change} className={inputClass('department')} placeholder='Operations' />
-                  </Field>
-                </div>
-
-                <Field label='Start Date' className='mb-4'>
-                  <DatePicker value={form.startDate} onChange={v => change({ target: { name: 'startDate', value: v } })} invalid={!!(errors.startDate && touched.startDate)} />
-                </Field>
-
-                <Field label='Notes / Remarks'>
-                  <textarea
-                    name='notes'
-                    value={form.notes}
-                    onChange={change}
-                    rows={3}
-                    className={inputClass('notes')}
-                    placeholder='Additional notes...'
-                  />
-                </Field>
-              </div>
-            </div>
-          )}
-    </>
+      <Section icon={NotebookPen} title='Notes' description='Only managers and the bookkeeper see these.'>
+        <TextField name='notes' label='Notes' multiline rows={4} placeholder='Anything worth remembering — agreed days off, uniform size…' />
+      </Section>
+    </div>
   );
 }

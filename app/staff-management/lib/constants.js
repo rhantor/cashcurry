@@ -60,6 +60,7 @@ export const EMPTY_FORM = {
   workingDays: '',         // override branch default working days/month
   deductionSettings: {},   // { [deductionKey]: { enabled, employeeRateOverride, employerRateOverride } }
   bankName: '',
+  bankAccountNumber: '',
   bankAccountHolderName: '',
   pinCode: '',
   employmentType: 'full-time',
