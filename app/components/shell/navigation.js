@@ -27,7 +27,6 @@ export const sidebarItems = [
   { label: "Requested Panel", section: "Daily work", icon: "MdOutlineRequestPage", path: "/requested-panel" },
   // Their own requests — for those who ask but don't approve.
   { label: "My Requests", section: "Daily work", icon: "MdOutlineFactCheck", path: "/supervisor-panel", hideIf: "advances.approve" },
-  { label: "Chat", section: "Daily work", icon: "MdOutlineChat", path: "/branch-chat" },
   {
     label: "Attendance",
     section: "Daily work",
@@ -183,7 +182,6 @@ const BOTTOM = [
   ["/entry-data/advance-entry", "Advance"],
   ["/attendance-log", "Attendance"],
   ["/staff-loans", "Loans"],
-  ["/branch-chat", "Chat"],
 ];
 
 export function bottomNavFor(role) {

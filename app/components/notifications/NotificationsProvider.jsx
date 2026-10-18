@@ -49,14 +49,17 @@ export default function NotificationsProvider({ user, children }) {
       q,
       (snap) => {
         const list = snap.docs.map((d) => ({ id: d.id, ...d.data(), at: d.data().createdAt?.toDate?.() || null }));
+        // new = an id not seen before, or one updated since (a chat's line in the bell is
+        // one document that each new message updates)
         if (seen.current) {
+          const inChat = window.location.pathname.startsWith("/messages");
           for (const n of list) {
-            if (!seen.current.has(n.id) && !n.readAt) {
-              toast.info(n.title, { description: n.body });
-            }
+            const at = n.at?.getTime?.() || 0;
+            const fresh = !seen.current.has(n.id) || seen.current.get(n.id) < at;
+            if (fresh && !n.readAt && !(n.type === "chat" && inChat)) toast.info(n.title, { description: n.body });
           }
         }
-        seen.current = new Set(list.map((n) => n.id));
+        seen.current = new Map(list.map((n) => [n.id, n.at?.getTime?.() || 0]));
         setItems(list);
         setReady(true);
       },

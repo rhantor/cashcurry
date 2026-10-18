@@ -1,45 +1,62 @@
 "use client";
 // Chat (roadmap 4.4): the company chat, the branch chats, groups and personal
-// chats on the left, the open one on the right (one at a time on phones).
-// ?c=<chatId> opens a chat — notifications link there.
+// chats on the left (filter: all / unread / groups / people), the open one on
+// the right — one at a time on phones. ?c=<chatId> opens a chat;
+// notifications link there.
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { formatDistanceToNowStrict } from "date-fns";
+import { format, isToday, isYesterday } from "date-fns";
 import { doc, onSnapshot } from "firebase/firestore";
-import { MessageSquarePlus, Search, UserRound, Users } from "lucide-react";
+import { BellOff, MessageSquarePlus, MessagesSquare, Search, UserRound, Users } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { Avatar, EmptyState, Input, Menu, Skeleton, cn } from "@/app/components/ui";
+import { Avatar, Input, Menu, Skeleton, cn } from "@/app/components/ui";
 import { canMakeGroups, chatTitle, timeOf } from "@/lib/chat/model";
 import { useChatPeople, useChats } from "./useChat";
 import Conversation, { chatIcon } from "./Conversation";
-import { DirectSheet, GroupSheet } from "./ChatSheets";
+import { DirectSheet, ForwardSheet, GroupSheet } from "./ChatSheets";
 
-function ChatRow({ chat, title, active, onOpen, me }) {
+const when = (t) => {
+  if (!t) return "";
+  const d = new Date(t);
+  if (isToday(d)) return format(d, "h:mm a");
+  if (isYesterday(d)) return "Yesterday";
+  return format(d, Date.now() - t < 6 * 86400000 ? "EEE" : "d MMM");
+};
+
+const FILTERS = [
+  ["all", "All"],
+  ["unread", "Unread"],
+  ["groups", "Groups"],
+  ["people", "People"],
+];
+
+function ChatRow({ chat, active, muted, onOpen, me }) {
   const Icon = chatIcon(chat.kind);
   const last = chat.lastMessage;
-  const at = timeOf(last?.at);
+  const who = last ? (last.byUid === me ? "You" : chat.kind === "direct" ? "" : String(last.byName || "").split(" ")[0]) : "";
   return (
     <button
       type="button"
       onClick={onOpen}
-      className={cn("flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors", active ? "bg-brand-soft" : "hover:bg-surface-2")}
+      className={cn("flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors", active ? "bg-brand-soft" : "hover:bg-surface-2")}
     >
       {Icon ? (
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-soft text-brand">
-          <Icon className="size-[18px]" />
+        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand to-brand/70 text-white shadow-sm">
+          <Icon className="size-5" />
         </span>
       ) : (
-        <Avatar name={title} />
+        <Avatar name={chat.title} size="lg" />
       )}
       <span className="min-w-0 flex-1">
         <span className="flex items-baseline gap-2">
-          <span className={cn("flex-1 truncate text-sm text-fg", chat.unread ? "font-bold" : "font-semibold")}>{title}</span>
-          {at > 0 && <span className="shrink-0 text-[11px] text-subtle">{formatDistanceToNowStrict(at)}</span>}
+          <span className={cn("flex-1 truncate text-sm text-fg", chat.unread ? "font-bold" : "font-semibold")}>{chat.title}</span>
+          <span className={cn("shrink-0 text-[11px]", chat.unread ? "font-semibold text-brand" : "text-subtle")}>{when(timeOf(last?.at))}</span>
         </span>
-        <span className="flex items-center gap-2">
-          <span className={cn("flex-1 truncate text-xs", chat.unread ? "font-semibold text-fg" : "text-muted")}>
-            {last ? `${last.byUid === me ? "You" : String(last.byName || "").split(" ")[0]}: ${last.text}` : "No messages yet"}
+        <span className="mt-0.5 flex items-center gap-2">
+          <span className={cn("flex-1 truncate text-xs", chat.unread ? "font-medium text-fg" : "text-muted")}>
+            {last ? `${who ? `${who}: ` : ""}${last.text}` : "No messages yet"}
           </span>
+          {muted && <BellOff className="size-3.5 shrink-0 text-subtle" />}
           {chat.unread && <span className="size-2.5 shrink-0 rounded-full bg-brand" />}
         </span>
       </span>
@@ -55,7 +72,9 @@ export default function ChatApp({ user, branches = [], className }) {
   const peopleById = useMemo(() => Object.fromEntries(people.map((p) => [p.uid, p])), [people]);
   const branchNames = useMemo(() => Object.fromEntries(branches.map((b) => [b.id, b.name])), [branches]);
   const [q, setQ] = useState("");
+  const [filter, setFilter] = useState("all");
   const [sheet, setSheet] = useState(null); // "direct" | "group" | "manage"
+  const [forwarding, setForwarding] = useState(null);
   const [mutedChats, setMutedChats] = useState([]);
   const openId = params.get("c");
 
@@ -77,7 +96,12 @@ export default function ChatApp({ user, branches = [], className }) {
   };
 
   const titled = useMemo(() => chats.map((c) => ({ ...c, title: chatTitle(c, user.uid, peopleById, branchNames) })), [chats, user.uid, peopleById, branchNames]);
-  const shown = q.trim() ? titled.filter((c) => c.title.toLowerCase().includes(q.trim().toLowerCase())) : titled;
+  const unreadCount = titled.filter((c) => c.unread).length;
+  const shown = titled.filter(
+    (c) =>
+      (!q.trim() || c.title.toLowerCase().includes(q.trim().toLowerCase())) &&
+      (filter === "all" || (filter === "unread" && c.unread) || (filter === "groups" && c.kind !== "direct") || (filter === "people" && c.kind === "direct"))
+  );
   const active = titled.find((c) => c.id === openId) || null;
 
   const newMenu = [
@@ -86,31 +110,46 @@ export default function ChatApp({ user, branches = [], className }) {
   ].filter(Boolean);
 
   return (
-    <div className={cn("grid min-h-0 overflow-hidden border-line bg-surface md:grid-cols-[20rem_1fr] md:rounded-2xl md:border", className)}>
+    <div className={cn("grid min-h-0 overflow-hidden bg-surface md:grid-cols-[22rem_1fr]", className)}>
       {/* the chats */}
       <aside className={cn("flex min-h-0 flex-col border-line md:border-r", active && "hidden md:flex")}>
-        <div className="flex items-center gap-2 px-3 pb-2 pt-3">
-          <h2 className="flex-1 text-base font-bold text-fg">Chats</h2>
+        <div className="flex items-center gap-2 px-4 pb-2 pt-4">
+          <h2 className="flex-1 text-xl font-bold tracking-tight text-fg">Chats</h2>
           <Menu
             align="end"
             width={200}
             items={newMenu}
             trigger={(p) => (
-              <button {...p} type="button" aria-label="New chat" className="rounded-xl p-2 text-brand hover:bg-brand-soft">
-                <MessageSquarePlus className="size-5" />
+              <button {...p} type="button" aria-label="New chat" className="flex size-9 items-center justify-center rounded-full bg-brand text-white shadow-sm transition-transform hover:scale-105">
+                <MessageSquarePlus className="size-[18px]" />
               </button>
             )}
           />
         </div>
-        <div className="relative px-3 pb-2">
-          <Search className="pointer-events-none absolute left-6 top-1/2 size-4 -translate-y-[60%] text-subtle" />
-          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search chats" className="h-9 pl-9" />
+        <div className="relative px-4 pb-2">
+          <Search className="pointer-events-none absolute left-7 top-1/2 size-4 -translate-y-[60%] text-subtle" />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" className="h-10 rounded-full pl-9" />
+        </div>
+        <div className="flex gap-1.5 overflow-x-auto px-4 pb-2 [scrollbar-width:none]">
+          {FILTERS.map(([v, label]) => (
+            <button
+              key={v}
+              type="button"
+              onClick={() => setFilter(v)}
+              className={cn("shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition-colors", filter === v ? "bg-fg text-surface" : "bg-surface-2 text-muted hover:text-fg")}
+            >
+              {label}
+              {v === "unread" && unreadCount > 0 && <span className="ml-1 tabular-nums">{unreadCount}</span>}
+            </button>
+          ))}
         </div>
         <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-3">
           {!ready && !chats.length ? (
-            [0, 1, 2, 3].map((i) => <Skeleton key={i} className="h-14" rounded="rounded-xl" />)
+            [0, 1, 2, 3].map((i) => <Skeleton key={i} className="mx-2 my-1 h-14" rounded="rounded-2xl" />)
+          ) : shown.length ? (
+            shown.map((c) => <ChatRow key={c.id} chat={c} me={user.uid} muted={mutedChats.includes(c.id)} active={c.id === openId} onOpen={() => open(c.id)} />)
           ) : (
-            shown.map((c) => <ChatRow key={c.id} chat={c} title={c.title} me={user.uid} active={c.id === openId} onOpen={() => open(c.id)} />)
+            <p className="px-4 py-10 text-center text-sm text-muted">{filter === "unread" ? "You're all caught up." : "No chats here."}</p>
           )}
         </div>
       </aside>
@@ -127,10 +166,15 @@ export default function ChatApp({ user, branches = [], className }) {
             muted={mutedChats.includes(active.id)}
             onBack={() => open(null)}
             onManage={() => setSheet("manage")}
+            onForward={setForwarding}
           />
         ) : (
-          <div className="flex h-full items-center justify-center">
-            <EmptyState icon={MessageSquarePlus} title="Pick a chat" description="Or start one: message someone, or (managers) make a group." />
+          <div className="flex h-full flex-col items-center justify-center gap-3 bg-bg px-6 text-center">
+            <span className="flex size-16 items-center justify-center rounded-3xl bg-brand-soft text-brand">
+              <MessagesSquare className="size-8" />
+            </span>
+            <p className="text-base font-bold text-fg">Your messages</p>
+            <p className="max-w-xs text-sm text-muted">Pick a chat on the left, or start one — message anyone in the company{canMakeGroups(user.role) ? ", or make a group" : ""}.</p>
           </div>
         )}
       </section>
@@ -138,6 +182,7 @@ export default function ChatApp({ user, branches = [], className }) {
       <DirectSheet open={sheet === "direct"} onClose={() => setSheet(null)} user={user} people={people} onOpened={open} />
       {sheet === "group" && <GroupSheet open onClose={() => setSheet(null)} user={user} people={people} onSaved={(id) => id && open(id)} />}
       {sheet === "manage" && active?.kind === "group" && <GroupSheet open onClose={() => setSheet(null)} user={user} people={people} chat={active} onSaved={(id) => open(id)} />}
+      {forwarding && <ForwardSheet msg={forwarding} onClose={() => setForwarding(null)} user={user} chats={titled} onSent={(id) => id && open(id)} />}
     </div>
   );
 }

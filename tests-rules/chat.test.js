@@ -106,6 +106,13 @@ describe("messages", () => {
     expect(await ok(db("kumar").doc(`${C}/dm_ali_kumar`).update({ lastMessage: { text: "hi" }, updatedAt: serverTimestamp() }))).toBe(true);
     expect(await ok(db("kumar").doc(`${C}/dm_ali_kumar`).update({ members: ["kumar", "rahim"] }))).toBe(false);
   });
+  it("anyone in the chat reacts — only with their own reaction, and only that changes", async () => {
+    const m = `${C}/dm_ali_kumar/messages/old`; // reacting has no 15-minute limit
+    expect(await ok(db("kumar").doc(m).update({ "reactions.kumar": "👍" }))).toBe(true);
+    expect(await ok(db("kumar").doc(m).update({ "reactions.ali": "😂" }))).toBe(false);
+    expect(await ok(db("kumar").doc(m).update({ "reactions.kumar": "❤️", text: "changed" }))).toBe(false);
+    expect(await ok(db("rahim").doc(m).update({ "reactions.rahim": "👍" }))).toBe(false);
+  });
   it("seen is each person's own", async () => {
     expect(await ok(db("kumar").doc(`${C}/dm_ali_kumar/reads/kumar`).set({ at: serverTimestamp() }))).toBe(true);
     expect(await ok(db("kumar").doc(`${C}/dm_ali_kumar/reads/ali`).set({ at: serverTimestamp() }))).toBe(false);

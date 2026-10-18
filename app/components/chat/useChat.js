@@ -85,7 +85,8 @@ export function useChats(user, branches = []) {
     const stops = idsKey.split(",").map((id) =>
       onSnapshot(
         doc(readsCol(companyId, id), uid),
-        (s) => setReads((r) => ({ ...r, [id]: s.exists() ? s.data() : null })),
+        // "estimate": a read mark just written counts at once (not as "never" until the server answers)
+        (s) => setReads((r) => ({ ...r, [id]: s.exists() ? s.data({ serverTimestamps: "estimate" }) : null })),
         () => {}
       )
     );
@@ -95,7 +96,8 @@ export function useChats(user, branches = []) {
   const list = useMemo(
     () =>
       chats
-        .map((c) => ({ ...c, unread: isUnread(c, reads[c.id], uid) }))
+        // unread only once we know when this person last looked — not while that is still loading
+        .map((c) => ({ ...c, unread: c.id in reads && isUnread(c, reads[c.id], uid) }))
         .sort((a, b) => timeOf(b.lastMessage?.at || b.updatedAt) - timeOf(a.lastMessage?.at || a.updatedAt)),
     [chats, reads, uid]
   );
@@ -114,9 +116,9 @@ export function useMessages(companyId, chatId) {
     setLoading(true);
     return onSnapshot(
       query(messagesCol(companyId, chatId), orderBy("createdAt", "desc"), limit(count)),
-      { includeMetadataChanges: false },
+      { includeMetadataChanges: true }, // so "sending…" turns into ✓ when the server has it
       (s) => {
-        setMessages(s.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }) })).reverse());
+        setMessages(s.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: "estimate" }), pending: d.metadata.hasPendingWrites })).reverse());
         setHasMore(s.size >= count);
         setLoading(false);
       },

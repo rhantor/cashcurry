@@ -5,7 +5,8 @@ import { useMemo, useState } from "react";
 import { Check, Search, Trash2 } from "lucide-react";
 import { Avatar, Button, Field, Input, Sheet, cn, confirmDialog, toast } from "@/app/components/ui";
 import { roleLabel } from "@/lib/authz/permissions";
-import { createGroup, deleteGroup, openDirect, updateGroup } from "@/lib/chat/client";
+import { createGroup, deleteGroup, forwardMessage, openDirect, updateGroup } from "@/lib/chat/client";
+import { previewOf } from "@/lib/chat/model";
 
 function PeoplePicker({ people, me, selected, onToggle, single }) {
   const [q, setQ] = useState("");
@@ -129,6 +130,61 @@ export function GroupSheet({ open, onClose, user, people, chat, onSaved }) {
       <div className="space-y-4">
         <Field label="Group name">{({ id }) => <Input id={id} value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Kitchen team, Managers" maxLength={60} />}</Field>
         <Field label="Who's in it">{() => <PeoplePicker people={people} me={user.uid} selected={members} onToggle={toggle} />}</Field>
+      </div>
+    </Sheet>
+  );
+}
+
+/** Forward a message to one or more chats. chats: [{ id, title, kind }] */
+export function ForwardSheet({ msg, onClose, user, chats, onSent }) {
+  const [q, setQ] = useState("");
+  const [picked, setPicked] = useState([]);
+  const [busy, setBusy] = useState(false);
+  const list = chats.filter((c) => !q.trim() || c.title.toLowerCase().includes(q.trim().toLowerCase()));
+  const send = async () => {
+    setBusy(true);
+    try {
+      await forwardMessage(user.companyId, msg, picked, user);
+      toast.success(picked.length === 1 ? "Forwarded" : `Forwarded to ${picked.length} chats`);
+      onSent?.(picked.length === 1 ? picked[0] : null);
+      onClose();
+    } catch (e) {
+      toast.error("Couldn't forward", { description: e?.message });
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <Sheet
+      open={!!msg}
+      onClose={onClose}
+      title="Forward to…"
+      description={msg ? previewOf(msg) : ""}
+      footer={
+        <Button onClick={send} loading={busy} disabled={!picked.length}>
+          Send{picked.length ? ` to ${picked.length}` : ""}
+        </Button>
+      }
+    >
+      <div className="space-y-2">
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-subtle" />
+          <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search chats" className="pl-9" />
+        </div>
+        <ul className="max-h-[50vh] divide-y divide-line overflow-y-auto rounded-xl border border-line">
+          {list.map((c) => {
+            const on = picked.includes(c.id);
+            return (
+              <li key={c.id}>
+                <button type="button" onClick={() => setPicked((p) => (on ? p.filter((x) => x !== c.id) : [...p, c.id]))} className={cn("flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-surface-2", on && "bg-brand-soft/50")}>
+                  <Avatar name={c.title} size="sm" />
+                  <span className="min-w-0 flex-1 truncate text-sm font-semibold text-fg">{c.title}</span>
+                  <span className={cn("flex size-5 items-center justify-center rounded-md border", on ? "border-brand bg-brand text-white" : "border-line")}>{on && <Check className="size-3.5" />}</span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
       </div>
     </Sheet>
   );

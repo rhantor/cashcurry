@@ -73,3 +73,20 @@ describe("who is pushed a new message", () => {
     expect(chatTitle({ kind: "direct", members: ["ali", "kumar"] }, "ali", { kumar: { name: "Kumar Raj" } })).toBe("Kumar Raj");
   });
 });
+
+import { REACTIONS, canForward, reactionSummary } from "@/lib/chat/model";
+describe("reactions and forwarding", () => {
+  it("one reaction each, counted in the usual order, mine marked", () => {
+    expect(reactionSummary({ a: "😂", b: "👍", c: "👍" }, "c")).toEqual([
+      { emoji: "👍", count: 2, mine: true, who: ["b", "c"] },
+      { emoji: "😂", count: 1, mine: false, who: ["a"] },
+    ]);
+    expect(REACTIONS).toHaveLength(6);
+  });
+  it("a deleted or empty message isn't forwarded", () => {
+    expect(canForward({ text: "hi" })).toBe(true);
+    expect(canForward({ files: [{ name: "a.pdf" }] })).toBe(true);
+    expect(canForward({ text: "hi", deleted: true })).toBe(false);
+    expect(canForward({ text: " " })).toBe(false);
+  });
+});

@@ -477,10 +477,15 @@ service cloud.firestore {
             request.resource.data.byUid == request.auth.uid &&
             request.resource.data.createdAt == request.time &&
             request.resource.data.get('deleted', false) == false;
-          allow update: if isAuth() && resource.data.byUid == request.auth.uid &&
-            resource.data.get('deleted', false) == false &&
-            request.time < resource.data.createdAt + duration.value(15, 'm') &&
-            changedKeys().hasOnly(['text', 'files', 'editedAt', 'deleted']);
+          allow update: if isAuth() && (
+            (resource.data.byUid == request.auth.uid &&
+              resource.data.get('deleted', false) == false &&
+              request.time < resource.data.createdAt + duration.value(15, 'm') &&
+              changedKeys().hasOnly(['text', 'files', 'editedAt', 'deleted'])) ||
+            // anyone in the chat reacts — changing only their own reaction
+            (canSeeChatId(companyId, chatId) && changedKeys().hasOnly(['reactions']) &&
+              request.resource.data.reactions.diff(resource.data.get('reactions', {})).affectedKeys().hasOnly([request.auth.uid]))
+          );
         }
 
         // when each person last looked
