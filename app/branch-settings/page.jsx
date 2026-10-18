@@ -133,7 +133,7 @@ export default function BranchSettingsPage() {
                 <StaffRolesSection role={role} value={form.staffRoles} onChange={set("staffRoles")} />
               </Panel>
               <Panel title="Loans & advances">
-                <LoansFinanceSection role={role} value={form.loansFinance} onChange={set("loansFinance")} />
+                <LoansFinanceSection role={role} value={form.loansFinance} onChange={set("loansFinance")} requests={form.requests} onRequestsChange={set("requests")} />
               </Panel>
               <Panel title="Purchasing">
                 <PurchasesSection role={role} value={form.purchases} onChange={set("purchases")} />

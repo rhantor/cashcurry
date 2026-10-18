@@ -159,7 +159,38 @@ service cloud.firestore {
     // A request as anyone may raise it: pending, nothing paid.
     function isNewRequest() {
       return request.resource.data.get('status', '') == 'pending' &&
-        request.resource.data.get('paidOut', null) == null;
+        request.resource.data.get('paidOut', null) == null &&
+        request.resource.data.get('approvals', []).size() == 0;
+    }
+
+    // Whoever asked may cancel it while it still waits — nothing else changes.
+    function isCancel() {
+      return resource.data.get('status', '') == 'pending' &&
+        request.resource.data.get('status', '') == 'cancelled' &&
+        changedKeys().hasOnly(['status', 'awaiting', 'cancelledBy', 'updatedAt']);
+    }
+
+    // Requests engine (roadmap 4.2, lib/requests/model.js): an advance or
+    // staff loan above the branch's limit (settings.requests.ownerApprovalAbove,
+    // 0 = no limit) becomes approved only by a company role.
+    function ownerApprovalAbove(c, b) {
+      let path = /databases/$(database)/documents/companies/$(c)/branches/$(b)/settings/settings;
+      return exists(path) ? get(path).data.get('requests', {}).get('ownerApprovalAbove', 0) : 0;
+    }
+    function keepsOwnerStep(c, b) {
+      let after = request.resource.data;
+      let becomesApproved = after.get('status', '') in ['approved', 'closed'] &&
+        (resource == null || resource.data.get('status', '') == 'pending');
+      let limit = ownerApprovalAbove(c, b);
+      return !becomesApproved || !(limit > 0 && after.get('amount', 0) > limit) ||
+        userData().role in companyRoles();
+    }
+
+    // The approval limit itself is the company's to set, not the branch's.
+    function keepsApprovalLimit() {
+      return resource == null ||
+        request.resource.data.get('requests', {}).get('ownerApprovalAbove', 0) ==
+          resource.data.get('requests', {}).get('ownerApprovalAbove', 0);
     }
 
     // Paying out: an approved, unpaid request gets paidOut — and nothing else
@@ -209,8 +240,9 @@ service cloud.firestore {
     // Money and date settings (opening balances, currency, time zone, day
     // cut-off) are enforced here too: a manager's save may not change them.
     function canWriteBranchSettings(companyId, branchId) {
-      return canMoneySettings(companyId, branchId) ||
-        (canBranchSettings(companyId, branchId) && (resource == null || keepsMoneySettings()));
+      return (canMoneySettings(companyId, branchId) ||
+        (canBranchSettings(companyId, branchId) && (resource == null || keepsMoneySettings()))) &&
+        (userData().role in companyRoles() || keepsApprovalLimit());
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -563,35 +595,55 @@ service cloud.firestore {
 
         // ── Staff Loans (Branch Level) ───────────────────────────────────────
         match /loans/{docId} {
-          // Anyone at the branch may ASK (pending, unpaid). branchAdmin / manager (and
-          // company roles) approve or reject, or record one handed over on the spot.
+          // Anyone at the branch may ASK (pending, unpaid) and cancel their own while
+          // it waits. branchAdmin / manager (and company roles) approve or reject, or
+          // record one handed over on the spot — above the branch's limit only a
+          // company role may make it approved (keepsOwnerStep).
           // A payer (cashier and up) marks an approved one paid — once, changing
           // nothing else. Payroll instalments: whoever enters salaries. Staff read
           // only their own (isOwnRequest).
           allow read: if canAdvancesPayOut(companyId, branchId) || canReportsView(companyId, branchId) ||
             (isBranchMember(companyId, branchId) && isOwnRequest());
+          allow create: if (canAdvancesApprove(companyId, branchId) && keepsOwnerStep(companyId, branchId)) ||
+            (isBranchMember(companyId, branchId) && isNewRequest());
+          allow update: if (canAdvancesApprove(companyId, branchId) && keepsOwnerStep(companyId, branchId)) ||
+            (canAdvancesPayOut(companyId, branchId) && isPayOut()) ||
+            (canSalariesEnter(companyId, branchId) && isBookkeeping()) ||
+            (isBranchMember(companyId, branchId) && isOwnRequest() && isCancel());
+          allow delete: if canAdvancesApprove(companyId, branchId);
+        }
+
+        // ── Leave requests (roadmap 4.2) ────────────────────────────────────
+        match /leaves/{docId} {
+          // Anyone at the branch may ask and cancel their own while it waits;
+          // approvers decide. Those who plan shifts and pay see them all.
+          allow read: if canAdvancesApprove(companyId, branchId) || canAttendanceView(companyId, branchId) ||
+            canPayrollView(companyId, branchId) ||
+            (isBranchMember(companyId, branchId) && isOwnRequest());
           allow create: if canAdvancesApprove(companyId, branchId) ||
             (isBranchMember(companyId, branchId) && isNewRequest());
           allow update: if canAdvancesApprove(companyId, branchId) ||
-            (canAdvancesPayOut(companyId, branchId) && isPayOut()) ||
-            (canSalariesEnter(companyId, branchId) && isBookkeeping());
+            (isBranchMember(companyId, branchId) && isOwnRequest() && isCancel());
           allow delete: if canAdvancesApprove(companyId, branchId);
         }
 
         // ── Staff Advances ───────────────────────────────────────────────────
         match /advances/{docId} {
-          // Anyone at the branch may ASK (pending, unpaid). branchAdmin / manager (and
-          // company roles) approve or reject, or record one handed over on the spot.
+          // Anyone at the branch may ASK (pending, unpaid) and cancel their own while
+          // it waits. branchAdmin / manager (and company roles) approve or reject, or
+          // record one handed over on the spot — above the branch's limit only a
+          // company role may make it approved (keepsOwnerStep).
           // A payer (cashier and up) marks an approved one paid — once, changing
           // nothing else. Payroll instalments: whoever enters salaries. Staff read
           // only their own (isOwnRequest).
           allow read: if canAdvancesPayOut(companyId, branchId) || canReportsView(companyId, branchId) ||
             (isBranchMember(companyId, branchId) && isOwnRequest());
-          allow create: if canAdvancesApprove(companyId, branchId) ||
+          allow create: if (canAdvancesApprove(companyId, branchId) && keepsOwnerStep(companyId, branchId)) ||
             (isBranchMember(companyId, branchId) && isNewRequest());
-          allow update: if canAdvancesApprove(companyId, branchId) ||
+          allow update: if (canAdvancesApprove(companyId, branchId) && keepsOwnerStep(companyId, branchId)) ||
             (canAdvancesPayOut(companyId, branchId) && isPayOut()) ||
-            (canSalariesEnter(companyId, branchId) && isBookkeeping());
+            (canSalariesEnter(companyId, branchId) && isBookkeeping()) ||
+            (isBranchMember(companyId, branchId) && isOwnRequest() && isCancel());
           allow delete: if canAdvancesApprove(companyId, branchId);
         }
 

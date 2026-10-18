@@ -43,8 +43,8 @@
  * @property {string} otherEarningsNote
  * @property {number} otherDeductions
  * @property {string} otherDeductionsNote
- * @property {number} advanceAmt  - total advance deduction for this period
- * @property {number} loanAmt     - total loan deduction for this period
+ * @property {number} advanceAmt  - advance due this period (taken only as far as pay allows)
+ * @property {number} loanAmt     - loan due this period (taken only as far as pay allows)
  */
 
 // ─── Main calculation ─────────────────────────────────────────────────────────
@@ -216,8 +216,16 @@ export function calcPayroll(
   // ── Other deductions ──────────────────────────────────────────────────────
   const otherDed   = r2(parseFloat(otherDeductions) || 0);
   const penaltyAmt = r2(parseFloat(penalty)         || 0);
-  const advDed     = r2(parseFloat(advanceAmt)      || 0);
-  const loanDed    = r2(parseFloat(loanAmt)         || 0);
+  // Advance and loan come out of what is left after statutory, penalty and
+  // other deductions — advance first, then loan — and never more than that:
+  // what doesn't fit is not taken this month and stays owed (finalize marks
+  // only the amounts taken as repaid; the rest carries to next month).
+  const advDue     = r2(parseFloat(advanceAmt)      || 0);
+  const loanDue    = r2(parseFloat(loanAmt)         || 0);
+  let room         = r2(Math.max(0, grossEarnings - totalStatutoryEmployee - otherDed - penaltyAmt));
+  const advDed     = r2(Math.min(advDue, room));
+  room             = r2(room - advDed);
+  const loanDed    = r2(Math.min(loanDue, room));
 
   const totalDeductions = r2(
     totalStatutoryEmployee + otherDed + penaltyAmt + advDed + loanDed
@@ -254,6 +262,8 @@ export function calcPayroll(
     totalStatutoryEmployer,
     advanceAmt:      advDed,
     loanAmt:         loanDed,
+    advanceDue:      advDue,   // what was scheduled; advanceAmt is what was taken
+    loanDue:         loanDue,
     penalty:         penaltyAmt,
     otherDeductions: otherDed,
     totalDeductions,
