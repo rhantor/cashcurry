@@ -226,14 +226,19 @@ export function LabelsSheet({ open, onClose, user, chat, prefs }) {
   };
 
   return (
-    <Sheet open={open} onClose={onClose} title="Labels" description="Sort your chats your way — only you see your labels.">
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title={chat ? `Labels · ${chat.title || "this chat"}` : "Your labels"}
+      description={chat ? "Tick the labels this chat has — only you see your labels." : "Make, and delete, the labels you sort your chats with — only you see them."}
+    >
       <div className="space-y-4">
         {prefs.labels.length > 0 && (
           <ul className="divide-y divide-line rounded-xl border border-line">
             {prefs.labels.map((l) => (
               <li key={l.id} className="flex items-center gap-3 px-3 py-2">
                 <button type="button" onClick={() => chat && save({ ...prefs, chats: toggleLabel(prefs, chat.id, l.id) })} className="flex flex-1 items-center gap-3 text-left">
-                  <span className={cn("flex size-5 items-center justify-center rounded-md border", on.includes(l.id) ? "border-brand bg-brand text-white" : "border-line")}>{on.includes(l.id) && <Check className="size-3.5" />}</span>
+                  {chat && <span className={cn("flex size-5 items-center justify-center rounded-md border", on.includes(l.id) ? "border-brand bg-brand text-white" : "border-line")}>{on.includes(l.id) && <Check className="size-3.5" />}</span>}
                   <span className="size-3 rounded-full" style={{ background: l.color }} />
                   <span className="text-sm font-semibold text-fg">{l.name}</span>
                 </button>

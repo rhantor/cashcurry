@@ -7,11 +7,12 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { format, isToday, isYesterday } from "date-fns";
 import { doc, onSnapshot } from "firebase/firestore";
-import { BellOff, MessageSquarePlus, MessagesSquare, Search, UserRound, Users } from "lucide-react";
+import { Bell, BellOff, ChevronDown, MessageSquarePlus, MessagesSquare, MoreHorizontal, Search, Settings2, Tag, UserRound, Users, X } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { Avatar, Input, Menu, Skeleton, cn } from "@/app/components/ui";
+import { Avatar, Input, Menu, Popover, Skeleton, cn, toast } from "@/app/components/ui";
 import { canMakeGroups, chatTitle, labelsOf, timeOf } from "@/lib/chat/model";
 import { useChatLabels, useChatPeople, useChats } from "./useChat";
+import { setChatMuted } from "@/lib/chat/client";
 import Conversation, { chatIcon } from "./Conversation";
 import { DirectSheet, ForwardSheet, GroupSheet, LabelsSheet } from "./ChatSheets";
 
@@ -23,6 +24,7 @@ const when = (t) => {
   return format(d, Date.now() - t < 6 * 86400000 ? "EEE" : "d MMM");
 };
 
+// the fixed filters; your labels sit behind one "Labels" chip (LabelFilter)
 const FILTERS = [
   ["all", "All"],
   ["unread", "Unread"],
@@ -30,47 +32,126 @@ const FILTERS = [
   ["people", "People"],
 ];
 
-function ChatRow({ chat, active, muted, labels = [], onOpen, me }) {
+const MAX_LABELS = 2;
+
+function ChatRow({ chat, active, muted, labels = [], onOpen, onLabels, onMute, me }) {
   const Icon = chatIcon(chat.kind);
   const last = chat.lastMessage;
   const who = last ? (last.byUid === me ? "You" : chat.kind === "direct" ? "" : String(last.byName || "").split(" ")[0]) : "";
+  const extra = labels.length - MAX_LABELS;
   return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className={cn("flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition-colors", active ? "bg-brand-soft" : "hover:bg-surface-2")}
-    >
-      {Icon ? (
-        <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand to-brand/70 text-white shadow-sm">
-          <Icon className="size-5" />
-        </span>
-      ) : (
-        <Avatar name={chat.title} size="lg" />
-      )}
-      <span className="min-w-0 flex-1">
-        <span className="flex items-baseline gap-2">
-          <span className={cn("flex-1 truncate text-sm text-fg", chat.unread ? "font-bold" : "font-semibold")}>{chat.title}</span>
-          <span className={cn("shrink-0 text-[11px]", chat.unread ? "font-semibold text-brand" : "text-subtle")}>{when(timeOf(last?.at))}</span>
-        </span>
-        <span className="mt-0.5 flex items-center gap-2">
-          <span className={cn("flex-1 truncate text-xs", chat.unread ? "font-medium text-fg" : "text-muted")}>
-            {last ? `${who ? `${who}: ` : ""}${last.text}` : "No messages yet"}
+    <div className={cn("group relative rounded-2xl transition-colors", active ? "bg-brand-soft" : "hover:bg-surface-2")}>
+      <button type="button" onClick={onOpen} className="flex w-full items-center gap-3 px-3 py-2.5 pr-10 text-left">
+        {Icon ? (
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand to-brand/70 text-white shadow-sm">
+            <Icon className="size-5" />
           </span>
-          {muted && <BellOff className="size-3.5 shrink-0 text-subtle" />}
-          {chat.unread && <span className="size-2.5 shrink-0 rounded-full bg-brand" />}
-        </span>
-        {labels.length > 0 && (
-          <span className="mt-1 flex flex-wrap gap-1">
-            {labels.map((l) => (
-              <span key={l.id} className="inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[10px] font-semibold" style={{ background: `${l.color}1f`, color: l.color }}>
-                <span className="size-1.5 rounded-full" style={{ background: l.color }} />
-                {l.name}
-              </span>
-            ))}
-          </span>
+        ) : (
+          <Avatar name={chat.title} size="lg" />
         )}
+        <span className="min-w-0 flex-1">
+          <span className="flex items-baseline gap-2">
+            <span className={cn("flex-1 truncate text-sm text-fg", chat.unread ? "font-bold" : "font-semibold")}>{chat.title}</span>
+            <span className={cn("shrink-0 text-[11px]", chat.unread ? "font-semibold text-brand" : "text-subtle")}>{when(timeOf(last?.at))}</span>
+          </span>
+          <span className="mt-0.5 flex items-center gap-2">
+            <span className={cn("flex-1 truncate text-xs", chat.unread ? "font-medium text-fg" : "text-muted")}>
+              {last ? `${who ? `${who}: ` : ""}${last.text}` : "No messages yet"}
+            </span>
+            {muted && <BellOff className="size-3.5 shrink-0 text-subtle" />}
+            {chat.unread && <span className="size-2.5 shrink-0 rounded-full bg-brand" />}
+          </span>
+          {labels.length > 0 && (
+            <span className="mt-1 flex items-center gap-1 overflow-hidden" title={labels.map((l) => l.name).join(", ")}>
+              {labels.slice(0, MAX_LABELS).map((l) => (
+                <span key={l.id} className="inline-flex min-w-0 max-w-[45%] items-center gap-1 rounded-full px-1.5 py-px text-[10px] font-semibold" style={{ background: `${l.color}1f`, color: l.color }}>
+                  <span className="size-1.5 shrink-0 rounded-full" style={{ background: l.color }} />
+                  <span className="truncate">{l.name}</span>
+                </span>
+              ))}
+              {extra > 0 && <span className="shrink-0 rounded-full bg-surface-2 px-1.5 py-px text-[10px] font-semibold text-muted">+{extra}</span>}
+            </span>
+          )}
+        </span>
+      </button>
+      {/* labels and mute, without opening the chat */}
+      <div className="absolute right-1.5 top-1/2 -translate-y-1/2 opacity-100 transition-opacity sm:opacity-0 sm:group-hover:opacity-100 sm:focus-within:opacity-100">
+        <Menu
+          align="end"
+          width={200}
+          items={[
+            { label: "Labels…", icon: Tag, onSelect: onLabels },
+            { label: muted ? "Turn notifications on" : "Mute notifications", icon: muted ? Bell : BellOff, onSelect: onMute },
+          ]}
+          trigger={(p) => (
+            <button {...p} type="button" aria-label={`Options for ${chat.title}`} className="rounded-lg p-1.5 text-subtle hover:bg-surface hover:text-fg">
+              <MoreHorizontal className="size-4" />
+            </button>
+          )}
+        />
+      </div>
+    </div>
+  );
+}
+
+/** "Labels ▾": filter by one of your labels, or manage them — one chip however many labels there are. */
+function LabelFilter({ prefs, value, onChange, onManage }) {
+  const on = prefs.labels.find((l) => l.id === value);
+  if (on)
+    return (
+      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-fg py-1 pl-2.5 pr-1 text-xs font-semibold text-surface">
+        <span className="size-2 rounded-full" style={{ background: on.color }} />
+        <span className="max-w-24 truncate">{on.name}</span>
+        <button type="button" aria-label="Clear label filter" onClick={() => onChange("all")} className="rounded-full p-0.5 hover:bg-white/20">
+          <X className="size-3" />
+        </button>
       </span>
-    </button>
+    );
+  return (
+    <Popover
+      align="start"
+      width={220}
+      className="p-1"
+      trigger={({ ref, toggle }) => (
+        <button ref={ref} type="button" onClick={toggle} className="inline-flex shrink-0 items-center gap-1 rounded-full bg-surface-2 px-3 py-1 text-xs font-semibold text-muted hover:text-fg">
+          <Tag className="size-3" /> Labels <ChevronDown className="size-3" />
+        </button>
+      )}
+    >
+      {({ close }) => (
+        <div>
+          {prefs.labels.map((l) => {
+            const count = Object.values(prefs.chats || {}).filter((ids) => ids.includes(l.id)).length;
+            return (
+              <button
+                key={l.id}
+                type="button"
+                onClick={() => {
+                  onChange(l.id);
+                  close();
+                }}
+                className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-sm hover:bg-surface-2"
+              >
+                <span className="size-2.5 shrink-0 rounded-full" style={{ background: l.color }} />
+                <span className="flex-1 truncate font-semibold text-fg">{l.name}</span>
+                <span className="text-xs tabular-nums text-subtle">{count}</span>
+              </button>
+            );
+          })}
+          {!prefs.labels.length && <p className="px-2.5 py-2 text-xs text-muted">No labels yet.</p>}
+          <button
+            type="button"
+            onClick={() => {
+              onManage();
+              close();
+            }}
+            className="mt-1 flex w-full items-center gap-2 rounded-lg border-t border-line px-2.5 py-2 text-left text-sm font-semibold text-brand hover:bg-surface-2"
+          >
+            <Settings2 className="size-4" /> {prefs.labels.length ? "Manage labels" : "Make a label"}
+          </button>
+        </div>
+      )}
+    </Popover>
   );
 }
 
@@ -88,6 +169,7 @@ export default function ChatApp({ user, branches = [], allBranches, className })
   const [forwarding, setForwarding] = useState(null);
   const [mutedChats, setMutedChats] = useState([]);
   const labelPrefs = useChatLabels(user?.companyId, user?.uid);
+  const [labelChat, setLabelChat] = useState(null); // the chat whose labels are being set, or { manage: true }
   const openId = params.get("c");
 
   // the chats this person muted
@@ -146,25 +228,37 @@ export default function ChatApp({ user, branches = [], allBranches, className })
           <Search className="pointer-events-none absolute left-7 top-1/2 size-4 -translate-y-[60%] text-subtle" />
           <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search" className="h-10 rounded-full pl-9" />
         </div>
-        <div className="flex gap-1.5 overflow-x-auto px-4 pb-2 [scrollbar-width:none]">
-          {[...FILTERS, ...labelPrefs.labels.map((l) => [l.id, l.name, l.color])].map(([v, label, color]) => (
+        <div className="flex flex-wrap items-center gap-1.5 px-4 pb-2">
+          {FILTERS.map(([v, label]) => (
             <button
               key={v}
               type="button"
               onClick={() => setFilter(v)}
               className={cn("shrink-0 rounded-full px-3 py-1 text-xs font-semibold transition-colors", filter === v ? "bg-fg text-surface" : "bg-surface-2 text-muted hover:text-fg")}
             >
-              {color && <span className="mr-1 inline-block size-2 rounded-full" style={{ background: color }} />}
               {label}
               {v === "unread" && unreadCount > 0 && <span className="ml-1 tabular-nums">{unreadCount}</span>}
             </button>
           ))}
+          <LabelFilter prefs={labelPrefs} value={filter} onChange={setFilter} onManage={() => setLabelChat({ manage: true })} />
         </div>
         <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2 pb-3">
           {!ready && !chats.length ? (
             [0, 1, 2, 3].map((i) => <Skeleton key={i} className="mx-2 my-1 h-14" rounded="rounded-2xl" />)
           ) : shown.length ? (
-            shown.map((c) => <ChatRow key={c.id} chat={c} me={user.uid} muted={mutedChats.includes(c.id)} labels={labelsOf(c.id, labelPrefs)} active={c.id === openId} onOpen={() => open(c.id)} />)
+            shown.map((c) => (
+              <ChatRow
+                key={c.id}
+                chat={c}
+                me={user.uid}
+                muted={mutedChats.includes(c.id)}
+                labels={labelsOf(c.id, labelPrefs)}
+                active={c.id === openId}
+                onOpen={() => open(c.id)}
+                onLabels={() => setLabelChat(c)}
+                onMute={() => setChatMuted(user.companyId, user.uid, c.id, !mutedChats.includes(c.id)).catch((e) => toast.error("Couldn't save", { description: e?.message }))}
+              />
+            ))
           ) : (
             <p className="px-4 py-10 text-center text-sm text-muted">{filter === "unread" ? "You're all caught up." : "No chats here."}</p>
           )}
@@ -184,7 +278,7 @@ export default function ChatApp({ user, branches = [], allBranches, className })
             onBack={() => open(null)}
             onManage={() => setSheet("manage")}
             onForward={setForwarding}
-            onLabels={() => setSheet("labels")}
+            onLabels={() => setLabelChat(active)}
           />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-3 bg-bg px-6 text-center">
@@ -200,7 +294,7 @@ export default function ChatApp({ user, branches = [], allBranches, className })
       <DirectSheet open={sheet === "direct"} onClose={() => setSheet(null)} user={user} people={people} onOpened={open} />
       {sheet === "group" && <GroupSheet open onClose={() => setSheet(null)} user={user} people={people} onSaved={(id) => id && open(id)} />}
       {sheet === "manage" && active?.kind === "group" && <GroupSheet open onClose={() => setSheet(null)} user={user} people={people} chat={active} onSaved={(id) => open(id)} />}
-      <LabelsSheet open={sheet === "labels"} onClose={() => setSheet(null)} user={user} chat={active} prefs={labelPrefs} />
+      <LabelsSheet open={!!labelChat} onClose={() => setLabelChat(null)} user={user} chat={labelChat?.manage ? null : labelChat} prefs={labelPrefs} />
       {forwarding && <ForwardSheet msg={forwarding} onClose={() => setForwarding(null)} user={user} chats={titled} people={people} onSent={(id) => id && open(id)} />}
     </div>
   );
