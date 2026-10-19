@@ -1,18 +1,20 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import PropTypes from 'prop-types'
 import { format, parseISO } from 'date-fns'
 import { AnimatePresence, motion } from 'framer-motion'
-import { ScanLine } from 'lucide-react'
-import { Button, CountUp, DatePicker, Field, Input, Sheet, Textarea } from '@/app/components/ui'
+import { FileWarning, ReceiptText, ScanLine, Store } from 'lucide-react'
+import { Button, CountUp, DatePicker, Field, Input, Select, Sheet, Switch, Textarea, cn } from '@/app/components/ui'
 import MoneyInput from '@/app/components/entry/MoneyInput'
 import ProofUpload from '@/app/components/entry/ProofUpload'
 import { Chip, PaidFromChoice } from '@/app/components/entry/Choices'
 import { EntryLayout, EntrySection, SummaryLine } from '@/app/components/entry/EntryLayout'
 import useCurrency from '@/app/hooks/useCurrency'
 import { formatMoney } from '@/lib/region/currency'
-import { CATEGORIES, BACK_OFFICE_METHODS, DESCRIPTION_CHIPS, categoryLabel } from '../logic/constants'
+import { BACK_OFFICE_METHODS, DESCRIPTION_CHIPS } from '../logic/constants'
+import { findCategory, pickable } from '@/lib/costs/categories'
+import { NO_INVOICE_REASONS } from '@/lib/costs/vouchers'
 import ImageCaptureEditor from './ImageCaptureEditor'
 
 // Invoices and receipts: photos shrunk like the old uploader did.
@@ -50,16 +52,102 @@ function PaidFrom ({ office, setOffice, method, setMethod, error }) {
  * and an optional payment receipt. Summary and save stay in view.
  * `errors` = { amount, category, custom, method } from the page's checks.
  */
-export default function CostEntryForm ({ form, onSave, errors = {}, saved = false, recent }) {
+/**
+ * What for (4.9): the group, then the category in it; then whatever that
+ * category asks — who was paid, which bill and month.
+ */
+function WhatFor ({ groups, vendors, form, errors }) {
+  const { category, setCategory, vendorId, setVendorId, paidTo, setPaidTo, billMonth, setBillMonth, billRef, setBillRef } = form
+  const list = pickable(groups)
+  const picked = findCategory(groups, category)
+  const [groupId, setGroupId] = useState(picked?.group.id || list[0]?.id || '')
+  useEffect(() => {
+    if (picked && picked.group.id !== groupId) setGroupId(picked.group.id)
+  }, [picked, groupId])
+  const group = list.find(g => g.id === groupId) || list[0]
+  const needs = picked?.category.needs || []
+
+  return (
+    <div className='space-y-4'>
+      <div className='flex flex-wrap gap-1.5'>
+        {list.map(g => (
+          <button
+            key={g.id}
+            type='button'
+            onClick={() => setGroupId(g.id)}
+            className={cn(
+              'shrink-0 rounded-xl px-3 py-2 text-sm font-semibold transition',
+              g.id === group?.id ? (g.kind === 'notCost' ? 'bg-warning-soft text-warning' : 'bg-brand text-brand-fg') : 'bg-surface-2 text-muted hover:text-fg'
+            )}
+          >
+            {g.name}
+          </button>
+        ))}
+      </div>
+      {group?.kind === 'notCost' && (
+        <p className='rounded-xl bg-warning-soft px-3 py-2 text-xs text-fg'>
+          Money out that isn&apos;t a cost: it comes out of the till or bank as usual, but stays out of profit.
+        </p>
+      )}
+      <motion.div
+        key={errors.category ? 'err' : 'ok'}
+        animate={errors.category ? { x: [0, -6, 6, -4, 4, 0] } : undefined}
+        transition={{ duration: 0.35 }}
+        className='flex flex-wrap gap-2'
+      >
+        {(group?.categories || []).map(c => (
+          <Chip key={c.id} on={category === c.id} onClick={() => setCategory(c.id)}>
+            {c.name}
+          </Chip>
+        ))}
+      </motion.div>
+      {errors.category && <p className='text-xs font-medium text-danger'>{errors.category}</p>}
+
+      <AnimatePresence initial={false}>
+        {needs.includes('paidTo') && (
+          <motion.div key='paidTo' initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className='overflow-hidden'>
+            <div className='grid gap-3 rounded-2xl border border-line p-4 sm:grid-cols-2'>
+              <p className='flex items-center gap-2 text-sm font-semibold text-fg sm:col-span-2'><Store className='size-4 text-muted' /> Who was paid?</p>
+              <Field label='A listed vendor'>
+                {({ id }) => (
+                  <Select id={id} value={vendorId} onChange={e => { setVendorId(e.target.value); if (e.target.value) setPaidTo('') }} className='h-11'>
+                    <option value=''>— Not a listed vendor —</option>
+                    {vendors.map(v => <option key={v.id} value={v.id}>{v.name || v.vendorName}</option>)}
+                  </Select>
+                )}
+              </Field>
+              <Field label='…or the shop' error={errors.paidTo}>
+                {({ id, invalid }) => (
+                  <Input id={id} value={paidTo} disabled={!!vendorId} invalid={invalid} onChange={e => setPaidTo(e.target.value)} placeholder='e.g. Pasar Chow Kit, Mydin' className='h-11' />
+                )}
+              </Field>
+            </div>
+          </motion.div>
+        )}
+        {needs.includes('billFor') && (
+          <motion.div key='billFor' initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className='overflow-hidden'>
+            <div className='grid gap-3 rounded-2xl border border-line p-4 sm:grid-cols-2'>
+              <p className='flex items-center gap-2 text-sm font-semibold text-fg sm:col-span-2'><ReceiptText className='size-4 text-muted' /> Which bill?</p>
+              <Field label='For the month' error={errors.billFor}>
+                {({ id, invalid }) => <Input id={id} type='month' value={billMonth} invalid={invalid} onChange={e => setBillMonth(e.target.value)} className='h-11' />}
+              </Field>
+              <Field label='Account or bill number (optional)'>
+                {({ id }) => <Input id={id} value={billRef} onChange={e => setBillRef(e.target.value)} placeholder='e.g. TNB 2200 1234 5678' className='h-11' />}
+              </Field>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
+export default function CostEntryForm ({ form, groups = [], vendors = [], onSave, errors = {}, saved = false, recent }) {
   const {
     date,
     setDate,
     amount,
     setAmount,
-    category,
-    setCategory,
-    customCategory,
-    setCustomCategory,
     description,
     setDescription,
     file,
@@ -76,8 +164,12 @@ export default function CostEntryForm ({ form, onSave, errors = {}, saved = fals
     receiptFile,
     setReceiptFile,
     receiptProgress,
-    resolvedCategory
+    noInvoice,
+    setNoInvoice,
+    voucherReason,
+    setVoucherReason
   } = form
+  const resolvedCategory = findCategory(groups, form.category)?.category.name || ''
 
   const currency = useCurrency()
   const money = v => formatMoney(v, currency)
@@ -120,7 +212,7 @@ export default function CostEntryForm ({ form, onSave, errors = {}, saved = fals
             <div className='space-y-2 border-t border-line pt-3'>
               <SummaryLine label='Paid from' value={paidLine} />
               <SummaryLine label='For' value={resolvedCategory || '—'} />
-              <SummaryLine label='Invoice' value={file ? 'Attached' : 'None'} muted={!file} />
+              <SummaryLine label='Invoice' value={file ? 'Attached' : noInvoice ? 'None — voucher' : 'Not yet'} muted={!file} />
             </div>
             {saveButton}
           </div>
@@ -150,30 +242,7 @@ export default function CostEntryForm ({ form, onSave, errors = {}, saved = fals
         </EntrySection>
 
         <EntrySection title='What for'>
-          <motion.div
-            key={errors.category ? 'err' : 'ok'}
-            animate={errors.category ? { x: [0, -6, 6, -4, 4, 0] } : undefined}
-            transition={{ duration: 0.35 }}
-            className='flex flex-wrap gap-2'
-          >
-            {CATEGORIES.map(c => (
-              <Chip key={c} on={category === c} onClick={() => setCategory(c)}>
-                {categoryLabel(c)}
-              </Chip>
-            ))}
-          </motion.div>
-          {errors.category && <p className='mt-2 text-xs font-medium text-danger'>{errors.category}</p>}
-          <AnimatePresence initial={false}>
-            {category === 'Other' && (
-              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className='overflow-hidden'>
-                <Field label='Name the category' error={errors.custom} className='mt-4'>
-                  {({ id, invalid }) => (
-                    <Input id={id} invalid={invalid} value={customCategory} onChange={e => setCustomCategory(e.target.value)} placeholder='e.g. Pest control, License renewal' />
-                  )}
-                </Field>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <WhatFor groups={groups} vendors={vendors} form={form} errors={errors} />
 
           <Field label='Note' className='mt-5'>
             {({ id }) => (
@@ -202,6 +271,7 @@ export default function CostEntryForm ({ form, onSave, errors = {}, saved = fals
         </EntrySection>
 
         <EntrySection title='Invoice and receipt'>
+          {errors.invoice && <p className='mb-3 text-xs font-medium text-danger'>{errors.invoice}</p>}
           <ProofUpload
             label='Invoice'
             pdf
@@ -225,6 +295,33 @@ export default function CostEntryForm ({ form, onSave, errors = {}, saved = fals
           >
             <ScanLine className='size-3.5' /> Several pages? Scan them into one PDF
           </button>
+
+          {!file && (
+            <div className={cn('mt-4 rounded-2xl border p-4 transition-colors', noInvoice ? 'border-warning/40 bg-warning-soft/50' : 'border-line')}>
+              <div className='flex items-center gap-3'>
+                <FileWarning className='size-5 shrink-0 text-warning' />
+                <div className='min-w-0 flex-1'>
+                  <p className='text-sm font-semibold text-fg'>No invoice for this</p>
+                  <p className='text-xs text-muted'>It is saved with a voucher; a manager or in-charge approves it.</p>
+                </div>
+                <Switch checked={noInvoice} onChange={setNoInvoice} />
+              </div>
+              <AnimatePresence initial={false}>
+                {noInvoice && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className='overflow-hidden'>
+                    <div className='mt-3 flex flex-wrap gap-1.5'>
+                      {NO_INVOICE_REASONS.map(r => (
+                        <Chip key={r} on={voucherReason === r} onClick={() => setVoucherReason(r)}>{r}</Chip>
+                      ))}
+                    </div>
+                    <Field label='Why there is no invoice' error={errors.voucher} className='mt-3'>
+                      {({ id, invalid }) => <Input id={id} invalid={invalid} value={voucherReason} onChange={e => setVoucherReason(e.target.value)} placeholder='Or say it in your own words' />}
+                    </Field>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          )}
 
           <div className='mt-5'>
             <ProofUpload
@@ -258,6 +355,8 @@ export default function CostEntryForm ({ form, onSave, errors = {}, saved = fals
 
 CostEntryForm.propTypes = {
   form: PropTypes.object.isRequired,
+  groups: PropTypes.array,
+  vendors: PropTypes.array,
   onSave: PropTypes.func.isRequired,
   errors: PropTypes.object,
   saved: PropTypes.bool,

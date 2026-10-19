@@ -7,8 +7,17 @@ import { toast } from "@/app/components/ui/notify";
 export function useCostEntryForm () {
   const [date, setDate] = useDefaultDate() // today on the branch's clock
   const [amount, setAmount] = useState('')
+  // What for (4.9): a category id from the company's list (lib/costs/categories.js)
   const [category, setCategory] = useState('')
-  const [customCategory, setCustomCategory] = useState('')
+  const [customCategory, setCustomCategory] = useState('') // old free-typed "Other" — no longer offered
+  // what some categories need: who was paid (a listed vendor or a shop typed in), which bill and month
+  const [vendorId, setVendorId] = useState('')
+  const [paidTo, setPaidTo] = useState('')
+  const [billMonth, setBillMonth] = useState('')
+  const [billRef, setBillRef] = useState('')
+  // no invoice → a voucher someone in charge approves (lib/costs/vouchers.js)
+  const [noInvoice, setNoInvoice] = useState(false)
+  const [voucherReason, setVoucherReason] = useState('')
   const [description, setDescription] = useState('')
 
   const [file, setFile] = useState(null)
@@ -47,6 +56,14 @@ export function useCostEntryForm () {
   const resolvedCategory = useMemo(() => {
     return category === 'Other' ? (customCategory || 'Other').trim() : category
   }, [category, customCategory])
+
+  // a new category asks its own questions
+  useEffect(() => {
+    setVendorId('')
+    setPaidTo('')
+    setBillMonth('')
+    setBillRef('')
+  }, [category])
 
   const handleDescriptionKeyDown = e => {
     if (e.key !== 'Enter') return
@@ -147,6 +164,8 @@ export function useCostEntryForm () {
     setReceiptProgress(0)
     setPaidFromOffice('front')
     setPaidMethod('cash')
+    setNoInvoice(false)
+    setVoucherReason('')
   }
 
   return {
@@ -180,6 +199,18 @@ export function useCostEntryForm () {
     paidMethod,
     setPaidMethod,
     resolvedCategory,
+    vendorId,
+    setVendorId,
+    paidTo,
+    setPaidTo,
+    billMonth,
+    setBillMonth,
+    billRef,
+    setBillRef,
+    noInvoice,
+    setNoInvoice,
+    voucherReason,
+    setVoucherReason,
 
     // handlers
     handleDescriptionKeyDown,

@@ -263,6 +263,8 @@ export default function useBranchData (filter) {
       totalWdr: t.withdrawal,
       totalDep: t.deposit,
       totalCosts: t.costCash + t.costBank,
+      // part of it that is not a cost (drawings, assets…) — out of profit (4.9)
+      totalNotCost: t.notCost || 0,
       totalCostsFront: t.costCash,
       totalCostsBack: t.costBank,
       backCard,
@@ -702,6 +704,7 @@ export default function useBranchData (filter) {
     totalWdr: totals.totalWdr,
     totalDep: totals.totalDep,
     totalCosts: totals.totalCosts,
+    totalNotCost: totals.totalNotCost,
     totalCostsFront: totals.totalCostsFront,
     totalCostsBack: totals.totalCostsBack,
     backCard: totals.backCard,

@@ -21,6 +21,7 @@ import { useGetBranchesBasicQuery } from "@/lib/redux/api/branchApiSlice";
 import { shiftsEnabled } from "@/lib/attendance/shifts";
 import { serverTimestamp } from "firebase/firestore";
 import LoanRequests from "./LoanRequests";
+import VoucherInbox, { useWaitingVouchers } from "@/app/components/costs/VoucherInbox";
 import OtRequests from "./OtRequests";
 import { confirmDialog, promptDialog } from "@/app/components/ui/notify";
 import { Button, Skeleton, Tabs } from "@/app/components/ui";
@@ -41,7 +42,11 @@ const sureToReject = (what) => confirmDialog({ title: `Reject this ${what}?`, me
 export default function RequestedPanel() {
   // the branch being viewed: a branch user's own, or the one a company role picked
   const { user, companyId, branchId } = useSession();
-  const [activeTab, setActiveTab] = useState("advance");
+  // in-charge sees only what they approve: vouchers (4.9)
+  const canRequests = can(user?.role, "advances.approve");
+  const canVouchers = can(user?.role, "costs.approve");
+  const [activeTab, setActiveTab] = useState(canRequests ? "advance" : "vouchers");
+  const { vouchers } = useWaitingVouchers(canVouchers ? companyId : null, branchId);
 
   // local action states
   const [loanWorkingId, setLoanWorkingId] = useState(null);
@@ -61,7 +66,7 @@ export default function RequestedPanel() {
   const allBranches = isCompanyRole(user?.role) && (branches?.length || 0) > 1 ? branches.map((b) => b.id) : null;
   const { data: waiting = [] } = useGetRequestsQuery(
     { companyId, branchId, branchIds: allBranches, status: "pending" },
-    { skip: !companyId || (!branchId && !allBranches), pollingInterval: 15000 }
+    { skip: !canRequests || !companyId || (!branchId && !allBranches), pollingInterval: 15000 }
   );
   const [leaveOpen, setLeaveOpen] = useState(false);
   const { data: staff = [], isLoading: staffLoading } = useGetStaffListQuery({ companyId, branchId }, { skip: !companyId || !branchId || !leaveOpen });
@@ -72,7 +77,7 @@ export default function RequestedPanel() {
     isError: loanError,
   } = useGetLoanEntriesQuery(
     { companyId, branchId, status: "pending" },
-    { skip: !companyId || !branchId, pollingInterval: 5000 }
+    { skip: !canRequests || !companyId || !branchId, pollingInterval: 5000 }
   );
 
   // Early-OT approvals only exist when the branch runs shift templates.
@@ -89,7 +94,7 @@ export default function RequestedPanel() {
     error: otErrorDetail,
   } = useGetOtRequestsQuery(
     { companyId, branchId, status: "pending" },
-    { skip: !companyId || !branchId || !otTabEnabled, pollingInterval: 5000 }
+    { skip: !canRequests || !companyId || !branchId || !otTabEnabled, pollingInterval: 5000 }
   );
 
   const [updateOtRequest] = useUpdateOtRequestMutation();
@@ -211,7 +216,7 @@ export default function RequestedPanel() {
   };
 
   // The OT tab disappears if shifts get turned off while it's open.
-  const currentTab = activeTab === "ot" && !otTabEnabled ? "advance" : activeTab;
+  const currentTab = activeTab === "ot" && !otTabEnabled ? "advance" : !canRequests ? "vouchers" : activeTab;
 
   if (!companyId || !branchId) return <Skeleton className="m-6 h-64" rounded="rounded-2xl" />;
 
@@ -229,9 +234,9 @@ export default function RequestedPanel() {
           value={currentTab}
           onChange={setActiveTab}
           tabs={[
-            { value: "advance", label: tab("Staff requests", waiting.length) },
-            { value: "loan", label: tab("Branch loans", pendingLoans.length) },
-            ...(otTabEnabled ? [{ value: "ot", label: tab("Early OT", pendingOt.length) }] : []),
+            ...(canRequests ? [{ value: "advance", label: tab("Staff requests", waiting.length) }, { value: "loan", label: tab("Branch loans", pendingLoans.length) }] : []),
+            ...(canRequests && otTabEnabled ? [{ value: "ot", label: tab("Early OT", pendingOt.length) }] : []),
+            ...(canVouchers ? [{ value: "vouchers", label: tab("Vouchers", vouchers.length) }] : []),
           ]}
         />
       </div>
@@ -259,6 +264,7 @@ export default function RequestedPanel() {
           getBranchName={getBranchName}
         />
       )}
+      {currentTab === "vouchers" && <VoucherInbox companyId={companyId} branchId={branchId} user={user} />}
       {currentTab === "ot" && (
         <OtRequests
           loading={otLoading}

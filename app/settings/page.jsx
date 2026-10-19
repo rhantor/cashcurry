@@ -1,15 +1,17 @@
 "use client";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Building2, Monitor, Moon, Palette, Sun, Users } from "lucide-react";
+import { Building2, Monitor, Moon, Palette, ReceiptText, Sun, Users } from "lucide-react";
 import BranchManagement from "../components/settings/BranchManagement";
 import UserManagement from "../components/settings/users/UserMangement";
+import CostCategories from "../components/settings/CostCategories";
 import { Card, cn, useTheme } from "@/app/components/ui";
 import { ChoiceCards } from "@/app/components/entry/Choices";
 
 const SECTIONS = [
   { id: "users", label: "People", note: "Who can sign in, and their role", icon: Users },
   { id: "branches", label: "Branches", note: "Add and look after branches", icon: Building2 },
+  { id: "costs", label: "Cost categories", note: "What costs can be entered under", icon: ReceiptText },
   { id: "appearance", label: "Appearance", note: "Light or dark", icon: Palette },
 ];
 
@@ -77,6 +79,7 @@ export default function SettingsPage() {
           </div>
           {active === "users" && <UserManagement />}
           {active === "branches" && <BranchManagement />}
+          {active === "costs" && <CostCategories />}
           {active === "appearance" && <Appearance />}
         </motion.div>
       </div>

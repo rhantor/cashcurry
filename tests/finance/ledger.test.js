@@ -84,3 +84,21 @@ describe("rules", () => {
     expect(t.countsInTotal("promotion")).toBe(false);
   });
 });
+
+describe("money out that is not a cost (4.9)", () => {
+  const settings = { financeSales: { openingBalance: 1000, openingBankBalance: 500, tenders: [{ key: "cash" }] } };
+  const day = "2026-10-10";
+  const run = (costs) => buildLedger({ branchId: "b", settings, records: { sales: [], costs, advances: [], staffLoans: [], deposits: [], salaries: [], withdrawals: [], loanActivities: [] }, from: day, to: day });
+  it("still leaves the till or bank, but is counted apart so profit can leave it out", () => {
+    const l = run([
+      { date: day, amount: 100, category: "Food & ingredients", costKind: "expense", paidFromOffice: "front" },
+      { date: day, amount: 300, category: "Owner drawings", costKind: "notCost", paidFromOffice: "front" },
+      { date: day, amount: 50, category: "New Purchases/Assets", paidFromOffice: "back", paidMethod: "card" }, // old record: equipment
+    ]);
+    expect(l.totals.costCash).toBe(400);
+    expect(l.totals.costBank).toBe(50);
+    expect(l.totals.notCost).toBe(350);
+    expect(l.closing.cash).toBe(600);
+    expect(l.closing.bank).toBe(450);
+  });
+});

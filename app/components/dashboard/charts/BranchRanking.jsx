@@ -21,7 +21,7 @@ export default function BranchRanking({ rows = [], format }) {
   const [by, setBy] = useState("sales");
   const list = rows
     .map((r) => {
-      const profit = r.sales - r.costs - r.salaries;
+      const profit = r.sales - (r.costs - (r.notCost || 0)) - r.salaries; // not-a-cost money stays out (4.9)
       return { ...r, profit, margin: r.sales ? (profit / r.sales) * 100 : 0 };
     })
     .sort((a, b) => b[by] - a[by]);

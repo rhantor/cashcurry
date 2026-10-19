@@ -56,6 +56,8 @@ const PROBES = {
   "issues.manage": (u) => as(u).doc(`${B}/issues/i-${u}`).update({ priority: "urgent" }),
   "chat.groups": (u) => as(u).collection(`companies/${CO}/chats`).add({ kind: "group", name: "G", members: [u], createdBy: u }),
   "notifications.manage": (u) => as(u).doc(`${B}/settings/notifications`).set({ recipients: { "daily.sales": [u] } }),
+  "categories.manage": (u) => as(u).doc(`companies/${CO}/settings/costCategories`).set({ groups: [{ id: `g-${u}`, name: "G", kind: "expense", categories: [] }] }),
+  "costs.approve": (u) => as(u).doc(`${B}/costs/v-${u}`).update({ "voucher.status": "approved", "voucher.decidedBy": { uid: u } }),
   "moneySettings.manage": (u) => as(u).doc(`${B}/settings/settings`).update({ "financeSales.openingBalance": USERS.indexOf(u) + 1000 }),
 };
 
@@ -81,6 +83,7 @@ beforeEach(async () => {
     await d.doc(`${B}/staffPrivate/st1`).set({ staffId: "st1", basicSalary: "1800", bankAccountNumber: "999" });
     await d.doc(`${B}/staffPrivate/st-me`).set({ staffId: "st-me", basicSalary: "1500" });
     await d.doc(`${B}/attendance/other`).set({ staffId: "st1", date: "2026-10-10", type: "in" });
+    for (const uid of Object.keys(PEOPLE)) await d.doc(`${B}/costs/v-${uid}`).set({ date: "2026-10-10", amount: 5, createdBy: { uid: "someoneElse" }, voucher: { status: "pending", reason: "stall", by: { uid: "someoneElse" } } });
     for (const uid of Object.keys(PEOPLE)) await d.doc(`${B}/issues/i-${uid}`).set({ title: "x", status: "open", priority: "normal", reporterUid: "someoneElse" });
     await d.doc(`companies/${CO}/vendors/v1`).set({ name: "V" });
     await d.doc(`${B}/settings/settings`).set({ basic: { phone: "1" }, financeSales: { openingBalance: 1, currency: "MYR" } });

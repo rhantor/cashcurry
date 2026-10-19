@@ -16,6 +16,9 @@ import { formatMoney } from "@/lib/region/currency";
 import { Badge, Select, Skeleton, confirmDialog, toast } from "@/app/components/ui";
 
 import { personName } from "@/lib/people";
+import { classify } from "@/lib/costs/categories";
+import { voucherText } from "@/lib/costs/vouchers";
+import { useCostCategories } from "@/lib/costs/client";
 const METHODS = { cash: "Cash", card: "Card", qr: "QR", online: "Online", bank_transfer: "Bank transfer" };
 
 // derive safe fields for old documents
@@ -38,6 +41,7 @@ export default function CostsReport() {
   const [deleteCostEntry] = useDeleteCostEntryMutation();
   const currency = useCurrency();
   const money = (v) => formatMoney(v, currency);
+  const { groups } = useCostCategories(companyId);
 
   const [category, setCategory] = useState("");
   const [office, setOffice] = useState("");
@@ -164,6 +168,21 @@ export default function CostsReport() {
 
             {/* where it went */}
             <div className="grid gap-4 lg:grid-cols-2">
+              <ChartCard title="By group" subtitle="“Not a cost” still left the till or bank, but stays out of profit" loading={isLoading} className="lg:col-span-2">
+                <RankedBars
+                  format={money}
+                  color={COLOR.out}
+                  rows={Object.values(
+                    rows.reduce((m, c) => {
+                      const k = classify(c, groups);
+                      const key = k.kind === "notCost" ? `${k.group} (not a cost)` : k.group;
+                      m[key] = { name: key, value: (m[key]?.value || 0) + (Number(c.amount) || 0) };
+                      return m;
+                    }, {})
+                  )}
+                  empty="No costs in this period"
+                />
+              </ChartCard>
               <ChartCard title="By category" subtitle="Tap one to see only those" loading={isLoading}>
                 <RankedBars
                   format={money}
@@ -201,10 +220,14 @@ export default function CostsReport() {
               amountLabel={categoryLabel(categoryOf(c))}
               tone="out"
               money={money}
-              note={locked ? `Paid to ${c.meta?.vendorName || "a vendor"} from Purchases — change or undo it there.` : undefined}
+              note={locked ? `Paid to ${c.meta?.vendorName || "a vendor"} from Purchases — change or undo it there.` : c.voucher ? voucherText(c) : undefined}
               rows={[
+                { label: "Group", value: (() => { const k = classify(c, groups); return k.kind === "notCost" ? `${k.group} — not a cost` : k.group; })() },
                 { label: "Paid from", value: paidFrom(c) === "front" ? "Till (cash)" : `Bank · ${METHODS[paidMethod(c)] || "—"}` },
                 { label: "Vendor", value: c.meta?.vendorName },
+                { label: "Paid to", value: c.paidTo },
+                { label: "Bill for", value: c.billMonth ? `${format(parseISO(`${c.billMonth}-01`), "MMMM yyyy")}${c.billRef ? ` · ${c.billRef}` : ""}` : null },
+                { label: "Voucher", value: c.voucher ? `${c.voucher.reason || "No invoice"}` : null },
                 { label: "Note", value: c.description },
               ]}
               files={filesOf(c)}
