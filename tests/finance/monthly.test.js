@@ -16,7 +16,7 @@ function branchRecords(dataset, b) {
   return {
     sales: b.cols.sales || [], costs: b.cols.costs || [], advances: b.cols.advances || [],
     staffLoans: b.cols.loans || [], deposits: b.cols.deposits || [], withdrawals: b.cols.cashWithdrawals || [],
-    salaries: b.cols.salaries || [],
+    salaries: b.cols.salaries || [], payouts: b.cols.payouts || [],
     loanActivities: (dataset.companyCols.loans || []).filter((l) => l.status === "approved"),
   };
 }

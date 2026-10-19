@@ -261,6 +261,7 @@ service cloud.firestore {
     function canSalesEnter(c, b)      { return may(c, b, officeBranchRoles()); }
     function canCostsEnter(c, b)      { return may(c, b, leadRoles().concat(['inCharge', 'accountant'])); }
     function canCostsApprove(c, b)    { return may(c, b, leadRoles().concat(['inCharge'])); }
+    function canPayoutsHandOut(c, b)  { return may(c, b, leadRoles().concat(['inCharge', 'supervisor', 'cashier'])); }
     // a cost's voucher moving to approved / rejected in this write
     function voucherDecided() {
       let before = resource.data.get('voucher', {}).get('status', '');
@@ -685,14 +686,50 @@ service cloud.firestore {
         match /costs/{docId} {
           allow read: if canCostsEnter(companyId, branchId);
           // a new cost's voucher can only start out waiting
-          allow create: if canCostsEnter(companyId, branchId) &&
-            request.resource.data.get('voucher', {}).get('status', 'pending') == 'pending';
+          allow create: if canCostsEnter(companyId, branchId) && (
+            request.resource.data.get('voucher', {}).get('status', 'pending') == 'pending' ||
+            // a pay-out's bill approved with no paper: its voucher was decided with it (4.10)
+            (request.resource.data.get('meta', {}).get('type', '') == 'payout' && canCostsApprove(companyId, branchId))
+          );
           // A voucher (a cost with no invoice, 4.9) is decided by branch admin,
           // manager or in-charge (and the company roles) — never by whoever made it.
           allow update: if canCostsEnter(companyId, branchId) && (
             !voucherDecided() || (canCostsApprove(companyId, branchId) && voucherMaker() != request.auth.uid)
           );
           allow delete: if canRecordsDelete(companyId, branchId);
+        }
+
+        // ── Pay-outs and their bills (4.10, lib/payouts/model.js) ─────────────
+        // kind "out": money handed out of the till; kind "settle": the bill
+        // back. Till roles hand out and bring bills back; branch admin,
+        // manager or in-charge (and the company roles) approve or send a bill
+        // back — never one they handed out or brought back. Approved bills
+        // become costs and are not changed here again.
+        match /payouts/{docId} {
+          allow read: if canPayoutsHandOut(companyId, branchId) || canCostsApprove(companyId, branchId) || canReportsView(companyId, branchId);
+          allow create: if canPayoutsHandOut(companyId, branchId) &&
+            request.resource.data.by.uid == request.auth.uid && (
+              (request.resource.data.kind == 'out' && request.resource.data.status == 'open') ||
+              (request.resource.data.kind == 'settle' && request.resource.data.status == 'pending')
+            );
+          allow update: if resource.data.get('status', '') != 'approved' && (
+            // an open pay-out gets its bill
+            (resource.data.kind == 'out' && canPayoutsHandOut(companyId, branchId) &&
+              changedKeys().hasOnly(['status', 'settleId', 'updatedAt']) && request.resource.data.status == 'billed') ||
+            // a bill sent back is tried again
+            (resource.data.kind == 'settle' && resource.data.status == 'rejected' && canPayoutsHandOut(companyId, branchId) &&
+              request.resource.data.status == 'pending' && request.resource.data.by.uid == request.auth.uid &&
+              !changedKeys().hasAny(['kind', 'payoutId', 'floatAmount', 'payoutBy'])) ||
+            // approved or sent back by someone in charge, not their own
+            (resource.data.kind == 'settle' && resource.data.status == 'pending' && canCostsApprove(companyId, branchId) &&
+              request.resource.data.status in ['approved', 'rejected'] &&
+              resource.data.by.uid != request.auth.uid &&
+              resource.data.get('payoutBy', {}).get('uid', '') != request.auth.uid &&
+              !changedKeys().hasAny(['kind', 'payoutId', 'floatAmount', 'by', 'payoutBy', 'date']))
+          );
+          // a pay-out made by mistake, before any bill: whoever made it; anything else: those who delete records
+          allow delete: if canRecordsDelete(companyId, branchId) ||
+            (resource.data.kind == 'out' && resource.data.status == 'open' && resource.data.by.uid == request.auth.uid);
         }
 
         // ── Bank Deposits ────────────────────────────────────────────────────

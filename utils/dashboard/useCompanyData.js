@@ -115,6 +115,7 @@ export default function useCompanyData(filter) {
   const [loanActivities, setLoanActivities] = useState([]);
   // Staff loans (branch-level /loans collection — cash disbursed to staff from register)
   const [allStaffLoans, setAllStaffLoans] = useState([]);
+  const [payouts, setPayouts] = useState([]); // pay-outs and bills (4.10)
   // Sum of each branch's configured opening cash float (from branch settings)
   const [totalOpeningCash, setTotalOpeningCash] = useState(0);
   // Each branch's settings: payment types and opening balances for its ledger
@@ -183,7 +184,7 @@ export default function useCompanyData(filter) {
         return chunks.flat();
       };
 
-      const [salesAll, costsAll, advAll, depAll, wdrAll, salAll, staffLoansAll] = await Promise.all([
+      const [salesAll, costsAll, advAll, depAll, wdrAll, salAll, staffLoansAll, payoutsAll] = await Promise.all([
         fetchColl("sales"),
         fetchColl("costs"),
         fetchColl("advances"),
@@ -191,6 +192,7 @@ export default function useCompanyData(filter) {
         fetchColl("withdrawals"),
         fetchColl("salaries"),
         fetchColl("staffLoans"),
+        fetchColl("payouts"),
       ]);
 
       // Sum opening cash float across all branches
@@ -209,6 +211,7 @@ export default function useCompanyData(filter) {
       setSalaries(salAll);
       setLoanActivities(loanAll);
       setAllStaffLoans(staffLoansAll);
+      setPayouts(payoutsAll);
       setTotalOpeningCash(openingCashSum);
       setSettingsByBranch(settingsOf);
       setCarriedByBranch(carried);
@@ -258,13 +261,14 @@ export default function useCompanyData(filter) {
           salaries: ofBranch(salaries, bid),
           withdrawals: ofBranch(withdrawals, bid),
           loanActivities: approvedLoans,
+          payouts: ofBranch(payouts, bid),
         },
         from: fromKey,
         to: toKey,
         carriedIn: carriedByBranch[bid] || null,
       })
     );
-  }, [settingsByBranch, carriedByBranch, sales, costs, advances, allStaffLoans, deposits, salaries, withdrawals, loanActivities, fromKey, toKey]);
+  }, [settingsByBranch, carriedByBranch, sales, costs, advances, allStaffLoans, deposits, salaries, withdrawals, loanActivities, payouts, fromKey, toKey]);
 
   // What one sale adds to total sales and to the bank, by its branch's rules.
   const { saleTotal, bankedOfSale } = useMemo(() => {

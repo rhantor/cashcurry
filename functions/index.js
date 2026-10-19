@@ -54,6 +54,21 @@ exports.notifyPurchaseOrders = onDocumentWritten("companies/{companyId}/branches
   }
 });
 
+// Pay-out bills and vouchers (4.9, 4.10): waiting → approvers; decided → whoever brought it.
+const notifyOn = (collection, handler, label) =>
+  onDocumentWritten(`companies/{companyId}/branches/{branchId}/${collection}/{id}`, async (event) => {
+    const { companyId, branchId, id } = event.params;
+    const before = event.data?.before?.exists ? event.data.before.data() : null;
+    const after = event.data?.after?.exists ? event.data.after.data() : null;
+    try {
+      await notify[handler]({ companyId, branchId, id, before, after });
+    } catch (err) {
+      console.error(`[notify ${label}]`, companyId, branchId, id, err);
+    }
+  });
+exports.notifyPayouts = notifyOn("payouts", "onPayout", "payouts");
+exports.notifyCostVouchers = notifyOn("costs", "onCostVoucher", "vouchers");
+
 // Chat (4.4): a push for each new message; the directory of who can be messaged.
 exports.notifyChatMessage = onDocumentCreated("companies/{companyId}/chats/{chatId}/messages/{id}", async (event) => {
   const { companyId, chatId } = event.params;
@@ -232,6 +247,7 @@ exports.summaryStaffLoans = makeSummaryTrigger("loans");
 exports.summaryDeposits = makeSummaryTrigger("deposits");
 exports.summaryWithdrawals = makeSummaryTrigger("cashWithdrawals");
 exports.summarySalaries = makeSummaryTrigger("salaries");
+exports.summaryPayouts = makeSummaryTrigger("payouts"); // pay-outs and their bills (4.10)
 
 // Loans between branches move both branches' cash.
 exports.summaryBranchLoans = onDocumentWritten(

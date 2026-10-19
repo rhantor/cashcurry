@@ -24,6 +24,8 @@ export const sidebarItems = [
       { label: "Salaries Entry", path: "/entry-data/salary-entry" },
     ],
   },
+  // Money handed out of the till and the bills that come back (4.10)
+  { label: "Pay-outs", section: "Daily work", icon: "payouts", path: "/payouts" },
   { label: "Requested Panel", section: "Daily work", icon: "MdOutlineRequestPage", path: "/requested-panel" },
   // Their own requests — for those who ask but don't approve.
   { label: "My Requests", section: "Daily work", icon: "MdOutlineFactCheck", path: "/supervisor-panel", hideIf: "advances.approve" },

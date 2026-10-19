@@ -13,6 +13,7 @@ import { useGetLoanActivitiesQuery } from '@/lib/redux/api/loanApiSlice'
 import { useGetBranchesBasicQuery, useGetSingleBranchQuery } from '@/lib/redux/api/branchApiSlice'
 import { useGetSalaryEntriesQuery } from '@/lib/redux/api/salaryApiSlice'
 import { useGetWithdrawEntriesQuery } from '@/lib/redux/api/cashWithdrawApiSlice'
+import { useGetPayoutsQuery } from '@/lib/redux/api/payoutsApiSlice'
 import { useGetCompanyDetailsQuery } from '@/lib/redux/api/authApiSlice'
 import { buildLedger } from '@/lib/finance/ledger'
 import { useBusinessToday } from '@/app/hooks/useRegion'
@@ -124,6 +125,8 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
   const { data: deposits = [], isLoading: loadingDeposits } = useGetDepositEntryQuery(recordArgs)
   const { data: salaries = [], isLoading: loadingSalaries } = useGetSalaryEntriesQuery(recordArgs)
   const { data: withdrawals = [], isLoading: loadingWithdrawals } = useGetWithdrawEntriesQuery(recordArgs)
+  // pay-outs and their bills move the till (4.10)
+  const { data: payouts = [], isLoading: loadingPayouts } = useGetPayoutsQuery(recordArgs)
   const { data: branches = [] } = useGetBranchesBasicQuery(companyId || skipToken)
   const { data: currentBranch } = useGetSingleBranchQuery(
     baseArgs ? baseArgs : skipToken
@@ -142,6 +145,7 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
     loadingDeposits ||
     loadingSalaries ||
     loadingWithdrawals ||
+    loadingPayouts ||
     loadingLoanActs
   const { data: company } = useGetCompanyDetailsQuery(companyId ?? skipToken)
 
@@ -168,6 +172,7 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
       ...deposits.map(depositDay),
       ...salaries.map(salaryDay),
       ...withdrawals.map(withdrawalDay),
+      ...payouts.map(p => p.date),
       ...branchLoanMovements(loanActs, branchId, branchTimeZone(settings)).map(m => m.day),
     ].filter(Boolean)
     if (collectDates.length) {
@@ -185,6 +190,7 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
     deposits,
     salaries,
     withdrawals,
+    payouts,
     loanActs,
     branchId,
     settings,
@@ -197,12 +203,12 @@ export const useSummaryReportLogic = (filterState, summaryMode, overrideBranchId
       buildLedger({
         branchId,
         settings,
-        records: { sales, costs, advances, staffLoans, deposits, salaries, withdrawals, loanActivities: loanActs },
+        records: { sales, costs, advances, staffLoans, deposits, salaries, withdrawals, loanActivities: loanActs, payouts },
         from: format(dateRange.from, 'yyyy-MM-dd'),
         to: format(dateRange.to, 'yyyy-MM-dd'),
         carriedIn: source.carriedIn,
       }),
-    [branchId, settings, sales, costs, advances, staffLoans, deposits, salaries, withdrawals, loanActs, dateRange, source.carriedIn]
+    [branchId, settings, sales, costs, advances, staffLoans, deposits, salaries, withdrawals, loanActs, payouts, dateRange, source.carriedIn]
   )
 
   const tenderDefs = ledger.tenders.defs

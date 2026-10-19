@@ -2,6 +2,16 @@
   "_comment": "Composite indexes required by Cash Curry v2 Firestore queries. Deploy with: firebase deploy --only firestore:indexes. Keep this file in sync whenever a query adds a new where+orderBy or multi-field filter combo — Firestore will otherwise return FAILED_PRECONDITION at runtime with a link to auto-create the index.",
   "indexes": [
     {
+      "_usedBy": "lib/payouts/client.js useRecentBills — a branch's approved pay-out bills, newest first (4.10)",
+      "collectionGroup": "payouts",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "kind", "order": "ASCENDING" },
+        { "fieldPath": "status", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "DESCENDING" }
+      ]
+    },
+    {
       "_usedBy": "attendanceApiSlice.kioskPunch — finds latest 'in' punch for a staff on a given day before recording an 'out'",
       "collectionGroup": "attendance",
       "queryScope": "COLLECTION",

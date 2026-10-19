@@ -137,6 +137,7 @@ export const rtk = {
   useGetDepositEntryQuery: branchCollection("deposits"),
   useGetSalaryEntriesQuery: branchCollection("salaries"),
   useGetWithdrawEntriesQuery: branchCollection("cashWithdrawals"),
+  useGetPayoutsQuery: branchCollection("payouts"),
   useGetBranchSettingsQuery: (args) =>
     skipped(args) ? result(undefined) : result(branch(args.branchId)?.settings ?? undefined),
   useGetSingleBranchQuery: (args) =>

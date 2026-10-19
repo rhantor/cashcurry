@@ -102,3 +102,35 @@ describe("money out that is not a cost (4.9)", () => {
     expect(l.closing.bank).toBe(450);
   });
 });
+
+describe("pay-outs and their bills (4.10)", () => {
+  const settings = { financeSales: { openingBalance: 1000, openingBankBalance: 0, tenders: [{ key: "cash" }] } };
+  const run = (payouts, costs = []) =>
+    buildLedger({ branchId: "b", settings, records: { sales: [], costs, advances: [], staffLoans: [], deposits: [], salaries: [], withdrawals: [], loanActivities: [], payouts }, from: "2026-10-10", to: "2026-10-12" });
+  const out = { kind: "out", date: "2026-10-10", amount: 100, status: "open" };
+  const settle = (status) => ({ kind: "settle", date: "2026-10-11", floatAmount: 100, billAmount: 82.5, status });
+  const cashByDay = (l) => l.days.map((d) => round(d.runningCash));
+
+  it("handing out takes it from the till at once", () => {
+    const l = run([out]);
+    expect(cashByDay(l)).toEqual([900, 900, 900]);
+    expect(l.totals.payout).toBe(100);
+  });
+  it("the bill back returns the change that day; not a cost until approved", () => {
+    const l = run([{ ...out, status: "billed" }, settle("pending")]);
+    expect(cashByDay(l)).toEqual([900, 917.5, 917.5]);
+    expect(l.totals.costCash).toBe(0);
+    expect(round(l.totals.payout)).toBe(82.5);
+  });
+  it("approved: the cost carries the bill, the till ends the same, nothing counted twice", () => {
+    const cost = { date: "2026-10-11", amount: 82.5, category: "Cooking gas", costKind: "expense", paidFromOffice: "front", meta: { type: "payout" } };
+    const l = run([{ ...out, status: "billed" }, settle("approved")], [cost]);
+    expect(cashByDay(l)).toEqual([900, 917.5, 917.5]);
+    expect(l.totals.costCash).toBe(82.5);
+    expect(l.totals.payout).toBe(0);
+  });
+  it("a bill bigger than the float: the till pays the rest", () => {
+    const l = run([{ ...out, status: "billed" }, { ...settle("pending"), billAmount: 120 }]);
+    expect(cashByDay(l)).toEqual([900, 880, 880]);
+  });
+});

@@ -102,6 +102,18 @@ service firebase.storage {
       allow delete: if canDelete(companyId, branchId);
     }
 
+    // Pay-out bills (4.10): photos of the bill brought back, each person into
+    // their own folder: payouts/{companyId}/{branchId}/{uid}/{filename}.
+    // Till roles bring them; the branch's office reads them.
+    match /payouts/{companyId}/{branchId}/{uid}/{filename} {
+      allow read: if canAccessBranch(companyId, branchId);
+      allow create: if canAccessBranch(companyId, branchId) && request.auth.uid == uid &&
+        userData().role in ['owner', 'superAdmin', 'superadmin', 'gm', 'branchAdmin', 'branchadmin', 'manager', 'inCharge', 'supervisor', 'cashier'] &&
+        request.resource.size <= 10 * 1024 * 1024 &&
+        (request.resource.contentType.matches('image/.*') || request.resource.contentType == 'application/pdf');
+      allow delete: if canDelete(companyId, branchId);
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Deposit Entry Receipts: deposits/{companyId}/{branchId}/{filename}
     // ─────────────────────────────────────────────────────────────────────────

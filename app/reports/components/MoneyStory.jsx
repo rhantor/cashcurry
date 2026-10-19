@@ -18,6 +18,7 @@ const bothMoves = (t) => [
   { key: "cost", label: "Costs", value: -(t.costCash + t.costBank) },
   { key: "salary", label: "Salaries", value: -(t.salaryCash + t.salaryBank) },
   { key: "advances", label: "Advances & staff loans", value: -(t.advance + t.staffLoanGiven + t.advanceBank + t.staffLoanBank) },
+  { key: "payout", label: "Pay-outs not yet costs", value: -(t.payout || 0) },
 ];
 
 export const VIEW = {

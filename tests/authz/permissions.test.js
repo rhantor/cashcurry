@@ -106,7 +106,7 @@ describe("the menu", () => {
 
   it("each role's menu, at a glance", () => {
     const top = (r) => navFor(r).flatMap((s) => s.items.map((i) => i.label));
-    expect(top("cashier")).toEqual(["Entries", "My Requests", "Issues", "Loans", "Support"]); // chat: its own workspace, from the top bar // Loans: the staff loan tracker, to hand out approved ones
+    expect(top("cashier")).toEqual(["Entries", "Pay-outs", "My Requests", "Issues", "Loans", "Support"]); // chat: its own workspace, from the top bar // Loans: the staff loan tracker, to hand out approved ones
     expect(top("staff")).toEqual([]);
     expect(top("owner")).toContain("Staff Management");
     expect(top("owner")).toContain("Payroll");
@@ -114,5 +114,7 @@ describe("the menu", () => {
     expect(top("supervisor")).not.toContain("Reports");
     expect(top("inCharge")).toContain("Reports");
     expect(top("inCharge")).not.toContain("Payroll");
+    expect(top("inCharge")).toContain("Requested Panel"); // vouchers and bills (4.9, 4.10)
+    expect(top("accountant")).not.toContain("Pay-outs");
   });
 });

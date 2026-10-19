@@ -43,3 +43,18 @@ describe("money flow bridge", () => {
     }
   }
 });
+
+describe("money flow bridge with pay-outs (4.10)", () => {
+  it("still adds up to cash in hand", () => {
+    const l = buildLedger({
+      branchId: "b",
+      settings: { financeSales: { openingBalance: 500, tenders: [{ key: "cash" }] } },
+      records: { sales: [{ date: "2026-10-10", cash: 300 }], costs: [], advances: [], staffLoans: [], deposits: [], salaries: [], withdrawals: [], loanActivities: [],
+        payouts: [{ kind: "out", date: "2026-10-10", amount: 100 }, { kind: "settle", date: "2026-10-11", floatAmount: 100, billAmount: 60, status: "pending" }] },
+      from: "2026-10-10", to: "2026-10-11",
+    });
+    const cash = cashSteps({ broughtForward: l.broughtForward, totals: l.totals, closing: l.closing });
+    expect(round(cash.start.value + sum(cash.steps))).toBe(round(cash.end.value));
+    expect(l.closing.cash).toBe(740);
+  });
+});
