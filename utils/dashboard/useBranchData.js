@@ -12,6 +12,7 @@ import { useGetWithdrawEntriesQuery } from '@/lib/redux/api/cashWithdrawApiSlice
 import { useGetSalaryEntriesQuery } from '@/lib/redux/api/salaryApiSlice'
 import { useGetLoanActivitiesQuery } from '@/lib/redux/api/loanApiSlice'
 import { useGetStaffLoansQuery } from '@/lib/redux/api/staffLoanApiSlice'
+import { useGetPayoutsQuery } from '@/lib/redux/api/payoutsApiSlice'
 import { useGetSingleBranchQuery } from '@/lib/redux/api/branchApiSlice'
 import { useGetBranchSettingsQuery } from '@/lib/redux/api/branchSettingsApiSlice'
 import useResolvedCompanyBranch from '../useResolvedCompanyBranch'
@@ -186,6 +187,9 @@ export default function useBranchData (filter) {
   // Staff loans paid out of the till reduce cash in hand.
   const { data: staffLoans = [], isLoading: staffLoanLoading } =
     useGetStaffLoansQuery(recordArgs)
+  // Pay-outs and their bills move the till (4.10)
+  const { data: payouts = [], isLoading: payoutsLoading } =
+    useGetPayoutsQuery(recordArgs)
 
   /* --------------- the period's records (charts and lists) --------------- */
   const fSales = useMemo(() => sales.filter(s => inPeriod(saleDay(s))), [sales, fromKey, toKey])
@@ -214,12 +218,12 @@ export default function useBranchData (filter) {
       buildLedger({
         branchId,
         settings: branchSettings,
-        records: { sales, costs, advances, staffLoans, deposits, salaries, withdrawals, loanActivities },
+        records: { sales, costs, advances, staffLoans, deposits, salaries, withdrawals, loanActivities, payouts },
         from: fromKey,
         to: toKey,
         carriedIn: source.carriedIn
       }),
-    [branchId, branchSettings, sales, costs, advances, staffLoans, deposits, salaries, withdrawals, loanActivities, fromKey, toKey, source.carriedIn]
+    [branchId, branchSettings, sales, costs, advances, staffLoans, deposits, salaries, withdrawals, loanActivities, payouts, fromKey, toKey, source.carriedIn]
   )
 
   // What one sale adds to total sales and to the bank, by the ledger's rules.
@@ -646,6 +650,7 @@ export default function useBranchData (filter) {
     wdLoading ||
     salLoading ||
     staffLoanLoading ||
+    payoutsLoading ||
     loanLoading
 
   // Expose loan summary for UI/exporters (still useful)

@@ -16,6 +16,7 @@ export const cashMoves = (t) => [
   { key: "cost", label: "Costs paid from the till", value: -t.costCash },
   { key: "salary", label: "Salaries in cash", value: -t.salaryCash },
   { key: "advances", label: "Advances & staff loans", value: -(t.advance + t.staffLoanGiven) },
+  { key: "payout", label: "Pay-outs not yet costs", value: -(t.payout || 0) },
   { key: "deposit", label: "Put into the bank", value: -t.deposit, transfer: true },
 ];
 export const bankMoves = (t) => [

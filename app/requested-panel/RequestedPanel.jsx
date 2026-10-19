@@ -22,6 +22,8 @@ import { shiftsEnabled } from "@/lib/attendance/shifts";
 import { serverTimestamp } from "firebase/firestore";
 import LoanRequests from "./LoanRequests";
 import VoucherInbox, { useWaitingVouchers } from "@/app/components/costs/VoucherInbox";
+import BillInbox from "@/app/components/payouts/BillInbox";
+import { useLivePayouts } from "@/lib/payouts/client";
 import OtRequests from "./OtRequests";
 import { confirmDialog, promptDialog } from "@/app/components/ui/notify";
 import { Button, Skeleton, Tabs } from "@/app/components/ui";
@@ -47,6 +49,7 @@ export default function RequestedPanel() {
   const canVouchers = can(user?.role, "costs.approve");
   const [activeTab, setActiveTab] = useState(canRequests ? "advance" : "vouchers");
   const { vouchers } = useWaitingVouchers(canVouchers ? companyId : null, branchId);
+  const { waiting: bills, loading: billsLoading } = useLivePayouts(canVouchers ? companyId : null, branchId);
 
   // local action states
   const [loanWorkingId, setLoanWorkingId] = useState(null);
@@ -216,7 +219,7 @@ export default function RequestedPanel() {
   };
 
   // The OT tab disappears if shifts get turned off while it's open.
-  const currentTab = activeTab === "ot" && !otTabEnabled ? "advance" : !canRequests ? "vouchers" : activeTab;
+  const currentTab = activeTab === "ot" && !otTabEnabled ? "advance" : !canRequests && !["vouchers", "bills"].includes(activeTab) ? "vouchers" : activeTab;
 
   if (!companyId || !branchId) return <Skeleton className="m-6 h-64" rounded="rounded-2xl" />;
 
@@ -236,7 +239,7 @@ export default function RequestedPanel() {
           tabs={[
             ...(canRequests ? [{ value: "advance", label: tab("Staff requests", waiting.length) }, { value: "loan", label: tab("Branch loans", pendingLoans.length) }] : []),
             ...(canRequests && otTabEnabled ? [{ value: "ot", label: tab("Early OT", pendingOt.length) }] : []),
-            ...(canVouchers ? [{ value: "vouchers", label: tab("Vouchers", vouchers.length) }] : []),
+            ...(canVouchers ? [{ value: "bills", label: tab("Bills", bills.length) }, { value: "vouchers", label: tab("Vouchers", vouchers.length) }] : []),
           ]}
         />
       </div>
@@ -265,6 +268,7 @@ export default function RequestedPanel() {
         />
       )}
       {currentTab === "vouchers" && <VoucherInbox companyId={companyId} branchId={branchId} user={user} />}
+      {currentTab === "bills" && <BillInbox companyId={companyId} branchId={branchId} user={user} bills={bills} loading={billsLoading} />}
       {currentTab === "ot" && (
         <OtRequests
           loading={otLoading}

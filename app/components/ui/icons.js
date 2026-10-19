@@ -12,6 +12,7 @@ import {
 
 export const MENU_ICONS = {
   home: House,
+  payouts: HandCoins, // pay-outs and their bills (4.10)
   MdOutlineSpaceDashboard: LayoutDashboard, // dashboards
   MdShoppingCart: ShoppingCart, // purchases
   GrTransaction: NotebookPen, // entries

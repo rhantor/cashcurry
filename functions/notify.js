@@ -126,6 +126,50 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
     await deliver({ companyId, branchId, uids, type: "purchases.approval", message, link: "/purchases/purchase-orders", ref: `requisitions/${id}` });
   }
 
+  // ── pay-out bills and vouchers (4.9, 4.10) ─────────────────────────────────
+  /** Those who approve at this branch, minus the people involved. */
+  async function approvers(companyId, branchId, b, without = []) {
+    const all = await people(companyId);
+    return N.recipientsFor("costs.approval", { config: b.config, people: N.branchPeople(all, branchId) }).filter((u) => !without.includes(u));
+  }
+
+  /** A pay-out's bill: waiting → approvers; approved / sent back → whoever brought it. */
+  async function onPayout({ companyId, branchId, id, before, after }) {
+    if (!after || after.kind !== "settle") return;
+    const b = await branch(companyId, branchId);
+    const money = (v) => N.formatMoney(v, b.currency);
+    const what = `${after.to?.name || "Someone"} · ${after.category || after.purpose || "a bill"} · ${money(after.billAmount)} of ${money(after.floatAmount)}`;
+    if (after.status === "pending" && before?.status !== "pending") {
+      const uids = await approvers(companyId, branchId, b, [after.by?.uid, after.payoutBy?.uid]);
+      await deliver({ companyId, branchId, uids, type: "costs.approval", message: { title: `Bill to approve · ${b.name}`, body: what }, link: "/requested-panel", ref: `payouts/${id}`, tag: `payout_${id}` });
+    } else if ((after.status === "approved" || after.status === "rejected") && before?.status === "pending" && after.by?.uid) {
+      const by = after.review?.by?.name || "a manager";
+      const message = after.status === "approved"
+        ? { title: "Bill approved", body: `${what} — ${by}` }
+        : { title: "Bill sent back", body: `${what} — ${by}${after.review?.note ? `: “${after.review.note}”` : ""}` };
+      await deliver({ companyId, branchId, uids: [after.by.uid], type: "requests.mine", message, link: "/payouts", ref: `payouts/${id}` });
+    }
+  }
+
+  /** A cost saved with no invoice: its voucher waits → approvers; decided → whoever made it. */
+  async function onCostVoucher({ companyId, branchId, id, before, after }) {
+    const v = after?.voucher;
+    if (!v || after?.meta?.type === "payout") return; // a pay-out's bill was decided with the bill
+    const was = before?.voucher?.status;
+    const b = await branch(companyId, branchId);
+    const what = `${after.category || "A cost"} · ${N.formatMoney(after.amount, b.currency)}${after.paidTo ? ` · ${after.paidTo}` : ""}`;
+    if (v.status === "pending" && was !== "pending") {
+      const uids = await approvers(companyId, branchId, b, [v.by?.uid, after.createdBy?.uid]);
+      await deliver({ companyId, branchId, uids, type: "costs.approval", message: { title: `Voucher to approve · ${b.name}`, body: `${what} — no invoice: ${v.reason || "no reason given"}` }, link: "/requested-panel", ref: `costs/${id}`, tag: `voucher_${id}` });
+    } else if ((v.status === "approved" || v.status === "rejected") && was === "pending" && v.by?.uid) {
+      const by = v.decidedBy?.name || "a manager";
+      const message = v.status === "approved"
+        ? { title: "Voucher approved", body: `${what} — ${by}` }
+        : { title: "Voucher sent back", body: `${what} — ${by}${v.note ? `: “${v.note}”` : ""}` };
+      await deliver({ companyId, branchId, uids: [v.by.uid], type: "requests.mine", message, link: "/reports/cost-report", ref: `costs/${id}` });
+    }
+  }
+
   // ── the daily summary ──────────────────────────────────────────────────────
   /**
    * Once an hour: every branch whose clock has reached its summary time
@@ -293,5 +337,5 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
     });
   }
 
-  return { deliver, onRequest, onPurchaseOrder, dailySummaries, onChatMessage, onUser, onIssue, onIssueComment, onStaffLogin };
+  return { deliver, onRequest, onPurchaseOrder, onPayout, onCostVoucher, dailySummaries, onChatMessage, onUser, onIssue, onIssueComment, onStaffLogin };
 };

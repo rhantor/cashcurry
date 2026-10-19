@@ -73,6 +73,7 @@ vi.mock("@/lib/redux/api/staffLoanApiSlice", rtk);
 vi.mock("@/lib/redux/api/depositApiSlice", rtk);
 vi.mock("@/lib/redux/api/salaryApiSlice", rtk);
 vi.mock("@/lib/redux/api/cashWithdrawApiSlice", rtk);
+vi.mock("@/lib/redux/api/payoutsApiSlice", rtk);
 vi.mock("@/lib/redux/api/branchSettingsApiSlice", rtk);
 vi.mock("@/lib/redux/api/branchApiSlice", rtk);
 vi.mock("@/lib/redux/api/loanApiSlice", rtk);

@@ -28,6 +28,8 @@ const categoryOf = (c) => (c.category || "Uncategorized").trim();
 const filesOf = (c) => (c.attachments?.length ? c.attachments : c.fileURL ? [c.fileURL] : []);
 // Paying a vendor in Purchases writes this cost; it is changed there, so the two never disagree.
 const fromPurchases = (c) => c?.meta?.type === "vendor_payment";
+// A pay-out's approved bill (4.10) is changed from Pay-outs, where the till moved.
+const fromPayout = (c) => c?.meta?.type === "payout";
 
 /**
  * Cost report: costs over a period with the same period bar and figures as
@@ -210,7 +212,7 @@ export default function CostsReport() {
           </>
         )}
         modalContentRenderer={(c, branch, close) => {
-          const locked = fromPurchases(c);
+          const locked = fromPurchases(c) || fromPayout(c);
           return (
             <RecordSheet
               onClose={close}
@@ -220,7 +222,7 @@ export default function CostsReport() {
               amountLabel={categoryLabel(categoryOf(c))}
               tone="out"
               money={money}
-              note={locked ? `Paid to ${c.meta?.vendorName || "a vendor"} from Purchases — change or undo it there.` : c.voucher ? voucherText(c) : undefined}
+              note={fromPurchases(c) ? `Paid to ${c.meta?.vendorName || "a vendor"} from Purchases — change or undo it there.` : fromPayout(c) ? `A pay-out's bill, approved by ${c.approvedBy?.name || "a manager"}${c.voucher ? " (no bill paper)" : ""}.` : c.voucher ? voucherText(c) : undefined}
               rows={[
                 { label: "Group", value: (() => { const k = classify(c, groups); return k.kind === "notCost" ? `${k.group} — not a cost` : k.group; })() },
                 { label: "Paid from", value: paidFrom(c) === "front" ? "Till (cash)" : `Bank · ${METHODS[paidMethod(c)] || "—"}` },
