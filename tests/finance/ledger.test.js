@@ -93,11 +93,11 @@ describe("money out that is not a cost (4.9)", () => {
     const l = run([
       { date: day, amount: 100, category: "Food & ingredients", costKind: "expense", paidFromOffice: "front" },
       { date: day, amount: 300, category: "Owner drawings", costKind: "notCost", paidFromOffice: "front" },
-      { date: day, amount: 50, category: "New Purchases/Assets", paidFromOffice: "back", paidMethod: "card" }, // old record: equipment
+      { date: day, amount: 50, category: "New Purchases/Assets", paidFromOffice: "back", paidMethod: "card" }, // old record: equipment — a cost
     ]);
     expect(l.totals.costCash).toBe(400);
     expect(l.totals.costBank).toBe(50);
-    expect(l.totals.notCost).toBe(350);
+    expect(l.totals.notCost).toBe(300);
     expect(l.closing.cash).toBe(600);
     expect(l.closing.bank).toBe(450);
   });

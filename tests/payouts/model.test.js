@@ -43,11 +43,11 @@ describe("pay-outs", () => {
     expect(approveBill(s, {}, manager).cost.voucher).toMatchObject({ status: "approved", reason: "Market stall", decidedBy: { uid: "m1" } });
     expect(rejectBill("Photo is blurry", manager)).toMatchObject({ status: "rejected", review: { note: "Photo is blurry" } });
   });
-  it("open ones by person, oldest first, late after a day", () => {
+  it("open ones by person, oldest first, late after two days", () => {
     const now = new Date("2026-10-12T12:00:00");
     const rows = openByPerson([
       { kind: "out", status: "open", amount: 50, to: { name: "Ali", staffId: "st1" }, createdAt: new Date("2026-10-12T10:00:00") },
-      { kind: "out", status: "open", amount: 30, to: { name: "Ali", staffId: "st1" }, createdAt: new Date("2026-10-10T10:00:00") },
+      { kind: "out", status: "open", amount: 30, to: { name: "Ali", staffId: "st1" }, createdAt: new Date("2026-10-09T10:00:00") },
       { kind: "out", status: "open", amount: 20, to: { name: "Kumar" }, createdAt: new Date("2026-10-12T11:00:00") },
       { kind: "out", status: "billed", amount: 99, to: { name: "Ali", staffId: "st1" } },
     ], now);

@@ -85,7 +85,7 @@ export default function CostCategories() {
     <div className="space-y-4">
       <Card className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
         <p className="min-w-0 flex-1 text-sm text-muted">
-          Every branch picks from these when entering a cost. Money that leaves but isn&apos;t a cost (drawings, equipment, deposits…) goes in a
+          Every branch picks from these when entering a cost. Money that leaves but isn&apos;t a cost (owner drawings, deposits, loan repayments…) goes in a
           <b className="text-fg"> Not a cost </b>group — it still comes out of the till or bank, but stays out of profit.
           {!saved && <span className="mt-1 block text-xs text-subtle">You&apos;re seeing Cash Curry&apos;s standard list — save to make it yours.</span>}
         </p>
