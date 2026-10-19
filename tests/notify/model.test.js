@@ -88,3 +88,12 @@ describe("the daily summary", () => {
     expect(localHour(new Date("2026-10-18T03:00:00Z"), "Asia/Dhaka")).toBe(9);
   });
 });
+
+describe("bills & vouchers (4.9, 4.10)", () => {
+  it("go by default to everyone who approves them, the GM and super admin too — not the owner unless chosen", async () => {
+    const { NOTIFY_TYPES } = await import("@/lib/notify/model");
+    const t = NOTIFY_TYPES["costs.approval"];
+    for (const r of ["gm", "superAdmin", "branchAdmin", "manager", "inCharge"]) expect(t.defaultFor(r)).toBe(true);
+    for (const r of ["owner", "accountant", "cashier", "supervisor", "staff"]) expect(t.defaultFor(r)).toBe(false);
+  });
+});
