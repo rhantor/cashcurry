@@ -18,13 +18,14 @@ describe("cost categories", () => {
     const g = groupsFrom(null);
     expect(categoryFields(g, "electricity")).toEqual({ categoryId: "electricity", category: "Electricity", costGroupId: "premises", costGroup: "Premises", costKind: "expense" });
     expect(categoryFields(g, "drawings").costKind).toBe("notCost");
+    expect(categoryFields(g, "assets")).toMatchObject({ costGroupId: "running", costKind: "expense" });
     expect(categoryFields(g, "nope")).toBeNull();
   });
 
   it("not a cost: by the saved kind, or for old records by their old name", () => {
     expect(isNotCost({ costKind: "notCost", category: "Owner drawings" })).toBe(true);
-    expect(isNotCost({ costKind: "expense", category: "New Purchases/Assets" })).toBe(false); // the snapshot wins
-    expect(isNotCost({ category: "New Purchases/Assets" })).toBe(true);
+    expect(isNotCost({ costKind: "notCost", category: "Equipment & assets" })).toBe(true); // the snapshot wins
+    expect(isNotCost({ category: "New Purchases/Assets" })).toBe(false); // equipment is a cost (19 Oct)
     expect(isNotCost({ category: "Inventory" })).toBe(false);
     expect(isNotCost({ category: "Some typed thing" })).toBe(false);
     expect(isNotCost({})).toBe(false);

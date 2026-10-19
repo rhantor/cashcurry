@@ -62,7 +62,7 @@ export default function OwnerDashboardPage() {
   const currency = currencies.length === 1 ? currencies[0] : activeBranchCurrency;
   const fmt = (v) => formatMoney(v, currency);
 
-  // Costs here are real costs: owner drawings, equipment, deposits, loan
+  // Costs here are real costs: owner drawings, deposits, loan
   // principal and SST still left the till or bank, but are not expenses (4.9).
   const totalOperatingExpenses = (totalCosts || 0) - (totalNotCost || 0) + (totalSal || 0);
   const netOperatingProfit = (totalSales || 0) - totalOperatingExpenses;
@@ -131,7 +131,7 @@ export default function OwnerDashboardPage() {
         <Section title="Performance" note="Tap a figure to see it by branch">
           <Stagger className="grid grid-cols-2 gap-3 xl:grid-cols-4">
             <StatCard loading={firstLoad} label="Sales" value={totalSales} format={fmt} icon={TrendingUp} tone="brand" hint="All branches" onClick={show("Sales", "sales")} />
-            <StatCard loading={firstLoad} label="Operating expenses" value={totalOperatingExpenses} format={fmt} icon={Receipt} hint={totalNotCost ? `Costs + salaries · ${fmt(totalNotCost)} of drawings, assets… left out` : "Costs + salaries"} onClick={show("Operating expenses", "expenses")} />
+            <StatCard loading={firstLoad} label="Operating expenses" value={totalOperatingExpenses} format={fmt} icon={Receipt} hint={totalNotCost ? `Costs + salaries · ${fmt(totalNotCost)} of drawings, deposits… left out` : "Costs + salaries"} onClick={show("Operating expenses", "expenses")} />
             <StatCard loading={firstLoad} label="Operating profit" value={netOperatingProfit} format={fmt} icon={PiggyBank} tone={netOperatingProfit >= 0 ? "brand" : "neutral"} hint="Sales − expenses" onClick={show("Operating profit", "profit")} />
             <StatCard loading={firstLoad} label="Operating margin" value={Number(operatingMargin)} format={(v) => `${v.toFixed(1)}%`} icon={Percent} hint="Profit as % of sales" />
           </Stagger>
