@@ -166,7 +166,9 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
       const message = v.status === "approved"
         ? { title: "Voucher approved", body: `${what} — ${by}` }
         : { title: "Voucher sent back", body: `${what} — ${by}${v.note ? `: “${v.note}”` : ""}` };
-      await deliver({ companyId, branchId, uids: [v.by.uid], type: "requests.mine", message, link: "/reports/cost-report", ref: `costs/${id}` });
+      // sent back → straight to the voucher on Cost Entry, where it is fixed
+      const link = v.status === "rejected" ? `/entry-data/cost-entry?voucher=${id}` : "/reports/cost-report";
+      await deliver({ companyId, branchId, uids: [v.by.uid], type: "requests.mine", message, link, ref: `costs/${id}` });
     }
   }
 

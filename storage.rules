@@ -52,7 +52,7 @@ service firebase.storage {
       return isAuth() && u.companyId == companyId && (
         isCompanyRole(u) ||
         (u.get('branchId', null) == branchId &&
-          (isBranchAdmin(u) || u.role in ['manager', 'accountant', 'supervisor']))
+          (isBranchAdmin(u) || u.role in ['manager', 'inCharge', 'accountant', 'supervisor']))
       );
     }
 

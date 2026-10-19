@@ -16,6 +16,7 @@ import { categoryFields, findCategory, missingFor } from '@/lib/costs/categories
 import { useCostCategories } from '@/lib/costs/client'
 import { newVoucher } from '@/lib/costs/vouchers'
 import { useGetVendorsQuery } from '@/lib/redux/api/vendorsApiSlice'
+import SentBackVouchers from '@/app/components/costs/SentBackVouchers'
 
 const storedUserNow = () => getSessionUser() || {}
 
@@ -166,6 +167,9 @@ export default function CostEntryPage () {
   }
 
   return (
+    <>
+    {/* vouchers sent back to this person, to fix (4.9) */}
+    <SentBackVouchers companyId={companyId} branchId={branchId} user={storedUserNow()} />
     <CostEntryForm
       form={form}
       groups={groups}
@@ -194,5 +198,6 @@ export default function CostEntryPage () {
         />
       }
     />
+    </>
   )
 }
