@@ -97,3 +97,19 @@ describe("bills & vouchers (4.9, 4.10)", () => {
     for (const r of ["owner", "accountant", "cashier", "supervisor", "staff"]) expect(t.defaultFor(r)).toBe(false);
   });
 });
+
+describe("who may get each kind (canGet)", () => {
+  it("only those who can open what it links to", async () => {
+    const { mayGet, recipientsFor } = await import("@/lib/notify/model");
+    expect(mayGet("costs.approval", "cashier")).toBe(false);
+    expect(mayGet("costs.approval", "inCharge")).toBe(true);
+    expect(mayGet("daily.sales", "cashier")).toBe(false);
+    expect(mayGet("daily.sales", "accountant")).toBe(true);
+    expect(mayGet("requests.payout", "cashier")).toBe(true);
+    expect(mayGet("requests.new", "accountant")).toBe(false);
+    expect(mayGet("nope", "owner")).toBe(false);
+    const people = [{ uid: "c", role: "cashier" }, { uid: "m", role: "manager" }];
+    // a branch had chosen the cashier for bills: they stop getting it; the manager still does
+    expect(recipientsFor("costs.approval", { config: { recipients: { "costs.approval": ["c", "m"] } }, people })).toEqual(["m"]);
+  });
+});

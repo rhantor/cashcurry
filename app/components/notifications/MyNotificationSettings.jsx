@@ -8,7 +8,7 @@ import { doc, getDoc, setDoc } from "firebase/firestore";
 import { ArrowLeft } from "lucide-react";
 import { db } from "@/lib/firebase";
 import useSession from "@/app/hooks/useSession";
-import { NOTIFY_TYPES } from "@/lib/notify/model";
+import { NOTIFY_TYPES, mayGet } from "@/lib/notify/model";
 import { Switch, toast } from "@/app/components/ui";
 
 const MINE = {
@@ -30,7 +30,8 @@ export default function MyNotificationSettings({ onBack }) {
   }, [path]);
 
   const staff = user?.role === "staff";
-  const kinds = staff ? MINE : { ...MINE, ...NOTIFY_TYPES };
+  // only the kinds this person can get at all (lib/notify/model.js canGet)
+  const kinds = staff ? MINE : { ...MINE, ...Object.fromEntries(Object.entries(NOTIFY_TYPES).filter(([t]) => mayGet(t, user?.role))) };
 
   const toggle = async (type, on) => {
     const next = on ? muted.filter((t) => t !== type) : [...new Set([...muted, type])];

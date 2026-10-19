@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from "react";
 import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc } from "firebase/firestore";
 import { Check, RotateCcw, Save } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { NOTIFY_TYPES, DEFAULT_DAILY_AT, branchPeople, recipientsFor } from "@/lib/notify/model";
+import { NOTIFY_TYPES, DEFAULT_DAILY_AT, branchPeople, mayGet, recipientsFor } from "@/lib/notify/model";
 import { personName } from "@/lib/people";
 import { roleLabel } from "@/lib/authz/permissions";
 import { Avatar, Badge, Button, Card, Field, Select, Skeleton, cn, toast } from "@/app/components/ui";
@@ -113,7 +113,7 @@ export default function NotificationsSection({ companyId, branchId }) {
               )}
             </div>
             <div className="flex flex-wrap gap-2">
-              {people.map((p) => {
+              {people.filter((p) => mayGet(type, p.role)).map((p) => {
                 const on = chosen[type].includes(p.uid);
                 return (
                   <button
