@@ -260,6 +260,16 @@ service cloud.firestore {
     function canReportsView(c, b)     { return may(c, b, leadRoles().concat(['inCharge', 'accountant'])); }
     function canSalesEnter(c, b)      { return may(c, b, officeBranchRoles()); }
     function canCostsEnter(c, b)      { return may(c, b, leadRoles().concat(['inCharge', 'accountant'])); }
+    function canCostsApprove(c, b)    { return may(c, b, leadRoles().concat(['inCharge'])); }
+    // a cost's voucher moving to approved / rejected in this write
+    function voucherDecided() {
+      let before = resource.data.get('voucher', {}).get('status', '');
+      let after = request.resource.data.get('voucher', {}).get('status', '');
+      return after != before && (after == 'approved' || after == 'rejected');
+    }
+    function voucherMaker() {
+      return resource.data.get('voucher', {}).get('by', {}).get('uid', resource.data.get('createdBy', {}).get('uid', ''));
+    }
     function canCashBank(c, b)        { return may(c, b, leadRoles().concat(['accountant'])); }
     function canSalariesEnter(c, b)   { return may(c, b, leadRoles().concat(['accountant'])); }
     function canAdvancesRequest(c, b) { return may(c, b, officeBranchRoles()); }
@@ -555,6 +565,14 @@ service cloud.firestore {
       }
 
       // ── Vendors ────────────────────────────────────────────────────────────
+      // Company-wide settings. costCategories (roadmap 4.9, lib/costs/categories.js):
+      // the cost groups and categories everyone picks from, kept by owner,
+      // super admin and gm ("categories.manage").
+      match /settings/{docId} {
+        allow read: if belongsToCompany(companyId);
+        allow write: if docId == 'costCategories' && mayInCompany(companyId, []);
+      }
+
       match /vendors/{vendorId} {
         allow read: if canCatalogView(companyId);
         allow write: if canCatalogManage(companyId);
@@ -665,7 +683,15 @@ service cloud.firestore {
 
         // ── Costs / Expenses ────────────────────────────────────────────────
         match /costs/{docId} {
-          allow read, create, update: if canCostsEnter(companyId, branchId);
+          allow read: if canCostsEnter(companyId, branchId);
+          // a new cost's voucher can only start out waiting
+          allow create: if canCostsEnter(companyId, branchId) &&
+            request.resource.data.get('voucher', {}).get('status', 'pending') == 'pending';
+          // A voucher (a cost with no invoice, 4.9) is decided by branch admin,
+          // manager or in-charge (and the company roles) — never by whoever made it.
+          allow update: if canCostsEnter(companyId, branchId) && (
+            !voucherDecided() || (canCostsApprove(companyId, branchId) && voucherMaker() != request.auth.uid)
+          );
           allow delete: if canRecordsDelete(companyId, branchId);
         }
 

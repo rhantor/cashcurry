@@ -8,11 +8,13 @@ import { useUpdateCostEntryMutation } from "@/lib/redux/api/costApiSlice";
 import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
 import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/lib/region/currency";
-import { Button, DatePicker, Field, Input, Sheet, Textarea, toast } from "@/app/components/ui";
+import { Button, DatePicker, Field, Select, Sheet, Textarea, toast } from "@/app/components/ui";
 import MoneyInput from "@/app/components/entry/MoneyInput";
 import ProofUpload from "@/app/components/entry/ProofUpload";
 import { Chip, PaidFromChoice } from "@/app/components/entry/Choices";
-import { CATEGORIES, BACK_OFFICE_METHODS, categoryLabel } from "@/app/entry-data/cost-entry/logic/constants";
+import { BACK_OFFICE_METHODS, categoryLabel } from "@/app/entry-data/cost-entry/logic/constants";
+import { categoryFields, findCategory, pickable } from "@/lib/costs/categories";
+import { useCostCategories } from "@/lib/costs/client";
 
 const SHRINK = { maxMB: 0.5, maxSide: 1024 };
 const toDay = (v) => {
@@ -32,11 +34,13 @@ export default function EditCostModal({ cost, onClose, onSuccess }) {
   const { companyId, branchId } = useResolvedCompanyBranch();
   const [updateCostEntry, { isLoading: isUpdating }] = useUpdateCostEntryMutation();
 
-  const known = CATEGORIES.includes(cost?.category);
+  // What for (4.9): a category from the company's list; a record saved
+  // before keeps its old name unless someone picks a new one.
+  const { groups } = useCostCategories(companyId);
+  const KEEP = "__keep";
   const [date, setDate] = useState(() => toDay(cost?.date));
   const [amount, setAmount] = useState(cost?.amount != null ? String(cost.amount) : "");
-  const [category, setCategory] = useState(cost?.category ? (known ? cost.category : "Other") : "");
-  const [customCategory, setCustomCategory] = useState(cost?.category && !known ? cost.category : "");
+  const [category, setCategory] = useState(cost?.categoryId || (cost?.category ? KEEP : ""));
   const [description, setDescription] = useState(cost?.description || "");
   const [paidFromOffice, setPaidFromOffice] = useState(cost?.paidFromOffice || "front");
   const [paidMethod, setPaidMethod] = useState(cost?.paidMethod || "cash");
@@ -54,7 +58,7 @@ export default function EditCostModal({ cost, onClose, onSuccess }) {
   const [receiptRemoved, setReceiptRemoved] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const resolvedCategory = useMemo(() => (category === "Other" ? (customCategory || "Other").trim() : category), [category, customCategory]);
+  const resolvedCategory = useMemo(() => (category === KEEP ? cost?.category || "" : findCategory(groups, category)?.category.name || ""), [category, groups, cost?.category]);
 
   const setOffice = (o) => {
     setPaidFromOffice(o);
@@ -78,7 +82,6 @@ export default function EditCostModal({ cost, onClose, onSuccess }) {
   const handleSave = async () => {
     if (!(Number(amount) > 0)) return toast.warning("Enter the amount");
     if (!resolvedCategory) return toast.warning("Pick what this cost was for");
-    if (category === "Other" && !customCategory.trim()) return toast.warning("Give the category a name");
     if (paidFromOffice === "back" && !paidMethod) return toast.warning("Pick how it was paid");
     setBusy(true);
     try {
@@ -117,7 +120,7 @@ export default function EditCostModal({ cost, onClose, onSuccess }) {
       const data = {
         date,
         amount: Number(amount),
-        category: resolvedCategory,
+        ...(category === KEEP ? {} : categoryFields(groups, category)),
         description: description?.trim() || "",
         fileURL: fileURL || null,
         receiptURL: receiptURL || null,
@@ -183,19 +186,21 @@ export default function EditCostModal({ cost, onClose, onSuccess }) {
         )}
       </AnimatePresence>
 
-      <p className="mb-2 mt-5 text-xs font-semibold text-muted">What for</p>
-      <div className="flex flex-wrap gap-2">
-        {CATEGORIES.map((c) => (
-          <Chip key={c} on={category === c} onClick={() => setCategory(c)}>
-            {categoryLabel(c)}
-          </Chip>
-        ))}
-      </div>
-      {category === "Other" && (
-        <Field label="Name the category" className="mt-3">
-          {({ id }) => <Input id={id} size="lg" value={customCategory} onChange={(e) => setCustomCategory(e.target.value)} placeholder="e.g. Pest control" />}
-        </Field>
-      )}
+      <Field label="What for" className="mt-5">
+        {({ id }) => (
+          <Select id={id} value={category} onChange={(e) => setCategory(e.target.value)} className="h-12">
+            {!category && <option value="">Choose…</option>}
+            {cost?.category && !cost?.categoryId && <option value={KEEP}>{categoryLabel(cost.category)} (as saved)</option>}
+            {pickable(groups).map((g) => (
+              <optgroup key={g.id} label={g.kind === "notCost" ? `${g.name} — not a cost` : g.name}>
+                {g.categories.map((c) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </optgroup>
+            ))}
+          </Select>
+        )}
+      </Field>
 
       <Field label="Note" className="mt-5">
         {({ id }) => <Textarea id={id} rows={3} value={description} onChange={(e) => setDescription(e.target.value)} />}

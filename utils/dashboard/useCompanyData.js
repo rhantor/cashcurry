@@ -280,7 +280,7 @@ export default function useCompanyData(filter) {
   }, [ledgers]);
 
   const totals = useMemo(() => {
-    const sumOf = (k) => ledgers.reduce((s, l) => s + l.totals[k], 0);
+    const sumOf = (k) => ledgers.reduce((s, l) => s + (l.totals[k] || 0), 0);
     let backCard = 0, backQR = 0, backOnline = 0, backBank = 0;
     fCosts.forEach((c) => {
       if (isCashCost(c)) return;
@@ -303,6 +303,8 @@ export default function useCompanyData(filter) {
       totalWdr: sumOf("withdrawal"),
       totalDep: sumOf("deposit"),
       totalCosts: sumOf("costCash") + sumOf("costBank"),
+      // part of totalCosts that is not a cost (drawings, assets…) — out of profit (4.9)
+      totalNotCost: sumOf("notCost"),
       totalCostsFront: sumOf("costCash"),
       totalCostsBack: sumOf("costBank"),
       backCard,
@@ -710,6 +712,7 @@ export default function useCompanyData(filter) {
       name: branchesList.find((b) => b.id === l.branchId)?.name || l.branchId,
       sales: t.totalSales,
       costs: t.costCash + t.costBank,
+      notCost: t.notCost || 0,
       salaries: t.salaryCash + t.salaryBank,
       advances: t.advance + t.advanceBank,
       staffLoans: t.staffLoanGiven,

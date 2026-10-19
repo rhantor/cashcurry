@@ -12,9 +12,17 @@ import { RecentEntries } from '@/app/components/entry/EntryLayout'
 import { useGetCostEntriesQuery } from '@/lib/redux/api/costApiSlice'
 import useCurrency from '@/app/hooks/useCurrency'
 import { formatMoney } from '@/lib/region/currency'
+import { categoryFields, findCategory, missingFor } from '@/lib/costs/categories'
+import { useCostCategories } from '@/lib/costs/client'
+import { newVoucher } from '@/lib/costs/vouchers'
+import { useGetVendorsQuery } from '@/lib/redux/api/vendorsApiSlice'
+
+const storedUserNow = () => getSessionUser() || {}
 
 export default function CostEntryPage () {
   const form = useCostEntryForm()
+  const { groups } = useCostCategories(form.companyId)
+  const { data: vendors = [] } = useGetVendorsQuery({ companyId: form.companyId }, { skip: !form.companyId })
   const currency = useCurrency()
   const money = v => formatMoney(v, currency)
   const [errors, setErrors] = useState({})
@@ -25,8 +33,12 @@ export default function CostEntryPage () {
     branchId,
     amount,
     category,
-    customCategory,
-    resolvedCategory,
+    vendorId,
+    paidTo,
+    billMonth,
+    billRef,
+    noInvoice,
+    voucherReason,
     paidFromOffice,
     paidMethod,
     description,
@@ -42,7 +54,13 @@ export default function CostEntryPage () {
   // a highlighted field calms down as soon as it is filled in
   useEffect(() => setErrors(e => (e.amount && Number(amount) > 0 ? { ...e, amount: undefined } : e)), [amount])
   useEffect(() => setErrors(e => (e.category && category ? { ...e, category: undefined } : e)), [category])
-  useEffect(() => setErrors(e => (e.custom && customCategory.trim() ? { ...e, custom: undefined } : e)), [customCategory])
+  useEffect(() => setErrors(e => (e.paidTo && (vendorId || paidTo.trim()) ? { ...e, paidTo: undefined } : e)), [vendorId, paidTo])
+  useEffect(() => setErrors(e => (e.billFor && billMonth ? { ...e, billFor: undefined } : e)), [billMonth])
+  useEffect(() => setErrors(e => (e.invoice && (file || noInvoice) ? { ...e, invoice: undefined } : e)), [file, noInvoice])
+  useEffect(() => setErrors(e => (e.voucher && voucherReason.trim() ? { ...e, voucher: undefined } : e)), [voucherReason])
+
+  const picked = findCategory(groups, category)
+  const resolvedCategory = picked?.category.name || ''
   useEffect(() => setErrors(e => (e.method && paidMethod ? { ...e, method: undefined } : e)), [paidMethod])
 
   // this month's costs, for the list under the form
@@ -66,8 +84,11 @@ export default function CostEntryPage () {
     const amt = Number(amount)
     const problems = {}
     if (!Number.isFinite(amt) || amt <= 0) problems.amount = 'Enter the amount'
-    if (!category) problems.category = 'Pick what this cost was for'
-    else if (category === 'Other' && !customCategory.trim()) problems.custom = 'Give the category a name'
+    if (!picked) problems.category = 'Pick what this cost was for'
+    else Object.assign(problems, missingFor(picked.category, { vendorId, paidTo, billMonth }))
+    // every cost has its invoice — or a voucher saying why not (4.9)
+    if (!file && !noInvoice) problems.invoice = 'Attach the invoice, or say there is none'
+    if (!file && noInvoice && !voucherReason.trim()) problems.voucher = 'Say why there is no invoice'
     if (paidFromOffice === 'back' && !paidMethod) problems.method = 'Pick how it was paid'
     setErrors(problems)
     if (Object.keys(problems).length) return toast.error('Check the highlighted fields')
@@ -103,10 +124,15 @@ export default function CostEntryPage () {
       const storedUser = getSessionUser()
       const createdBy = storedUser ? storedUser : {}
 
+      const vendor = vendors.find(v => v.id === vendorId)
       const data = {
         date, // YYYY-MM-DD
         amount: amt,
-        category: resolvedCategory,
+        // category, its group and whether it counts as a cost — a snapshot (lib/costs/categories.js)
+        ...categoryFields(groups, category),
+        ...(vendor ? { vendorId: vendor.id, paidTo: vendor.name || vendor.vendorName || '' } : paidTo.trim() ? { paidTo: paidTo.trim() } : {}),
+        ...(billMonth ? { billMonth, billRef: billRef.trim() } : {}),
+        ...(!file && noInvoice ? { voucher: newVoucher(storedUserNow(), voucherReason) } : {}),
         description: description?.trim() || '',
         fileURL: fileURL || null,
         receiptURL: receiptURL || null,
@@ -142,6 +168,8 @@ export default function CostEntryPage () {
   return (
     <CostEntryForm
       form={form}
+      groups={groups}
+      vendors={vendors}
       onSave={handleSave}
       errors={errors}
       saved={saved}
@@ -159,7 +187,7 @@ export default function CostEntryPage () {
               date: c.date,
               amount: c.amount,
               proof: !!link,
-              note: `${c.category || 'Cost'} · ${c.paidFromOffice === 'back' ? 'bank' : 'till'}`,
+              note: `${c.category || 'Cost'} · ${c.paidFromOffice === 'back' ? 'bank' : 'till'}${c.voucher ? ' · voucher' : ''}`,
               onOpen: link ? () => window.open(link, '_blank', 'noopener') : undefined
             }
           })}

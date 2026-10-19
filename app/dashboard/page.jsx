@@ -45,6 +45,7 @@ export default function DashboardPage() {
     effectiveBankedAfterWithdrawals,
     estCashOnHand,
     totalCosts,
+    totalNotCost,
     totalCostsFront,
     totalCostsBack,
     totalSal,
@@ -78,7 +79,7 @@ export default function DashboardPage() {
           <StatCard loading={firstLoad} label="Total sales" value={totalSales} format={fmt} icon={TrendingUp} tone="brand" hint="All payment types" />
           <StatCard loading={firstLoad} label="Cash in hand" value={estCashOnHand} format={fmt} icon={Wallet} tone="brand" hint="Opening + cash in − cash out" />
           <StatCard loading={firstLoad} label="Bank (expected)" value={effectiveBankedAfterWithdrawals} format={fmt} icon={Landmark} tone="info" hint={bankedTenderLabelList || "Card · QR · online"} />
-          <StatCard loading={firstLoad} label="Total costs" value={totalCosts} format={fmt} icon={Receipt} tone="neutral" hint="Front + back office" />
+          <StatCard loading={firstLoad} label="Total costs" value={totalCosts} format={fmt} icon={Receipt} tone="neutral" hint={totalNotCost ? `Till + bank · incl. ${fmt(totalNotCost)} not a cost` : "Front + back office"} />
         </Stagger>
 
         {/* ── The rest: a swipeable row on phones, a grid on computers ── */}

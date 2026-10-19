@@ -404,3 +404,31 @@ describe("everyday work keeps working", () => {
     await assertSucceeds(as("klAdmin").doc(`${B()}/pos/main/menu/m1`).update({ name: "Nasi Lemak" }));
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+describe("costs: categories and vouchers (4.9)", () => {
+  const V = (extra = {}) => ({ date: "2026-10-10", amount: 20, category: "Food & ingredients", createdBy: { uid: "klCashier" }, voucher: { status: "pending", reason: "Market stall", by: { uid: "klManager" } }, ...extra });
+  it("a new cost's voucher starts out waiting — nobody saves one already approved", async () => {
+    await assertSucceeds(as("klManager").doc(`${B()}/costs/new1`).set(V()));
+    await assertFails(as("klManager").doc(`${B()}/costs/new2`).set(V({ voucher: { status: "approved", by: { uid: "klManager" } } })));
+    await assertSucceeds(as("klAccountant").doc(`${B()}/costs/plain`).set({ date: "2026-10-10", amount: 5, category: "Office supplies" }));
+  });
+  it("nobody approves their own voucher; a colleague in charge can", async () => {
+    await env.withSecurityRulesDisabled((ctx) => ctx.firestore().doc(`${B()}/costs/mine`).set(V()));
+    await assertFails(as("klManager").doc(`${B()}/costs/mine`).update({ "voucher.status": "approved" }));
+    await assertSucceeds(as("klAdmin").doc(`${B()}/costs/mine`).update({ "voucher.status": "approved" }));
+  });
+  it("the bookkeeper enters costs but doesn't approve vouchers", async () => {
+    await env.withSecurityRulesDisabled((ctx) => ctx.firestore().doc(`${B()}/costs/w`).set(V()));
+    await assertFails(as("klAccountant").doc(`${B()}/costs/w`).update({ "voucher.status": "rejected", "voucher.note": "no" }));
+    await assertSucceeds(as("klAccountant").doc(`${B()}/costs/w`).update({ description: "fixed a typo" }));
+  });
+  it("the cost categories are kept by owner, super admin and gm; everyone in the company reads them", async () => {
+    const doc = `companies/${CO}/settings/costCategories`;
+    await assertSucceeds(as("gm").doc(doc).set({ groups: [] }));
+    await assertFails(as("klAdmin").doc(doc).set({ groups: [] }));
+    await assertSucceeds(as("klCashier").doc(doc).get());
+    await assertFails(as("outsider").doc(doc).get());
+    await assertFails(as("owner").doc(`companies/${CO}/settings/other`).set({ x: 1 }));
+  });
+});
