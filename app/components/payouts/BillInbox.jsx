@@ -93,41 +93,41 @@ export default function BillInbox({ companyId, branchId, user, bills, loading })
         {[...bills].sort((a, b) => String(a.date).localeCompare(String(b.date))).map((b) => {
           const mine = !canReviewBill(user, b, can);
           return (
-            <li key={b.id} className="rounded-2xl border border-line bg-surface p-4">
-              <div className="flex flex-wrap items-start gap-4">
-                <div className="flex gap-2">
+            <li key={b.id} className="overflow-hidden rounded-2xl border border-line bg-surface">
+              <div className="flex gap-4 p-4">
+                <div className="flex shrink-0 flex-col gap-2">
                   {(b.attachments || []).slice(0, 2).map((u) => (
-                    <a key={u} href={u} target="_blank" rel="noreferrer" className="size-20 overflow-hidden rounded-xl border border-line">
+                    <a key={u} href={u} target="_blank" rel="noreferrer" className="block size-20 overflow-hidden rounded-xl border border-line">
                       <img src={u} alt="Bill" className="size-full object-cover" />
                     </a>
                   ))}
                   {!b.attachments?.length && (
-                    <span className="flex size-20 items-center justify-center rounded-xl bg-warning-soft text-center text-[11px] font-semibold text-warning">No bill<br />paper</span>
+                    <span className="flex size-20 items-center justify-center rounded-xl bg-warning-soft text-center text-[11px] font-semibold leading-tight text-warning">No bill<br />paper</span>
                   )}
                 </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <p className="text-base font-semibold text-fg">{money(b.billAmount)}</p>
+                <div className="min-w-0 flex-1 space-y-1.5">
+                  <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                    <p className="text-lg font-semibold leading-none text-fg">{money(b.billAmount)}</p>
                     <span className="text-xs text-muted">of {money(b.floatAmount)} given</span>
                     {b.costKind === "notCost" && <Badge tone="neutral">Not a cost</Badge>}
                   </div>
-                  <p className="text-sm text-fg">{b.category || "—"}{b.purpose && b.purpose !== b.category ? ` · ${b.purpose}` : ""}</p>
+                  <p className="text-sm font-medium text-fg">{b.category || "—"}{b.purpose && b.purpose !== b.category ? ` · ${b.purpose}` : ""}</p>
                   <p className="text-xs text-muted">{day(b.date)} · {b.to?.name || "—"} · brought by {b.by?.name || "someone"}</p>
-                  <p className="mt-1 text-xs font-medium text-muted">{changeText(b.floatAmount, b.billAmount, money)}</p>
-                  {b.voucherReason && <p className="mt-2 rounded-xl bg-surface-2 px-3 py-2 text-sm">&ldquo;{b.voucherReason}&rdquo;</p>}
-                  {b.note && <p className="mt-1 text-xs text-muted">{b.note}</p>}
+                  <p className="inline-flex rounded-lg bg-brand-soft px-2 py-1 text-xs font-medium text-brand">{changeText(b.floatAmount, b.billAmount, money)}</p>
+                  {b.voucherReason && <p className="rounded-xl bg-surface-2 px-3 py-2 text-sm text-fg">&ldquo;{b.voucherReason}&rdquo;</p>}
+                  {b.note && <p className="text-xs text-muted">{b.note}</p>}
                 </div>
-                <div className="flex w-full gap-2 sm:w-auto sm:flex-col">
-                  {mine ? (
-                    <p className="text-xs text-subtle">You handed it out or brought it — someone else approves it.</p>
-                  ) : (
-                    <>
-                      <Button size="sm" icon={Check} loading={busy === b.id} onClick={() => approve(b)} className="flex-1">Approve</Button>
-                      <Button size="sm" variant="secondary" icon={PencilLine} disabled={busy === b.id} onClick={() => setCorrecting(b)} className="flex-1">Correct</Button>
-                      <Button size="sm" variant="ghost" icon={Undo2} disabled={busy === b.id} onClick={() => back(b)} className="flex-1">Send back</Button>
-                    </>
-                  )}
-                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 border-t border-line bg-surface-2/40 px-4 py-3">
+                {mine ? (
+                  <p className="text-xs text-subtle">You handed it out or brought it — someone else approves it.</p>
+                ) : (
+                  <>
+                    <Button size="sm" icon={Check} loading={busy === b.id} onClick={() => approve(b)} className="min-w-28 flex-1 sm:flex-none">Approve</Button>
+                    <Button size="sm" variant="secondary" icon={PencilLine} disabled={busy === b.id} onClick={() => setCorrecting(b)} className="min-w-28 flex-1 sm:flex-none">Correct</Button>
+                    <Button size="sm" variant="ghost" icon={Undo2} disabled={busy === b.id} onClick={() => back(b)} className="flex-1 sm:ml-auto sm:flex-none">Send back</Button>
+                  </>
+                )}
               </div>
             </li>
           );
