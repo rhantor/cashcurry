@@ -3,7 +3,7 @@ import { format, parseISO } from "date-fns";
 import { Landmark, Paperclip } from "lucide-react";
 import ReportPage from "@/app/components/common/ReportPage";
 import useReportData from "@/app/hooks/useReportData";
-import { exportDepositsToExcel, exportDepositsToPDF, exportDepositToExcel, exportDepositToPDF, shareDeposit } from "@/utils/export/exportDepositData";
+import { exportDepositsToExcel, exportDepositsToPDF, exportDepositToExcel, exportDepositToPDF, shareDeposit } from "@/app/export/exportDepositData";
 import { useGetDepositEntryQuery } from "@/lib/redux/api/depositApiSlice";
 import RecordSheet from "@/app/components/entry/RecordSheet";
 import { COLOR, ChartCard, RankedBars } from "@/app/components/dashboard/charts/kit";

@@ -15,6 +15,7 @@
 
 # next.js
 /.next/
+/.next-check/
 /out/
 
 # production
@@ -72,3 +73,6 @@ functions/node_modules/
 
 # emulator crash dumps (local data — never commit)
 firebase-export-*/
+
+# this computer's own Claude Code settings
+.claude/settings.local.json

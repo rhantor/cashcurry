@@ -1,7 +1,7 @@
 "use client";
 import { useMemo, useState, useRef } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
-import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
+import useResolvedCompanyBranch from "@/app/hooks/useResolvedCompanyBranch";
 import { useGetItemsQuery, useAddItemMutation, useUpdateItemMutation, useRetireItemMutation, useRestoreItemMutation, useAddItemToBranchMutation, useRemoveItemFromBranchMutation, useAddMultipleItemsMutation, itemKey, itemInBranch } from "@/lib/redux/api/itemsApiSlice";
 import { useGetVendorsQuery } from "@/lib/redux/api/vendorsApiSlice";
 import { useGetBranchesBasicQuery } from "@/lib/redux/api/branchApiSlice";

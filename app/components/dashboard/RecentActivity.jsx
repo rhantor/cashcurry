@@ -6,7 +6,7 @@ import { ArrowDownToLine, ArrowUpFromLine, ChevronRight, HandCoins, Inbox, Landm
 import { Card, EmptyState, Stagger, Tabs, cn } from "@/app/components/ui";
 import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/lib/region/currency";
-import { toDate } from "@/utils/dashboard/utils";
+import { toDate } from "@/app/hooks/dashboard/utils";
 
 // How each kind of record looks, and where its report is.
 const KINDS = {

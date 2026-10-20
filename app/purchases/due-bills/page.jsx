@@ -7,7 +7,7 @@ import { skipToken } from '@reduxjs/toolkit/query'
 import { useRouter } from 'next/navigation'
 import { Edit3, AlertCircle, Trash2, Eye, Paperclip, ChevronRight, PartyPopper } from 'lucide-react'
 
-import useResolvedCompanyBranch from '@/utils/useResolvedCompanyBranch'
+import useResolvedCompanyBranch from '@/app/hooks/useResolvedCompanyBranch'
 import { useGetSingleBranchQuery } from '@/lib/redux/api/branchApiSlice'
 import {
   useGetVendorBillsQuery,
@@ -15,7 +15,7 @@ import {
   useDeleteVendorBillMutation
 } from '@/lib/redux/api/vendorBillsApiSlice'
 import { useGetVendorsQuery } from '@/lib/redux/api/vendorsApiSlice'
-import { payVendorBills } from '@/utils/payVendorBills'
+import { payVendorBills } from '@/lib/purchases/payVendorBills'
 // components
 import DueBillsHeader from './components/DueBillsHeader'
 import { makeDueBillsExports } from './exportDueBills'
@@ -25,7 +25,7 @@ import DueBillsFilters from './components/DueBillsFilters'
 import ViewBillModal from './components/ViewBillModal'
 import ExportBillsModal from './components/ExportBillsModal'
 import PayBillsModal from '@/app/components/purchases/PayBillsModal'
-import { uploadInvoiceFile } from "../../../utils/storage/uploadInvoice"
+import { uploadInvoiceFile } from "@/lib/storage/uploadInvoice"
 import useCurrency from '@/app/hooks/useCurrency'
 import { toast, confirmDialog } from "@/app/components/ui/notify";
 import { Badge, DataTable } from '@/app/components/ui'

@@ -2,7 +2,7 @@
 import React, { useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronDown, Printer } from 'lucide-react'
-import { calcPayroll } from '@/utils/payrollCalculations'
+import { calcPayroll } from '@/lib/payroll/calculations'
 import { Input, cn } from '@/app/components/ui'
 
 /** A number box with a small label above it. */

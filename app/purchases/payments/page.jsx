@@ -3,7 +3,7 @@ import React, { useMemo, useState } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { format, parseISO } from "date-fns";
 import { Building2, Landmark, ReceiptText, RefreshCw, Wallet, X } from "lucide-react";
-import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
+import useResolvedCompanyBranch from "@/app/hooks/useResolvedCompanyBranch";
 import { useGetVendorPaymentsQuery } from "@/lib/redux/api/vendorPaymentsApiSlice";
 import { useGetVendorsQuery } from "@/lib/redux/api/vendorsApiSlice";
 import PaymentDetailsModal from "@/app/components/purchases/PaymentDetailsModal";

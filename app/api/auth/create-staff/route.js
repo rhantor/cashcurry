@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import admin from "firebase-admin";
 import { adminAuth, adminDb } from "@/lib/server/firebaseAdmin";
 import { staffManager, staffRecord, writeStaffLogins } from "@/lib/server/staffAccess";
-import { isPin, randomPin } from "@/lib/staffLogin";
+import { isPin, randomPin } from "@/lib/staff/login";
 
 // Creates a staff member's login and links it to their staff record
 // (docs/STAFF_APP.md). They log in with their phone or IC number and a

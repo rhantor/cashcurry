@@ -5,7 +5,7 @@ import { parseISO, format, isValid } from "date-fns";
 import { storage } from "@/lib/firebase";
 import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { useUpdateCostEntryMutation } from "@/lib/redux/api/costApiSlice";
-import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
+import useResolvedCompanyBranch from "@/app/hooks/useResolvedCompanyBranch";
 import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/lib/region/currency";
 import { Button, DatePicker, Field, Select, Sheet, Textarea, toast } from "@/app/components/ui";

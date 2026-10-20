@@ -1,6 +1,6 @@
 "use client";
 
-import { looksLikeStaffId } from "@/lib/staffLogin";
+import { looksLikeStaffId } from "@/lib/staff/login";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";

@@ -6,7 +6,7 @@ import { format } from "date-fns";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useGetBranchesBasicQuery } from "@/lib/redux/api/branchApiSlice";
-import { useSummaryReportLogic } from "@/hook/useSummaryReportLogic";
+import { useSummaryReportLogic } from "@/app/hooks/useSummaryReportLogic";
 import useCurrency from "@/app/hooks/useCurrency";
 import { 
   useGetCompanyDeductionsQuery, 

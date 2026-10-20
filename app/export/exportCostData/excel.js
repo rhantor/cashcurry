@@ -1,6 +1,6 @@
 // exportCostData: the excel part (moved from exportCostData.js unchanged).
  
-// /utils/export/exportCostData.js
+// app/export/exportCostData.js
 import * as XLSX from "xlsx";
 import { format } from "date-fns";
 import { toast } from "@/app/components/ui/notify";

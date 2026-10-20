@@ -7,7 +7,7 @@ import { ChevronLeft, ChevronRight, Download, Trophy } from "lucide-react";
 import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/lib/region/currency";
 import { useBusinessToday } from "@/app/hooks/useRegion";
-import { useSummaryReportLogic } from "@/hook/useSummaryReportLogic";
+import { useSummaryReportLogic } from "@/app/hooks/useSummaryReportLogic";
 import { COLOR, ChartCard, Legend, TimeChart } from "@/app/components/dashboard/charts/kit";
 import { Button, Card, CountUp, Skeleton, Tabs, cn, toast } from "@/app/components/ui";
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calcPayroll } from "@/utils/payrollCalculations";
+import { calcPayroll } from "@/lib/payroll/calculations";
 import { allocateTaken, applyRepayment } from "@/lib/payroll/repayments";
 
 const staff = { basicSalary: 1000, salaryMode: "days", workingDays: 26 };

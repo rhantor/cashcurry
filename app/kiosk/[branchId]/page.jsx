@@ -9,7 +9,7 @@ import {
 } from "@/lib/redux/api/attendanceApiSlice";
 import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
 import { Clock, LogIn, LogOut, Camera, Lock, ChevronLeft, Fingerprint, Loader2 } from "lucide-react";
-import { verifyBiometric } from "@/lib/biometricUtils";
+import { verifyBiometric } from "@/lib/attendance/biometric";
 import { getAttendanceDate, todayLocalStr } from "@/lib/attendance/computeHours";
 import { otRequestId, resolveStaffShift, shiftRules, shiftWindow } from "@/lib/attendance/shifts";
 import { getSessionUser } from "@/lib/session";

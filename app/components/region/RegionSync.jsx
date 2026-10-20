@@ -2,7 +2,7 @@
 // Loads the active branch's settings and publishes its region (time zone,
 // day cut-off, currency) for the whole app — see lib/region.
 import { useEffect } from "react";
-import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
+import useResolvedCompanyBranch from "@/app/hooks/useResolvedCompanyBranch";
 import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
 import { regionOf, setActiveRegion } from "@/lib/region";
 

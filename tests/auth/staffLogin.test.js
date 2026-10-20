@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isPin, keysForTyped, loginKeys, looksLikeStaffId, normalIc, normalPhone, randomPin } from "@/lib/staffLogin";
+import { isPin, keysForTyped, loginKeys, looksLikeStaffId, normalIc, normalPhone, randomPin } from "@/lib/staff/login";
 
 describe("staff login numbers", () => {
   it("phones match however they're written (Malaysia and Bangladesh)", () => {

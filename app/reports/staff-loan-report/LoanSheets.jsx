@@ -5,7 +5,7 @@ import { format, isValid, parseISO } from "date-fns";
 import { ChevronRight, ExternalLink, FileSpreadsheet, FileText } from "lucide-react";
 import { useDeleteStaffLoanMutation, useUpdateStaffLoanMutation } from "@/lib/redux/api/staffLoanApiSlice";
 import { getSessionUser } from "@/lib/session";
-import { exportStaffLoansToExcel, exportStaffLoansToPDF } from "@/utils/export/exportStaffLoans";
+import { exportStaffLoansToExcel, exportStaffLoansToPDF } from "@/app/export/exportStaffLoans";
 import RecordSheet from "@/app/components/entry/RecordSheet";
 import MoneyInput from "@/app/components/entry/MoneyInput";
 import { Chip } from "@/app/components/entry/Choices";

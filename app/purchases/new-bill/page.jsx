@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
-import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
+import useResolvedCompanyBranch from "@/app/hooks/useResolvedCompanyBranch";
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
 import { AlertTriangle, ReceiptText, Store } from "lucide-react";
@@ -13,7 +13,7 @@ import {
   useLazyGetVendorBillsQuery,
 } from "@/lib/redux/api/vendorBillsApiSlice";
 import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
-import { uploadInvoiceFile } from "@/utils/storage/uploadInvoice";
+import { uploadInvoiceFile } from "@/lib/storage/uploadInvoice";
 // payVendorBills not needed here — payment happens via Due Bills page
 import useCurrency from "@/app/hooks/useCurrency";
 import { toast, confirmDialog } from "@/app/components/ui/notify";

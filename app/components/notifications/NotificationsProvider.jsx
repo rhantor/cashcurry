@@ -7,7 +7,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useRouter } from "next/navigation";
 import { collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, serverTimestamp, writeBatch, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { enablePush, pushState, refreshPush } from "@/lib/notifications/push";
+import { enablePush, pushState, refreshPush } from "@/lib/notify/push";
 import { toast } from "@/app/components/ui";
 
 const Ctx = createContext(null);

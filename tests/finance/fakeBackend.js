@@ -10,7 +10,7 @@
 //   the Cloud Functions keep them, so the dashboards take their fast path.
 //   `setLedgerMode("full")` serves none (the full download).
 //
-// Point them at a dataset with `useDataset(dataset, branchId)` before rendering.
+// Point them at a dataset with `pointAtDataset(dataset, branchId)` before rendering.
 import { summarizeMonth, monthOf, nextMonth } from "@/lib/finance/monthly";
 import { COLLECTION, DATE_FIELD } from "@/lib/finance/rules";
 
@@ -18,7 +18,7 @@ const current = { dataset: null, branchId: null };
 const cache = new Map();
 let ledgerMode = "fast";
 
-export function useDataset(dataset, branchId = null) {
+export function pointAtDataset(dataset, branchId = null) {
   current.dataset = dataset;
   current.branchId = branchId;
   cache.clear();

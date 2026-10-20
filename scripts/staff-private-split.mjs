@@ -1,5 +1,5 @@
 // `npm run staff:private` — move each staff member's private details (pay, IC,
-// bank, address…; see lib/staffPrivate.js) off their staff record into
+// bank, address…; see lib/staff/private.js) off their staff record into
 // companies/{c}/branches/{b}/staffPrivate/{staffId}, where only those who may
 // see pay can read them (roadmap 4.1). Values already in staffPrivate win;
 // nothing else on the record changes. Safe to run again.
@@ -14,7 +14,7 @@
 import { initializeApp } from "firebase-admin/app";
 import { FieldValue, getFirestore } from "firebase-admin/firestore";
 import { LOCAL_PROJECT_ID } from "./local/config.mjs";
-import { PRIVATE_FIELDS } from "../lib/staffPrivate.js";
+import { PRIVATE_FIELDS } from "../lib/staff/private.js";
 
 const arg = (name) => {
   const i = process.argv.indexOf(name);

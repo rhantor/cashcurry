@@ -2,7 +2,7 @@
 /* eslint-disable no-useless-escape */
 import { format, parseISO } from "date-fns";
 import * as XLSX from "xlsx";
-import { aggregateLoanMovements } from "@/utils/finance/loanAgg";
+import { aggregateLoanMovements } from "@/lib/finance/loanAgg";
 
 
 /* ----------------------- tiny helpers ----------------------- */

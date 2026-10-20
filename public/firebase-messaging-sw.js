@@ -1,8 +1,8 @@
 /* eslint-env serviceworker */
-/* global firebase, clients */
+/* global firebase */
 // public/firebase-messaging-sw.js — the app's one service worker for push
 // (roadmap 4.3). The Firebase project comes in the address it is registered
-// with (lib/notifications/push.js), so the same file serves production and
+// with (lib/notify/push.js), so the same file serves production and
 // the staging project.
 
 importScripts("https://www.gstatic.com/firebasejs/10.12.3/firebase-app-compat.js");

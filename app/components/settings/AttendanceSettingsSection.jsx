@@ -4,7 +4,7 @@ import SettingsSection from "./SettingsSection";
 import { FieldRow, TextField, NumberField, Toggle, SectionCard } from "./fields";
 import ShiftRulesSection from "./ShiftRulesSection";
 import { useGetStaffListQuery, useUpdateStaffMutation } from "@/lib/redux/api/staffApiSlice";
-import { registerBiometric, isBiometricAvailable } from "@/lib/biometricUtils";
+import { registerBiometric, isBiometricAvailable } from "@/lib/attendance/biometric";
 import { Fingerprint, CheckCircle2, ShieldAlert, Loader2 } from "lucide-react";
 import { toast } from "@/app/components/ui/notify";
 

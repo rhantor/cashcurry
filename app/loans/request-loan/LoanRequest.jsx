@@ -5,7 +5,7 @@ import { ArrowRight, Building2, Send } from "lucide-react";
 import { serverTimestamp } from "firebase/firestore";
 import { useAddLoanEntryMutation } from "@/lib/redux/api/loanApiSlice";
 import { useGetBranchesBasicQuery } from "@/lib/redux/api/branchApiSlice";
-import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
+import useResolvedCompanyBranch from "@/app/hooks/useResolvedCompanyBranch";
 import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/lib/region/currency";
 import { Button, CountUp, Field, Input, Skeleton, cn, toast } from "@/app/components/ui";

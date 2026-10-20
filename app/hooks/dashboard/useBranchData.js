@@ -15,10 +15,10 @@ import { useGetStaffLoansQuery } from '@/lib/redux/api/staffLoanApiSlice'
 import { useGetPayoutsQuery } from '@/lib/redux/api/payoutsApiSlice'
 import { useGetSingleBranchQuery } from '@/lib/redux/api/branchApiSlice'
 import { useGetBranchSettingsQuery } from '@/lib/redux/api/branchSettingsApiSlice'
-import useResolvedCompanyBranch from '../useResolvedCompanyBranch'
+import useResolvedCompanyBranch from '@/app/hooks/useResolvedCompanyBranch'
 import useLedgerSource from '@/app/hooks/useLedgerSource'
 import { skipToken } from '@reduxjs/toolkit/query'
-import { aggregateLoanMovements } from '../finance/loanAgg'
+import { aggregateLoanMovements } from '@/lib/finance/loanAgg'
 import { buildLedger } from '@/lib/finance/ledger'
 import {
   saleDay, costDay, advanceDay, depositDay, withdrawalDay, salaryDay, staffLoanDay,

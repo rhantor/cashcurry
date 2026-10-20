@@ -4,7 +4,7 @@ import { Paperclip } from "lucide-react";
 import ReportPage from "@/app/components/common/ReportPage";
 import useReportData from "@/app/hooks/useReportData";
 import { useGetWithdrawEntriesQuery } from "@/lib/redux/api/cashWithdrawApiSlice";
-import { exportWithdrawalsToExcel, exportWithdrawalsToPDF, exportWithdrawalToExcel, exportWithdrawalToPDF, shareWithdrawal } from "@/utils/export/exportWithdrawData";
+import { exportWithdrawalsToExcel, exportWithdrawalsToPDF, exportWithdrawalToExcel, exportWithdrawalToPDF, shareWithdrawal } from "@/app/export/exportWithdrawData";
 import RecordSheet from "@/app/components/entry/RecordSheet";
 import { COLOR, ChartCard, RankedBars } from "@/app/components/dashboard/charts/kit";
 import useCurrency from "@/app/hooks/useCurrency";

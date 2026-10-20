@@ -5,7 +5,7 @@ import { useGetAdvanceEntriesQuery } from "@/lib/redux/api/AdvanceApiSlice";
 import useReportData from "@/app/hooks/useReportData";
 import ReportPage from "@/app/components/common/ReportPage";
 import ReportErrorState from "@/app/components/common/ReportErrorState";
-import { exportAdvanceAllStaffToExcel, exportAdvanceAllStaffToPDF, exportAdvancesToExcel, exportAdvancesToPDF } from "@/utils/export/exportAdvanceData";
+import { exportAdvanceAllStaffToExcel, exportAdvanceAllStaffToPDF, exportAdvancesToExcel, exportAdvancesToPDF } from "@/app/export/exportAdvanceData";
 import { Chip } from "@/app/components/entry/Choices";
 import { COLOR, ChartCard, RankedBars } from "@/app/components/dashboard/charts/kit";
 import useCurrency from "@/app/hooks/useCurrency";

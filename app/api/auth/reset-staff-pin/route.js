@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import admin from "firebase-admin";
 import { adminAuth } from "@/lib/server/firebaseAdmin";
 import { staffManager, staffRecord, writeStaffLogins } from "@/lib/server/staffAccess";
-import { isPin, randomPin } from "@/lib/staffLogin";
+import { isPin, randomPin } from "@/lib/staff/login";
 
 // A staff member forgot their PIN (docs/STAFF_APP.md): whoever may manage
 // staff at the branch sets a new one. Their other phones are signed out, and

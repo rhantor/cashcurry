@@ -74,7 +74,7 @@ const MONEY_ADVANCE_TYPES = ["personal", "salary", "emergency"];
  * early OT waiting for approval — the same engine as payroll — and what they owe.
  */
 export function useMyWork(user, publicStaff, priv) {
-  // Pay rates live in the private half (lib/staffPrivate.js)
+  // Pay rates live in the private half (lib/staff/private.js)
   const staff = useMemo(() => (publicStaff ? { ...publicStaff, ...(priv || {}) } : null), [publicStaff, priv]);
   const period = useMemo(() => {
     if (!staff) return null;

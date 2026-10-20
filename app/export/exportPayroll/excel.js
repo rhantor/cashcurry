@@ -5,7 +5,7 @@
  */
 
 import * as XLSX from 'xlsx'
-import { periodLabel } from '@/utils/payrollCalculations'
+import { periodLabel } from '@/lib/payroll/calculations'
 import { toast } from "@/app/components/ui/notify";
 import { buildCols, buildHeaders, buildRow, buildTotalRow, num } from "./helpers";
 

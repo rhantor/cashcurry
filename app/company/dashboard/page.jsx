@@ -1,15 +1,15 @@
 "use client";
 import React, { useMemo, useState } from "react";
 import { AlertTriangle, ArrowDownToLine, HandCoins, Landmark, Percent, PiggyBank, Receipt, TrendingUp, Wallet } from "lucide-react";
-import useCompanyData from "@/utils/dashboard/useCompanyData";
-import { presetFilter } from "@/utils/dashboard/dateFilters";
+import useCompanyData from "@/app/hooks/dashboard/useCompanyData";
+import { presetFilter } from "@/app/hooks/dashboard/dateFilters";
 import { businessToday } from "@/lib/region";
 import { Stagger, Tabs } from "@/app/components/ui";
 import PeriodBar from "@/app/components/dashboard/PeriodBar";
 import StatCard from "@/app/components/dashboard/StatCard";
 import BreakdownSheet from "@/app/components/dashboard/BreakdownSheet";
 import useCurrency from "@/app/hooks/useCurrency";
-import { formatMoney } from "@/utils/formatMoney";
+import { formatMoney } from "@/lib/format/money";
 import RecentActivity from "@/app/components/dashboard/RecentActivity";
 import SalesHero from "@/app/components/dashboard/charts/SalesHero";
 import DailyNet from "@/app/components/dashboard/charts/DailyNet";

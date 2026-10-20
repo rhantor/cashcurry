@@ -33,7 +33,7 @@ import AddCompanyUserModal from "./modals/AddCompanyUserModal"; // <-- NEW
 
 // Helpers
 import { can } from "@/lib/authz/permissions";
-import { sanitizeUpdates, normalizeRole } from "@/utils/sanitize";
+import { sanitizeUpdates, normalizeRole } from "@/lib/format/sanitize";
 import { getSessionUser } from "@/lib/session";
 import { toast, confirmDialog } from "@/app/components/ui/notify";
 import { Skeleton, Tabs } from "@/app/components/ui";

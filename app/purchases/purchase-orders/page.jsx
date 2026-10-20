@@ -6,7 +6,7 @@ import { businessToday } from "@/lib/region";
 import React, { useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { skipToken } from "@reduxjs/toolkit/query";
-import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
+import useResolvedCompanyBranch from "@/app/hooks/useResolvedCompanyBranch";
 import {
   useGetRequisitionsQuery, // Using requisitionsApiSlice as our PO storage
   useUpdateRequisitionMutation,
@@ -25,9 +25,9 @@ import { useGetCompanyDetailsQuery } from "@/lib/redux/api/authApiSlice";
 import ConfirmSheet from "@/app/components/purchases/ConfirmSheet";
 import { filterItems } from "@/app/components/purchases/ItemFilterBar";
 import useToast from "@/app/components/purchases/useToast";
-import { uploadInvoiceFile } from "@/utils/storage/uploadInvoice";
+import { uploadInvoiceFile } from "@/lib/storage/uploadInvoice";
 import useCurrency from "@/app/hooks/useCurrency";
-import buildPurchaseOrderPdf, { loadLogo, poReference } from "@/utils/pdf/purchaseOrderPdf";
+import buildPurchaseOrderPdf, { loadLogo, poReference } from "@/lib/purchases/purchaseOrderPdf";
 import {
   FileText,
   Send,
