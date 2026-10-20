@@ -195,6 +195,10 @@ rehearsed on the local copy first.
 - [ ] **Staff Android app (4.6):** Firebase console → add Android app `com.cashcurry.staff` → `google-services.json` into `android/app/`; `CAP_SERVER_URL=https://<app domain> npm run android:sync`; icon; signing key; `./gradlew bundleRelease`; Play Console → new app, internal testing first (docs/STAFF_APP.md §5)
 - [ ] **Staff payslips (4.6):** deploy `storage.rules` with `firestore.rules`; then `npm run payslips:copy -- --project <id>` and `--write --confirm` (gives staff their payslips from runs already finalized or paid)
 - [ ] **Staff logins (4.6):** after the rules and functions deploy, `npm run staff:logins -- --project <id>` then `--write --confirm` (lets staff who already have a login sign in with their phone or IC number; their password stays until a manager resets their PIN). Functions keep it up to date after that
+- [ ] **Audit log (20 Oct):** the audit triggers (auditSales, auditCosts, auditSalaries, auditLoans, auditVendorBills)
+      now record the signed-in account, so their trigger type changes; if the deploy refuses, delete those five
+      first (`firebase functions:delete auditSales auditCosts auditSalaries auditLoans auditVendorBills --region asia-southeast1`)
+      and deploy again. Writes made between the delete and the deploy are not logged — do it at a quiet hour
 - [ ] Deploy Cloud Functions (`firebase deploy --only functions` builds the finance engine first). This
       removes the old rollup functions — confirm the deletion when the CLI asks
 - [ ] Right after: `npm run summaries:rebuild -- --project <id> --confirm` (engine v3 since 4.9 / 4.10 — every stored summary is rebuilt; needs

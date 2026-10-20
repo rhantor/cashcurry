@@ -21,7 +21,7 @@ comment.
 | `lib/redux/api/` | RTK Query slices, one per collection | |
 | `lib/server/` | Admin-SDK code for API routes and scripts only | be imported by a page |
 | `lib/format/` | Money and text helpers (`money.js`, `sanitize.js`) | |
-| `functions/` | Cloud Functions. `engine.cjs` and `notify.cjs` are **generated** from `lib/finance` and `lib/notify` by `node scripts/build-functions-engine.mjs` | be edited by hand |
+| `functions/` | Cloud Functions. `engine.cjs`, `notify.cjs` and `audit.cjs` are **generated** from `lib/finance`, `lib/notify` and `lib/audit` by `node scripts/build-functions-engine.mjs` | be edited by hand |
 | `scripts/` | One-off data jobs and local dev (`scripts/local`) — each says what it changes at the top | run against production without a dry run |
 | `tests/` | Unit tests (`npm test`), one folder per `lib/` area | |
 | `tests-rules/` | Firestore and Storage rules tests (`npm run test:rules`) | |
@@ -29,7 +29,7 @@ comment.
 
 ## Areas in `lib/`
 
-`attendance` (incl. `biometric.js`) · `authz` (roles and permissions) · `chat` ·
+`attendance` (incl. `biometric.js`) · `audit` (who did a change, entries in words) · `authz` (roles and permissions) · `chat` ·
 `costs` (categories, vouchers) · `finance` · `format` · `issues` · `native`
 (Capacitor) · `notify` (types, recipients, push) · `payouts` · `payroll`
 (incl. `calculations.js`) · `purchases` · `redux` · `region` (currency) ·

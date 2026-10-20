@@ -9,7 +9,7 @@ import { defineConfig } from "eslint/config";
 export default defineConfig([
   // The Android app's generated native project (npx cap add android)
   // plus build output and the generated functions bundles (never edited by hand)
-  { ignores: ["android/**", ".next/**", ".next-check/**", "out/**", "functions/engine.cjs", "functions/notify.cjs", "functions/node_modules/**"] },
+  { ignores: ["android/**", ".next/**", ".next-check/**", "out/**", "functions/engine.cjs", "functions/notify.cjs", "functions/audit.cjs", "functions/node_modules/**"] },
   {
     files: ["**/*.{js,mjs,cjs,jsx}"],
     plugins: { js },

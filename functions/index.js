@@ -7,6 +7,7 @@ const { FieldValue } = require("firebase-admin/firestore");
 const {
   onDocumentCreated,
   onDocumentWritten,
+  onDocumentWrittenWithAuthContext,
 } = require("firebase-functions/v2/firestore");
 const { onSchedule } = require("firebase-functions/v2/scheduler");
 const { setGlobalOptions } = require("firebase-functions/v2");
@@ -137,43 +138,34 @@ exports.notifyDailySummary = onSchedule({ schedule: "0 * * * *", timeZone: "UTC"
 // Uses Admin SDK so it bypasses Firestore rules (clients cannot fake audit logs).
 // ─────────────────────────────────────────────────────────────────────────────
 
-async function writeAuditLog({
-  companyId,
-  branchId = null,
-  collection,
-  docId,
-  action,
-  before,
-  after,
-}) {
-  const actor =
-    after?.createdBy?.uid ||
-    after?.updatedBy?.uid ||
-    before?.createdBy?.uid ||
-    null;
+// Who did it: the account that made the write (authId), named from its user
+// record. Writes by the server (functions, scripts) have no account; then the
+// record's own stamps say who (lib/audit/actor.js, bundled as audit.cjs).
+const audit = require("./audit.cjs");
+const people = new Map(); // uid → name, for this instance
 
-  const actorName =
-    after?.createdBy?.username ||
-    after?.updatedBy?.username ||
-    before?.createdBy?.username ||
-    "unknown";
+async function nameOfUser(uid) {
+  if (people.has(uid)) return people.get(uid);
+  const u = (await db.collection("users").doc(uid).get()).data() || {};
+  const full = [u.firstName, u.lastName].filter(Boolean).join(" ");
+  const name = u.name || u.fullName || u.displayName || full || u.username || u.email || "";
+  people.set(uid, name);
+  return name;
+}
 
-  await db.collection(`companies/${companyId}/auditLog`).add({
-    companyId,
-    branchId,
-    collection,
-    docId,
-    action,
-    actorUid: actor,
-    actorName,
-    before: action === "created" ? null : before,
-    after: action === "deleted" ? null : after,
-    timestamp: FieldValue.serverTimestamp(),
-  });
+async function actorOf(event, change) {
+  const fromRecord = audit.actorFromChange(change);
+  if (event.authType === "app_user" && event.authId) {
+    const uid = event.authId;
+    const name = fromRecord?.uid === uid ? fromRecord.name : (await nameOfUser(uid)) || fromRecord?.name || "";
+    return { actorUid: uid, actorName: name || "unknown", actorFrom: "account" };
+  }
+  if (fromRecord) return { actorUid: fromRecord.uid || null, actorName: fromRecord.name, actorFrom: "record" };
+  return { actorUid: null, actorName: event.authType === "unauthenticated" ? "unknown" : "System", actorFrom: event.authType || "unknown" };
 }
 
 function makeAuditTrigger(collectionPath, collectionName) {
-  return onDocumentWritten(collectionPath, async (event) => {
+  return onDocumentWrittenWithAuthContext(collectionPath, async (event) => {
     const params = event.params;
     const companyId = params.companyId;
     const branchId = params.branchId || null;
@@ -188,7 +180,18 @@ function makeAuditTrigger(collectionPath, collectionName) {
     else action = "updated";
 
     try {
-      await writeAuditLog({ companyId, branchId, collection: collectionName, docId, action, before, after });
+      const who = await actorOf(event, { action, before, after });
+      await db.collection(`companies/${companyId}/auditLog`).add({
+        companyId,
+        branchId,
+        collection: collectionName,
+        docId,
+        action,
+        ...who,
+        before: action === "created" ? null : before,
+        after: action === "deleted" ? null : after,
+        timestamp: FieldValue.serverTimestamp(),
+      });
     } catch (err) {
       console.error("[audit] failed to write log:", err);
     }
