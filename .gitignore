@@ -64,6 +64,7 @@ tests/finance/__golden__/*.actual.json
 # generated from lib/finance by scripts/build-functions-engine.mjs
 functions/engine.cjs
 functions/notify.cjs
+functions/audit.cjs
 
 # Cloud Functions dependencies (npm install in functions/; deploy installs them itself)
 functions/node_modules/
