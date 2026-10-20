@@ -200,6 +200,61 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
     }
   }
 
+  // ── task reminders (4.11) ──────────────────────────────────────────────────
+  /**
+   * Once an hour: at a branch's morning time (settings/notifications.tasksMorningAt,
+   * default 09:00) everyone with tasks hears what is on today; at its evening
+   * time (tasksEveningAt, default two hours before the day ends) those with
+   * something still left hear what. A marker per branch, day and time means
+   * each goes out once. Muting "tasks.reminder" turns it off for oneself.
+   */
+  async function taskReminders(now = new Date()) {
+    for (const company of await db.collection("companies").listDocuments()) {
+      let all = null;
+      for (const branchRef of await company.collection("branches").listDocuments()) {
+        try {
+          const b = await branch(company.id, branchRef.id);
+          const hour = N.localHour(now, b.timeZone);
+          const when =
+            hour === N.hourOf(b.config.tasksMorningAt || N.DEFAULT_MORNING_AT) ? "morning" : hour === N.hourOf(b.config.tasksEveningAt || N.defaultEveningAt(b.cutoff)) ? "evening" : null;
+          if (!when) continue;
+          const tasks = (await branchRef.collection("tasks").get()).docs.map((d) => ({ id: d.id, ...d.data() }));
+          if (!tasks.length) continue;
+          const today = N.businessDateFor(now, b.cutoff, b.timeZone);
+          try {
+            await branchRef.collection("notifyLog").doc(`tasks-${when}-${today}`).create({ at: FieldValue.serverTimestamp() });
+          } catch {
+            continue; // already sent
+          }
+          const from = N.addDays(today, -N.CATCH_UP_DAYS);
+          const checkSnap = await branchRef.collection("taskChecks").where("date", ">=", from).where("date", "<=", today).get();
+          const checks = Object.fromEntries(checkSnap.docs.map((d) => [d.id, d.data()]));
+          all = all || (await people(company.id));
+          const roleOf = (uid) => all.find((p) => p.uid === uid)?.role;
+          const byPerson = new Map();
+          for (const t of tasks) if (t.assigneeUid) byPerson.set(t.assigneeUid, [...(byPerson.get(t.assigneeUid) || []), t]);
+          for (const [uid, mine] of byPerson) {
+            if (!roleOf(uid)) continue; // no longer has a login
+            const message = N.reminderMessage(when, N.agenda(mine, checks, today), { branchName: b.name });
+            if (!message) continue;
+            await deliver({
+              companyId: company.id,
+              branchId: branchRef.id,
+              uids: [uid],
+              type: "tasks.reminder",
+              message,
+              link: roleOf(uid) === "staff" ? "/my-tasks" : "/tasks?tab=mine",
+              ref: `tasks/reminder-${when}-${today}`,
+              tag: `tasks_${when}`,
+            });
+          }
+        } catch (err) {
+          console.error("[notify task reminders]", company.id, branchRef.id, err);
+        }
+      }
+    }
+  }
+
   // ── the daily summary ──────────────────────────────────────────────────────
   /**
    * Once an hour: every branch whose clock has reached its summary time
@@ -386,5 +441,5 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
     });
   }
 
-  return { deliver, onRequest, onPurchaseOrder, onPayout, onCostVoucher, dailySummaries, onChatMessage, onUser, onIssue, onIssueComment, onTask, onStaffLogin };
+  return { deliver, onRequest, onPurchaseOrder, onPayout, onCostVoucher, dailySummaries, onChatMessage, onUser, onIssue, onIssueComment, onTask, taskReminders, onStaffLogin };
 };

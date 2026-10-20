@@ -9,6 +9,7 @@ import { collection, doc, getDoc, getDocs, serverTimestamp, setDoc } from "fireb
 import { Check, RotateCcw, Save } from "lucide-react";
 import { db } from "@/lib/firebase";
 import { NOTIFY_TYPES, DEFAULT_DAILY_AT, branchPeople, mayGet, recipientsFor } from "@/lib/notify/model";
+import { DEFAULT_MORNING_AT } from "@/lib/tasks/model";
 import { personName } from "@/lib/people";
 import { roleLabel } from "@/lib/authz/permissions";
 import { Avatar, Badge, Button, Card, Field, Select, Skeleton, cn, toast } from "@/app/components/ui";
@@ -51,7 +52,7 @@ export default function NotificationsSection({ companyId, branchId }) {
     Promise.all([loadPeople(companyId, branchId), getDoc(doc(db, "companies", companyId, "branches", branchId, "settings", "notifications"))])
       .then(([p, snap]) => {
         const c = snap.exists() ? snap.data() : {};
-        const clean = { recipients: c.recipients || {}, dailyAt: c.dailyAt || DEFAULT_DAILY_AT };
+        const clean = { recipients: c.recipients || {}, dailyAt: c.dailyAt || DEFAULT_DAILY_AT, tasksMorningAt: c.tasksMorningAt || DEFAULT_MORNING_AT, tasksEveningAt: c.tasksEveningAt || "" };
         setPeople(p);
         setConfig(clean);
         setSaved(JSON.stringify(clean));
@@ -151,6 +152,31 @@ export default function NotificationsSection({ companyId, branchId }) {
             </Select>
           )}
         </Field>
+      </Card>
+
+      {/* task reminders (4.11): whoever has tasks gets them; each person can turn them off from the bell */}
+      <Card className="space-y-4 p-4 sm:p-5">
+        <div>
+          <h3 className="text-sm font-semibold text-fg">Task reminders</h3>
+          <p className="text-xs text-muted">Everyone with tasks: in the morning what is on today, in the evening what is still left. Anyone can turn them off for themselves from the bell.</p>
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Morning reminder at">
+            {({ id }) => (
+              <Select id={id} value={config.tasksMorningAt} onChange={(e) => setConfig((c) => ({ ...c, tasksMorningAt: e.target.value }))}>
+                {HOURS.map((h) => <option key={h} value={h}>{hourLabel(h)}</option>)}
+              </Select>
+            )}
+          </Field>
+          <Field label="Evening reminder at" hint="Only to those with something left">
+            {({ id }) => (
+              <Select id={id} value={config.tasksEveningAt} onChange={(e) => setConfig((c) => ({ ...c, tasksEveningAt: e.target.value }))}>
+                <option value="">2 hours before the day ends</option>
+                {HOURS.map((h) => <option key={h} value={h}>{hourLabel(h)}</option>)}
+              </Select>
+            )}
+          </Field>
+        </div>
       </Card>
 
       <div className="flex justify-end">

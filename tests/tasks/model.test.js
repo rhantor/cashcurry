@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, agenda, canManageTasks, todayCount, checkId, checkTask, dayList, monthOf, occursOn, performance, repeatText } from "@/lib/tasks/model";
+import { addDays, agenda, canManageTasks, defaultEveningAt, reminderMessage, todayCount, checkId, checkTask, dayList, monthOf, occursOn, performance, repeatText } from "@/lib/tasks/model";
 
 const ali = { uid: "ali", name: "Ali" };
 const daily = { id: "fryer", title: "Clean the fryer", assigneeUid: "ali", assignee: ali, repeat: { every: "day" }, startDate: "2026-10-01", active: true };
@@ -135,5 +135,27 @@ describe("the to-do list", () => {
   });
   it("today at a glance", () => {
     expect(todayCount(tasks, checks, today)).toEqual({ total: 2, done: 1, late: 6 });
+  });
+});
+
+describe("reminders", () => {
+  const t = (title, done = false) => ({ task: { title }, done });
+  const list = (today, late = []) => ({ late, today, tomorrow: [], week: [], later: [], anytime: [] });
+  it("evening reminder two hours before the day ends, unless the branch chose", () => {
+    expect(defaultEveningAt("00:00")).toBe("22:00");
+    expect(defaultEveningAt("05:00")).toBe("03:00");
+    expect(defaultEveningAt()).toBe("22:00");
+  });
+  it("morning: today's tasks, and how many are late", () => {
+    expect(reminderMessage("morning", list([t("Clean the fryer"), t("Count the stock"), t("Mop")], [t("Door")]), { branchName: "KL" })).toEqual({
+      title: "Today's tasks · KL",
+      body: "3 tasks: Clean the fryer, Count the stock and 1 more · 1 late",
+    });
+    expect(reminderMessage("morning", list([], [t("Door")]))).toEqual({ title: "Tasks waiting", body: "1 late task: Door" });
+    expect(reminderMessage("morning", list([]))).toBeNull();
+  });
+  it("evening: only what is still left — nothing when all is done", () => {
+    expect(reminderMessage("evening", list([t("Clean the fryer", true), t("Count the stock")]))).toEqual({ title: "Still to do today", body: "1 task left: Count the stock" });
+    expect(reminderMessage("evening", list([t("Clean the fryer", true)]))).toBeNull();
   });
 });
