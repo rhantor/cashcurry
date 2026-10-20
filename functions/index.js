@@ -100,6 +100,16 @@ exports.notifyIssues = onDocumentWritten("companies/{companyId}/branches/{branch
     console.error("[notify issues]", companyId, branchId, id, err);
   }
 });
+exports.notifyTasks = onDocumentWritten("companies/{companyId}/branches/{branchId}/tasks/{id}", async (event) => {
+  const { companyId, branchId, id } = event.params;
+  const before = event.data?.before?.exists ? event.data.before.data() : null;
+  const after = event.data?.after?.exists ? event.data.after.data() : null;
+  try {
+    await notify.onTask({ companyId, branchId, id, before, after });
+  } catch (err) {
+    console.error("[notify tasks]", companyId, branchId, id, err);
+  }
+});
 exports.notifyIssueComments = onDocumentCreated("companies/{companyId}/branches/{branchId}/issues/{issueId}/comments/{id}", async (event) => {
   const { companyId, branchId, issueId } = event.params;
   try {

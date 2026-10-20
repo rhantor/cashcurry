@@ -34,7 +34,7 @@ comment.
 (Capacitor) · `notify` (types, recipients, push) · `payouts` · `payroll`
 (incl. `calculations.js`) · `purchases` · `redux` · `region` (currency) ·
 `requests` · `server` · `session` · `staff` (incl. `login.js`, `private.js`) ·
-`storage`. Top-level files: `firebase.js` (the one Firebase setup),
+`storage` · `tasks` (tasks, checklists, ratings, notes). Top-level files: `firebase.js` (the one Firebase setup),
 `people.js` (names and initials), `signupPending.js`.
 
 A new feature gets its own `lib/<area>/` with `model.js` + `client.js`, and
