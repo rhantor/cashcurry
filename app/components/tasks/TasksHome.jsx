@@ -4,7 +4,7 @@
 // Notes — your own. ?tab=team|performance|notes opens one (notifications link there).
 import { useEffect, useMemo, useState } from "react";
 import { CalendarCheck, Gauge, NotebookPen, Users } from "lucide-react";
-import { Tabs } from "@/app/components/ui";
+import { Tabs, useIsPhone } from "@/app/components/ui";
 import { useBusinessToday } from "@/app/hooks/useRegion";
 import { useChatPeople } from "@/app/components/chat/useChat";
 import { canManageTasks } from "@/lib/tasks/model";
@@ -30,12 +30,14 @@ export default function TasksHome({ user, branchId }) {
   // who a task can be given to: this branch's people with a login, not yourself
   const people = useMemo(() => everyone.filter((p) => p.branchId === branchId && p.uid !== user.uid), [everyone, branchId, user.uid]);
 
+  // on a phone the tabs share the width, words only, so all of them fit
+  const phone = useIsPhone();
   const tabs = [
     { value: "today", label: "Today", icon: CalendarCheck },
     ...(manage ? [{ value: "team", label: "Team", icon: Users }] : []),
-    { value: "performance", label: manage ? "Performance" : "My performance", icon: Gauge },
+    { value: "performance", label: manage || phone ? "Performance" : "My performance", icon: Gauge },
     { value: "notes", label: "Notes", icon: NotebookPen },
-  ];
+  ].map((t) => (phone ? { ...t, icon: undefined } : t));
   const current = tab === "team" && !manage ? "today" : tab;
 
   if (!branchId)
@@ -44,7 +46,7 @@ export default function TasksHome({ user, branchId }) {
   return (
     <div className="space-y-5">
       <div className="-mx-1 max-w-full overflow-x-auto px-1 [scrollbar-width:none]">
-        <Tabs tabs={tabs} value={current} onChange={setTab} />
+        <Tabs tabs={tabs} value={current} onChange={setTab} className={phone ? "flex w-full [&>button]:flex-1 [&>button]:justify-center [&>button]:px-2" : undefined} />
       </div>
       {current === "today" && <TodayTab tasks={mine.list} loading={mine.loading} companyId={companyId} branchId={branchId} user={user} today={today} />}
       {current === "team" && <TeamTab tasks={all.list} loading={all.loading} people={people} companyId={companyId} branchId={branchId} user={user} today={today} />}

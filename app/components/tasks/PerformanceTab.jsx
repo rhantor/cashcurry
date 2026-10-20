@@ -5,8 +5,9 @@
 // them; everyone else sees their own.
 import { useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { ChevronLeft, ChevronRight, Gauge, Star } from "lucide-react";
-import { Avatar, Button, EmptyState, Sheet, Skeleton, Textarea, cn, toast } from "@/app/components/ui";
+import { ChevronLeft, ChevronRight, Gauge, List, Star } from "lucide-react";
+import { Avatar, Badge, Button, EmptyState, Sheet, Skeleton, Textarea, cn, toast } from "@/app/components/ui";
+import { Chip } from "@/app/components/entry/Choices";
 import { monthOf, performance } from "@/lib/tasks/model";
 import { rate, useChecks, useRatings } from "@/lib/tasks/client";
 
@@ -34,9 +35,24 @@ function Stars({ value = 0, size = "size-4", onPick }) {
   );
 }
 
-function ScoreBar({ p }) {
+const RESULTS = [
+  { value: "missed", label: "Missed", tone: "danger", text: "text-danger" },
+  { value: "late", label: "Late", tone: "warning", text: "text-warning" },
+  { value: "onTime", label: "On time", tone: "success", text: "text-brand" },
+  { value: "open", label: "Still to do", tone: "neutral", text: "text-muted" },
+];
+const dayText = (d) => format(parseISO(d), "EEE d MMM");
+
+/** The bar and the counts; each count opens the list of those tasks. */
+function ScoreBar({ p, onShow }) {
   const total = p.onTime + p.late + p.missed;
   const w = (n) => `${total ? (n / total) * 100 : 0}%`;
+  const count = (r, n) => (
+    <button type="button" onClick={() => onShow(r.value)} disabled={!n} className="rounded-md px-1 py-0.5 hover:bg-surface-2 disabled:pointer-events-none">
+      <span className={cn("font-semibold", r.text)}>{n}</span> {r.label.toLowerCase()}
+    </button>
+  );
+  const [missed, late, onTime, open] = RESULTS;
   return (
     <div className="space-y-1.5">
       <div className="flex h-2 overflow-hidden rounded-full bg-surface-2" aria-hidden="true">
@@ -44,11 +60,49 @@ function ScoreBar({ p }) {
         <span className="bg-warning" style={{ width: w(p.late) }} />
         <span className="bg-danger" style={{ width: w(p.missed) }} />
       </div>
-      <p className="text-xs tabular-nums text-muted">
-        <span className="font-semibold text-brand">{p.onTime}</span> on time · <span className="font-semibold text-warning">{p.late}</span> late · <span className="font-semibold text-danger">{p.missed}</span> missed
-        {p.open ? ` · ${p.open} still to do` : ""}
+      <p className="-mx-1 flex flex-wrap items-center gap-x-0.5 text-xs tabular-nums text-muted">
+        {count(onTime, p.onTime)}·{count(late, p.late)}·{count(missed, p.missed)}
+        {p.open ? <>·{count(open, p.open)}</> : null}
       </p>
     </div>
+  );
+}
+
+/** Which tasks: each day missed, late (and when it was done), on time or still to do. */
+function DetailsSheet({ open, onClose, who, month, p, show, setShow }) {
+  const list = (p?.items || []).filter((x) => x.result === show);
+  const r = RESULTS.find((x) => x.value === show) || RESULTS[0];
+  return (
+    <Sheet open={open} onClose={onClose} title={`${who} · ${monthLabel(month)}`} description="Every task counted this month, day by day.">
+      <div className="space-y-4">
+        <div className="flex flex-wrap gap-1.5">
+          {RESULTS.map((x) => {
+            const n = (p?.items || []).filter((i) => i.result === x.value).length;
+            return (
+              <Chip key={x.value} on={show === x.value} onClick={() => setShow(x.value)} disabled={!n}>
+                {x.label} · {n}
+              </Chip>
+            );
+          })}
+        </div>
+        {!list.length ? (
+          <p className="text-sm text-muted">None.</p>
+        ) : (
+          <ul className="divide-y divide-line rounded-2xl border border-line">
+            {list.map((x) => (
+              <li key={`${x.taskId}-${x.date}`} className="flex items-center gap-3 px-4 py-2.5">
+                <span className="w-24 shrink-0 text-xs font-medium tabular-nums text-muted">{dayText(x.date)}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm text-fg">{x.title}</span>
+                  {x.result === "late" && x.doneOn && <span className="block text-xs text-warning">done {dayText(x.doneOn)}</span>}
+                </span>
+                <Badge tone={r.tone} className="shrink-0 px-2 py-px text-[10px]">{r.label}</Badge>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </Sheet>
   );
 }
 
@@ -85,6 +139,7 @@ function RateSheet({ person, month, current, onClose, companyId, branchId, user 
 export default function PerformanceTab({ tasks, loading, manage, companyId, branchId, user, today }) {
   const [month, setMonth] = useState(today.slice(0, 7));
   const [rating, setRating] = useState(null);
+  const [details, setDetails] = useState(null); // { uid, show }
   const { from, to } = monthOf(`${month}-01`);
   const { checks, loading: checksLoading } = useChecks(companyId, branchId, { from, to, ...(manage ? { all: true } : { uid: user.uid }) });
   const { ratings } = useRatings(companyId, branchId, month, manage ? { all: true } : { uid: user.uid });
@@ -125,7 +180,12 @@ export default function PerformanceTab({ tasks, loading, manage, companyId, bran
                 </div>
                 <p className={cn("text-2xl font-bold tabular-nums", scoreTone(p.score))}>{p.score == null ? "—" : `${p.score}%`}</p>
               </div>
-              <ScoreBar p={p} />
+              <ScoreBar p={p} onShow={(show) => setDetails({ uid: person.uid, show })} />
+              {p.given > 0 && (
+                <Button size="sm" variant="ghost" icon={List} onClick={() => setDetails({ uid: person.uid, show: p.missed ? "missed" : p.late ? "late" : "onTime" })} className="-ml-2">
+                  See each task
+                </Button>
+              )}
               <div className="space-y-1.5 border-t border-line pt-3">
                 <div className="flex items-center gap-2">
                   <Stars value={r?.stars || 0} />
@@ -140,6 +200,20 @@ export default function PerformanceTab({ tasks, loading, manage, companyId, bran
           ))}
         </ul>
       )}
+      {(() => {
+        const row = details && rows.find((x) => x.person.uid === details.uid);
+        return (
+          <DetailsSheet
+            open={!!row}
+            onClose={() => setDetails(null)}
+            who={row ? (row.person.uid === user.uid && !manage ? "You" : row.person.name) : ""}
+            month={month}
+            p={row?.p}
+            show={details?.show || "missed"}
+            setShow={(show) => setDetails((d) => ({ ...d, show }))}
+          />
+        );
+      })()}
       {rating && <RateSheet person={rating.person} current={rating.current} month={month} onClose={() => setRating(null)} companyId={companyId} branchId={branchId} user={user} />}
     </div>
   );
