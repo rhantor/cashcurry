@@ -3,8 +3,10 @@
 // Team — today at a glance and each person (management: everyone; a
 // supervisor: their own team), shown first to those who give tasks; My tasks
 // — your to-do list; Performance; Notes — your own (a note's line can become a task).
-// ?tab=team|mine|performance|notes opens one (notifications link there).
+// ?tab=team|mine|performance|notes opens one; ?task=<id> opens that task with
+// its questions and answers (notifications link there).
 import { useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { CalendarCheck, Gauge, NotebookPen, Users } from "lucide-react";
 import { Tabs, useIsPhone } from "@/app/components/ui";
 import { useBusinessToday } from "@/app/hooks/useRegion";
@@ -16,6 +18,7 @@ import MyTasksTab from "./MyTasksTab";
 import TeamTab from "./TeamTab";
 import PerformanceTab from "./PerformanceTab";
 import NotesTab from "./NotesTab";
+import TaskDetailSheet from "./TaskDetailSheet";
 
 export default function TasksHome({ user, branchId }) {
   const companyId = user.companyId;
@@ -24,11 +27,15 @@ export default function TasksHome({ user, branchId }) {
   const lead = !manage && canTeamTasks(user.role) && !!branchId; // a supervisor
   const gives = manage || lead;
   const [tab, setTab] = useState(null); // null: Team for those who give tasks, else My tasks
+  const params = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
+  const tabParam = params.get("tab");
+  const taskParam = params.get("task");
   useEffect(() => {
-    const t = new URLSearchParams(window.location.search).get("tab");
-    if (t === "today") setTab("mine"); // older links
-    else if (["mine", "team", "performance", "notes"].includes(t)) setTab(t);
-  }, []);
+    if (tabParam === "today") setTab("mine"); // older links
+    else if (["mine", "team", "performance", "notes"].includes(tabParam)) setTab(tabParam);
+  }, [tabParam]);
 
   const mine = useTasks(companyId, branchId, { uid: user.uid });
   const given = useTasks(companyId, branchId, manage ? { all: true } : { lead: lead ? user.uid : undefined });
@@ -47,6 +54,18 @@ export default function TasksHome({ user, branchId }) {
   // who leads a new task: the supervisor giving it, else the person's own supervisor
   const leadFor = useMemo(() => (lead ? () => user.uid : (uid) => leadOf(staff, uid)), [lead, user.uid, staff]);
   const scope = manage ? { all: true } : { lead: user.uid };
+
+  // the task a notification points at: open it, on the tab it belongs to
+  const linked = taskParam ? mine.list.find((t) => t.id === taskParam) || given.list.find((t) => t.id === taskParam) : null;
+  useEffect(() => {
+    if (!linked) return;
+    setTab(linked.assigneeUid === user.uid ? "mine" : "team");
+  }, [linked?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const closeLinked = () => {
+    const next = new URLSearchParams(params.toString());
+    next.delete("task");
+    router.replace(next.toString() ? `${pathname}?${next}` : pathname, { scroll: false });
+  };
 
   // on a phone the tabs share the width, words only, so all of them fit
   const phone = useIsPhone();
@@ -81,6 +100,10 @@ export default function TasksHome({ user, branchId }) {
           user={user}
           today={today}
         />
+      )}
+      {linked && <TaskDetailSheet task={linked} onClose={closeLinked} companyId={companyId} branchId={branchId} user={user} team={lead ? people : []} />}
+      {taskParam && !linked && !mine.loading && !given.loading && (
+        <p className="rounded-xl bg-surface-2 px-4 py-3 text-sm text-muted">That task is no longer here — it was finished long ago, deleted, or is at another branch.</p>
       )}
       {current === "notes" && <NotesTab companyId={companyId} user={user} gives={gives} people={people} branchId={branchId} today={today} leadFor={leadFor} />}
     </div>
