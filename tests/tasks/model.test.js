@@ -58,7 +58,14 @@ describe("performance", () => {
       [checkId("fryer", "2026-10-02")]: { doneOn: "2026-10-03" }, // ticked the day after
     };
     const p = performance([daily], checks, "ali", { from: "2026-10-01", to: "2026-10-31", today: "2026-10-04" });
-    expect(p).toEqual({ given: 4, onTime: 1, late: 1, missed: 1, open: 1, score: 50 });
+    expect(p).toMatchObject({ given: 4, onTime: 1, late: 1, missed: 1, open: 1, score: 50 });
+    // and which ones: the day, the result, when it was done
+    expect(p.items.map((x) => [x.date, x.result, x.doneOn])).toEqual([
+      ["2026-10-01", "onTime", "2026-10-01"],
+      ["2026-10-02", "late", "2026-10-03"],
+      ["2026-10-03", "missed", null],
+      ["2026-10-04", "open", null],
+    ]);
   });
   it("one-offs: on time by the due date, late after, missed when overdue", () => {
     const tasks = [
@@ -67,7 +74,7 @@ describe("performance", () => {
       { ...once, id: "c" },
       { ...once, id: "d", dueDate: "2026-10-25" },
     ];
-    expect(performance(tasks, {}, "ali", { from: "2026-10-01", to: "2026-10-31", today: "2026-10-20" })).toEqual({ given: 4, onTime: 1, late: 1, missed: 1, open: 1, score: 50 });
+    expect(performance(tasks, {}, "ali", { from: "2026-10-01", to: "2026-10-31", today: "2026-10-20" })).toMatchObject({ given: 4, onTime: 1, late: 1, missed: 1, open: 1, score: 50 });
   });
   it("only that person's, and nothing due yet means no score", () => {
     expect(performance([daily], {}, "siti", { from: "2026-10-01", to: "2026-10-31", today: "2026-10-20" }).given).toBe(0);
