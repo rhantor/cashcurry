@@ -130,20 +130,44 @@ function localLoginEnv() {
 // Auto-save every 5 minutes. Data is otherwise saved only on a clean Ctrl+C;
 // if the emulators crash or the window is closed, everything since the last
 // save would be lost.
+//
+// Firestore (where nearly all changes are) is saved straight from its own
+// emulator, into a fresh folder first, and swapped in only once that export
+// is complete — so a failed save never leaves an empty copy behind. The CLI's
+// whole-suite `emulators:export` is not used for this: on Windows it crashed
+// the CLI mid-export (21 Oct 2026), taking every emulator down with it.
+// Accounts and files are still saved on Ctrl+C (--export-on-exit).
 const AUTOSAVE_MS = 5 * 60 * 1000;
 let saving = false;
+async function saveFirestore() {
+  const tmp = path.join(LOCAL_DIR, "autosave-tmp");
+  fs.rmSync(tmp, { recursive: true, force: true });
+  fs.mkdirSync(tmp, { recursive: true });
+  const res = await fetch(`http://127.0.0.1:8080/emulator/v1/projects/${LOCAL_PROJECT_ID}:export`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ database: `projects/${LOCAL_PROJECT_ID}/databases/(default)`, export_directory: tmp, export_name: "firestore_export" }),
+  });
+  if (!res.ok) throw new Error(`export ${res.status}`);
+  const fresh = path.join(tmp, "firestore_export");
+  if (!fs.existsSync(path.join(fresh, "firestore_export.overall_export_metadata"))) throw new Error("export left no metadata");
+  const target = path.join(EMULATOR_DATA_DIR, "firestore_export");
+  const old = path.join(LOCAL_DIR, "autosave-old");
+  fs.rmSync(old, { recursive: true, force: true });
+  if (fs.existsSync(target)) fs.renameSync(target, old);
+  fs.renameSync(fresh, target);
+  fs.rmSync(old, { recursive: true, force: true });
+  fs.rmSync(tmp, { recursive: true, force: true });
+}
 setInterval(() => {
   if (saving || stopping) return;
   saving = true;
-  const child = spawn(
-    "firebase",
-    ["emulators:export", `"${EMULATOR_DATA_DIR}"`, "--force", "--project", LOCAL_PROJECT_ID],
-    { cwd: ROOT, stdio: "ignore", shell: true }
-  );
-  child.on("exit", (code) => {
-    saving = false;
-    if (code === 0) console.log(`  [local data saved ${new Date().toLocaleTimeString()}]`);
-  });
+  saveFirestore()
+    .then(() => console.log(`  [local data saved ${new Date().toLocaleTimeString()}]`))
+    .catch((e) => console.log(`  [local data NOT saved: ${e.message} — the last save is kept]`))
+    .finally(() => {
+      saving = false;
+    });
 }, AUTOSAVE_MS).unref();
 
 console.log("\n  Local data ready — emulator dashboard: http://127.0.0.1:4000\n");
