@@ -10,7 +10,7 @@ import { Avatar, Badge, Button, Select, Sheet, Textarea, cn, toast } from "@/app
 import { FileThumb } from "@/app/components/common/Files";
 import { timeOf } from "@/lib/chat/model";
 import { canHandOver, chainText, repeatText } from "@/lib/tasks/model";
-import { addTaskComment, handOver, useTaskComments } from "@/lib/tasks/client";
+import { addTaskComment, handOver, markTaskRead, useTaskComments } from "@/lib/tasks/client";
 
 const dayText = (d) => format(parseISO(d), "EEE d MMM");
 const when = (t) => {
@@ -31,6 +31,10 @@ export default function TaskDetailSheet({ task, onClose, companyId, branchId, us
   useEffect(() => {
     end.current?.scrollIntoView({ block: "end" });
   }, [comments.length]);
+  // opened (and each new message while open): seen — the badge and the bell's notes go
+  useEffect(() => {
+    if (task?.id && user?.uid) markTaskRead(companyId, user.uid, task.id).catch(() => {});
+  }, [task?.id, task?.commentCount, companyId, user?.uid]);
   if (!task) return <Sheet open={false} onClose={onClose} />;
 
   const send = async () => {

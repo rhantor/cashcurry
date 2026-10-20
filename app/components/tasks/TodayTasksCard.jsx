@@ -5,15 +5,17 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { ChevronRight, ListChecks } from "lucide-react";
 import { useBusinessToday } from "@/app/hooks/useRegion";
-import { dayList } from "@/lib/tasks/model";
-import { useChecks, useTasks } from "@/lib/tasks/client";
+import { dayList, unreadOn } from "@/lib/tasks/model";
+import { useChecks, useTaskReads, useTasks } from "@/lib/tasks/client";
 
 export default function TodayTasksCard({ user, href = "/my-tasks" }) {
   const today = useBusinessToday();
   const { list: tasks, loading } = useTasks(user.companyId, user.branchId, { uid: user.uid });
   const { checks } = useChecks(user.companyId, user.branchId, { from: today, to: today, uid: user.uid });
+  const reads = useTaskReads(user.companyId, user.uid);
   const items = useMemo(() => dayList(tasks, checks, today, today), [tasks, checks, today]);
-  if (loading || !items.length) return null;
+  const fresh = tasks.filter((t) => unreadOn(t, reads, user.uid)).length;
+  if (loading || (!items.length && !fresh)) return null;
   const left = items.filter((x) => !x.done);
   return (
     <Link href={href} className="block rounded-2xl border border-line bg-surface p-4 transition hover:bg-surface-2">
@@ -23,7 +25,10 @@ export default function TodayTasksCard({ user, href = "/my-tasks" }) {
         </span>
         <span className="flex-1">
           <span className="block text-sm font-semibold text-fg">Today&apos;s tasks</span>
-          <span className="block text-xs text-muted">{left.length ? `${left.length} of ${items.length} left` : `All ${items.length} done`}</span>
+          <span className="block text-xs text-muted">
+            {items.length ? (left.length ? `${left.length} of ${items.length} left` : `All ${items.length} done`) : "Nothing today"}
+            {fresh > 0 && <span className="ml-2 font-semibold text-brand">· {fresh} with new messages</span>}
+          </span>
         </span>
         <ChevronRight className="size-4 text-subtle" />
       </span>

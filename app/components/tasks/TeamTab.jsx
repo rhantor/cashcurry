@@ -7,10 +7,11 @@ import { format, parseISO } from "date-fns";
 import { ArrowLeft, ChevronRight, Flag, MoreHorizontal, Pause, Pencil, Play, Plus, Repeat, Trash2, Users } from "lucide-react";
 import { Avatar, Badge, Button, EmptyState, Menu, Skeleton, Tabs, cn, toast } from "@/app/components/ui";
 import { confirmDialog } from "@/app/components/ui/notify";
-import { CATCH_UP_DAYS, addDays, repeatText, todayCount } from "@/lib/tasks/model";
+import { CATCH_UP_DAYS, addDays, repeatText, todayCount, unreadOn } from "@/lib/tasks/model";
 import { deleteTask, setTaskActive, useChecks } from "@/lib/tasks/client";
 import TaskSheet from "./TaskSheet";
 import MyTasksTab from "./MyTasksTab";
+import MessageBadge from "./MessageBadge";
 
 const label = (d) => format(parseISO(d), "d MMM");
 
@@ -24,7 +25,7 @@ function Progress({ done, total, className }) {
 }
 
 /** Every task given to one person, to change, stop or delete. */
-function GivenList({ tasks, onEdit, companyId, branchId, today }) {
+function GivenList({ tasks, onEdit, onOpen, companyId, branchId, today, reads, uid }) {
   const remove = async (t) => {
     if (!(await confirmDialog({ title: "Delete this task?", message: `“${t.title}” goes. Days already ticked stay in the performance figures.`, confirmLabel: "Delete", danger: true }))) return;
     try {
@@ -49,7 +50,12 @@ function GivenList({ tasks, onEdit, companyId, branchId, today }) {
       {sorted.map((t) => (
         <li key={t.id} className={cn("flex items-start gap-3 px-4 py-3", t.active === false && "opacity-60")}>
           <div className="min-w-0 flex-1 space-y-1">
-            <p className="text-sm font-medium text-fg">{t.title}</p>
+            <span className="flex items-start gap-2">
+              <button type="button" onClick={() => onOpen(t)} className="min-w-0 flex-1 text-left text-sm font-medium text-fg hover:underline">{t.title}</button>
+              <button type="button" onClick={() => onOpen(t)} className="shrink-0" aria-label="Open questions and answers">
+                <MessageBadge count={t.commentCount || 0} unread={unreadOn(t, reads, uid)} />
+              </button>
+            </span>
             <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-muted">
               {t.repeat ? <span className="inline-flex items-center gap-1"><Repeat className="size-3" />{repeatText(t)}</span> : <span>{t.dueDate ? `By ${label(t.dueDate)}` : "Once, any time"}</span>}
               {t.priority === "urgent" && <Flag className="size-3 text-danger" aria-label="Urgent" />}
@@ -80,7 +86,7 @@ function GivenList({ tasks, onEdit, companyId, branchId, today }) {
  * supervisor. people: who can be given tasks (a supervisor: their team).
  * leadFor(uid): who leads a new task for that person.
  */
-export default function TeamTab({ tasks, loading, people, companyId, branchId, user, today, scope = { all: true }, leadFor }) {
+export default function TeamTab({ tasks, loading, people, companyId, branchId, user, today, scope = { all: true }, leadFor, reads = {}, onOpenTask }) {
   const [editing, setEditing] = useState(null); // a task, or { new: true, assigneeUid }
   const [openUid, setOpenUid] = useState(null);
   const [view, setView] = useState("todo");
@@ -93,10 +99,10 @@ export default function TeamTab({ tasks, loading, people, companyId, branchId, u
     return [...byUid.values()]
       .map((p) => {
         const mine = tasks.filter((t) => t.assigneeUid === p.uid);
-        return { person: p, tasks: mine, ...todayCount(mine, checks, today) };
+        return { person: p, tasks: mine, unread: mine.filter((t) => unreadOn(t, reads, user.uid)).length, ...todayCount(mine, checks, today) };
       })
       .sort((a, b) => Number(!a.tasks.length) - Number(!b.tasks.length) || b.late - a.late || String(a.person.name).localeCompare(String(b.person.name)));
-  }, [people, tasks, checks, today]);
+  }, [people, tasks, checks, today, reads, user.uid]);
   const total = rows.reduce((n, r) => n + r.total, 0);
   const done = rows.reduce((n, r) => n + r.done, 0);
   const late = rows.reduce((n, r) => n + r.late, 0);
@@ -144,9 +150,9 @@ export default function TeamTab({ tasks, loading, people, companyId, branchId, u
           ]}
         />
         {view === "todo" ? (
-          <MyTasksTab tasks={open.tasks} loading={false} companyId={companyId} branchId={branchId} user={user} today={today} person={open.person} readOnly scope={scope} />
+          <MyTasksTab tasks={open.tasks} loading={false} companyId={companyId} branchId={branchId} user={user} today={today} person={open.person} readOnly scope={scope} reads={reads} />
         ) : (
-          <GivenList tasks={open.tasks} onEdit={setEditing} companyId={companyId} branchId={branchId} today={today} />
+          <GivenList tasks={open.tasks} onEdit={setEditing} onOpen={(t) => onOpenTask?.(t.id)} companyId={companyId} branchId={branchId} today={today} reads={reads} uid={user.uid} />
         )}
         {sheet}
       </div>
@@ -188,6 +194,7 @@ export default function TeamTab({ tasks, loading, people, companyId, branchId, u
                   <span className="flex items-center gap-2">
                     <span className="truncate text-sm font-medium text-fg">{r.person.name}</span>
                     {r.late > 0 && <Badge tone="danger" className="shrink-0 px-2 py-px text-[10px]">{r.late} late</Badge>}
+                    {r.unread > 0 && <MessageBadge count={r.unread} unread />}
                   </span>
                   {r.tasks.length ? (
                     r.total ? <Progress done={r.done} total={r.total} /> : <span className="block text-xs text-muted">Nothing today</span>

@@ -896,7 +896,13 @@ service cloud.firestore {
             (canTasksTeam(companyId, branchId) && resource.data.get('assigneeUid', '') == request.auth.uid &&
               changedKeys().hasOnly(['assignee', 'assigneeUid', 'teamLeadUid', 'via', 'updatedAt']) &&
               request.resource.data.teamLeadUid == request.auth.uid &&
-              inMyTeam(companyId, branchId, request.resource.data.assigneeUid));
+              inMyTeam(companyId, branchId, request.resource.data.assigneeUid)) ||
+            // a new question or answer: whoever can see it counts it up by one, as themselves
+            (canSeeTask(companyId, branchId, resource.data) &&
+              changedKeys().hasOnly(['commentCount', 'lastCommentAt', 'lastCommentByUid']) &&
+              request.resource.data.commentCount == resource.data.get('commentCount', 0) + 1 &&
+              request.resource.data.lastCommentAt == request.time &&
+              request.resource.data.lastCommentByUid == request.auth.uid);
           allow delete: if canTasksManage(companyId, branchId) ||
             (canTasksTeam(companyId, branchId) && resource.data.get('creatorUid', '') == request.auth.uid &&
               resource.data.get('teamLeadUid', '') == request.auth.uid);
