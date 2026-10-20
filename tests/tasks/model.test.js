@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, canManageTasks, checkId, checkTask, dayList, monthOf, occursOn, performance, repeatText } from "@/lib/tasks/model";
+import { addDays, agenda, canManageTasks, todayCount, checkId, checkTask, dayList, monthOf, occursOn, performance, repeatText } from "@/lib/tasks/model";
 
 const ali = { uid: "ali", name: "Ali" };
 const daily = { id: "fryer", title: "Clean the fryer", assigneeUid: "ali", assignee: ali, repeat: { every: "day" }, startDate: "2026-10-01", active: true };
@@ -94,5 +94,46 @@ describe("the rest", () => {
   it("what a task needs before saving", () => {
     expect(checkTask({ title: " ", repeat: { every: "week", days: [] } })).toEqual({ title: "What needs doing?", assignee: "Who does it?", repeat: "Pick at least one day" });
     expect(checkTask({ title: "Mop", assignee: ali, repeat: null })).toEqual({});
+  });
+});
+
+describe("the to-do list", () => {
+  const today = "2026-10-20"; // a Tuesday
+  const tasks = [
+    { ...daily, startDate: "2026-10-15" },
+    { ...mondays, startDate: "2026-10-01" },
+    { ...once, id: "late1", dueDate: "2026-10-18" },
+    { ...once, id: "now", title: "Today's one", dueDate: today },
+    { ...once, id: "tmr", title: "Tomorrow's one", dueDate: "2026-10-21" },
+    { ...once, id: "wk", title: "This week", dueDate: "2026-10-24" },
+    { ...once, id: "far", title: "Far off", dueDate: "2026-11-30" },
+    { ...once, id: "any", title: "Whenever", dueDate: null },
+  ];
+  const checks = { [checkId("fryer", "2026-10-15")]: { doneOn: "2026-10-15" }, [checkId("fryer", today)]: { doneOn: today } };
+  const a = agenda(tasks, checks, today);
+  it("late: missed days of the last week and overdue one-offs, oldest first", () => {
+    expect(a.late.map((x) => [x.task.id, x.date])).toEqual([
+      ["fryer", "2026-10-16"],
+      ["fryer", "2026-10-17"],
+      ["fryer", "2026-10-18"],
+      ["late1", "2026-10-18"],
+      ["fryer", "2026-10-19"],
+      ["stock", "2026-10-19"],
+    ]);
+    expect(a.late.every((x) => x.canTick)).toBe(true);
+  });
+  it("today: the checklist (done last) and what is due today", () => {
+    expect(a.today.map((x) => [x.task.id, x.done])).toEqual([["now", false], ["fryer", true]]);
+  });
+  it("tomorrow, this week (the next Monday), later and anytime", () => {
+    expect(a.tomorrow.map((x) => x.task.id)).toEqual(["fryer", "tmr"]);
+    expect(a.tomorrow.find((x) => x.task.id === "fryer").canTick).toBe(false); // not yet
+    expect(a.tomorrow.find((x) => x.task.id === "tmr").canTick).toBe(true); // a one-off can be done early
+    expect(a.week.map((x) => [x.task.id, x.date])).toEqual([["wk", "2026-10-24"], ["stock", "2026-10-26"]]);
+    expect(a.later.map((x) => x.task.id)).toEqual(["far"]);
+    expect(a.anytime.map((x) => x.task.id)).toEqual(["any"]);
+  });
+  it("today at a glance", () => {
+    expect(todayCount(tasks, checks, today)).toEqual({ total: 2, done: 1, late: 6 });
   });
 });

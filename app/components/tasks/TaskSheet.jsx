@@ -34,16 +34,19 @@ function fromTask(t, today) {
   };
 }
 
-/** task: the one to change, or null for a new one. people: who it can be given to [{ uid, name, role }]. */
-export default function TaskSheet({ open, onClose, task, people, companyId, branchId, user, today }) {
+/**
+ * task: the one to change, or null for a new one. people: who it can be given
+ * to [{ uid, name, role }]; defaultAssigneeUid: picked already (from a person's page).
+ */
+export default function TaskSheet({ open, onClose, task, defaultAssigneeUid, people, companyId, branchId, user, today }) {
   const [f, setF] = useState(() => blank(today));
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     if (!open) return;
-    setF(task ? fromTask(task, today) : blank(today));
+    setF(task ? fromTask(task, today) : { ...blank(today), assigneeUid: defaultAssigneeUid || "" });
     setErrors({});
-  }, [open, task, today]);
+  }, [open, task, today, defaultAssigneeUid]);
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
 
   const save = async () => {
