@@ -390,14 +390,14 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
     const passer = after.via?.length ? after.via[after.via.length - 1] : null;
     if (after.assigneeUid && after.assigneeUid !== before?.assigneeUid && after.assigneeUid !== after.creatorUid) {
       const by = passer?.name || after.createdBy?.name || "Your manager";
-      await deliver({ companyId, branchId, uids: [after.assigneeUid], type: "tasks.mine", message: { title: `New task · ${b.name}`, body: `${what}${when ? ` — ${when}` : ""} · from ${by}` }, link: linkFor(after.assigneeUid), ref: `tasks/${id}` });
+      await deliver({ companyId, branchId, uids: [after.assigneeUid], type: "tasks.mine", message: { title: `New task · ${b.name}`, body: `${what}${when ? ` — ${when}` : ""} · from ${by}` }, link: `${linkFor(after.assigneeUid)}?task=${id}`, ref: `tasks/${id}` });
     }
     // handed on by a supervisor: whoever gave it hears who is doing it now
     if (before && (after.via?.length || 0) > (before.via?.length || 0) && after.creatorUid && after.creatorUid !== passer?.uid) {
-      await deliver({ companyId, branchId, uids: [after.creatorUid], type: "tasks.mine", message: { title: "Task handed on", body: `${what} — ${passer?.name || "Your supervisor"} gave it to ${after.assignee?.name || "someone"}` }, link: `${linkFor(after.creatorUid)}?tab=team`, ref: `tasks/${id}` });
+      await deliver({ companyId, branchId, uids: [after.creatorUid], type: "tasks.mine", message: { title: "Task handed on", body: `${what} — ${passer?.name || "Your supervisor"} gave it to ${after.assignee?.name || "someone"}` }, link: `${linkFor(after.creatorUid)}?task=${id}`, ref: `tasks/${id}` });
     }
     if (!after.repeat && before?.status !== "done" && after.status === "done" && after.creatorUid && after.done?.by?.uid !== after.creatorUid) {
-      await deliver({ companyId, branchId, uids: [after.creatorUid], type: "tasks.mine", message: { title: "Task done", body: `${what} — ${after.done?.by?.name || "someone"}${after.done?.note ? `: “${after.done.note}”` : ""}` }, link: `${linkFor(after.creatorUid)}?tab=team`, ref: `tasks/${id}` });
+      await deliver({ companyId, branchId, uids: [after.creatorUid], type: "tasks.mine", message: { title: "Task done", body: `${what} — ${after.done?.by?.name || "someone"}${after.done?.note ? `: “${after.done.note}”` : ""}` }, link: `${linkFor(after.creatorUid)}?task=${id}`, ref: `tasks/${id}` });
     }
   }
 
@@ -419,7 +419,7 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
         uids: [u],
         type: "tasks.mine",
         message: { title: `${asking ? "Question" : "Reply"} on “${t.title}”`, body: `${comment.byName || "Someone"}: ${text}` },
-        link: roleOf(u) === "staff" ? "/my-tasks" : u === t.assigneeUid ? "/tasks?tab=mine" : "/tasks?tab=team",
+        link: `${roleOf(u) === "staff" ? "/my-tasks" : "/tasks"}?task=${taskId}`,
         ref: `tasks/${taskId}`,
         tag: `task_${taskId}`,
       });
