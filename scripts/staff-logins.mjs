@@ -10,7 +10,7 @@
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { LOCAL_PROJECT_ID } from "./local/config.mjs";
-import { loginKeys } from "../lib/staffLogin.js";
+import { loginKeys } from "../lib/staff/login.js";
 
 const arg = (name) => {
   const i = process.argv.indexOf(name);

@@ -8,13 +8,13 @@ import {
   useGetPayrollSlipsQuery,
   useDeletePayrollRunMutation,
 } from '@/lib/redux/api/payrollRunApiSlice'
-import { periodLabel } from '@/utils/payrollCalculations'
+import { periodLabel } from '@/lib/payroll/calculations'
 import { useGetBranchSettingsQuery } from '@/lib/redux/api/branchSettingsApiSlice'
 import { useGetCompanyDetailsQuery } from '@/lib/redux/api/authApiSlice'
 import { useGetSingleBranchQuery } from '@/lib/redux/api/branchApiSlice'
 import { useGetStaffListQuery } from '@/lib/redux/api/staffApiSlice'
 import PayrollPrintView from '../components/PayrollPrintView'
-import useResolvedCompanyBranch from '@/utils/useResolvedCompanyBranch'
+import useResolvedCompanyBranch from '@/app/hooks/useResolvedCompanyBranch'
 import { can } from '@/lib/authz/permissions'
 import { toast, confirmDialog } from "@/app/components/ui/notify";
 import { format } from 'date-fns'

@@ -7,7 +7,7 @@ import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { useAddRepaymentEntryMutation } from "@/lib/redux/api/loanApiSlice";
 import { useGetBranchesBasicQuery } from "@/lib/redux/api/branchApiSlice";
 import useCurrency from "@/app/hooks/useCurrency";
-import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
+import useResolvedCompanyBranch from "@/app/hooks/useResolvedCompanyBranch";
 import { formatMoney } from "@/lib/region/currency";
 import { Button, Card, Field, Input, toast } from "@/app/components/ui";
 import MoneyInput from "@/app/components/entry/MoneyInput";

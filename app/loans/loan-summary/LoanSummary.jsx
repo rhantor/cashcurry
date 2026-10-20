@@ -9,9 +9,9 @@ import { useGetBranchesBasicQuery } from "@/lib/redux/api/branchApiSlice";
 import LoanPayCards from "./LoanPayCards";
 import LoanActivityFeed from "./LoanActivityFeed";
 import useCurrency from "@/app/hooks/useCurrency";
-import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
+import useResolvedCompanyBranch from "@/app/hooks/useResolvedCompanyBranch";
 import { formatMoney } from "@/lib/region/currency";
-import { exportLoanSummaryToExcel, exportLoanSummaryToPDF } from "@/utils/export/exportLoanSummary";
+import { exportLoanSummaryToExcel, exportLoanSummaryToPDF } from "@/app/export/exportLoanSummary";
 import { Badge, Button, Card, DateRangePicker, EmptyState, Menu, Skeleton, Tabs, cn } from "@/app/components/ui";
 
 import { personName } from "@/lib/people";

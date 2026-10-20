@@ -233,7 +233,7 @@ export function buildDemoCompany(today = new Date()) {
       // A staff login is linked both ways, as create-staff does it.
       ...(s.login ? { uid: uid(s.login), loginEmail: emailOf(s.login) } : {}),
     });
-    // pay apart from the record, readable only by those who see pay (lib/staffPrivate.js)
+    // pay apart from the record, readable only by those who see pay (lib/staff/private.js)
     push(s.branchId, "staffPrivate", { id: s.id, staffId: s.id, basicSalary: s.basicSalary, allowance: "0", icNumber: s.ic || "" });
   }
 

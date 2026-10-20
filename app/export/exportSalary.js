@@ -1,4 +1,4 @@
-// utils/exportSalary.js
+// app/export/exportSalary.js
 // Minimal exporters mirroring your sales exporters’ signatures.
 
 import { jsPDF } from "jspdf";

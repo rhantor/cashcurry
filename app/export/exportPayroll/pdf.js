@@ -6,7 +6,7 @@
 
 import { jsPDF } from 'jspdf'
 import autoTable from 'jspdf-autotable'
-import { periodLabel } from '@/utils/payrollCalculations'
+import { periodLabel } from '@/lib/payroll/calculations'
 import { toast } from "@/app/components/ui/notify";
 import { buildCols, buildHeaders, buildPDFHeaders, buildRow, buildTotalRow, drawCompactPayslipToPDF, drawCuttingLine, drawPayslipToPDF } from "./helpers";
 

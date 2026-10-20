@@ -2,10 +2,10 @@
 // figures each screen shows. The calling test file must mock the data layer
 // (see finance.test.js).
 import { renderHook, waitFor } from "@testing-library/react";
-import { useSummaryReportLogic } from "@/hook/useSummaryReportLogic";
-import useBranchData from "@/utils/dashboard/useBranchData";
-import useCompanyData from "@/utils/dashboard/useCompanyData";
-import { useDataset } from "./fakeBackend";
+import { useSummaryReportLogic } from "@/app/hooks/useSummaryReportLogic";
+import useBranchData from "@/app/hooks/dashboard/useBranchData";
+import useCompanyData from "@/app/hooks/dashboard/useCompanyData";
+import { pointAtDataset } from "./fakeBackend";
 
 /** Round to cents; turns -0 into 0 so goldens don't flip on sign of zero. */
 export const cents = (v) => {
@@ -40,7 +40,7 @@ export const COMPANY_DASHBOARD_KEYS = [
 
 /** Summary report (reports page), "By Month" or "Date Range" filter. */
 export function summary(dataset, branchId, filterState) {
-  useDataset(dataset, branchId);
+  pointAtDataset(dataset, branchId);
   const { result, unmount } = renderHook(() => useSummaryReportLogic(filterState, "all"));
   const kpis = result.current.computed.kpis;
   unmount();
@@ -63,7 +63,7 @@ export function centsDeep(v) {
  * the day rows (raw cost records reduced to their ids) and period totals.
  */
 export function summaryDetail(dataset, branchId, filterState) {
-  useDataset(dataset, branchId);
+  pointAtDataset(dataset, branchId);
   const { result, unmount } = renderHook(() => useSummaryReportLogic(filterState, "all"));
   const c = result.current.computed;
   unmount();
@@ -90,7 +90,7 @@ const COMPANY_CHARTS = [
 
 /** Chart series on the branch dashboard. */
 export function branchCharts(dataset, branchId, filter) {
-  useDataset(dataset, branchId);
+  pointAtDataset(dataset, branchId);
   const { result, unmount } = renderHook(() => useBranchData(filter));
   const out = Object.fromEntries(BRANCH_CHARTS.map((k) => [k, result.current[k]]));
   unmount();
@@ -99,7 +99,7 @@ export function branchCharts(dataset, branchId, filter) {
 
 /** Chart series on the company dashboard. */
 export async function companyCharts(dataset, filter) {
-  useDataset(dataset, null);
+  pointAtDataset(dataset, null);
   const { result, unmount } = renderHook(() => useCompanyData(filter));
   // The full company backup can take more than waitFor's default 1s while the
   // machine is busy (dev server, emulators) — that made this test flaky.
@@ -116,7 +116,7 @@ export async function companyCharts(dataset, filter) {
 
 /** Which source the branch dashboard used ("fast" | "full"). */
 export function branchDataSource(dataset, branchId, filter) {
-  useDataset(dataset, branchId);
+  pointAtDataset(dataset, branchId);
   const { result, unmount } = renderHook(() => useBranchData(filter));
   const out = result.current.dataSource;
   unmount();
@@ -125,7 +125,7 @@ export function branchDataSource(dataset, branchId, filter) {
 
 /** Branch dashboard KPIs for a dashboard filter ({ from, to, preset }). */
 export function branchDashboard(dataset, branchId, filter) {
-  useDataset(dataset, branchId);
+  pointAtDataset(dataset, branchId);
   const { result, unmount } = renderHook(() => useBranchData(filter));
   const out = pick(result.current, BRANCH_DASHBOARD_KEYS);
   unmount();
@@ -134,7 +134,7 @@ export function branchDashboard(dataset, branchId, filter) {
 
 /** Company dashboard KPIs for a dashboard filter. Loads asynchronously. */
 export async function companyDashboard(dataset, filter) {
-  useDataset(dataset, null);
+  pointAtDataset(dataset, null);
   const { result, unmount } = renderHook(() => useCompanyData(filter));
   // The full company backup can take more than waitFor's default 1s while the
   // machine is busy (dev server, emulators) — that made this test flaky.

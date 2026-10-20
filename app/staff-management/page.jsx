@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useMemo, useState } from 'react'
-import useResolvedCompanyBranch from '@/utils/useResolvedCompanyBranch'
+import useResolvedCompanyBranch from '@/app/hooks/useResolvedCompanyBranch'
 import {
   useGetStaffListQuery,
   useAddStaffMutation,

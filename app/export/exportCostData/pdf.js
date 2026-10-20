@@ -1,6 +1,6 @@
 // exportCostData: the pdf part (moved from exportCostData.js unchanged).
 /* eslint-disable no-empty */
-// /utils/export/exportCostData.js
+// app/export/exportCostData.js
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { format } from "date-fns";

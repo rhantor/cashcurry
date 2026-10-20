@@ -8,7 +8,7 @@ import useReportData from "@/app/hooks/useReportData";
 import { useGetSalesEntriesQuery } from "@/lib/redux/api/salesApiSlice";
 import SalesReportModal from "./SalesReportModal";
 import SalesEditModal from "./SalesEditModal";
-import { exportSalesToExcel, exportSalesToPDF } from "@/utils/export/exportData";
+import { exportSalesToExcel, exportSalesToPDF } from "@/app/export/exportData";
 import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/lib/region/currency";
 import { Button, Skeleton } from "@/app/components/ui";

@@ -1,6 +1,6 @@
 // exportCostData: the helpers part (moved from exportCostData.js unchanged).
  
-// /utils/export/exportCostData.js
+// app/export/exportCostData.js
 import { format } from "date-fns";
 import { categoryLabel } from "@/app/entry-data/cost-entry/logic/constants";
 

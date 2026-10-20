@@ -5,7 +5,7 @@ import { ArrowLeftRight, ArrowRight, ExternalLink, HandCoins } from "lucide-reac
 import { useGetLoanActivitiesQuery } from "@/lib/redux/api/loanApiSlice";
 import { useGetBranchesBasicQuery } from "@/lib/redux/api/branchApiSlice";
 import useCurrency from "@/app/hooks/useCurrency";
-import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
+import useResolvedCompanyBranch from "@/app/hooks/useResolvedCompanyBranch";
 import { formatMoney } from "@/lib/region/currency";
 import { Badge, Card, Skeleton, Tabs, cn } from "@/app/components/ui";
 import { Chip } from "@/app/components/entry/Choices";

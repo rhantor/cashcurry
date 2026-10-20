@@ -3,7 +3,7 @@ import React, { useMemo, useState } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { Download, Eye, FileSpreadsheet, FileText, MoreHorizontal, Pencil, Plus, RefreshCcw, Search, Store, Trash2, Wallet, CheckCircle2 } from "lucide-react";
 import { useGetVendorsQuery, useAddVendorMutation, useUpdateVendorMutation, useDeleteVendorMutation } from "@/lib/redux/api/vendorsApiSlice";
-import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
+import useResolvedCompanyBranch from "@/app/hooks/useResolvedCompanyBranch";
 import useCurrency from "@/app/hooks/useCurrency";
 import useSession from "@/app/hooks/useSession";
 import { formatMoney } from "@/lib/region/currency";

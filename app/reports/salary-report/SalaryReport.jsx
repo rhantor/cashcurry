@@ -7,7 +7,7 @@ import { useGetSalaryEntriesQuery } from "@/lib/redux/api/salaryApiSlice";
 import ReportPage from "@/app/components/common/ReportPage";
 import ReportErrorState from "@/app/components/common/ReportErrorState";
 import useReportData from "@/app/hooks/useReportData";
-import { exportSalariesToExcel, exportSalariesToPDF } from "@/utils/export/exportSalary";
+import { exportSalariesToExcel, exportSalariesToPDF } from "@/app/export/exportSalary";
 import { splitSalaryMonth } from "@/lib/payroll/splitSalaryMonth";
 import { COLOR, ChartCard, RankedBars } from "@/app/components/dashboard/charts/kit";
 import useCurrency from "@/app/hooks/useCurrency";

@@ -6,7 +6,7 @@ import { useGetStaffLoansQuery } from "@/lib/redux/api/staffLoanApiSlice";
 import useReportData from "@/app/hooks/useReportData";
 import ReportPage from "@/app/components/common/ReportPage";
 import ReportErrorState from "@/app/components/common/ReportErrorState";
-import { exportStaffLoanTotalsToExcel, exportStaffLoanTotalsToPDF, exportStaffLoansToExcel, exportStaffLoansToPDF } from "@/utils/export/exportStaffLoans";
+import { exportStaffLoanTotalsToExcel, exportStaffLoanTotalsToPDF, exportStaffLoansToExcel, exportStaffLoansToPDF } from "@/app/export/exportStaffLoans";
 import { Chip } from "@/app/components/entry/Choices";
 import { COLOR, ChartCard, RankedBars } from "@/app/components/dashboard/charts/kit";
 import useCurrency from "@/app/hooks/useCurrency";

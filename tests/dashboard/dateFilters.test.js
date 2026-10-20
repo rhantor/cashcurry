@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { presetFilter, filterFromInput, filterToInput, dayKeyOfFilter } from "@/utils/dashboard/dateFilters";
-import { dayKey } from "@/utils/dashboard/utils";
+import { presetFilter, filterFromInput, filterToInput, dayKeyOfFilter } from "@/app/hooks/dashboard/dateFilters";
+import { dayKey } from "@/app/hooks/dashboard/utils";
 
 // Tests run in Asia/Kuala_Lumpur (UTC+8) — see vitest.config.mjs.
 const at = (y, m, d, h = 0, min = 0, s = 0) => new Date(y, m - 1, d, h, min, s);

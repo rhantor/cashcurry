@@ -31,7 +31,7 @@ export default function PayrollPrintView ({ mode, singleSlip, slips, branchName,
               <button 
                 onClick={() => {
                   if (slip) {
-                    import('@/utils/export/exportPayroll').then(({ exportPayslipToPDF }) => {
+                    import('@/app/export/exportPayroll').then(({ exportPayslipToPDF }) => {
                       exportPayslipToPDF(slip, branchName, period, companyName)
                     })
                   }
@@ -58,7 +58,7 @@ export default function PayrollPrintView ({ mode, singleSlip, slips, branchName,
                           onClick={() => {
                             setShowLayoutMenu(false)
                             if (slips) {
-                              import('@/utils/export/exportPayroll').then(({ exportAllPayslipsToPDF }) => {
+                              import('@/app/export/exportPayroll').then(({ exportAllPayslipsToPDF }) => {
                                 exportAllPayslipsToPDF(slips, branchName, period, companyName, false)
                               })
                             }
@@ -76,7 +76,7 @@ export default function PayrollPrintView ({ mode, singleSlip, slips, branchName,
                           onClick={() => {
                             setShowLayoutMenu(false)
                             if (slips) {
-                              import('@/utils/export/exportPayroll').then(({ exportAllPayslipsToPDF }) => {
+                              import('@/app/export/exportPayroll').then(({ exportAllPayslipsToPDF }) => {
                                 exportAllPayslipsToPDF(slips, branchName, period, companyName, true)
                               })
                             }
@@ -96,7 +96,7 @@ export default function PayrollPrintView ({ mode, singleSlip, slips, branchName,
                 <button 
                   onClick={() => {
                     if (slips) {
-                      import('@/utils/export/exportPayroll').then(({ exportPayrollToPDF }) => {
+                      import('@/app/export/exportPayroll').then(({ exportPayrollToPDF }) => {
                         exportPayrollToPDF(slips, branchName, period, run, companyName)
                       })
                     }

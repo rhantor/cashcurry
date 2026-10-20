@@ -3,7 +3,7 @@ import React, { useMemo, useState } from "react";
 import { ArrowLeftRight, ArrowRight, ExternalLink, HandCoins } from "lucide-react";
 import { useGetLoanActivitiesQuery } from "@/lib/redux/api/loanApiSlice";
 import { useGetBranchesBasicQuery } from "@/lib/redux/api/branchApiSlice";
-import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
+import useResolvedCompanyBranch from "@/app/hooks/useResolvedCompanyBranch";
 import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/lib/region/currency";
 import { Badge, Card, EmptyState, Skeleton, Tabs, cn } from "@/app/components/ui";

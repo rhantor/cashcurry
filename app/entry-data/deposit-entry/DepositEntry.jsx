@@ -8,7 +8,7 @@ import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 import { useAddDepositEntryMutation, useGetDepositEntryQuery } from "@/lib/redux/api/depositApiSlice";
 import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
-import { exportDepositToExcel, exportDepositToPDF, shareDeposit } from "@/utils/export/exportDepositData";
+import { exportDepositToExcel, exportDepositToPDF, shareDeposit } from "@/app/export/exportDepositData";
 import useCurrency from "@/app/hooks/useCurrency";
 import useSession from "@/app/hooks/useSession";
 import { useDefaultDate } from "@/app/hooks/useRegion";

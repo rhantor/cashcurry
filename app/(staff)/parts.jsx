@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ChevronRight, Clock, Coffee, MoonStar, Timer } from "lucide-react";
 import { Sheet, Skeleton, cn } from "@/app/components/ui";
-import { formatMoney } from "@/utils/formatMoney";
+import { formatMoney } from "@/lib/format/money";
 
 const monthName = (period) => {
   const [y, m] = String(period || "").split("-").map(Number);

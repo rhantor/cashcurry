@@ -59,7 +59,7 @@ function diffPaths(a, b, at = []) {
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
   return [...keys].flatMap((k) => diffPaths(a[k], b[k], [...at, k]));
 }
-import { presetFilter } from "@/utils/dashboard/dateFilters";
+import { presetFilter } from "@/app/hooks/dashboard/dateFilters";
 import { buildDemoCompany, KL as DEMO_KL, PJ as DEMO_PJ } from "@/scripts/local/demo/demoCompany.mjs";
 import { setLedgerMode, fetched } from "./fakeBackend";
 
@@ -87,8 +87,8 @@ vi.mock("@/lib/session", async () => {
   const fb = await import("./fakeBackend");
   return { getSessionUser: () => ({ uid: "test-owner", role: "owner", companyId: fb.currentCompanyId() }) };
 });
-vi.mock("@/utils/export/exportSummary", () => ({ makeFilterText: () => "" }));
-vi.mock("@/utils/useResolvedCompanyBranch", async () => {
+vi.mock("@/app/export/exportSummary", () => ({ makeFilterText: () => "" }));
+vi.mock("@/app/hooks/useResolvedCompanyBranch", async () => {
   const fb = await import("./fakeBackend");
   return {
     default: () => ({

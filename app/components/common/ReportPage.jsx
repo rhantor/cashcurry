@@ -8,7 +8,7 @@ import { formatMoney } from "@/lib/region/currency";
 import { Button, Card, CountUp, DataTable, Input, Menu, Skeleton, cn } from "@/app/components/ui";
 import { COLOR, ChartCard, TimeChart } from "@/app/components/dashboard/charts/kit";
 import PeriodBar from "@/app/components/dashboard/PeriodBar";
-import { dayKeyOfFilter, presetFilter } from "@/utils/dashboard/dateFilters";
+import { dayKeyOfFilter, presetFilter } from "@/app/hooks/dashboard/dateFilters";
 
 // The export functions name the period by the old filter types; this maps
 // the dashboard's periods onto them so their titles keep working.

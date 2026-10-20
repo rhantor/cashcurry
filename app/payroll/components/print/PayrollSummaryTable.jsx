@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { fmtAmt, periodLabel } from '@/utils/payrollCalculations'
+import { fmtAmt, periodLabel } from '@/lib/payroll/calculations'
 import useCurrency from '@/app/hooks/useCurrency'
 import { currencyInfo } from '@/lib/region/currency'
 import { TH, TD } from './printParts'

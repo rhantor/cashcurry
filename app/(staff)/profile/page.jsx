@@ -10,7 +10,7 @@ import { db } from "@/lib/firebase";
 import useSession from "@/app/hooks/useSession";
 import { Avatar, Skeleton, Switch, cn, confirmDialog, toast } from "@/app/components/ui";
 import { signOut } from "@/lib/session";
-import { enablePush, pushState } from "@/lib/notifications/push";
+import { enablePush, pushState } from "@/lib/notify/push";
 import { fingerprintAvailable, isNativeApp, lockEnabled, nativePushState, setFingerprintLock, startNativePush } from "@/lib/native";
 import { removeMyPhoto, saveMyPhoto } from "@/lib/staff/self";
 import { ROLES } from "@/app/staff-management/lib/constants";

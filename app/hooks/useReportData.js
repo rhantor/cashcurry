@@ -2,7 +2,7 @@ import { useState } from "react";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
-import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
+import useResolvedCompanyBranch from "@/app/hooks/useResolvedCompanyBranch";
 
 export default function useReportData() {
   const { ready, companyId, branchId } = useResolvedCompanyBranch();

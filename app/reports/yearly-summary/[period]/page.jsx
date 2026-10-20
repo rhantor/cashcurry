@@ -8,7 +8,7 @@ import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/lib/region/currency";
 import { categoryLabel } from "@/app/entry-data/cost-entry/logic/constants";
 import { Button, Card, CountUp, EmptyState, Menu, Skeleton, cn } from "@/app/components/ui";
-import { useSummaryReportLogic } from "@/hook/useSummaryReportLogic";
+import { useSummaryReportLogic } from "@/app/hooks/useSummaryReportLogic";
 import {
   buildStatementColumns,
   buildStatementRow,
@@ -19,7 +19,7 @@ import {
   exportStatementToPDF,
   monthTitle,
   STATEMENT_FOOTNOTES,
-} from "@/utils/export/exportMonthlyStatement";
+} from "@/app/export/exportMonthlyStatement";
 
 const PERIOD_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 

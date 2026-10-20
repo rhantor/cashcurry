@@ -4,7 +4,7 @@ import { Select } from "@/app/components/ui";
 import { formatMoney } from "@/lib/region/currency";
 import React, { useMemo, useState } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
-import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
+import useResolvedCompanyBranch from "@/app/hooks/useResolvedCompanyBranch";
 import {
   useGetOrderGuidesQuery,
   useAddOrderGuideMutation,

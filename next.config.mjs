@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // A check build can run beside the dev server: NEXT_DIST_DIR=.next-check npm run build
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   eslint: {
     ignoreDuringBuilds: true,
   },

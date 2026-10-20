@@ -23,14 +23,14 @@ import {
   useLazyGetOtRequestsQuery
 } from '@/lib/redux/api/attendanceApiSlice'
 import { shiftsEnabled } from '@/lib/attendance/shifts'
-import { calcPayroll, fmtAmt, toPeriodKey, periodLabel } from '@/utils/payrollCalculations'
+import { calcPayroll, fmtAmt, toPeriodKey, periodLabel } from '@/lib/payroll/calculations'
 import { allocateTaken } from '@/lib/payroll/repayments'
-import { exportPayrollToPDF, exportPayrollToExcel } from '@/utils/export/exportPayroll'
+import { exportPayrollToPDF, exportPayrollToExcel } from '@/app/export/exportPayroll'
 import { computeAttendance } from '@/lib/attendance/computeHours'
 import { startOfMonth, endOfMonth, addDays, subDays, format } from 'date-fns'
 import { skipToken } from '@reduxjs/toolkit/query'
 import PayrollPrintView from './components/PayrollPrintView'
-import useResolvedCompanyBranch from '@/utils/useResolvedCompanyBranch'
+import useResolvedCompanyBranch from '@/app/hooks/useResolvedCompanyBranch'
 import { can } from '@/lib/authz/permissions'
 import { confirmDialog, toast } from "@/app/components/ui/notify";
 import { Banknote, Building2, Check, CheckCircle2, ChevronLeft, ChevronRight, Clock, FileSpreadsheet, FileText, Lock, MoreHorizontal, Printer, Save, Search, Trash2, Undo2, Users, Wallet } from 'lucide-react'

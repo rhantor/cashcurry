@@ -1,6 +1,6 @@
 'use client'
 
-import { fmtAmt, periodLabel } from '@/utils/payrollCalculations'
+import { fmtAmt, periodLabel } from '@/lib/payroll/calculations'
 
 const PreviewRow = ({ label, val, bold, red }) => (
   <div className={`flex justify-between ${bold?'font-bold':''} ${red?'text-red-600':'text-gray-700'}`}>

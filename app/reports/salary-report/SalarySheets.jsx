@@ -5,7 +5,7 @@ import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 import { useDeleteSalaryEntryMutation, useUpdateSalaryEntryMutation } from "@/lib/redux/api/salaryApiSlice";
 import { getSessionUser } from "@/lib/session";
-import { exportOneSalaryToExcel, exportOneSalaryToPDF, shareSalary } from "@/utils/export/exportSalary";
+import { exportOneSalaryToExcel, exportOneSalaryToPDF, shareSalary } from "@/app/export/exportSalary";
 import RecordSheet from "@/app/components/entry/RecordSheet";
 import MoneyInput from "@/app/components/entry/MoneyInput";
 import ProofUpload from "@/app/components/entry/ProofUpload";

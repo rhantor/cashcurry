@@ -9,7 +9,7 @@
     "local:seed:backup": "node scripts/local/seed-run.mjs --backup",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:golden:update": "node scripts/test-golden-update.mjs",

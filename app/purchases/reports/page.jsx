@@ -4,7 +4,7 @@ import { format as fmtDate, parseISO } from "date-fns";
 import { formatMoney, currencyInfo } from "@/lib/region/currency";
 import React, { useMemo, useState } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
-import useResolvedCompanyBranch from "@/utils/useResolvedCompanyBranch";
+import useResolvedCompanyBranch from "@/app/hooks/useResolvedCompanyBranch";
 import { useGetReceivedOrdersQuery } from "@/lib/redux/api/requisitionsApiSlice";
 import { useGetVendorsQuery } from "@/lib/redux/api/vendorsApiSlice";
 import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
@@ -20,9 +20,9 @@ import {
   purchaseReportCsv,
   downloadCsv,
   localDate,
-} from "@/utils/reports/purchaseReport";
-import buildPurchaseReportPdf from "@/utils/pdf/purchaseReportPdf";
-import { loadLogo } from "@/utils/pdf/purchaseOrderPdf";
+} from "@/lib/purchases/purchaseReport";
+import buildPurchaseReportPdf from "@/lib/purchases/purchaseReportPdf";
+import { loadLogo } from "@/lib/purchases/purchaseOrderPdf";
 import { FileText, Sheet as SheetIcon, Package, TrendingUp, Calendar } from "lucide-react";
 
 const money = (n) => Number(n || 0).toFixed(2);

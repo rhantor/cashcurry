@@ -5,7 +5,7 @@
  */
 
 import autoTable from 'jspdf-autotable'
-import { fmtAmt, periodLabel } from '@/utils/payrollCalculations'
+import { fmtAmt, periodLabel } from '@/lib/payroll/calculations'
 
 
 export const RM = v => `RM ${fmtAmt(v || 0)}`
