@@ -138,7 +138,10 @@ exports.staffLoginsFromPrivate = staffLoginTrigger("staffPrivate");
 
 // Every hour; each branch's summary goes out at its own time on its own clock.
 exports.notifyDailySummary = onSchedule({ schedule: "0 * * * *", timeZone: "UTC", timeoutSeconds: 540 }, async () => {
-  await notify.dailySummaries(new Date());
+  const now = new Date();
+  await notify.dailySummaries(now);
+  // task reminders (4.11) ride on the same hourly run
+  await notify.taskReminders(now);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
