@@ -2,7 +2,7 @@
 // The two steps a till person does (roadmap 4.10): hand money out, and bring
 // the bill back (or try again when a bill was sent back).
 import { useEffect, useMemo, useState } from "react";
-import { Camera, FileText, X } from "lucide-react";
+import { Camera, FileText, Paperclip, X } from "lucide-react";
 import { Button, DatePicker, Field, Input, Select, Sheet, Switch, Textarea, cn, toast } from "@/app/components/ui";
 import MoneyInput from "@/app/components/entry/MoneyInput";
 import { Chip } from "@/app/components/entry/Choices";
@@ -15,6 +15,7 @@ import { NO_INVOICE_REASONS } from "@/lib/costs/vouchers";
 import { changeOf } from "@/lib/payouts/model";
 import { bringBill, handOut, resubmitBill, uploadBillFiles } from "@/lib/payouts/client";
 import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
+import { FileThumb } from "@/app/components/common/Files";
 
 const PURPOSES = ["Cooking gas", "Ice", "Market", "Vegetables", "Taxi / Grab", "Repairs", "Cleaning things"];
 const fullName = (s) => `${s.firstName || ""} ${s.lastName || ""}`.trim();
@@ -88,30 +89,65 @@ export function HandOutSheet({ open, onClose, companyId, branchId, user }) {
   );
 }
 
-/** Photos (or PDFs) of the bill, a few at most, with a way to take one away. */
-function BillFiles({ files, setFiles, existing = [] }) {
+const MAX_MB = 10; // storage.rules: payouts files up to 10 MB each
+
+/**
+ * Photos or PDFs, with a way to take one away: the camera for a quick photo,
+ * or "Photo or PDF" to pick files (a scanned 8-page bill as one PDF, or many
+ * photos). `existing` = files saved before (a bill tried again).
+ */
+function FilePicker({ files, setFiles, existing = [], setExisting, max }) {
   const previews = useMemo(() => files.map((f) => ({ f, url: f.type.startsWith("image/") ? URL.createObjectURL(f) : null })), [files]);
   useEffect(() => () => previews.forEach((p) => p.url && URL.revokeObjectURL(p.url)), [previews]);
+  const room = max - files.length - existing.length;
+  const add = (e) => {
+    const picked = [...(e.target.files || [])];
+    e.target.value = "";
+    const big = picked.filter((f) => f.type === "application/pdf" && f.size > MAX_MB * 1024 * 1024);
+    if (big.length) toast.error(`${big.length === 1 ? "A PDF is" : "Some PDFs are"} over ${MAX_MB} MB`, { description: "Split it in two, or take photos of the pages." });
+    const ok = picked.filter((f) => !big.includes(f) && (f.type.startsWith("image/") || f.type === "application/pdf"));
+    if (ok.length > room) toast.warning(`Only ${max} files fit`, { description: `${ok.length - room} left out.` });
+    setFiles((list) => [...list, ...ok].slice(0, max - existing.length));
+  };
+  const remove = "absolute right-1 top-1 rounded-full bg-black/60 p-0.5 text-white";
   return (
     <div className="flex flex-wrap gap-2">
       {existing.map((u) => (
-        <a key={u} href={u} target="_blank" rel="noreferrer" className="size-20 overflow-hidden rounded-xl border border-line">
-          <img src={u} alt="Bill" className="size-full object-cover" />
-        </a>
+        <div key={u} className="relative">
+          <FileThumb url={u} label="Saved file" />
+          {setExisting && (
+            <button type="button" aria-label="Remove" onClick={() => setExisting((list) => list.filter((x) => x !== u))} className={remove}>
+              <X className="size-3.5" />
+            </button>
+          )}
+        </div>
       ))}
-      {previews.map(({ url }, i) => (
+      {previews.map(({ f, url }, i) => (
         <div key={i} className="relative size-20 overflow-hidden rounded-xl border border-line bg-surface-2">
-          {url ? <img src={url} alt="" className="size-full object-cover" /> : <FileText className="m-auto mt-6 size-8 text-muted" />}
-          <button type="button" aria-label="Remove" onClick={() => setFiles((list) => list.filter((_, j) => j !== i))} className="absolute right-1 top-1 rounded-full bg-black/60 p-0.5 text-white">
+          {url ? (
+            <img src={url} alt="" className="size-full object-cover" />
+          ) : (
+            <span className="flex size-full flex-col items-center justify-center gap-0.5 bg-danger-soft/60 px-1 text-danger">
+              <FileText className="size-6" />
+              <span className="w-full truncate text-center text-[10px] font-semibold">{f.name || "PDF"}</span>
+            </span>
+          )}
+          <button type="button" aria-label="Remove" onClick={() => setFiles((list) => list.filter((_, j) => j !== i))} className={remove}>
             <X className="size-3.5" />
           </button>
         </div>
       ))}
-      {files.length < 4 && (
-        <label className="flex size-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-line text-xs font-medium text-muted hover:bg-surface-2">
-          <Camera className="size-5" /> Photo
-          <input type="file" accept="image/*,application/pdf" capture="environment" multiple className="sr-only" onChange={(e) => { const picked = [...(e.target.files || [])]; e.target.value = ""; setFiles((list) => [...list, ...picked].slice(0, 4)); }} />
-        </label>
+      {room > 0 && (
+        <>
+          <label className="flex size-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-line text-xs font-medium text-muted hover:bg-surface-2">
+            <Camera className="size-5" /> Camera
+            <input type="file" accept="image/*" capture="environment" className="sr-only" onChange={add} />
+          </label>
+          <label className="flex size-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-line px-1 text-center text-xs font-medium leading-tight text-muted hover:bg-surface-2">
+            <Paperclip className="size-5" /> Photo or PDF
+            <input type="file" accept="image/*,application/pdf" multiple className="sr-only" onChange={add} />
+          </label>
+        </>
       )}
     </div>
   );
@@ -129,6 +165,9 @@ export function BillSheet({ payout, retry, onClose, companyId, branchId, user })
   const [date, setDate] = useDefaultDate();
   const [amount, setAmount] = useState("");
   const [files, setFiles] = useState([]);
+  const [kept, setKept] = useState([]);
+  const [receipts, setReceipts] = useState([]);
+  const [keptReceipts, setKeptReceipts] = useState([]);
   const [noPaper, setNoPaper] = useState(false);
   const [reason, setReason] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -141,6 +180,9 @@ export function BillSheet({ payout, retry, onClose, companyId, branchId, user })
     if (!open) return;
     setAmount(retry ? String(retry.billAmount) : "");
     setFiles([]);
+    setKept(retry?.attachments || []);
+    setReceipts([]);
+    setKeptReceipts(retry?.receipts || []);
     setNoPaper(!!retry?.voucherReason);
     setReason(retry?.voucherReason || "");
     setCategoryId(retry?.categoryId || "");
@@ -150,20 +192,28 @@ export function BillSheet({ payout, retry, onClose, companyId, branchId, user })
 
   const bill = Number(amount) || 0;
   const change = changeOf(float, bill);
-  const kept = retry?.attachments || [];
 
   const save = async () => {
     const e = {};
     if (!(bill > 0)) e.amount = "The amount on the bill";
     if (!findCategory(groups, categoryId)) e.category = "What was it for?";
-    if (!files.length && !kept.length && !noPaper) e.files = "Take a photo of the bill — or say there is none";
+    if (!files.length && !kept.length && !noPaper) e.files = "Add the bill (photo or PDF) — or say there is none";
     if (noPaper && !files.length && !reason.trim()) e.reason = "Why is there no bill?";
     setErrors(e);
     if (Object.keys(e).length) return;
     setBusy(true);
     try {
       const uploaded = files.length ? await uploadBillFiles(companyId, branchId, user.uid, files) : [];
-      const data = { date, billAmount: bill, fields: categoryFields(groups, categoryId), files: [...kept, ...uploaded], voucherReason: !uploaded.length && !kept.length && noPaper ? reason : "", note };
+      const paid = receipts.length ? await uploadBillFiles(companyId, branchId, user.uid, receipts) : [];
+      const data = {
+        date,
+        billAmount: bill,
+        fields: categoryFields(groups, categoryId),
+        files: [...kept, ...uploaded],
+        receipts: [...keptReceipts, ...paid],
+        voucherReason: !uploaded.length && !kept.length && noPaper ? reason : "",
+        note,
+      };
       if (retry) await resubmitBill(companyId, branchId, user, retry, data);
       else await bringBill(companyId, branchId, user, payout, data);
       toast.success("Bill saved", { description: change > 0 ? `Put ${money(change)} back in the till` : change < 0 ? `${money(-change)} more from the till` : "Exact amount" });
@@ -212,7 +262,8 @@ export function BillSheet({ payout, retry, onClose, companyId, branchId, user })
         </Field>
         <div>
           <p className="mb-2 text-xs font-semibold text-muted">The bill</p>
-          {!noPaper && <BillFiles files={files} setFiles={setFiles} existing={kept} />}
+          {!noPaper && <FilePicker files={files} setFiles={setFiles} existing={kept} setExisting={setKept} max={12} />}
+          {!noPaper && <p className="mt-2 text-xs text-muted">A long bill: one PDF, or a photo of each page (up to 12 files).</p>}
           {errors.files && <p className="mt-2 text-xs font-medium text-danger">{errors.files}</p>}
           {!files.length && !kept.length && (
             <div className={cn("mt-3 rounded-2xl border p-3", noPaper ? "border-warning/40 bg-warning-soft/50" : "border-line")}>
@@ -230,6 +281,11 @@ export function BillSheet({ payout, retry, onClose, companyId, branchId, user })
               )}
             </div>
           )}
+        </div>
+        <div>
+          <p className="mb-1 text-xs font-semibold text-muted">Payment receipt (optional)</p>
+          <p className="mb-2 text-xs text-muted">If the shop gave a separate receipt for the payment, add it here.</p>
+          <FilePicker files={receipts} setFiles={setReceipts} existing={keptReceipts} setExisting={setKeptReceipts} max={4} />
         </div>
         <Field label="Note (optional)">{({ id }) => <Textarea id={id} rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Anything the manager should know" />}</Field>
       </div>

@@ -9,7 +9,7 @@ const when = (v) => {
   const d = typeof v === "string" ? parseISO(v) : v?.toDate ? v.toDate() : v?.seconds ? new Date(v.seconds * 1000) : v ? new Date(v) : null;
   return d && isValid(d) ? d : null;
 };
-const isPdfUrl = (u) => /\.pdf(\?|$)/i.test(String(u));
+import { isPdfUrl } from "@/app/components/common/Files";
 
 const TONE = {
   bank: "from-[#2a78d6] to-[#1a4f94]",

@@ -19,10 +19,10 @@ describe("who is told", () => {
   it("a branch's people: company roles and that branch's office users — not staff, not other branches", () => {
     expect(kl.map((p) => p.uid)).toEqual(["owner", "gm", "kla", "klm", "klc", "kls"]);
   });
-  it("defaults: approvers hear of new requests, company roles of decisions and the daily summaries, payers of pay-outs", () => {
+  it("defaults: approvers hear of new requests and decisions, company roles of the daily summaries, payers of pay-outs", () => {
     expect(recipientsFor("requests.new", { people: kl })).toEqual(["owner", "gm", "kla", "klm"]);
-    expect(recipientsFor("requests.decided", { people: kl })).toEqual(["owner", "gm"]);
-    expect(recipientsFor("requests.payout", { people: kl })).toEqual(["klc", "kls"]);
+    expect(recipientsFor("requests.decided", { people: kl })).toEqual(["owner", "gm", "kla", "klm"]);
+    expect(recipientsFor("requests.payout", { people: kl })).toEqual(["kla", "klc", "kls"]);
     expect(recipientsFor("daily.sales", { people: kl })).toEqual(["owner", "gm"]);
   });
   it("once chosen in the branch's settings, only those chosen — and only if still at the branch", () => {
@@ -69,6 +69,9 @@ describe("messages", () => {
   it("open the right page", () => {
     expect(requestLink("new")).toBe("/requested-panel");
     expect(requestLink("payout")).toBe("/entry-data/advance-entry");
+    // decided: not the panel, which is empty by then
+    expect(requestLink("approved", { type: "advance" })).toBe("/entry-data/advance-entry");
+    expect(requestLink("rejected", { type: "staffLoan" })).toBe("/staff-loans");
     expect(requestLink("approved", { forRequester: true, role: "staff" })).toBe("/requests");
     expect(requestLink("approved", { forRequester: true, role: "cashier" })).toBe("/supervisor-panel");
   });
