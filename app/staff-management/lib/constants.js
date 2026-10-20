@@ -47,6 +47,8 @@ export const EMPTY_FORM = {
   country: 'Malaysia',
   role: '',
   department: '',
+  supervisorUid: '', // who leads their work (4.11): a supervisor's login at this branch
+  supervisorName: '',
   startDate: '',
   notes: '',
   photoUrl: null,

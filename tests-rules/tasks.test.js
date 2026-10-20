@@ -4,6 +4,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
 import fs from "node:fs";
 import { initializeTestEnvironment } from "@firebase/rules-unit-testing";
+import { serverTimestamp } from "firebase/firestore";
 
 const CO = "co";
 const B = `companies/${CO}/branches/kl`;
@@ -19,6 +20,9 @@ const PEOPLE = {
   pjManager: { role: "manager", branchId: "pj" },
   ali: { role: "staff", branchId: "kl", staffId: "st-ali" },
   siti: { role: "staff", branchId: "kl", staffId: "st-siti" },
+  kumar: { role: "staff", branchId: "kl", staffId: "st-kumar" },
+  rahim: { role: "supervisor", branchId: "kl" }, // leads Ali; Kumar has no supervisor
+  nadia: { role: "supervisor", branchId: "kl" }, // leads Siti
 };
 const db = (uid) => env.authenticatedContext(uid).firestore();
 const files = (uid) => env.authenticatedContext(uid).storage();
@@ -48,6 +52,12 @@ beforeEach(async () => {
     await d.doc(`${C}/alisDaily_2026-10-19`).set(tick("ali", "alisDaily", "2026-10-19"));
     await d.doc(`${R}/2026-10_ali`).set({ uid: "ali", month: "2026-10", stars: 4, by: { uid: "klManager" } });
     await d.doc(`companies/${CO}/users/ali/notes/n1`).set({ title: "Mine" });
+    // who leads whom (4.11): on the staff records
+    await d.doc(`${B}/staff/st-ali`).set({ firstName: "Ali", uid: "ali", supervisorUid: "rahim" });
+    await d.doc(`${B}/staff/st-siti`).set({ firstName: "Siti", uid: "siti", supervisorUid: "nadia" });
+    await d.doc(`${B}/staff/st-kumar`).set({ firstName: "Kumar", uid: "kumar" });
+    await d.doc(`${T}/forRahim`).set(task("rahim"));
+    await d.doc(`${T}/ledByRahim`).set(task("ali", { repeat: { every: "day" }, teamLeadUid: "rahim", creatorUid: "rahim", createdBy: { uid: "rahim" } }));
   });
 });
 
@@ -118,5 +128,67 @@ describe("ratings and notes", () => {
     expect(await ok(db("ali").collection(`companies/${CO}/users/ali/notes`).add({ title: "Buy milk" }))).toBe(true);
     expect(await ok(db("owner").doc(`companies/${CO}/users/ali/notes/n1`).get())).toBe(false);
     expect(await ok(db("klManager").collection(`companies/${CO}/users/ali/notes`).add({ title: "x" }))).toBe(false);
+  });
+});
+
+describe("supervisors and their team", () => {
+  const mine = (assigneeUid, extra = {}) => task(assigneeUid, { creatorUid: "rahim", createdBy: { uid: "rahim" }, teamLeadUid: "rahim", ...extra });
+  it("give tasks to their own team (and to staff with no supervisor), leading them", async () => {
+    expect(await ok(db("rahim").collection(T).add(mine("ali")))).toBe(true);
+    expect(await ok(db("rahim").collection(T).add(mine("kumar")))).toBe(true);
+    expect(await ok(db("rahim").collection(T).add(mine("siti")))).toBe(false); // Nadia's team
+    expect(await ok(db("rahim").collection(T).add(mine("klCashier")))).toBe(false); // not staff
+    expect(await ok(db("rahim").collection(T).add(mine("ali", { teamLeadUid: null })))).toBe(false); // must lead it
+    expect(await ok(db("rahim").collection(T).add(mine("ali", { creatorUid: "klManager" })))).toBe(false); // as themselves
+  });
+  it("see the tasks they lead or were given — not the whole branch", async () => {
+    expect(await ok(db("rahim").collection(T).where("teamLeadUid", "==", "rahim").get())).toBe(true);
+    expect(await ok(db("rahim").collection(T).where("assigneeUid", "==", "rahim").get())).toBe(true);
+    expect(await ok(db("rahim").doc(`${T}/sitis`).get())).toBe(false);
+    expect(await ok(db("rahim").collection(T).get())).toBe(false);
+  });
+  it("change and delete what they lead, within their team only", async () => {
+    expect(await ok(db("rahim").doc(`${T}/ledByRahim`).update({ title: "Clean the fryer well" }))).toBe(true);
+    expect(await ok(db("rahim").doc(`${T}/ledByRahim`).update({ assigneeUid: "siti", assignee: { uid: "siti" } }))).toBe(false);
+    expect(await ok(db("nadia").doc(`${T}/ledByRahim`).update({ title: "x" }))).toBe(false);
+    expect(await ok(db("rahim").doc(`${T}/alisOnce`).delete())).toBe(false); // the manager's
+    expect(await ok(db("rahim").doc(`${T}/ledByRahim`).delete())).toBe(true);
+  });
+  it("hand a task given to them on to their team — nothing else in the same go", async () => {
+    const pass = (to, extra = {}) => ({ assigneeUid: to, assignee: { uid: to }, teamLeadUid: "rahim", via: [{ uid: "rahim" }], ...extra });
+    expect(await ok(db("rahim").doc(`${T}/forRahim`).update(pass("siti")))).toBe(false); // not their team
+    expect(await ok(db("rahim").doc(`${T}/forRahim`).update(pass("ali", { title: "Easier" })))).toBe(false);
+    expect(await ok(db("nadia").doc(`${T}/forRahim`).update({ ...pass("siti"), teamLeadUid: "nadia" }))).toBe(false); // not given to her
+    expect(await ok(db("rahim").doc(`${T}/forRahim`).update(pass("ali")))).toBe(true);
+  });
+  it("ticks carry the team lead; the supervisor can tick for their team and sees the ticks", async () => {
+    const t = (by, date, lead) => ({ taskId: "ledByRahim", date, assigneeUid: "ali", teamLeadUid: lead, by: { uid: by }, doneOn: date });
+    expect(await ok(db("ali").doc(`${C}/ledByRahim_2026-10-20`).set(t("ali", "2026-10-20", "nadia")))).toBe(false); // wrong lead
+    expect(await ok(db("ali").doc(`${C}/ledByRahim_2026-10-20`).set(t("ali", "2026-10-20", "rahim")))).toBe(true);
+    expect(await ok(db("rahim").doc(`${C}/ledByRahim_2026-10-21`).set(t("rahim", "2026-10-21", "rahim")))).toBe(true);
+    expect(await ok(db("nadia").doc(`${C}/ledByRahim_2026-10-22`).set(t("nadia", "2026-10-22", "rahim")))).toBe(false);
+    expect(await ok(db("rahim").collection(C).where("teamLeadUid", "==", "rahim").get())).toBe(true);
+    expect(await ok(db("nadia").doc(`${C}/ledByRahim_2026-10-20`).get())).toBe(false);
+  });
+  it("management moves ticks to a new team lead — only that, and only management", async () => {
+    expect(await ok(db("klManager").doc(`${C}/alisDaily_2026-10-19`).update({ teamLeadUid: "rahim" }))).toBe(true);
+    expect(await ok(db("klManager").doc(`${C}/alisDaily_2026-10-19`).update({ teamLeadUid: "nadia", doneOn: "2026-10-01" }))).toBe(false);
+    expect(await ok(db("rahim").doc(`${C}/alisDaily_2026-10-19`).update({ teamLeadUid: "rahim" }))).toBe(false);
+  });
+  it("don't rate", async () => {
+    expect(await ok(db("rahim").doc(`${R}/2026-10_ali`).set({ uid: "ali", month: "2026-10", stars: 5, by: { uid: "rahim" } }))).toBe(false);
+  });
+});
+
+describe("a task's questions and answers", () => {
+  const say = (uid) => ({ byUid: uid, byName: uid, text: "Which oil?", photos: [], createdAt: serverTimestamp() });
+  it("whoever has it, leads it, gave it or manages asks and answers, as themselves", async () => {
+    expect(await ok(db("ali").collection(`${T}/ledByRahim/comments`).add(say("ali")))).toBe(true);
+    expect(await ok(db("rahim").collection(`${T}/ledByRahim/comments`).add(say("rahim")))).toBe(true);
+    expect(await ok(db("klManager").collection(`${T}/ledByRahim/comments`).add(say("klManager")))).toBe(true);
+    expect(await ok(db("siti").collection(`${T}/ledByRahim/comments`).add(say("siti")))).toBe(false);
+    expect(await ok(db("ali").collection(`${T}/ledByRahim/comments`).add(say("rahim")))).toBe(false); // not as someone else
+    expect(await ok(db("rahim").collection(`${T}/ledByRahim/comments`).get())).toBe(true);
+    expect(await ok(db("nadia").collection(`${T}/ledByRahim/comments`).get())).toBe(false);
   });
 });

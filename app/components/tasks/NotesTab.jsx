@@ -1,21 +1,25 @@
 "use client";
 // Your own notebook (roadmap 4.11): notes and small checklists only you see —
-// pinned first, then the latest.
+// pinned first, then the latest. Those who give tasks turn a line into a task
+// (a manager's words in a meeting, written down, handed out to the team).
 import { useMemo, useState } from "react";
-import { NotebookPen, Pin, PinOff, Plus, Trash2, X } from "lucide-react";
+import { NotebookPen, Pin, PinOff, Plus, Send, Trash2, X } from "lucide-react";
 import { Button, EmptyState, Input, Sheet, Skeleton, Textarea, cn, toast } from "@/app/components/ui";
 import { confirmDialog } from "@/app/components/ui/notify";
 import { NOTE_COLORS } from "@/lib/tasks/model";
 import { deleteNote, saveNote, useNotes } from "@/lib/tasks/client";
+import TaskSheet from "./TaskSheet";
 
 // colours from the theme's soft tones, so notes read in light and dark
 const TINT = { plain: "bg-surface", yellow: "bg-warning-soft", green: "bg-brand-soft", blue: "bg-info-soft", pink: "bg-danger-soft" };
 const millis = (t) => (t?.toMillis ? t.toMillis() : t?.seconds ? t.seconds * 1000 : 0);
 
-function NoteSheet({ note, onClose, companyId, uid }) {
+/** giving: { people, branchId, today, leadFor, user } when this person gives tasks, else null. */
+function NoteSheet({ note, onClose, companyId, uid, giving }) {
   const [f, setF] = useState(() => ({ title: note?.title || "", body: note?.body || "", items: note?.items || [], pinned: !!note?.pinned, color: note?.color || "plain" }));
   const [item, setItem] = useState("");
   const [busy, setBusy] = useState(false);
+  const [making, setMaking] = useState(null); // the line being made into a task (index)
   const set = (k, v) => setF((x) => ({ ...x, [k]: v }));
   const addItem = () => {
     if (!item.trim()) return;
@@ -61,7 +65,15 @@ function NoteSheet({ note, onClose, companyId, uid }) {
           {f.items.map((x, i) => (
             <div key={i} className="flex items-center gap-2">
               <input type="checkbox" checked={x.done} onChange={() => set("items", f.items.map((y, j) => (j === i ? { ...y, done: !y.done } : y)))} className="size-4 accent-[var(--cc-brand)]" aria-label={x.text} />
-              <span className={cn("flex-1 text-sm", x.done ? "text-muted line-through" : "text-fg")}>{x.text}</span>
+              <span className={cn("flex-1 text-sm", x.done ? "text-muted line-through" : "text-fg")}>
+                {x.text}
+                {x.given && <span className="ml-2 rounded-full bg-brand-soft px-2 py-px text-[10px] font-semibold text-brand">Given to {x.given}</span>}
+              </span>
+              {giving && !x.given && (
+                <button type="button" onClick={() => setMaking(i)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-brand hover:bg-brand-soft" aria-label={`Give “${x.text}” as a task`}>
+                  <Send className="size-3.5" /> Task
+                </button>
+              )}
               <button type="button" aria-label="Remove" onClick={() => set("items", f.items.filter((_, j) => j !== i))} className="rounded p-1 text-subtle hover:bg-surface-2">
                 <X className="size-3.5" />
               </button>
@@ -71,6 +83,7 @@ function NoteSheet({ note, onClose, companyId, uid }) {
             <Input value={item} onChange={(e) => setItem(e.target.value)} placeholder="Add an item" aria-label="New checklist item" />
             <Button type="submit" variant="secondary" icon={Plus} aria-label="Add item" />
           </form>
+          {giving && f.items.length > 0 && <p className="text-xs text-muted">Wrote down what was said in a meeting? Give each line to someone as a task.</p>}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {NOTE_COLORS.map((c) => (
@@ -81,11 +94,30 @@ function NoteSheet({ note, onClose, companyId, uid }) {
           </Button>
         </div>
       </div>
+      {giving && (
+        <TaskSheet
+          open={making !== null}
+          onClose={() => setMaking(null)}
+          task={null}
+          defaultTitle={making !== null ? f.items[making]?.text : ""}
+          people={giving.people}
+          companyId={companyId}
+          branchId={giving.branchId}
+          user={giving.user}
+          today={giving.today}
+          leadFor={giving.leadFor}
+          onSaved={({ assignee }) => {
+            const i = making;
+            set("items", f.items.map((y, j) => (j === i ? { ...y, given: assignee?.name?.split(" ")[0] || "someone" } : y)));
+          }}
+        />
+      )}
     </Sheet>
   );
 }
 
-export default function NotesTab({ companyId, user }) {
+/** gives: may turn note lines into tasks (people, branchId, today, leadFor as for TaskSheet). */
+export default function NotesTab({ companyId, user, gives = false, people = [], branchId, today, leadFor }) {
   const { list, loading } = useNotes(companyId, user.uid);
   const [open, setOpen] = useState(null); // a note, or "new"
   const notes = useMemo(() => [...list].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || millis(b.updatedAt) - millis(a.updatedAt)), [list]);
@@ -115,7 +147,15 @@ export default function NotesTab({ companyId, user }) {
           })}
         </ul>
       )}
-      {open && <NoteSheet note={open === "new" ? null : open} onClose={() => setOpen(null)} companyId={user.companyId} uid={user.uid} />}
+      {open && (
+        <NoteSheet
+          note={open === "new" ? null : open}
+          onClose={() => setOpen(null)}
+          companyId={user.companyId}
+          uid={user.uid}
+          giving={gives && branchId ? { people, branchId, today, leadFor, user } : null}
+        />
+      )}
     </div>
   );
 }

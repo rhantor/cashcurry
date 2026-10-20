@@ -110,6 +110,14 @@ exports.notifyTasks = onDocumentWritten("companies/{companyId}/branches/{branchI
     console.error("[notify tasks]", companyId, branchId, id, err);
   }
 });
+exports.notifyTaskComments = onDocumentCreated("companies/{companyId}/branches/{branchId}/tasks/{taskId}/comments/{id}", async (event) => {
+  const { companyId, branchId, taskId } = event.params;
+  try {
+    await notify.onTaskComment({ companyId, branchId, taskId, comment: event.data?.data() });
+  } catch (err) {
+    console.error("[notify task comments]", companyId, branchId, taskId, err);
+  }
+});
 exports.notifyIssueComments = onDocumentCreated("companies/{companyId}/branches/{branchId}/issues/{issueId}/comments/{id}", async (event) => {
   const { companyId, branchId, issueId } = event.params;
   try {

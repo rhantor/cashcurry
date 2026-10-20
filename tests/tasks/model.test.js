@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, agenda, canManageTasks, defaultEveningAt, reminderMessage, todayCount, checkId, checkTask, dayList, monthOf, occursOn, performance, repeatText } from "@/lib/tasks/model";
+import { addDays, agenda, canGiveTasks, canHandOver, canManageTasks, canTeamTasks, chainText, defaultEveningAt, leadOf, teamOf, reminderMessage, todayCount, checkId, checkTask, dayList, monthOf, occursOn, performance, repeatText } from "@/lib/tasks/model";
 
 const ali = { uid: "ali", name: "Ali" };
 const daily = { id: "fryer", title: "Clean the fryer", assigneeUid: "ali", assignee: ali, repeat: { every: "day" }, startDate: "2026-10-01", active: true };
@@ -157,5 +157,37 @@ describe("reminders", () => {
   it("evening: only what is still left — nothing when all is done", () => {
     expect(reminderMessage("evening", list([t("Clean the fryer", true), t("Count the stock")]))).toEqual({ title: "Still to do today", body: "1 task left: Count the stock" });
     expect(reminderMessage("evening", list([t("Clean the fryer", true)]))).toBeNull();
+  });
+});
+
+describe("supervisors' teams", () => {
+  const staff = [
+    { uid: "ali", supervisorUid: "rahim" },
+    { uid: "siti", supervisorUid: "nadia" },
+    { uid: "kumar" }, // no supervisor: any supervisor may lead
+    { uid: null, supervisorUid: "rahim" }, // no login: can't be given tasks
+  ];
+  it("a team is the staff naming them, plus those naming no one", () => {
+    expect(teamOf(staff, "rahim")).toEqual(["ali", "kumar"]);
+    expect(teamOf(staff, "nadia")).toEqual(["siti", "kumar"]);
+    expect(leadOf(staff, "ali")).toBe("rahim");
+    expect(leadOf(staff, "kumar")).toBeNull();
+  });
+  it("who gives tasks, and to whom", () => {
+    expect(canGiveTasks("supervisor")).toBe(true);
+    expect(canTeamTasks("supervisor")).toBe(true);
+    expect(canManageTasks("supervisor")).toBe(false);
+    expect(canGiveTasks("cashier")).toBe(false);
+  });
+  it("hands a task on only if it's theirs and not finished", () => {
+    const rahim = { uid: "rahim", role: "supervisor" };
+    expect(canHandOver({ assigneeUid: "rahim", status: "open" }, rahim)).toBe(true);
+    expect(canHandOver({ assigneeUid: "rahim", status: "done" }, rahim)).toBe(false);
+    expect(canHandOver({ assigneeUid: "ali", status: "open" }, rahim)).toBe(false);
+    expect(canHandOver({ assigneeUid: "x", status: "open" }, { uid: "x", role: "manager" })).toBe(false);
+  });
+  it("the chain from who gave it to who has it", () => {
+    expect(chainText({ createdBy: { name: "KL Manager" }, via: [{ name: "Rahim" }], assignee: { name: "Ali" } })).toBe("KL Manager → Rahim → Ali");
+    expect(chainText({ createdBy: { name: "Rahim" }, assignee: { name: "Ali" } })).toBe("Rahim → Ali");
   });
 });

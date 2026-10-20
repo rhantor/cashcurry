@@ -38,28 +38,31 @@ function fromTask(t, today) {
  * task: the one to change, or null for a new one. people: who it can be given
  * to [{ uid, name, role }]; defaultAssigneeUid: picked already (from a person's page).
  */
-export default function TaskSheet({ open, onClose, task, defaultAssigneeUid, people, companyId, branchId, user, today }) {
+export default function TaskSheet({ open, onClose, task, defaultAssigneeUid, defaultTitle, people, companyId, branchId, user, today, leadFor, onSaved }) {
   const [f, setF] = useState(() => blank(today));
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     if (!open) return;
-    setF(task ? fromTask(task, today) : { ...blank(today), assigneeUid: defaultAssigneeUid || "" });
+    setF(task ? fromTask(task, today) : { ...blank(today), assigneeUid: defaultAssigneeUid || "", title: defaultTitle || "" });
     setErrors({});
-  }, [open, task, today, defaultAssigneeUid]);
+  }, [open, task, today, defaultAssigneeUid, defaultTitle]);
   const set = (k) => (v) => setF((x) => ({ ...x, [k]: v }));
 
   const save = async () => {
     const assignee = people.find((p) => p.uid === f.assigneeUid) || (task && task.assigneeUid === f.assigneeUid ? task.assignee : null);
     const repeat = f.how === "once" ? null : f.how === "day" ? { every: "day" } : f.how === "week" ? { every: "week", days: [...f.days].sort() } : { every: "month", day: Number(f.monthDay) };
-    const data = { title: f.title, details: f.details, assignee, repeat, dueDate: f.how === "once" ? f.dueDate || null : null, startDate: repeat ? f.startDate || today : null, needsPhoto: f.needsPhoto, priority: f.urgent ? "urgent" : "normal" };
+    // who leads it: kept while the person stays the same, else theirs (leadFor)
+    const teamLeadUid = (task && task.assigneeUid === f.assigneeUid && task.teamLeadUid) || (leadFor ? leadFor(f.assigneeUid) : null);
+    const data = { teamLeadUid, title: f.title, details: f.details, assignee, repeat, dueDate: f.how === "once" ? f.dueDate || null : null, startDate: repeat ? f.startDate || today : null, needsPhoto: f.needsPhoto, priority: f.urgent ? "urgent" : "normal" };
     const e = checkTask(data);
     setErrors(e);
     if (Object.keys(e).length) return;
     setBusy(true);
     try {
-      await saveTask(companyId, branchId, user, data, task?.id);
+      const id = await saveTask(companyId, branchId, user, data, task?.id);
       toast.success(task ? "Task changed" : `Given to ${assignee.name.split(" ")[0]}`);
+      onSaved?.({ id: id || task?.id, assignee });
       onClose();
     } catch (err) {
       toast.error("Couldn't save the task", { description: err.message });

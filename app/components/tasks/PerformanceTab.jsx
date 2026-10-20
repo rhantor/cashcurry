@@ -136,21 +136,29 @@ function RateSheet({ person, month, current, onClose, companyId, branchId, user 
 }
 
 /** manage: everyone's (and rating); otherwise only `user`'s own. */
-export default function PerformanceTab({ tasks, loading, manage, companyId, branchId, user, today }) {
+/**
+ * manage: everyone, and rating. lead (a supervisor): their team and themselves,
+ * no rating (they see their own). Otherwise only the person's own.
+ */
+export default function PerformanceTab({ tasks, loading, manage, lead = false, companyId, branchId, user, today }) {
   const [month, setMonth] = useState(today.slice(0, 7));
   const [rating, setRating] = useState(null);
   const [details, setDetails] = useState(null); // { uid, show }
   const { from, to } = monthOf(`${month}-01`);
-  const { checks, loading: checksLoading } = useChecks(companyId, branchId, { from, to, ...(manage ? { all: true } : { uid: user.uid }) });
+  const many = manage || lead;
+  const { checks: scoped, loading: checksLoading } = useChecks(companyId, branchId, { from, to, ...(manage ? { all: true } : lead ? { lead: user.uid } : { uid: user.uid }) });
+  // a supervisor's own ticks are not among their team's
+  const { checks: own } = useChecks(companyId, branchId, { from, to, uid: lead ? user.uid : undefined });
+  const checks = useMemo(() => ({ ...own, ...scoped }), [own, scoped]);
   const { ratings } = useRatings(companyId, branchId, month, manage ? { all: true } : { uid: user.uid });
 
   const rows = useMemo(() => {
-    const people = manage ? [...new Map(tasks.map((t) => [t.assigneeUid, t.assignee])).values()].filter(Boolean) : [{ uid: user.uid, name: "You" }];
+    const people = many ? [...new Map(tasks.map((t) => [t.assigneeUid, t.assigneeUid === user.uid ? { ...t.assignee, name: "You" } : t.assignee])).values()].filter(Boolean) : [{ uid: user.uid, name: "You" }];
     return people
       .map((p) => ({ person: p, p: performance(tasks, checks, p.uid, { from, to, today }), r: ratings[p.uid] }))
-      .filter((x) => !manage || x.p.given || x.r)
+      .filter((x) => !many || x.p.given || x.r)
       .sort((a, b) => (b.p.score ?? -1) - (a.p.score ?? -1) || String(a.person.name).localeCompare(String(b.person.name)));
-  }, [tasks, checks, ratings, manage, user.uid, from, to, today]);
+  }, [tasks, checks, ratings, many, user.uid, from, to, today]);
 
   const future = month > today.slice(0, 7);
   return (
