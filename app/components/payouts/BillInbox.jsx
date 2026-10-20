@@ -15,6 +15,7 @@ import { can } from "@/lib/authz/permissions";
 import { categoryFields, pickable } from "@/lib/costs/categories";
 import { useCostCategories } from "@/lib/costs/client";
 import { canReviewBill, changeText } from "@/lib/payouts/model";
+import { FileThumb, FilesSheet } from "@/app/components/common/Files";
 import { approveBillNow, sendBillBack } from "@/lib/payouts/client";
 
 const day = (d) => (d ? format(parseISO(d), "EEE d MMM") : "");
@@ -58,6 +59,7 @@ export default function BillInbox({ companyId, branchId, user, bills, loading })
   const { groups } = useCostCategories(companyId);
   const [busy, setBusy] = useState(null);
   const [correcting, setCorrecting] = useState(null);
+  const [viewing, setViewing] = useState(null);
 
   const approve = async (bill, correction = {}) => {
     setBusy(bill.id);
@@ -96,11 +98,14 @@ export default function BillInbox({ companyId, branchId, user, bills, loading })
             <li key={b.id} className="overflow-hidden rounded-2xl border border-line bg-surface">
               <div className="flex gap-4 p-4">
                 <div className="flex shrink-0 flex-col gap-2">
-                  {(b.attachments || []).slice(0, 2).map((u) => (
-                    <a key={u} href={u} target="_blank" rel="noreferrer" className="block size-20 overflow-hidden rounded-xl border border-line">
-                      <img src={u} alt="Bill" className="size-full object-cover" />
-                    </a>
-                  ))}
+                  {(b.attachments || []).slice(0, 1).map((u) => <FileThumb key={u} url={u} label="Bill" />)}
+                  {/* every page and receipt in one sheet */}
+                  {(b.attachments?.length || 0) + (b.receipts?.length || 0) > 1 && (
+                    <button type="button" onClick={() => setViewing(b)} className="flex size-20 flex-col items-center justify-center rounded-xl border border-line bg-surface-2 text-xs font-semibold text-fg hover:bg-surface">
+                      <span className="text-base">{(b.attachments?.length || 0) + (b.receipts?.length || 0)}</span>
+                      files
+                    </button>
+                  )}
                   {!b.attachments?.length && (
                     <span className="flex size-20 items-center justify-center rounded-xl bg-warning-soft text-center text-[11px] font-semibold leading-tight text-warning">No bill<br />paper</span>
                   )}
@@ -115,6 +120,7 @@ export default function BillInbox({ companyId, branchId, user, bills, loading })
                   <p className="text-xs text-muted">{day(b.date)} · {b.to?.name || "—"} · brought by {b.by?.name || "someone"}</p>
                   <p className="inline-flex rounded-lg bg-brand-soft px-2 py-1 text-xs font-medium text-brand">{changeText(b.floatAmount, b.billAmount, money)}</p>
                   {b.voucherReason && <p className="rounded-xl bg-surface-2 px-3 py-2 text-sm text-fg">&ldquo;{b.voucherReason}&rdquo;</p>}
+                  {b.receipts?.length > 0 && <p className="text-xs text-muted">With a payment receipt</p>}
                   {b.note && <p className="text-xs text-muted">{b.note}</p>}
                 </div>
               </div>
@@ -133,6 +139,12 @@ export default function BillInbox({ companyId, branchId, user, bills, loading })
           );
         })}
       </ul>
+      <FilesSheet
+        open={!!viewing}
+        onClose={() => setViewing(null)}
+        title={viewing ? `${money(viewing.billAmount)} · ${viewing.category || viewing.purpose || "Bill"}` : "Files"}
+        groups={viewing ? [{ title: "Bill", urls: viewing.attachments || [] }, { title: "Payment receipt", urls: viewing.receipts || [] }] : []}
+      />
       {correcting && <CorrectSheet bill={correcting} onClose={() => setCorrecting(null)} onApprove={approve} groups={groups} currency={currency} />}
     </>
   );

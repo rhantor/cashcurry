@@ -1,5 +1,5 @@
 "use client";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import PayOutQueue from "@/app/components/requests/PayOutQueue";
 import RequestInbox from "@/app/components/requests/RequestInbox";
 import LeaveSheet from "@/app/components/requests/LeaveSheet";
@@ -48,6 +48,11 @@ export default function RequestedPanel() {
   const canRequests = can(user?.role, "advances.approve");
   const canVouchers = can(user?.role, "costs.approve");
   const [activeTab, setActiveTab] = useState(canRequests ? "advance" : "vouchers");
+  // a notification opens its own tab: /requested-panel?tab=bills
+  useEffect(() => {
+    const t = new URLSearchParams(window.location.search).get("tab");
+    if (["advance", "loan", "ot", "bills", "vouchers"].includes(t)) setActiveTab(t);
+  }, []);
   const { vouchers } = useWaitingVouchers(canVouchers ? companyId : null, branchId);
   const { waiting: bills, loading: billsLoading } = useLivePayouts(canVouchers ? companyId : null, branchId);
 

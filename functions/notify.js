@@ -84,6 +84,21 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
     return list.length;
   }
 
+  /**
+   * Someone already acted on it: the "to approve" notes the others got now say
+   * what happened and open where it went — not a list that is empty by now.
+   */
+  async function closeOut({ companyId, uids, ref, type, message, link }) {
+    for (const uid of [...new Set(uids)].filter(Boolean)) {
+      const snap = await db.collection(`companies/${companyId}/users/${uid}/inbox`).where("ref", "==", ref).get();
+      const open = snap.docs.filter((d) => d.data().type === type && !d.data().closed);
+      if (!open.length) continue;
+      const batch = db.batch();
+      for (const d of open) batch.update(d.ref, { title: message.title, body: message.body, link, closed: true, closedAt: FieldValue.serverTimestamp() });
+      await batch.commit();
+    }
+  }
+
   // ── requests: advances, staff loans, leave ────────────────────────────────
   /** A request was written: tell those who should know about each change. */
   async function onRequest({ companyId, branchId, type, id, before, after }) {
@@ -104,7 +119,12 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
         ? [...new Set([r.createdBy?.uid, ...staff.filter((p) => r.staffId && p.staffId === r.staffId).map((p) => p.uid)])].filter((u) => u && u !== by)
         : [];
       const watchers = N.recipientsFor(kind, { config: b.config, people: office }).filter((u) => u !== by && !requesters.includes(u));
-      await deliver({ companyId, branchId, uids: watchers, type: kind, message: N.requestMessage(e, r, { money, branchName: b.name }), link: N.requestLink(e), ref: `${type}/${id}` });
+      await deliver({ companyId, branchId, uids: watchers, type: kind, message: N.requestMessage(e, r, { money, branchName: b.name }), link: N.requestLink(e, { type }), ref: `${type}/${id}` });
+      // decided: the "new request" notes say so, and open where it went
+      if (e === "approved" || e === "rejected") {
+        const asked = N.recipientsFor("requests.new", { config: b.config, people: office });
+        await closeOut({ companyId, uids: asked, ref: `${type}/${id}`, type: "requests.new", message: N.requestMessage(e, r, { money, branchName: b.name }), link: N.requestLink(e, { type }) });
+      }
       for (const u of requesters) {
         const role = all.find((p) => p.uid === u)?.role;
         await deliver({ companyId, branchId, uids: [u], type: "requests.mine", message: N.requesterMessage(e, r, { money }), link: N.requestLink(e, { forRequester: true, role }), ref: `${type}/${id}` });
@@ -141,13 +161,17 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
     const what = `${after.to?.name || "Someone"} · ${after.category || after.purpose || "a bill"} · ${money(after.billAmount)} of ${money(after.floatAmount)}`;
     if (after.status === "pending" && before?.status !== "pending") {
       const uids = await approvers(companyId, branchId, b, [after.by?.uid, after.payoutBy?.uid]);
-      await deliver({ companyId, branchId, uids, type: "costs.approval", message: { title: `Bill to approve · ${b.name}`, body: what }, link: "/requested-panel", ref: `payouts/${id}`, tag: `payout_${id}` });
+      await deliver({ companyId, branchId, uids, type: "costs.approval", message: { title: `Bill to approve · ${b.name}`, body: what }, link: "/requested-panel?tab=bills", ref: `payouts/${id}`, tag: `payout_${id}` });
     } else if ((after.status === "approved" || after.status === "rejected") && before?.status === "pending" && after.by?.uid) {
       const by = after.review?.by?.name || "a manager";
       const message = after.status === "approved"
         ? { title: "Bill approved", body: `${what} — ${by}` }
         : { title: "Bill sent back", body: `${what} — ${by}${after.review?.note ? `: “${after.review.note}”` : ""}` };
       await deliver({ companyId, branchId, uids: [after.by.uid], type: "requests.mine", message, link: "/payouts", ref: `payouts/${id}` });
+      const done = after.status === "approved"
+        ? { title: `Bill approved · ${b.name}`, body: `${what} — approved by ${by}` }
+        : { title: `Bill sent back · ${b.name}`, body: `${what} — sent back by ${by}` };
+      await closeOut({ companyId, uids: await approvers(companyId, branchId, b), ref: `payouts/${id}`, type: "costs.approval", message: done, link: after.status === "approved" ? "/reports/cost-report" : "/payouts" });
     }
   }
 
@@ -160,7 +184,7 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
     const what = `${after.category || "A cost"} · ${N.formatMoney(after.amount, b.currency)}${after.paidTo ? ` · ${after.paidTo}` : ""}`;
     if (v.status === "pending" && was !== "pending") {
       const uids = await approvers(companyId, branchId, b, [v.by?.uid, after.createdBy?.uid]);
-      await deliver({ companyId, branchId, uids, type: "costs.approval", message: { title: `Voucher to approve · ${b.name}`, body: `${what} — no invoice: ${v.reason || "no reason given"}` }, link: "/requested-panel", ref: `costs/${id}`, tag: `voucher_${id}` });
+      await deliver({ companyId, branchId, uids, type: "costs.approval", message: { title: `Voucher to approve · ${b.name}`, body: `${what} — no invoice: ${v.reason || "no reason given"}` }, link: "/requested-panel?tab=vouchers", ref: `costs/${id}`, tag: `voucher_${id}` });
     } else if ((v.status === "approved" || v.status === "rejected") && was === "pending" && v.by?.uid) {
       const by = v.decidedBy?.name || "a manager";
       const message = v.status === "approved"
@@ -169,6 +193,10 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
       // sent back → straight to the voucher on Cost Entry, where it is fixed
       const link = v.status === "rejected" ? `/entry-data/cost-entry?voucher=${id}` : "/reports/cost-report";
       await deliver({ companyId, branchId, uids: [v.by.uid], type: "requests.mine", message, link, ref: `costs/${id}` });
+      const done = v.status === "approved"
+        ? { title: `Voucher approved · ${b.name}`, body: `${what} — approved by ${by}` }
+        : { title: `Voucher sent back · ${b.name}`, body: `${what} — sent back by ${by}` };
+      await closeOut({ companyId, uids: await approvers(companyId, branchId, b), ref: `costs/${id}`, type: "costs.approval", message: done, link: "/reports/cost-report" });
     }
   }
 

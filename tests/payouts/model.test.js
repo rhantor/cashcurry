@@ -43,6 +43,14 @@ describe("pay-outs", () => {
     expect(approveBill(s, {}, manager).cost.voucher).toMatchObject({ status: "approved", reason: "Market stall", decidedBy: { uid: "m1" } });
     expect(rejectBill("Photo is blurry", manager)).toMatchObject({ status: "rejected", review: { note: "Photo is blurry" } });
   });
+  it("a bill of many pages (PDFs) with a payment receipt: the cost keeps both, bill first", () => {
+    const s = { id: "s1", ...newSettle(p, { date: "2026-10-11", billAmount: 50, files: ["b1.pdf", "b2.jpg"], receipts: ["r1.jpg"] }, cashier) };
+    expect(s).toMatchObject({ attachments: ["b1.pdf", "b2.jpg"], receipts: ["r1.jpg"] });
+    const { cost } = approveBill(s, {}, manager);
+    expect(cost.attachments).toEqual(["b1.pdf", "b2.jpg", "r1.jpg"]);
+    expect(cost.receipts).toEqual(["r1.jpg"]);
+    expect(cost.fileURL).toBe("b1.pdf");
+  });
   it("open ones by person, oldest first, late after two days", () => {
     const now = new Date("2026-10-12T12:00:00");
     const rows = openByPerson([

@@ -225,8 +225,11 @@ export function TimeChart({ data = [], xKey = "date", series, currency, height =
             const common = { dataKey: s.key, name: s.name, animationDuration: 700, animationEasing: "ease-out" };
             if (s.kind === "bar")
               return (
+                // Recharts draws a negative bar upside down (height below zero), so the
+                // same [4, 4, 0, 0] rounds its far end — the bottom — and keeps the
+                // zero line square for both.
                 <Bar key={s.key} {...common} fill={s.color} radius={[4, 4, 0, 0]} maxBarSize={22}>
-                  {s.colorOf && data.map((row, i) => <Cell key={i} fill={s.colorOf(row)} radius={Number(row[s.key]) < 0 ? [0, 0, 4, 4] : [4, 4, 0, 0]} />)}
+                  {s.colorOf && data.map((row, i) => <Cell key={i} fill={s.colorOf(row)} />)}
                 </Bar>
               );
             if (s.kind === "area")
