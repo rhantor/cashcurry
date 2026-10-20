@@ -312,6 +312,22 @@ service cloud.firestore {
     }
     // ── tasks (4.11, lib/tasks/model.js) ──
     function canTasksManage(c, b) { return may(c, b, leadRoles().concat(['inCharge'])); }
+    // a supervisor at this branch (their own team only)
+    function canTasksTeam(c, b) {
+      let u = userData();
+      return isAuth() && u.companyId == c && inBranch(u, b) && u.role == 'supervisor';
+    }
+    // `uid` is staff at this branch whose record names me as supervisor, or names no one
+    function inMyTeam(c, b, uid) {
+      let u = get(/databases/$(database)/documents/users/$(uid)).data;
+      return u.get('role', '') == 'staff' && u.get('branchId', '') == b && u.get('companyId', '') == c &&
+        get(/databases/$(database)/documents/companies/$(c)/branches/$(b)/staff/$(u.get('staffId', 'none'))).data.get('supervisorUid', '') in [request.auth.uid, ''];
+    }
+    // who may see a task (and its thread): management, whoever has it, leads its team or gave it
+    function canSeeTask(c, b, d) {
+      return canTasksManage(c, b) || (isBranchMember(c, b) && (
+        d.get('assigneeUid', '') == request.auth.uid || d.get('teamLeadUid', '') == request.auth.uid || d.get('creatorUid', '') == request.auth.uid));
+    }
     // a one-off task marked done (or undone) by whoever has it: nothing else moves
     function isTaskWork() {
       return changedKeys().hasOnly(['status', 'done', 'updatedAt']) && request.resource.data.status in ['open', 'done'];
@@ -860,26 +876,61 @@ service cloud.firestore {
         // Management gives, changes and stops them; whoever has one sees it and
         // marks it done. Each tick of a repeating one is a taskCheck.
         match /tasks/{taskId} {
-          allow read: if canTasksManage(companyId, branchId) ||
-            (isBranchMember(companyId, branchId) && resource.data.get('assigneeUid', '') == request.auth.uid);
-          allow create, delete: if canTasksManage(companyId, branchId);
+          allow read: if canSeeTask(companyId, branchId, resource.data);
+          // management gives anyone a task; a supervisor gives their team one, leading it
+          allow create: if canTasksManage(companyId, branchId) ||
+            (canTasksTeam(companyId, branchId) &&
+              request.resource.data.creatorUid == request.auth.uid &&
+              request.resource.data.teamLeadUid == request.auth.uid &&
+              inMyTeam(companyId, branchId, request.resource.data.assigneeUid));
           allow update: if canTasksManage(companyId, branchId) ||
+            // whoever has a one-off marks it done (or not)
             (isBranchMember(companyId, branchId) && resource.data.get('assigneeUid', '') == request.auth.uid &&
-              resource.data.get('repeat', null) == null && isTaskWork());
+              resource.data.get('repeat', null) == null && isTaskWork()) ||
+            // a supervisor changes the tasks they lead, still within their team
+            (canTasksTeam(companyId, branchId) && resource.data.get('teamLeadUid', '') == request.auth.uid &&
+              request.resource.data.teamLeadUid == request.auth.uid &&
+              !changedKeys().hasAny(['creatorUid', 'createdBy']) &&
+              inMyTeam(companyId, branchId, request.resource.data.assigneeUid)) ||
+            // a supervisor hands a task given to them on to their team
+            (canTasksTeam(companyId, branchId) && resource.data.get('assigneeUid', '') == request.auth.uid &&
+              changedKeys().hasOnly(['assignee', 'assigneeUid', 'teamLeadUid', 'via', 'updatedAt']) &&
+              request.resource.data.teamLeadUid == request.auth.uid &&
+              inMyTeam(companyId, branchId, request.resource.data.assigneeUid));
+          allow delete: if canTasksManage(companyId, branchId) ||
+            (canTasksTeam(companyId, branchId) && resource.data.get('creatorUid', '') == request.auth.uid &&
+              resource.data.get('teamLeadUid', '') == request.auth.uid);
+
+          // questions and answers about the task: whoever can see it, as themselves
+          match /comments/{commentId} {
+            allow read: if canSeeTask(companyId, branchId,
+              get(/databases/$(database)/documents/companies/$(companyId)/branches/$(branchId)/tasks/$(taskId)).data);
+            allow create: if canSeeTask(companyId, branchId,
+                get(/databases/$(database)/documents/companies/$(companyId)/branches/$(branchId)/tasks/$(taskId)).data) &&
+              request.resource.data.byUid == request.auth.uid &&
+              request.resource.data.createdAt == request.time;
+          }
         }
         match /taskChecks/{checkId} {
           allow read: if canTasksManage(companyId, branchId) ||
-            (isBranchMember(companyId, branchId) && resource.data.get('assigneeUid', '') == request.auth.uid);
-          // ticked as yourself, for a task that is yours (or by management for anyone),
-          // under the id {taskId}_{date}
+            (isBranchMember(companyId, branchId) && (
+              resource.data.get('assigneeUid', '') == request.auth.uid || resource.data.get('teamLeadUid', '') == request.auth.uid));
+          // ticked as yourself, under the id {taskId}_{date}, for a task that is yours —
+          // or for someone, by management or the supervisor leading it; the tick
+          // carries the task's team lead
           allow create: if isBranchMember(companyId, branchId) &&
             request.resource.data.by.uid == request.auth.uid &&
             checkId == request.resource.data.taskId + '_' + request.resource.data.date &&
             get(/databases/$(database)/documents/companies/$(companyId)/branches/$(branchId)/tasks/$(request.resource.data.taskId)).data.get('assigneeUid', '') == request.resource.data.assigneeUid &&
-            (request.resource.data.assigneeUid == request.auth.uid || canTasksManage(companyId, branchId));
-          // untick: whoever ticked it, or management
+            get(/databases/$(database)/documents/companies/$(companyId)/branches/$(branchId)/tasks/$(request.resource.data.taskId)).data.get('teamLeadUid', null) == request.resource.data.get('teamLeadUid', null) &&
+            (request.resource.data.assigneeUid == request.auth.uid || canTasksManage(companyId, branchId) ||
+              (canTasksTeam(companyId, branchId) && request.resource.data.get('teamLeadUid', '') == request.auth.uid));
+          // a new supervisor leads the task: management moves its ticks along
+          allow update: if canTasksManage(companyId, branchId) && changedKeys().hasOnly(['teamLeadUid']);
+          // untick: whoever ticked it, the team's supervisor, or management
           allow delete: if canTasksManage(companyId, branchId) ||
-            (isBranchMember(companyId, branchId) && resource.data.get('by', {}).get('uid', '') == request.auth.uid);
+            (isBranchMember(companyId, branchId) && (
+              resource.data.get('by', {}).get('uid', '') == request.auth.uid || resource.data.get('teamLeadUid', '') == request.auth.uid));
         }
         // A manager's stars for someone's month: management writes (never their
         // own); the person sees their own.

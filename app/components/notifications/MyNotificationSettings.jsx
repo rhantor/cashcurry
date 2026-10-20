@@ -14,7 +14,7 @@ import { Switch, toast } from "@/app/components/ui";
 const MINE = {
   "requests.mine": { label: "My own requests", hint: "When something you asked for is approved, rejected or paid out" },
   "issues.mine": { label: "My issues", hint: "Issues you reported or were given: assigned, resolved, reopened, new comments" },
-  "tasks.mine": { label: "My tasks", hint: "A task given to you, and a task you gave marked done" },
+  "tasks.mine": { label: "My tasks", hint: "A task given or handed to you, questions and answers on tasks, a task you gave done or handed on" },
   "tasks.reminder": { label: "Task reminders", hint: "Morning: what's on today · evening: what's still left" },
 };
 

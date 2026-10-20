@@ -75,11 +75,16 @@ function GivenList({ tasks, onEdit, companyId, branchId, today }) {
   );
 }
 
-export default function TeamTab({ tasks, loading, people, companyId, branchId, user, today }) {
+/**
+ * scope: which ticks to read — { all: true } for management, { lead: uid } for a
+ * supervisor. people: who can be given tasks (a supervisor: their team).
+ * leadFor(uid): who leads a new task for that person.
+ */
+export default function TeamTab({ tasks, loading, people, companyId, branchId, user, today, scope = { all: true }, leadFor }) {
   const [editing, setEditing] = useState(null); // a task, or { new: true, assigneeUid }
   const [openUid, setOpenUid] = useState(null);
   const [view, setView] = useState("todo");
-  const { checks } = useChecks(companyId, branchId, { from: addDays(today, -CATCH_UP_DAYS), to: today, all: true });
+  const { checks } = useChecks(companyId, branchId, { from: addDays(today, -CATCH_UP_DAYS), to: today, ...scope });
 
   // everyone at the branch who can be given tasks, and anyone who already has some
   const rows = useMemo(() => {
@@ -104,6 +109,7 @@ export default function TeamTab({ tasks, loading, people, companyId, branchId, u
       task={editing && !editing.new ? editing : null}
       defaultAssigneeUid={editing?.new ? editing.assigneeUid : undefined}
       people={people}
+      leadFor={leadFor}
       companyId={companyId}
       branchId={branchId}
       user={user}
@@ -138,7 +144,7 @@ export default function TeamTab({ tasks, loading, people, companyId, branchId, u
           ]}
         />
         {view === "todo" ? (
-          <MyTasksTab tasks={open.tasks} loading={false} companyId={companyId} branchId={branchId} user={user} today={today} person={open.person} readOnly />
+          <MyTasksTab tasks={open.tasks} loading={false} companyId={companyId} branchId={branchId} user={user} today={today} person={open.person} readOnly scope={scope} />
         ) : (
           <GivenList tasks={open.tasks} onEdit={setEditing} companyId={companyId} branchId={branchId} today={today} />
         )}
@@ -167,7 +173,11 @@ export default function TeamTab({ tasks, loading, people, companyId, branchId, u
       </div>
 
       {!rows.length ? (
-        <EmptyState icon={Users} title="No one to give tasks to" description="People at this branch with a login show up here." />
+        <EmptyState
+          icon={Users}
+          title={scope.lead ? "No one in your team yet" : "No one to give tasks to"}
+          description={scope.lead ? "Staff whose record names you as their supervisor (or names no one) show up here — set it in Staff management." : "People at this branch with a login show up here."}
+        />
       ) : (
         <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
           {rows.map((r) => (

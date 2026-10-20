@@ -1,5 +1,6 @@
 'use client'
 
+import { moveTasksToLead } from '@/lib/tasks/client'
 import React, { useMemo, useState } from 'react'
 import useResolvedCompanyBranch from '@/app/hooks/useResolvedCompanyBranch'
 import {
@@ -113,6 +114,10 @@ export default function StaffManagementPage () {
       } else {
         await updateStaff({ companyId, branchId, id, staffId: id, data, photoFile, oldPhotoUrl }).unwrap()
         toast.success(`${data.firstName} ${data.lastName} saved`)
+        // a new supervisor leads their unfinished tasks from now on (4.11)
+        if ((editTarget?.supervisorUid || '') !== (data.supervisorUid || '') && editTarget?.uid) {
+          moveTasksToLead(companyId, branchId, editTarget.uid, data.supervisorUid || null).catch(() => {})
+        }
       }
       setModalMode(null)
       setEditTarget(null)

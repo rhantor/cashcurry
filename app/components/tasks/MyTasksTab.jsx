@@ -10,6 +10,7 @@ import { Badge, Button, EmptyState, Sheet, Skeleton, Textarea, cn, toast } from 
 import { FileThumb } from "@/app/components/common/Files";
 import { CATCH_UP_DAYS, addDays, agenda, dayList, repeatText } from "@/lib/tasks/model";
 import { completeOnce, reopenOnce, tickDay, untickDay, uploadProof, useChecks } from "@/lib/tasks/client";
+import TaskDetailSheet from "./TaskDetailSheet";
 
 const dayText = (d) => format(parseISO(d), "EEE d MMM");
 
@@ -68,7 +69,7 @@ function DoneSheet({ item, onClose, onDone }) {
 }
 
 /** One task on the list. `showDate`: say which day it is for (late and coming-up items). */
-function Row({ item, onTick, busy, canUndo, showDate, readOnly }) {
+function Row({ item, onTick, onOpen, busy, canUndo, showDate, readOnly }) {
   const { task, done } = item;
   const check = item.check;
   const proof = done ? (item.kind === "repeat" ? check?.photos : task.done?.photos) || [] : [];
@@ -97,7 +98,9 @@ function Row({ item, onTick, busy, canUndo, showDate, readOnly }) {
         </button>
       )}
       <div className="min-w-0 flex-1 space-y-1">
-        <p className={cn("text-sm font-semibold", done ? "text-muted line-through decoration-subtle" : "text-fg")}>{task.title}</p>
+        <button type="button" onClick={() => onOpen(task)} className={cn("text-left text-sm font-semibold hover:underline", done ? "text-muted line-through decoration-subtle" : "text-fg")}>
+          {task.title}
+        </button>
         {task.details && !done && <p className="text-xs text-muted">{task.details}</p>}
         <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-[11px] text-muted">
           {showDate && item.date && <span className="font-semibold text-fg">{dayText(item.date)}</span>}
@@ -135,16 +138,23 @@ function Section({ title, hint, tone, items, children }) {
   );
 }
 
-/** tasks: this person's (live). user: who is ticking. person: whose list (defaults to user). */
-export default function MyTasksTab({ tasks, loading, companyId, branchId, user, today, person, readOnly = false }) {
+/**
+ * tasks: this person's (live). user: who is looking. person: whose list
+ * (defaults to user). scope: the ticks a viewer may read for someone else
+ * ({ all: true } management, { lead: uid } their supervisor). team: who a
+ * supervisor can hand a task to.
+ */
+export default function MyTasksTab({ tasks, loading, companyId, branchId, user, today, person, readOnly = false, scope, team = [] }) {
   const uid = person?.uid || user.uid;
   const [day, setDay] = useState(null); // null = the to-do list; a date = that day only
   const [asking, setAsking] = useState(null);
   const [busy, setBusy] = useState(null);
+  const [openId, setOpenId] = useState(null);
+  const opened = openId && tasks.find((t) => t.id === openId);
   const monday = weekStart(today);
   const week = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(monday, i)), [monday]);
   const from = [addDays(today, -CATCH_UP_DAYS), monday].sort()[0];
-  const { checks, loading: checksLoading } = useChecks(companyId, branchId, { from, to: today, uid, all: readOnly });
+  const { checks, loading: checksLoading } = useChecks(companyId, branchId, { from, to: today, ...(readOnly && scope ? scope : { uid }) });
   const list = useMemo(() => agenda(tasks, checks, today), [tasks, checks, today]);
   const single = useMemo(() => (day ? dayList(tasks, checks, day, today).map((x) => ({ ...x, date: day, canTick: x.kind === "once" || day <= today })) : []), [tasks, checks, day, today]);
 
@@ -180,7 +190,7 @@ export default function MyTasksTab({ tasks, loading, companyId, branchId, user, 
   // your own tick, or a one-off you finished — today only
   const canUndo = (item) => (item.kind === "repeat" ? item.check?.by?.uid === user.uid && item.check?.doneOn === today : item.task.done?.by?.uid === user.uid && item.task.done?.date === today);
   const row = (item, showDate) => (
-    <Row key={`${item.task.id}-${item.date}`} item={item} onTick={onTick} busy={busy === `${item.task.id}-${item.date}`} canUndo={canUndo(item)} showDate={showDate} readOnly={readOnly} />
+    <Row key={`${item.task.id}-${item.date}`} item={item} onTick={onTick} onOpen={(t) => setOpenId(t.id)} busy={busy === `${item.task.id}-${item.date}`} canUndo={canUndo(item)} showDate={showDate} readOnly={readOnly} />
   );
 
   // a dot under a day of the strip: something still to do that day
@@ -254,6 +264,7 @@ export default function MyTasksTab({ tasks, loading, companyId, branchId, user, 
         </div>
       )}
       <DoneSheet key={asking ? `${asking.task.id}-${asking.date}` : "none"} item={asking} onClose={() => setAsking(null)} onDone={finish} />
+      {opened && <TaskDetailSheet task={opened} onClose={() => setOpenId(null)} companyId={companyId} branchId={branchId} user={user} team={team} />}
     </div>
   );
 }
