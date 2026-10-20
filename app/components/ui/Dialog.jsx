@@ -10,10 +10,15 @@ import { fade, pop, spring } from "./motion";
 function useOverlay(open, onClose, panelRef) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
+  // The latest onClose, without making the effect below run again: callers
+  // often pass a new function on every render (e.g. while someone types), and
+  // re-running it would move focus back to the first field each time.
+  const close = useRef(onClose);
+  close.current = onClose;
   useEffect(() => {
     if (!open) return;
     const before = document.activeElement;
-    const onKey = (e) => e.key === "Escape" && onClose?.();
+    const onKey = (e) => e.key === "Escape" && close.current?.();
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     document.addEventListener("keydown", onKey);
@@ -31,7 +36,7 @@ function useOverlay(open, onClose, panelRef) {
       document.removeEventListener("keydown", onKey);
       before?.focus?.();
     };
-  }, [open, onClose, panelRef]);
+  }, [open, panelRef]);
   return mounted;
 }
 
