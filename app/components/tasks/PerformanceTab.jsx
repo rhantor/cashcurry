@@ -114,9 +114,9 @@ export default function PerformanceTab({ tasks, loading, manage, companyId, bran
       ) : !rows.length || future ? (
         <EmptyState icon={Gauge} title="Nothing to show for this month" description={manage ? "Once people have tasks, how they did shows here." : "Tasks given to you show here once they're due."} />
       ) : (
-        <ul className="grid gap-3 sm:grid-cols-2">
+        <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {rows.map(({ person, p, r }) => (
-            <li key={person.uid} className="space-y-3 rounded-2xl border border-line bg-surface p-4">
+            <li key={person.uid} className="min-w-0 space-y-3 rounded-2xl border border-line bg-surface p-4">
               <div className="flex items-center gap-3">
                 <Avatar name={person.name} />
                 <div className="min-w-0 flex-1">
@@ -126,12 +126,15 @@ export default function PerformanceTab({ tasks, loading, manage, companyId, bran
                 <p className={cn("text-2xl font-bold tabular-nums", scoreTone(p.score))}>{p.score == null ? "—" : `${p.score}%`}</p>
               </div>
               <ScoreBar p={p} />
-              <div className="flex flex-wrap items-center gap-2 border-t border-line pt-3">
-                <Stars value={r?.stars || 0} />
-                <span className="min-w-0 flex-1 truncate text-xs text-muted">{r ? (r.note ? `“${r.note}” — ${r.by?.name || ""}` : `by ${r.by?.name || "a manager"}`) : "Not rated yet"}</span>
-                {manage && person.uid !== user.uid && (
-                  <Button size="sm" variant="secondary" onClick={() => setRating({ person, current: r })}>{r ? "Change" : "Rate"}</Button>
-                )}
+              <div className="space-y-1.5 border-t border-line pt-3">
+                <div className="flex items-center gap-2">
+                  <Stars value={r?.stars || 0} />
+                  <span className="min-w-0 flex-1 truncate text-xs text-muted">{r ? `by ${r.by?.name || "a manager"}` : "Not rated yet"}</span>
+                  {manage && person.uid !== user.uid && (
+                    <Button size="sm" variant="secondary" onClick={() => setRating({ person, current: r })}>{r ? "Change" : "Rate"}</Button>
+                  )}
+                </div>
+                {r?.note && <p className="text-sm text-fg">“{r.note}”</p>}
               </div>
             </li>
           ))}
