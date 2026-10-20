@@ -54,6 +54,8 @@ const PROBES = {
   "catalog.manage": (u) => as(u).doc(`companies/${CO}/vendors/v-${u}`).set({ name: "V" }),
   "branchSettings.manage": (u) => as(u).doc(`${B}/settings/settings`).update({ "basic.phone": `p-${u}` }),
   "issues.manage": (u) => as(u).doc(`${B}/issues/i-${u}`).update({ priority: "urgent" }),
+  // a task for someone else (the staff member), given by u
+  "tasks.manage": (u) => as(u).doc(`${B}/tasks/t-${u}`).set({ title: "Mop", assigneeUid: "klStaff", creatorUid: u, repeat: null, status: "open" }),
   "chat.groups": (u) => as(u).collection(`companies/${CO}/chats`).add({ kind: "group", name: "G", members: [u], createdBy: u }),
   "notifications.manage": (u) => as(u).doc(`${B}/settings/notifications`).set({ recipients: { "daily.sales": [u] } }),
   "categories.manage": (u) => as(u).doc(`companies/${CO}/settings/costCategories`).set({ groups: [{ id: `g-${u}`, name: "G", kind: "expense", categories: [] }] }),

@@ -11,6 +11,7 @@ import { Skeleton } from "@/app/components/ui";
 import AdvanceAskSheet from "@/app/components/requests/AdvanceAskSheet";
 import LeaveSheet from "@/app/components/requests/LeaveSheet";
 import NewIssueSheet from "@/app/components/issues/NewIssueSheet";
+import TodayTasksCard from "@/app/components/tasks/TodayTasksCard";
 import { useMyPayslips, useMyStaff, useMyWork } from "../useStaffApp";
 import { Heading, MoneyTile, PayslipRow, PayslipSheet, PeriodCard } from "../parts";
 
@@ -94,6 +95,8 @@ export default function StaffHome() {
           <PayslipRow slip={slips[0]} currency={currency} onOpen={setOpen} />
         </section>
       )}
+
+      <TodayTasksCard user={user} />
 
       <section className="space-y-2">
         <Heading href="/my-issues" more="My issues">Something wrong at work?</Heading>

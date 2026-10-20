@@ -310,6 +310,13 @@ service cloud.firestore {
     function canSeeIssue(c, b, d) {
       return canIssuesSeeAll(c, b) || (isBranchMember(c, b) && isIssueParty(d));
     }
+    // ── tasks (4.11, lib/tasks/model.js) ──
+    function canTasksManage(c, b) { return may(c, b, leadRoles().concat(['inCharge'])); }
+    // a one-off task marked done (or undone) by whoever has it: nothing else moves
+    function isTaskWork() {
+      return changedKeys().hasOnly(['status', 'done', 'updatedAt']) && request.resource.data.status in ['open', 'done'];
+    }
+
     // the fields that move when work is done on an issue (not who it's for, not what it is)
     function isIssueWork() {
       return changedKeys().hasOnly(['status', 'resolution', 'resolvedBy', 'resolvedAt', 'updatedAt', 'lastActivityAt', 'watchers']);
@@ -481,6 +488,11 @@ service cloud.firestore {
         // Their own choices, e.g. kinds of notification they muted
         match /prefs/{doc} {
           allow read, write: if isAuth() && request.auth.uid == uid;
+        }
+
+        // Their own notes (4.11): no one else reads them, not even the owner
+        match /notes/{noteId} {
+          allow read, write: if isAuth() && request.auth.uid == uid && belongsToCompany(companyId);
         }
       }
 
@@ -842,6 +854,44 @@ service cloud.firestore {
               request.resource.data.byUid == request.auth.uid &&
               request.resource.data.createdAt == request.time;
           }
+        }
+
+        // ── Tasks and checklists (roadmap 4.11) ─────────────────────────────
+        // Management gives, changes and stops them; whoever has one sees it and
+        // marks it done. Each tick of a repeating one is a taskCheck.
+        match /tasks/{taskId} {
+          allow read: if canTasksManage(companyId, branchId) ||
+            (isBranchMember(companyId, branchId) && resource.data.get('assigneeUid', '') == request.auth.uid);
+          allow create, delete: if canTasksManage(companyId, branchId);
+          allow update: if canTasksManage(companyId, branchId) ||
+            (isBranchMember(companyId, branchId) && resource.data.get('assigneeUid', '') == request.auth.uid &&
+              resource.data.get('repeat', null) == null && isTaskWork());
+        }
+        match /taskChecks/{checkId} {
+          allow read: if canTasksManage(companyId, branchId) ||
+            (isBranchMember(companyId, branchId) && resource.data.get('assigneeUid', '') == request.auth.uid);
+          // ticked as yourself, for a task that is yours (or by management for anyone),
+          // under the id {taskId}_{date}
+          allow create: if isBranchMember(companyId, branchId) &&
+            request.resource.data.by.uid == request.auth.uid &&
+            checkId == request.resource.data.taskId + '_' + request.resource.data.date &&
+            get(/databases/$(database)/documents/companies/$(companyId)/branches/$(branchId)/tasks/$(request.resource.data.taskId)).data.get('assigneeUid', '') == request.resource.data.assigneeUid &&
+            (request.resource.data.assigneeUid == request.auth.uid || canTasksManage(companyId, branchId));
+          // untick: whoever ticked it, or management
+          allow delete: if canTasksManage(companyId, branchId) ||
+            (isBranchMember(companyId, branchId) && resource.data.get('by', {}).get('uid', '') == request.auth.uid);
+        }
+        // A manager's stars for someone's month: management writes (never their
+        // own); the person sees their own.
+        match /ratings/{ratingId} {
+          allow read: if canTasksManage(companyId, branchId) ||
+            (isBranchMember(companyId, branchId) && resource.data.get('uid', '') == request.auth.uid);
+          allow create, update: if canTasksManage(companyId, branchId) &&
+            request.resource.data.uid != request.auth.uid &&
+            request.resource.data.by.uid == request.auth.uid &&
+            ratingId == request.resource.data.month + '_' + request.resource.data.uid &&
+            request.resource.data.stars is int && request.resource.data.stars >= 1 && request.resource.data.stars <= 5;
+          allow delete: if canTasksManage(companyId, branchId);
         }
 
         // ── Leave requests (roadmap 4.2) ────────────────────────────────────

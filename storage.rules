@@ -234,6 +234,15 @@ service firebase.storage {
       allow delete: if request.auth.uid == uid;
     }
 
+    // Task proof photos (4.11): tasks/{companyId}/{branchId}/{uid}/{filename} —
+    // whoever does the task adds them (up to 10 MB); the branch sees them.
+    match /tasks/{companyId}/{branchId}/{uid}/{filename} {
+      allow read: if isBranchMember(companyId, branchId);
+      allow create: if request.auth.uid == uid && isBranchMember(companyId, branchId) &&
+        request.resource.size <= 10 * 1024 * 1024 && request.resource.contentType.matches('image/.*');
+      allow delete: if request.auth.uid == uid;
+    }
+
     // Company chat stickers: stickers/{companyId}/{filename} — an image up to
     // 1 MB, added by management (owner, super admin, gm, branch admin, manager).
     match /stickers/{companyId}/{filename} {

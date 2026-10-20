@@ -320,6 +320,25 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
     }
   }
 
+  /**
+   * Tasks (4.11): given (or handed over) → whoever has it now; a one-off done →
+   * whoever gave it. Ticks of a daily checklist tell no one — the Team tab shows them.
+   */
+  async function onTask({ companyId, branchId, id, before, after }) {
+    if (!after) return;
+    const [all, b] = await Promise.all([people(companyId), branch(companyId, branchId)]);
+    const linkFor = (uid) => (all.find((p) => p.uid === uid)?.role === "staff" ? "/my-tasks" : "/tasks");
+    const what = `${after.priority === "urgent" ? "🚩 " : ""}${after.title}`;
+    const when = after.repeat ? N.repeatText(after) : after.dueDate ? `by ${after.dueDate}` : "";
+    if (after.assigneeUid && after.assigneeUid !== before?.assigneeUid && after.assigneeUid !== after.creatorUid) {
+      const by = after.createdBy?.name || "Your manager";
+      await deliver({ companyId, branchId, uids: [after.assigneeUid], type: "tasks.mine", message: { title: `New task · ${b.name}`, body: `${what}${when ? ` — ${when}` : ""} · from ${by}` }, link: linkFor(after.assigneeUid), ref: `tasks/${id}` });
+    }
+    if (!after.repeat && before?.status !== "done" && after.status === "done" && after.creatorUid && after.done?.by?.uid !== after.creatorUid) {
+      await deliver({ companyId, branchId, uids: [after.creatorUid], type: "tasks.mine", message: { title: "Task done", body: `${what} — ${after.done?.by?.name || "someone"}${after.done?.note ? `: “${after.done.note}”` : ""}` }, link: `${linkFor(after.creatorUid)}?tab=team`, ref: `tasks/${id}` });
+    }
+  }
+
   /** A comment on an issue: everyone involved but whoever wrote it. */
   async function onIssueComment({ companyId, branchId, issueId, comment }) {
     if (!comment || comment.kind !== "comment") return;
@@ -367,5 +386,5 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
     });
   }
 
-  return { deliver, onRequest, onPurchaseOrder, onPayout, onCostVoucher, dailySummaries, onChatMessage, onUser, onIssue, onIssueComment, onStaffLogin };
+  return { deliver, onRequest, onPurchaseOrder, onPayout, onCostVoucher, dailySummaries, onChatMessage, onUser, onIssue, onIssueComment, onTask, onStaffLogin };
 };

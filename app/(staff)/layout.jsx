@@ -5,7 +5,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { Home, MessageCircle, FileText, TriangleAlert, User, Wallet, LogOut } from "lucide-react";
+import { Home, ListChecks, MessageCircle, FileText, TriangleAlert, User, Wallet, LogOut } from "lucide-react";
 import NotificationBell from "@/app/components/notifications/NotificationBell";
 import useSession from "@/app/hooks/useSession";
 import { useChats } from "@/app/components/chat/useChat";
@@ -18,11 +18,12 @@ const NAV = [
   { label: "Pay", href: "/my-pay", icon: Wallet },
   { label: "Requests", href: "/requests", icon: FileText },
   { label: "Chat", href: "/messages", icon: MessageCircle },
+  { label: "Tasks", href: "/my-tasks", icon: ListChecks, wide: true }, // phones: from Home (4.11)
   { label: "Issues", href: "/my-issues", icon: TriangleAlert, wide: true }, // phones: from Home
   { label: "Me", href: "/profile", icon: User },
 ];
 
-const TITLES = { "/staff-portal": "Home", "/my-pay": "My pay", "/requests": "Requests", "/my-issues": "Issues", "/profile": "Me" };
+const TITLES = { "/staff-portal": "Home", "/my-pay": "My pay", "/requests": "Requests", "/my-issues": "Issues", "/my-tasks": "Tasks", "/profile": "Me" };
 
 export default function StaffLayout({ children }) {
   const pathname = usePathname();

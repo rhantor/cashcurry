@@ -13,6 +13,7 @@ import {
 export const MENU_ICONS = {
   home: House,
   payouts: HandCoins, // pay-outs and their bills (4.10)
+  tasks: ListChecks, // tasks, checklists, notes and performance (4.11)
   MdOutlineSpaceDashboard: LayoutDashboard, // dashboards
   MdShoppingCart: ShoppingCart, // purchases
   GrTransaction: NotebookPen, // entries

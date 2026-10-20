@@ -26,7 +26,7 @@ export default function ClientLayoutWrapper({ children }) {
   const authPages = ["/login", "/signup", "/signup/verify", "/reset-password"];
   // No sidebar/top bar on these (the staff app, the kiosk, and the /ui design preview).
   // …and chat, which has its own full-screen workspace (/messages).
-  const staffPages = ["/staff-portal", "/requests", "/kiosk", "/profile", "/ui", "/messages", "/my-issues", "/my-pay"];
+  const staffPages = ["/staff-portal", "/requests", "/kiosk", "/profile", "/ui", "/messages", "/my-issues", "/my-pay", "/my-tasks"];
   const isAuthPage = authPages.some((path) => pathname.startsWith(path));
   const isStaffPage = staffPages.some((path) => pathname.startsWith(path));
   const isLoggedIn = status === "signedIn" && !!user?.role;
