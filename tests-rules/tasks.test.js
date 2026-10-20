@@ -181,6 +181,15 @@ describe("supervisors and their team", () => {
 });
 
 describe("a task's questions and answers", () => {
+  it("each new one counts the task's messages up by one, as whoever wrote it", async () => {
+    const bump = (uid, n = 1) => ({ commentCount: n, lastCommentAt: serverTimestamp(), lastCommentByUid: uid });
+    expect(await ok(db("ali").doc(`${T}/ledByRahim`).update(bump("ali")))).toBe(true);
+    expect(await ok(db("rahim").doc(`${T}/ledByRahim`).update(bump("rahim", 2)))).toBe(true);
+    expect(await ok(db("ali").doc(`${T}/ledByRahim`).update(bump("ali", 5)))).toBe(false); // by one only
+    expect(await ok(db("ali").doc(`${T}/ledByRahim`).update(bump("rahim", 3)))).toBe(false); // as themselves
+    expect(await ok(db("siti").doc(`${T}/ledByRahim`).update(bump("siti", 3)))).toBe(false); // not theirs
+    expect(await ok(db("ali").doc(`${T}/ledByRahim`).update({ ...bump("ali", 3), title: "x" }))).toBe(false);
+  });
   const say = (uid) => ({ byUid: uid, byName: uid, text: "Which oil?", photos: [], createdAt: serverTimestamp() });
   it("whoever has it, leads it, gave it or manages asks and answers, as themselves", async () => {
     expect(await ok(db("ali").collection(`${T}/ledByRahim/comments`).add(say("ali")))).toBe(true);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addDays, agenda, canGiveTasks, canHandOver, canManageTasks, canTeamTasks, chainText, defaultEveningAt, leadOf, teamOf, reminderMessage, todayCount, checkId, checkTask, dayList, monthOf, occursOn, performance, repeatText } from "@/lib/tasks/model";
+import { addDays, agenda, canGiveTasks, canHandOver, canManageTasks, canTeamTasks, chainText, defaultEveningAt, leadOf, teamOf, unreadOn, reminderMessage, todayCount, checkId, checkTask, dayList, monthOf, occursOn, performance, repeatText } from "@/lib/tasks/model";
 
 const ali = { uid: "ali", name: "Ali" };
 const daily = { id: "fryer", title: "Clean the fryer", assigneeUid: "ali", assignee: ali, repeat: { every: "day" }, startDate: "2026-10-01", active: true };
@@ -189,5 +189,18 @@ describe("supervisors' teams", () => {
   it("the chain from who gave it to who has it", () => {
     expect(chainText({ createdBy: { name: "KL Manager" }, via: [{ name: "Rahim" }], assignee: { name: "Ali" } })).toBe("KL Manager → Rahim → Ali");
     expect(chainText({ createdBy: { name: "Rahim" }, assignee: { name: "Ali" } })).toBe("Rahim → Ali");
+  });
+});
+
+describe("new messages on a task", () => {
+  const t = (extra) => ({ id: "t1", commentCount: 2, lastCommentAt: { seconds: 200 }, lastCommentByUid: "ali", ...extra });
+  it("new when someone else wrote after you last opened it", () => {
+    expect(unreadOn(t(), {}, "rahim")).toBe(true);
+    expect(unreadOn(t(), { t1: { seconds: 100 } }, "rahim")).toBe(true);
+    expect(unreadOn(t(), { t1: { seconds: 300 } }, "rahim")).toBe(false);
+  });
+  it("not your own message, and nothing when there are none", () => {
+    expect(unreadOn(t(), {}, "ali")).toBe(false);
+    expect(unreadOn(t({ commentCount: 0, lastCommentAt: null }), {}, "rahim")).toBe(false);
   });
 });
