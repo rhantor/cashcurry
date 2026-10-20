@@ -17,6 +17,18 @@ const nextConfig = {
       { source: "/feeds", destination: "/", permanent: false },
     ];
   },
+  // The dev server watches code only. `npm run dev:local` rewrites .local/
+  // (the emulator data) every 5 minutes; on Windows watching that churn
+  // stopped the watcher, and edits no longer reloaded.
+  webpack(config, { dev }) {
+    if (dev) {
+      config.watchOptions = {
+        ...config.watchOptions,
+        ignored: ["**/node_modules/**", "**/.git/**", "**/.local/**", "**/.next*/**", "**/firebase-export-*/**", "**/android/**", "**/functions/**", "**/*.log"],
+      };
+    }
+    return config;
+  },
 };
 
 export default nextConfig;
