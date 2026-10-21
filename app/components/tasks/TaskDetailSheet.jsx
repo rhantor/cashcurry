@@ -11,7 +11,7 @@ import { FileThumb } from "@/app/components/common/Files";
 import { timeOf } from "@/lib/chat/model";
 import { canHandOver, chainText, repeatText } from "@/lib/tasks/model";
 import { addTaskComment, handOver, markTaskRead, useTaskComments } from "@/lib/tasks/client";
-import useVoiceRecorder, { canRecordVoice } from "@/app/hooks/useVoiceRecorder";
+import useVoiceRecorder, { whyNoVoice } from "@/app/hooks/useVoiceRecorder";
 import { MicButton, RecordingBar, VoicePlayer } from "@/app/components/common/Voice";
 
 const dayText = (d) => format(parseISO(d), "EEE d MMM");
@@ -30,9 +30,13 @@ export default function TaskDetailSheet({ task, onClose, companyId, branchId, us
   const end = useRef(null);
   const voice = useVoiceRecorder();
   const [canVoice, setCanVoice] = useState(false);
-  useEffect(() => setCanVoice(canRecordVoice()), []);
+  useEffect(() => setCanVoice(true), []); // after mount: the browser is known
   useEffect(() => {
     if (voice.state === "denied") toast.error("No microphone", { description: "Allow the microphone for this app in your phone or browser settings, then try again." });
+    if (voice.state === "unavailable") {
+      const why = whyNoVoice() || { title: "Voice isn't available here", description: "" };
+      toast.error(why.title, { description: why.description });
+    }
   }, [voice.state]);
   const previews = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files]);
   useEffect(() => () => previews.forEach((u) => URL.revokeObjectURL(u)), [previews]);
