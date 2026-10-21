@@ -1,5 +1,7 @@
 'use client'
 
+import { HandOutSheet } from '@/app/components/payouts/PayoutSheets'
+import { can } from '@/lib/authz/permissions'
 import { businessToday } from "@/lib/region";
 import { formatMoney } from '@/lib/region/currency'
 import React, { useMemo, useState } from 'react'
@@ -208,6 +210,13 @@ export default function DueBillsPage () {
   }
 
   const selectedBills = filteredBills.filter(b => selectedIds.includes(b.id))
+  // "Send cash": a pay-out for the ticked bills — whoever takes it brings the receipt back (4.10)
+  const [sendCash, setSendCash] = useState(false)
+  const cashPreset = useMemo(
+    () => (sendCash && selectedBills.length ? { vendorId: selectedBills[0].vendorId, vendorName: selectedBills[0].vendorName, bills: selectedBills } : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [sendCash, selectedIds.join(',')]
+  )
   const canPay =
     selectedBills.length > 0 &&
     new Set(selectedBills.map(b => b.vendorId)).size === 1
@@ -445,6 +454,17 @@ const handleSaveEdit = async (billId, formData) => {
 
   return (
     <div className='mx-auto max-w-7xl px-4 py-5 pb-28 sm:px-6 sm:py-6'>
+      <HandOutSheet
+        open={sendCash}
+        onClose={() => {
+          setSendCash(false)
+          setSelectedIds([])
+        }}
+        companyId={companyId}
+        branchId={branchId}
+        user={user}
+        preset={cashPreset}
+      />
       {/* Header Section */}
       <DueBillsHeader
         bills={allBills}
@@ -452,6 +472,7 @@ const handleSaveEdit = async (billId, formData) => {
         canPay={canPay}
         totalSelectedBalance={totalSelectedBalance}
         onPayClick={() => setPayOpen(true)}
+        onSendCash={can(user?.role, 'payouts.handOut') ? () => setSendCash(true) : undefined}
         fmtRM={fmtRM}
         onExportPDF={handleExportPDF}
         onExportExcel={handleExportExcel}

@@ -50,7 +50,8 @@ const PROBES = {
   "purchases.order": (u) => as(u).doc(`${B}/requisitions/po-${u}`).set({ status: "Pending", vendorId: "v1" }),
   "purchases.approve": (u) => as(u).doc(`${B}/requisitions/pending-${u}`).update({ status: "Approved", approvedBy: u }),
   "purchases.bills": (u) => as(u).doc(`${B}/vendorPayments/vp-${u}`).set({ vendorId: "v1", total: 1 }),
-  "catalog.view": (u) => as(u).doc(`companies/${CO}/vendors/v1`).get(),
+  // the item catalog (vendor names are also open to pay-outs, to pick a supplier — 4.10)
+  "catalog.view": (u) => as(u).doc(`companies/${CO}/items/i1`).get(),
   "catalog.manage": (u) => as(u).doc(`companies/${CO}/vendors/v-${u}`).set({ name: "V" }),
   "branchSettings.manage": (u) => as(u).doc(`${B}/settings/settings`).update({ "basic.phone": `p-${u}` }),
   "issues.manage": (u) => as(u).doc(`${B}/issues/i-${u}`).update({ priority: "urgent" }),
@@ -88,6 +89,7 @@ beforeEach(async () => {
     for (const uid of Object.keys(PEOPLE)) await d.doc(`${B}/costs/v-${uid}`).set({ date: "2026-10-10", amount: 5, createdBy: { uid: "someoneElse" }, voucher: { status: "pending", reason: "stall", by: { uid: "someoneElse" } } });
     for (const uid of Object.keys(PEOPLE)) await d.doc(`${B}/issues/i-${uid}`).set({ title: "x", status: "open", priority: "normal", reporterUid: "someoneElse" });
     await d.doc(`companies/${CO}/vendors/v1`).set({ name: "V" });
+    await d.doc(`companies/${CO}/items/i1`).set({ name: "Rice" });
     await d.doc(`${B}/settings/settings`).set({ basic: { phone: "1" }, financeSales: { openingBalance: 1, currency: "MYR" } });
     for (const u of USERS) {
       const req = { staffId: "st1", amount: 100, date: "2026-10-10", paidOut: null, paidFromOffice: "front" };

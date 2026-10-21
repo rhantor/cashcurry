@@ -262,6 +262,16 @@ service cloud.firestore {
     function canCostsEnter(c, b)      { return may(c, b, leadRoles().concat(['inCharge', 'accountant'])); }
     function canCostsApprove(c, b)    { return may(c, b, leadRoles().concat(['inCharge'])); }
     function canPayoutsHandOut(c, b)  { return may(c, b, leadRoles().concat(['inCharge', 'supervisor', 'cashier'])); }
+    // ── a pay-out spent at a supplier (4.10, lib/payouts/supplier.js) ──
+    // those who hand out or approve pay-outs, in any branch of the company
+    function canPayoutsAny(c) { return mayInCompany(c, leadRoles().concat(['inCharge', 'supervisor', 'cashier'])); }
+    function canCostsApproveAny(c) { return mayInCompany(c, leadRoles().concat(['inCharge'])); }
+    // the pay-out bill `settleId` ends this write approved, with a supplier — the
+    // supplier's bills, payment and balance may move only as part of that
+    function supplierPayoutApproved(c, b, settleId) {
+      let after = getAfter(/databases/$(database)/documents/companies/$(c)/branches/$(b)/payouts/$(settleId)).data;
+      return after.get('status', '') == 'approved' && after.get('supplier', null) != null;
+    }
     // a cost's voucher moving to approved / rejected in this write
     function voucherDecided() {
       let before = resource.data.get('voucher', {}).get('status', '');
@@ -603,11 +613,17 @@ service cloud.firestore {
       }
 
       match /vendors/{vendorId} {
-        allow read: if canCatalogView(companyId);
+        // pay-outs pick a supplier (4.10) — names, to choose from
+        allow read: if canCatalogView(companyId) || canPayoutsAny(companyId);
         allow write: if canCatalogManage(companyId);
         // receiving goods raises what the vendor is owed
         allow update: if canPurchasesOrderAny(companyId) &&
           changedKeys().hasOnly(['currentBalance', 'totalBilled', 'updatedAt']);
+        // a pay-out's supplier bill approved: what they're owed moves with it
+        allow update: if canCostsApproveAny(companyId) &&
+          changedKeys().hasOnly(['currentBalance', 'totalBilled', 'totalPaid', 'lastPaymentDate', 'updatedAt', 'lastPayout']) &&
+          supplierPayoutApproved(companyId, request.resource.data.lastPayout.branchId, request.resource.data.lastPayout.settleId) &&
+          getAfter(/databases/$(database)/documents/companies/$(companyId)/branches/$(request.resource.data.lastPayout.branchId)/payouts/$(request.resource.data.lastPayout.settleId)).data.supplier.vendorId == vendorId;
       }
 
       // ── POS: Customer DB (company-scoped so loyalty spans branches) ──────
@@ -1009,14 +1025,25 @@ service cloud.firestore {
 
         // ── Vendor Bills ─────────────────────────────────────────────────────
         match /vendorBills/{docId} {
-          allow read, update, delete: if canPurchasesBills(companyId, branchId);
+          // those who hand out pay-outs see what suppliers are owed, to pick a bill (4.10)
+          allow read: if canPurchasesBills(companyId, branchId) || canPayoutsHandOut(companyId, branchId) || canCostsApprove(companyId, branchId);
+          allow update, delete: if canPurchasesBills(companyId, branchId);
           // receiving goods against a purchase order raises the bill
           allow create: if canPurchasesBills(companyId, branchId) || canPurchasesOrder(companyId, branchId);
+          // a pay-out's supplier bill approved: the bill it paid, or the bill it raised
+          allow update: if canCostsApprove(companyId, branchId) &&
+            changedKeys().hasOnly(['paid', 'balance', 'status', 'updatedAt', 'paymentHistory', 'lastPayoutSettleId']) &&
+            supplierPayoutApproved(companyId, branchId, request.resource.data.lastPayoutSettleId);
+          allow create: if canCostsApprove(companyId, branchId) &&
+            supplierPayoutApproved(companyId, branchId, request.resource.data.payoutSettleId);
         }
 
         // ── Vendor Payments ──────────────────────────────────────────────────
         match /vendorPayments/{docId} {
           allow read, write: if canPurchasesBills(companyId, branchId);
+          // the payment a pay-out made to a supplier, written as its bill is approved
+          allow create: if canCostsApprove(companyId, branchId) &&
+            supplierPayoutApproved(companyId, branchId, request.resource.data.payoutSettleId);
         }
 
         // ── Purchase Requisitions ────────────────────────────────────────────
