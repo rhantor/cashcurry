@@ -234,12 +234,13 @@ service firebase.storage {
       allow delete: if request.auth.uid == uid;
     }
 
-    // Task proof photos (4.11): tasks/{companyId}/{branchId}/{uid}/{filename} —
-    // whoever does the task adds them (up to 10 MB); the branch sees them.
+    // Task photos and voice messages (4.11): tasks/{companyId}/{branchId}/{uid}/{filename} —
+    // proof of work and questions about it (up to 10 MB); the branch sees them.
     match /tasks/{companyId}/{branchId}/{uid}/{filename} {
       allow read: if isBranchMember(companyId, branchId);
       allow create: if request.auth.uid == uid && isBranchMember(companyId, branchId) &&
-        request.resource.size <= 10 * 1024 * 1024 && request.resource.contentType.matches('image/.*');
+        request.resource.size <= 10 * 1024 * 1024 &&
+        (request.resource.contentType.matches('image/.*') || request.resource.contentType.matches('audio/.*'));
       allow delete: if request.auth.uid == uid;
     }
 

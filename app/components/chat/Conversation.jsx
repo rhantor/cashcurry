@@ -281,9 +281,9 @@ export default function Conversation({ chat, user, peopleById, branchName, muted
           setReplyTo(null);
           setEditing(null);
         }}
-        onSend={async ({ text, files, onProgress }) => {
+        onSend={async ({ text, files, voice, onProgress }) => {
           atBottom.current = true;
-          await sendMessage(companyId, chat.id, user, { text, files, replyTo, onProgress });
+          await sendMessage(companyId, chat.id, user, { text, files, voice, replyTo, onProgress });
           setReplyTo(null);
           toBottom(true);
         }}

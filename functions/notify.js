@@ -411,7 +411,7 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
     const roleOf = (uid) => all.find((p) => p.uid === uid)?.role;
     const uids = [t.assigneeUid, t.teamLeadUid, t.creatorUid, ...(t.via || []).map((v) => v.uid)].filter((u) => u && u !== comment.byUid && roleOf(u));
     const asking = comment.byUid === t.assigneeUid;
-    const text = comment.text ? `“${String(comment.text).slice(0, 120)}”` : "sent a photo";
+    const text = comment.text ? `“${String(comment.text).slice(0, 120)}”` : comment.voice ? "🎤 sent a voice message" : "sent a photo";
     for (const u of [...new Set(uids)]) {
       await deliver({
         companyId,

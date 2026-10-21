@@ -3,6 +3,7 @@
 // photos (open in a viewer) and files, reactions, the time with ✓ sent / ✓✓
 // seen on your own, "edited" / "Message deleted". On hover (always on phones):
 // react, reply, forward — and edit / delete your own within 15 minutes.
+import { VoicePlayer } from "@/app/components/common/Voice";
 import { useState } from "react";
 import { format } from "date-fns";
 import { Check, CheckCheck, Clock3, CornerUpLeft, Download, EyeOff, FileText, Forward, MoreHorizontal, Pencil, Share2, ShieldX, SmilePlus, Trash2 } from "lucide-react";
@@ -77,9 +78,11 @@ function Text({ text, mine }) {
 
 function Files({ files, mine, onOpenPhoto }) {
   const photos = files.filter((f) => String(f.type).startsWith("image/"));
-  const others = files.filter((f) => !String(f.type).startsWith("image/"));
+  const voices = files.filter((f) => f.voice);
+  const others = files.filter((f) => !String(f.type).startsWith("image/") && !f.voice);
   return (
     <div className="space-y-1.5">
+      {voices.map((f) => <VoicePlayer key={f.path || f.url} url={f.url} duration={f.duration} mine={mine} />)}
       {photos.length > 0 && (
         <div className={cn("grid gap-1 overflow-hidden rounded-xl", photos.length > 1 && "grid-cols-2")}>
           {photos.slice(0, 4).map((f, i) => (

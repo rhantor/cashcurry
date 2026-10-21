@@ -107,6 +107,7 @@ describe("doing them", () => {
     expect(await ok(files("ali").ref(`tasks/${CO}/kl/ali/p.jpg`).put(img, { contentType: "image/jpeg" }))).toBe(true);
     expect(await ok(files("ali").ref(`tasks/${CO}/kl/siti/p.jpg`).put(img, { contentType: "image/jpeg" }))).toBe(false);
     expect(await ok(files("ali").ref(`tasks/${CO}/kl/ali/p.exe`).put(img, { contentType: "application/octet-stream" }))).toBe(false);
+    expect(await ok(files("ali").ref(`tasks/${CO}/kl/ali/v.m4a`).put(img, { contentType: "audio/mp4" }))).toBe(true); // a voice question
   });
 });
 

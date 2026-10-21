@@ -45,6 +45,7 @@ describe("messages", () => {
   it("a one-line preview", () => {
     expect(previewOf({ text: "  hello  " })).toBe("hello");
     expect(previewOf({ deleted: true, text: "x" })).toBe("Message deleted");
+    expect(previewOf({ files: [{ voice: true, duration: 75, type: "audio/mp4", name: "Voice message.m4a" }] })).toBe("🎤 Voice message (1:15)");
     expect(previewOf({ files: [{ type: "image/jpeg" }, { type: "image/png" }] })).toBe("📷 2 photos");
     expect(previewOf({ files: [{ type: "application/pdf", name: "bill.pdf" }] })).toBe("📎 bill.pdf");
   });

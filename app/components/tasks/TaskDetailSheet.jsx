@@ -11,6 +11,8 @@ import { FileThumb } from "@/app/components/common/Files";
 import { timeOf } from "@/lib/chat/model";
 import { canHandOver, chainText, repeatText } from "@/lib/tasks/model";
 import { addTaskComment, handOver, markTaskRead, useTaskComments } from "@/lib/tasks/client";
+import useVoiceRecorder, { canRecordVoice } from "@/app/hooks/useVoiceRecorder";
+import { MicButton, RecordingBar, VoicePlayer } from "@/app/components/common/Voice";
 
 const dayText = (d) => format(parseISO(d), "EEE d MMM");
 const when = (t) => {
@@ -26,6 +28,12 @@ export default function TaskDetailSheet({ task, onClose, companyId, branchId, us
   const [busy, setBusy] = useState(false);
   const [passTo, setPassTo] = useState("");
   const end = useRef(null);
+  const voice = useVoiceRecorder();
+  const [canVoice, setCanVoice] = useState(false);
+  useEffect(() => setCanVoice(canRecordVoice()), []);
+  useEffect(() => {
+    if (voice.state === "denied") toast.error("No microphone", { description: "Allow the microphone for this app in your phone or browser settings, then try again." });
+  }, [voice.state]);
   const previews = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files]);
   useEffect(() => () => previews.forEach((u) => URL.revokeObjectURL(u)), [previews]);
   useEffect(() => {
@@ -37,6 +45,17 @@ export default function TaskDetailSheet({ task, onClose, companyId, branchId, us
   }, [task?.id, task?.commentCount, companyId, user?.uid]);
   if (!task) return <Sheet open={false} onClose={onClose} />;
 
+  const sendVoice = async (rec) => {
+    if (!rec) return;
+    setBusy(true);
+    try {
+      await addTaskComment(companyId, branchId, task, user, { voice: rec });
+    } catch (e) {
+      toast.error("Couldn't send the voice message", { description: e.message });
+    } finally {
+      setBusy(false);
+    }
+  };
   const send = async () => {
     setBusy(true);
     try {
@@ -110,6 +129,7 @@ export default function TaskDetailSheet({ task, onClose, companyId, branchId, us
                     <div className={cn("max-w-[80%] space-y-1 rounded-2xl px-3 py-2", me ? "bg-brand-soft" : "bg-surface-2")}>
                       <p className="text-[11px] text-muted">{me ? "You" : c.byName} · {when(c.createdAt)}</p>
                       {c.text && <p className="whitespace-pre-line text-sm text-fg">{c.text}</p>}
+                      {c.voice?.url && <VoicePlayer url={c.voice.url} duration={c.voice.duration} className={me ? "bg-surface/70" : "bg-surface"} />}
                       {c.photos?.length > 0 && <div className="flex flex-wrap gap-1.5">{c.photos.map((u) => <FileThumb key={u} url={u} label="Photo" className="size-16" />)}</div>}
                     </div>
                   </li>
@@ -131,14 +151,32 @@ export default function TaskDetailSheet({ task, onClose, companyId, branchId, us
                 ))}
               </div>
             )}
+            {voice.state === "recording" ? (
+              <div className="rounded-2xl border border-line">
+                <RecordingBar seconds={voice.seconds} level={voice.level} busy={busy} onCancel={voice.cancel} onSend={async () => sendVoice(await voice.stop())} />
+              </div>
+            ) : (
             <div className="flex items-end gap-2">
               <label className="flex size-10 shrink-0 cursor-pointer items-center justify-center rounded-xl border border-line text-muted hover:bg-surface-2" aria-label="Add a photo">
                 <Camera className="size-4" />
                 <input type="file" accept="image/*" className="sr-only" onChange={(e) => { const p = [...(e.target.files || [])]; e.target.value = ""; setFiles((l) => [...l, ...p].slice(0, 4)); }} />
               </label>
               <Textarea rows={1} value={text} onChange={(e) => setText(e.target.value)} placeholder="Ask or answer…" aria-label="Message" className="min-h-10 flex-1" />
-              <Button icon={Send} onClick={send} loading={busy} disabled={!text.trim() && !files.length} aria-label="Send" />
+              {!text.trim() && !files.length && canVoice ? (
+                <MicButton
+                  onClick={async () => {
+                    await voice.start();
+                    voice.onLimit(sendVoice);
+                  }}
+                  disabled={busy}
+                  label="Ask by voice"
+                  className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-brand text-brand-fg hover:bg-brand-hover disabled:opacity-50"
+                />
+              ) : (
+                <Button icon={Send} onClick={send} loading={busy} disabled={!text.trim() && !files.length} aria-label="Send" />
+              )}
             </div>
+            )}
           </div>
         </section>
       </div>
