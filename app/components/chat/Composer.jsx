@@ -10,7 +10,7 @@ import { Popover, cn, toast } from "@/app/components/ui";
 import { checkFiles, previewOf } from "@/lib/chat/model";
 import { toggleList, toggleMark } from "@/lib/chat/format";
 import StickerPicker from "./StickerPicker";
-import useVoiceRecorder, { canRecordVoice } from "@/app/hooks/useVoiceRecorder";
+import useVoiceRecorder, { whyNoVoice } from "@/app/hooks/useVoiceRecorder";
 import { MicButton, RecordingBar } from "@/app/components/common/Voice";
 
 const isTouch = () => typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
@@ -137,7 +137,7 @@ const Composer = forwardRef(function Composer({ onSend, onSaveEdit, onSticker, u
   // voice messages: 🎤 shows while there is nothing typed or attached
   const voice = useVoiceRecorder();
   const [canVoice, setCanVoice] = useState(false);
-  useEffect(() => setCanVoice(canRecordVoice()), []);
+  useEffect(() => setCanVoice(true), []); // after mount: the browser is known
   const sendVoice = async (rec) => {
     if (!rec) return;
     setBusy(true);
@@ -156,6 +156,10 @@ const Composer = forwardRef(function Composer({ onSend, onSaveEdit, onSticker, u
   };
   useEffect(() => {
     if (voice.state === "denied") toast.error("No microphone", { description: "Allow the microphone for this app in your phone or browser settings, then try again." });
+    if (voice.state === "unavailable") {
+      const why = whyNoVoice() || { title: "Voice isn't available here", description: "" };
+      toast.error(why.title, { description: why.description });
+    }
   }, [voice.state]);
 
   const send = async () => {

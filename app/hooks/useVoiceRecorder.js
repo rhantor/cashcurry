@@ -15,7 +15,19 @@ const extOf = (type) => (type.includes("mp4") ? "m4a" : type.includes("ogg") ? "
 export const canRecordVoice = () => typeof window !== "undefined" && !!navigator.mediaDevices?.getUserMedia && typeof MediaRecorder !== "undefined";
 
 /**
- * { state: "idle" | "recording" | "denied", seconds, level (0–1), start(), stop() → { file, duration } | null, cancel() }
+ * Why it can't, in words — or null when it can. Browsers turn the microphone
+ * off on a plain http:// address (other than localhost): the live app is
+ * https, but a phone testing the dev server over Wi-Fi isn't.
+ */
+export function whyNoVoice() {
+  if (typeof window === "undefined") return null;
+  if (!window.isSecureContext) return { title: "Voice needs a secure address", description: "This address starts with http://, so the browser keeps the microphone off. It works in the live app (https). To try it here, open the app on this computer at localhost." };
+  if (!canRecordVoice()) return { title: "Voice isn't available here", description: "This browser can't record. Try Chrome, or the Cash Curry app." };
+  return null;
+}
+
+/**
+ * { state: "idle" | "recording" | "denied" | "unavailable", seconds, level (0–1), start(), stop() → { file, duration } | null, cancel() }
  */
 export default function useVoiceRecorder() {
   const [state, setState] = useState("idle");
@@ -63,16 +75,17 @@ export default function useVoiceRecorder() {
 
   const start = useCallback(async () => {
     if (rec.current) return;
-    if (!canRecordVoice()) {
-      setState("denied");
-      return;
-    }
+    // say why (the page shows a message on this state), then be ready to try again
+    const fail = (why) => {
+      setState(why);
+      setTimeout(() => setState("idle"), 200);
+    };
+    if (!canRecordVoice()) return fail("unavailable");
     let stream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
     } catch {
-      setState("denied");
-      return;
+      return fail("denied");
     }
     const type = pickType();
     const recorder = new MediaRecorder(stream, type ? { mimeType: type, audioBitsPerSecond: 48000 } : undefined);
