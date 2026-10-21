@@ -10,6 +10,8 @@ import { Popover, cn, toast } from "@/app/components/ui";
 import { checkFiles, previewOf } from "@/lib/chat/model";
 import { toggleList, toggleMark } from "@/lib/chat/format";
 import StickerPicker from "./StickerPicker";
+import useVoiceRecorder, { canRecordVoice } from "@/app/hooks/useVoiceRecorder";
+import { MicButton, RecordingBar } from "@/app/components/common/Voice";
 
 const isTouch = () => typeof window !== "undefined" && window.matchMedia?.("(pointer: coarse)").matches;
 const size = (b) => (b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(b / 1024))} KB`);
@@ -131,6 +133,31 @@ const Composer = forwardRef(function Composer({ onSend, onSaveEdit, onSticker, u
   };
 
   const ready = !disabled && (text.trim() || files.length);
+
+  // voice messages: 🎤 shows while there is nothing typed or attached
+  const voice = useVoiceRecorder();
+  const [canVoice, setCanVoice] = useState(false);
+  useEffect(() => setCanVoice(canRecordVoice()), []);
+  const sendVoice = async (rec) => {
+    if (!rec) return;
+    setBusy(true);
+    try {
+      await onSend({ text: "", files: [], voice: rec, onProgress: setProgress });
+    } catch (e) {
+      toast.error("Couldn't send the voice message", { description: e?.message });
+    } finally {
+      setBusy(false);
+      setProgress(0);
+    }
+  };
+  const startVoice = async () => {
+    await voice.start();
+    voice.onLimit(sendVoice); // at 5 minutes it stops and sends by itself
+  };
+  useEffect(() => {
+    if (voice.state === "denied") toast.error("No microphone", { description: "Allow the microphone for this app in your phone or browser settings, then try again." });
+  }, [voice.state]);
+
   const send = async () => {
     if (busy || !ready) return;
     setBusy(true);
@@ -241,7 +268,10 @@ const Composer = forwardRef(function Composer({ onSend, onSaveEdit, onSticker, u
           </div>
         )}
 
-        {/* the line you type on */}
+        {/* the line you type on — or, while recording, the recording */}
+        {voice.state === "recording" ? (
+          <RecordingBar seconds={voice.seconds} level={voice.level} busy={busy} onCancel={voice.cancel} onSend={async () => sendVoice(await voice.stop())} />
+        ) : (
         <div className="flex items-end gap-0.5 p-1.5">
           {!editing && (
             <>
@@ -311,6 +341,13 @@ const Composer = forwardRef(function Composer({ onSend, onSaveEdit, onSticker, u
             }}
             className="max-h-40 min-h-9 flex-1 resize-none bg-transparent px-2 py-2 text-[15px] leading-snug text-fg outline-none placeholder:text-subtle"
           />
+          {!ready && !editing && !busy && canVoice ? (
+            <MicButton
+              onClick={startVoice}
+              disabled={disabled}
+              className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-brand to-brand/80 text-white shadow-md transition-all hover:shadow-lg active:scale-95 disabled:opacity-40"
+            />
+          ) : (
           <button
             type="button"
             aria-label={editing ? "Save" : "Send"}
@@ -323,7 +360,9 @@ const Composer = forwardRef(function Composer({ onSend, onSaveEdit, onSticker, u
           >
             {busy ? <span className="size-4 animate-spin rounded-full border-2 border-white/40 border-t-white" /> : editing ? <Check className="size-[18px]" /> : <SendHorizontal className="size-[18px] translate-x-px" />}
           </button>
+          )}
         </div>
+        )}
       </div>
       <p className="mt-1 hidden px-4 text-[10px] text-subtle sm:block">
         <kbd className="font-sans font-semibold">Enter</kbd> to send · <kbd className="font-sans font-semibold">Shift + Enter</kbd> for a new line
