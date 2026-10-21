@@ -123,3 +123,62 @@ describe("bill photos (storage)", () => {
     expect(await ok(put("pjManager", `payouts/${CO}/kl/pjManager/bill.jpg`))).toBe(false);
   });
 });
+
+describe("a pay-out spent at a supplier (Purchases)", () => {
+  const V = `companies/${CO}/vendors/rice`;
+  const VB = `${B}/vendorBills`;
+  const VP = `${B}/vendorPayments`;
+  const sup = { vendorId: "rice", vendorName: "Rice Co", mode: "pays", pays: [{ billId: "inv1", amount: 80 }] };
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const d = ctx.firestore();
+      await d.doc(V).set({ name: "Rice Co", currentBalance: 500, totalBilled: 500, totalPaid: 0 });
+      await d.doc(`${VB}/inv1`).set({ vendorId: "rice", invoiceNo: "INV-1", total: 500, paid: 0, balance: 500, status: "unpaid" });
+      await d.doc(`${P}/sup`).set(settle("klCashier", { supplier: sup }));
+    });
+  });
+  // the approver's one transaction, as lib/payouts/client.js approveSupplierNow writes it
+  const approveAs = (uid, { settleId = "sup", vendorTweak = {}, billTweak = {} } = {}) => {
+    const d = db(uid);
+    const b = d.batch();
+    b.update(d.doc(`${P}/${settleId}`), { status: "approved", billAmount: 80, change: 20, review: { by: { uid } }, vendorPaymentId: "vp1", costId: "c1" });
+    b.update(d.doc(`${VB}/inv1`), { paid: 80, balance: 420, status: "partially_paid", lastPayoutSettleId: settleId, ...billTweak });
+    b.set(d.doc(`${VP}/vp1`), { vendorId: "rice", total: 80, payoutSettleId: settleId });
+    b.update(d.doc(V), { currentBalance: 420, totalPaid: 80, lastPayout: { branchId: "kl", settleId }, ...vendorTweak });
+    return b.commit();
+  };
+  it("those who hand out see suppliers and what they're owed — to pick a bill", async () => {
+    expect(await ok(db("klCashier").doc(V).get())).toBe(true);
+    expect(await ok(db("klCashier").doc(`${VB}/inv1`).get())).toBe(true);
+    expect(await ok(db("klStaff").doc(`${VB}/inv1`).get())).toBe(false);
+    expect(await ok(db("klCashier").doc(`${VB}/inv1`).update({ paid: 500 }))).toBe(false); // seeing, not paying
+  });
+  it("in-charge approves: the bill, the payment and the supplier's balance move with it", async () => {
+    expect(await ok(approveAs("klInCharge"))).toBe(true);
+  });
+  it("only as part of approving that pay-out bill — never on their own", async () => {
+    expect(await ok(db("klInCharge").doc(`${VB}/inv1`).update({ paid: 80, balance: 420, status: "partially_paid", lastPayoutSettleId: "sup" }))).toBe(false);
+    expect(await ok(db("klInCharge").doc(`${VP}/x`).set({ vendorId: "rice", total: 80, payoutSettleId: "sup" }))).toBe(false);
+    expect(await ok(db("klInCharge").doc(V).update({ currentBalance: 0, lastPayout: { branchId: "kl", settleId: "sup" } }))).toBe(false);
+  });
+  it("nothing else on the bill or the supplier moves in the same go", async () => {
+    expect(await ok(approveAs("klInCharge", { billTweak: { total: 80 } }))).toBe(false);
+    expect(await ok(approveAs("klInCharge", { vendorTweak: { name: "Cheaper Rice" } }))).toBe(false);
+  });
+  it("not whoever brought the bill back", async () => {
+    expect(await ok(approveAs("klCashier"))).toBe(false);
+  });
+  it("a new bill bought and paid on the spot is raised as the pay-out is approved", async () => {
+    await env.withSecurityRulesDisabled((ctx) =>
+      ctx.firestore().doc(`${P}/nb`).set(settle("klCashier", { supplier: { vendorId: "rice", vendorName: "Rice Co", mode: "newBill", newBill: { total: 120, paid: 80 } } }))
+    );
+    const bill = { vendorId: "rice", invoiceNo: "INV-9", total: 120, paid: 80, balance: 40, status: "partially_paid", payoutSettleId: "nb", lastPayoutSettleId: "nb" };
+    const d = db("klInCharge");
+    const b = d.batch();
+    b.update(d.doc(`${P}/nb`), { status: "approved", billAmount: 80, change: 20, review: { by: { uid: "klInCharge" } }, vendorPaymentId: "vp2", costId: "c2" });
+    b.set(d.doc(`${VB}/new`), bill);
+    b.set(d.doc(`${VP}/vp2`), { vendorId: "rice", total: 80, payoutSettleId: "nb" });
+    b.update(d.doc(V), { currentBalance: 540, totalBilled: 620, totalPaid: 80, lastPayout: { branchId: "kl", settleId: "nb" } });
+    expect(await ok(b.commit())).toBe(true);
+  });
+});

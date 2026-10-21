@@ -16,25 +16,50 @@ import { changeOf } from "@/lib/payouts/model";
 import { bringBill, handOut, resubmitBill, uploadBillFiles } from "@/lib/payouts/client";
 import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
 import { FileThumb } from "@/app/components/common/Files";
+import SupplierPicker from "./SupplierPicker";
+import { checkSupplier, supplierPaid } from "@/lib/payouts/supplier";
 
 const PURPOSES = ["Cooking gas", "Ice", "Market", "Vegetables", "Taxi / Grab", "Repairs", "Cleaning things"];
 const fullName = (s) => `${s.firstName || ""} ${s.lastName || ""}`.trim();
 
-/** Hand money out of the till: how much, to whom, for what. */
-export function HandOutSheet({ open, onClose, companyId, branchId, user }) {
+/**
+ * Hand money out of the till: how much, to whom, for what — something to buy,
+ * or a supplier's bills to pay (picked from Purchases → Due Bills).
+ * preset: { vendorId, vendorName, bills: [{ id, invoiceNo, balance }] } from Due Bills.
+ */
+export function HandOutSheet({ open, onClose, companyId, branchId, user, preset = null }) {
   const currency = useCurrency();
   const [date, setDate] = useDefaultDate();
   const [amount, setAmount] = useState("");
   const [staffId, setStaffId] = useState("");
   const [name, setName] = useState("");
   const [purpose, setPurpose] = useState("");
+  const [kind, setKind] = useState("buy"); // "buy" | "supplier"
+  const [supplier, setSupplier] = useState(null);
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
   const { data: staff = [] } = useGetStaffListQuery({ companyId, branchId }, { skip: !open || !companyId || !branchId });
 
   useEffect(() => {
-    if (open) { setAmount(""); setStaffId(""); setName(""); setPurpose(""); setErrors({}); }
-  }, [open]);
+    if (!open) return;
+    setStaffId(""); setName(""); setErrors({});
+    if (preset?.vendorId) {
+      const pays = (preset.bills || []).map((b) => ({ billId: b.id, invoiceNo: b.invoiceNo || "", amount: Number(b.balance) || 0, balance: Number(b.balance) || 0 }));
+      setKind("supplier");
+      setSupplier({ vendorId: preset.vendorId, vendorName: preset.vendorName || "", mode: "pays", pays });
+      setAmount(String(pays.reduce((n, p) => n + p.amount, 0) || ""));
+      setPurpose(`Pay ${preset.vendorName || "the supplier"}`);
+    } else {
+      setKind("buy"); setSupplier(null); setAmount(""); setPurpose("");
+    }
+  }, [open, preset?.vendorId]); // eslint-disable-line react-hooks/exhaustive-deps
+  // paying bills: the money is what the ticked bills come to (it can still be changed)
+  const pickSupplier = (s) => {
+    setSupplier(s);
+    const total = supplierPaid(s);
+    if (total > 0) setAmount(String(total));
+    if (s?.vendorName) setPurpose(`Pay ${s.vendorName}`);
+  };
 
   const save = async () => {
     const person = staff.find((s) => s.id === staffId);
@@ -42,11 +67,13 @@ export function HandOutSheet({ open, onClose, companyId, branchId, user }) {
     if (!(Number(amount) > 0)) e.amount = "How much?";
     if (!person && !name.trim()) e.to = "Who took it?";
     if (!purpose.trim()) e.purpose = "What is it for?";
+    if (kind === "supplier") Object.assign(e, checkSupplier({ ...supplier, mode: "pays" }));
     setErrors(e);
     if (Object.keys(e).length) return;
     setBusy(true);
     try {
-      await handOut(companyId, branchId, user, { date, amount, to: person ? { name: fullName(person), staffId: person.id } : { name }, purpose });
+      const forSupplier = kind === "supplier" ? { forVendor: { vendorId: supplier.vendorId, vendorName: supplier.vendorName }, forBills: supplier.pays || [] } : {};
+      await handOut(companyId, branchId, user, { date, amount, to: person ? { name: fullName(person), staffId: person.id } : { name }, purpose, ...forSupplier });
       toast.success("Handed out", { description: `${formatMoney(Number(amount), currency)} · the till goes down now` });
       onClose();
     } catch (err) {
@@ -59,6 +86,13 @@ export function HandOutSheet({ open, onClose, companyId, branchId, user }) {
   return (
     <Sheet open={open} onClose={onClose} title="Hand out money" description="From the till, to buy something. Bring the bill back when it's bought." footer={<Button onClick={save} loading={busy}>Hand it out</Button>}>
       <div className="space-y-4">
+        <div className="flex flex-wrap gap-1.5">
+          <Chip on={kind === "buy"} onClick={() => setKind("buy")}>To buy something</Chip>
+          <Chip on={kind === "supplier"} onClick={() => setKind("supplier")}>To pay a supplier&apos;s bill</Chip>
+        </div>
+        {kind === "supplier" && (
+          <SupplierPicker companyId={companyId} branchId={branchId} value={supplier} onChange={pickSupplier} currency={currency} date={date} errors={errors} modes={["pays"]} />
+        )}
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Amount" error={errors.amount}>
             {({ id, invalid }) => <MoneyInput id={id} currency={currency} value={amount} invalid={invalid} onValueChange={setAmount} />}
@@ -81,9 +115,11 @@ export function HandOutSheet({ open, onClose, companyId, branchId, user }) {
         <Field label="For" error={errors.purpose}>
           {({ id, invalid }) => <Input id={id} size="lg" invalid={invalid} value={purpose} onChange={(e) => setPurpose(e.target.value)} placeholder="What will be bought" />}
         </Field>
-        <div className="flex flex-wrap gap-1.5">
-          {PURPOSES.map((p) => <Chip key={p} on={purpose === p} onClick={() => setPurpose(p)}>{p}</Chip>)}
-        </div>
+        {kind === "buy" && (
+          <div className="flex flex-wrap gap-1.5">
+            {PURPOSES.map((p) => <Chip key={p} on={purpose === p} onClick={() => setPurpose(p)}>{p}</Chip>)}
+          </div>
+        )}
       </div>
     </Sheet>
   );
@@ -174,10 +210,17 @@ export function BillSheet({ payout, retry, onClose, companyId, branchId, user })
   const [note, setNote] = useState("");
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
+  const [where, setWhere] = useState("shop"); // "shop" | "supplier"
+  const [supplier, setSupplier] = useState(null);
   const float = Number(retry ? retry.floatAmount : payout?.amount) || 0;
 
   useEffect(() => {
     if (!open) return;
+    // money sent for a supplier's bills comes back as those bills; a bill sent back keeps its supplier
+    const sent = payout?.forVendor;
+    const start = retry?.supplier || (sent ? { vendorId: sent.vendorId, vendorName: sent.vendorName, mode: "pays", pays: (payout.forBills || []).map((b) => ({ ...b, amount: b.balance })) } : null);
+    setWhere(start ? "supplier" : "shop");
+    setSupplier(start);
     setAmount(retry ? String(retry.billAmount) : "");
     setFiles([]);
     setKept(retry?.attachments || []);
@@ -188,31 +231,50 @@ export function BillSheet({ payout, retry, onClose, companyId, branchId, user })
     setCategoryId(retry?.categoryId || "");
     setNote(retry?.note || "");
     setErrors({});
-  }, [open, retry]);
+    // keyed on the pay-out's id, not the object: a live update must not wipe what is being typed
+  }, [open, retry, payout?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const bill = Number(amount) || 0;
+  const atSupplier = where === "supplier";
+  // at a supplier, what was spent is what went to their bills
+  const bill = atSupplier ? supplierPaid(supplier) : Number(amount) || 0;
   const change = changeOf(float, bill);
 
   const save = async () => {
     const e = {};
-    if (!(bill > 0)) e.amount = "The amount on the bill";
-    if (!findCategory(groups, categoryId)) e.category = "What was it for?";
-    if (!files.length && !kept.length && !noPaper) e.files = "Add the bill (photo or PDF) — or say there is none";
-    if (noPaper && !files.length && !reason.trim()) e.reason = "Why is there no bill?";
+    if (atSupplier) {
+      Object.assign(e, checkSupplier(supplier));
+      if (supplier?.mode === "newBill" && !files.length && !kept.length) e.files = "Add the supplier's bill (photo or PDF)";
+    } else {
+      if (!(bill > 0)) e.amount = "The amount on the bill";
+      if (!findCategory(groups, categoryId)) e.category = "What was it for?";
+      if (!files.length && !kept.length && !noPaper) e.files = "Add the bill (photo or PDF) — or say there is none";
+      if (noPaper && !files.length && !reason.trim()) e.reason = "Why is there no bill?";
+    }
     setErrors(e);
     if (Object.keys(e).length) return;
     setBusy(true);
     try {
       const uploaded = files.length ? await uploadBillFiles(companyId, branchId, user.uid, files) : [];
       const paid = receipts.length ? await uploadBillFiles(companyId, branchId, user.uid, receipts) : [];
+      const supplierData = atSupplier
+        ? {
+            vendorId: supplier.vendorId,
+            vendorName: supplier.vendorName,
+            mode: supplier.mode,
+            ...(supplier.mode === "newBill"
+              ? { newBill: { invoiceNo: supplier.newBill?.invoiceNo || "", invoiceDate: supplier.newBill?.invoiceDate || date, total: Number(supplier.newBill?.total) || 0, paid: Number(supplier.newBill?.paid) || 0 } }
+              : { pays: (supplier.pays || []).map((p) => ({ billId: p.billId, invoiceNo: p.invoiceNo || "", amount: Number(p.amount) || 0 })) }),
+          }
+        : null;
       const data = {
         date,
         billAmount: bill,
-        fields: categoryFields(groups, categoryId),
+        fields: atSupplier ? categoryFields(groups, null) : categoryFields(groups, categoryId),
         files: [...kept, ...uploaded],
         receipts: [...keptReceipts, ...paid],
-        voucherReason: !uploaded.length && !kept.length && noPaper ? reason : "",
+        voucherReason: !atSupplier && !uploaded.length && !kept.length && noPaper ? reason : "",
         note,
+        supplier: supplierData,
       };
       if (retry) await resubmitBill(companyId, branchId, user, retry, data);
       else await bringBill(companyId, branchId, user, payout, data);
@@ -237,10 +299,21 @@ export function BillSheet({ payout, retry, onClose, companyId, branchId, user })
     >
       <div className="space-y-5">
         {retry?.review?.note && <p className="rounded-xl bg-warning-soft px-3 py-2 text-sm text-fg">Sent back: {retry.review.note}</p>}
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-muted">Where was it spent?</p>
+          <div className="flex flex-wrap gap-1.5">
+            <Chip on={!atSupplier} onClick={() => setWhere("shop")}>A shop or market</Chip>
+            <Chip on={atSupplier} onClick={() => setWhere("supplier")}>A supplier (Purchases)</Chip>
+          </div>
+          {atSupplier && <p className="text-xs text-muted">Goes into Purchases: the supplier&apos;s bills and what they&apos;re owed move with it.</p>}
+        </div>
+        {atSupplier && <SupplierPicker companyId={companyId} branchId={branchId} value={supplier} onChange={setSupplier} currency={currency} date={date} errors={errors} />}
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Amount on the bill" error={errors.amount}>
-            {({ id, invalid }) => <MoneyInput id={id} currency={currency} value={amount} invalid={invalid} onValueChange={setAmount} />}
-          </Field>
+          {!atSupplier && (
+            <Field label="Amount on the bill" error={errors.amount}>
+              {({ id, invalid }) => <MoneyInput id={id} currency={currency} value={amount} invalid={invalid} onValueChange={setAmount} />}
+            </Field>
+          )}
           {!retry && <Field label="Day">{() => <DatePicker size="lg" value={date} onChange={setDate} />}</Field>}
         </div>
         {bill > 0 && (
@@ -248,6 +321,7 @@ export function BillSheet({ payout, retry, onClose, companyId, branchId, user })
             {change > 0 ? `${money(change)} change — put it back in the till` : change < 0 ? `${money(-change)} more — paid from the till` : "Exact — nothing comes back"}
           </div>
         )}
+        {!atSupplier && (
         <Field label="What was it for?" error={errors.category}>
           {({ id, invalid }) => (
             <Select id={id} value={categoryId} invalid={invalid} onChange={(e) => setCategoryId(e.target.value)} className="h-12">
@@ -260,12 +334,13 @@ export function BillSheet({ payout, retry, onClose, companyId, branchId, user })
             </Select>
           )}
         </Field>
+        )}
         <div>
-          <p className="mb-2 text-xs font-semibold text-muted">The bill</p>
+          <p className="mb-2 text-xs font-semibold text-muted">{atSupplier && supplier?.mode === "pays" ? "The supplier's receipt (optional)" : "The bill"}</p>
           {!noPaper && <FilePicker files={files} setFiles={setFiles} existing={kept} setExisting={setKept} max={12} />}
           {!noPaper && <p className="mt-2 text-xs text-muted">A long bill: one PDF, or a photo of each page (up to 12 files).</p>}
           {errors.files && <p className="mt-2 text-xs font-medium text-danger">{errors.files}</p>}
-          {!files.length && !kept.length && (
+          {!atSupplier && !files.length && !kept.length && (
             <div className={cn("mt-3 rounded-2xl border p-3", noPaper ? "border-warning/40 bg-warning-soft/50" : "border-line")}>
               <div className="flex items-center gap-3">
                 <p className="flex-1 text-sm font-medium text-fg">No bill paper</p>

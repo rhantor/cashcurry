@@ -16,7 +16,8 @@ import { categoryFields, pickable } from "@/lib/costs/categories";
 import { useCostCategories } from "@/lib/costs/client";
 import { canReviewBill, changeText } from "@/lib/payouts/model";
 import { FileThumb, FilesSheet } from "@/app/components/common/Files";
-import { approveBillNow, sendBillBack } from "@/lib/payouts/client";
+import { approveBillNow, approveSupplierNow, sendBillBack } from "@/lib/payouts/client";
+import { supplierText } from "@/lib/payouts/supplier";
 
 const day = (d) => (d ? format(parseISO(d), "EEE d MMM") : "");
 
@@ -64,8 +65,14 @@ export default function BillInbox({ companyId, branchId, user, bills, loading })
   const approve = async (bill, correction = {}) => {
     setBusy(bill.id);
     try {
-      await approveBillNow(companyId, branchId, user, bill, correction);
-      toast.success("Approved — it's a cost now");
+      if (bill.supplier) {
+        // spent at a supplier: into Purchases — their bills, a payment, what they're owed
+        const r = await approveSupplierNow(companyId, branchId, user, bill);
+        toast.success("Approved — in Purchases now", { description: `${money(r.paid)} paid to ${bill.supplier.vendorName}` });
+      } else {
+        await approveBillNow(companyId, branchId, user, bill, correction);
+        toast.success("Approved — it's a cost now");
+      }
     } catch (e) {
       toast.error("Couldn't approve", { description: e.message });
     } finally {
@@ -107,7 +114,11 @@ export default function BillInbox({ companyId, branchId, user, bills, loading })
                     </button>
                   )}
                   {!b.attachments?.length && (
-                    <span className="flex size-20 items-center justify-center rounded-xl bg-warning-soft text-center text-[11px] font-semibold leading-tight text-warning">No bill<br />paper</span>
+                    b.supplier ? (
+                      <span className="flex size-20 items-center justify-center rounded-xl bg-surface-2 text-center text-[11px] font-semibold leading-tight text-muted">No<br />receipt</span>
+                    ) : (
+                      <span className="flex size-20 items-center justify-center rounded-xl bg-warning-soft text-center text-[11px] font-semibold leading-tight text-warning">No bill<br />paper</span>
+                    )
                   )}
                 </div>
                 <div className="min-w-0 flex-1 space-y-1.5">
@@ -116,7 +127,14 @@ export default function BillInbox({ companyId, branchId, user, bills, loading })
                     <span className="text-xs text-muted">of {money(b.floatAmount)} given</span>
                     {b.costKind === "notCost" && <Badge tone="neutral">Not a cost</Badge>}
                   </div>
-                  <p className="text-sm font-medium text-fg">{b.category || "—"}{b.purpose && b.purpose !== b.category ? ` · ${b.purpose}` : ""}</p>
+                  {b.supplier ? (
+                    <p className="text-sm font-medium text-fg">
+                      <Badge tone="info" className="mr-1.5 px-2 py-px text-[10px]">Supplier</Badge>
+                      {supplierText(b.supplier, money)}
+                    </p>
+                  ) : (
+                    <p className="text-sm font-medium text-fg">{b.category || "—"}{b.purpose && b.purpose !== b.category ? ` · ${b.purpose}` : ""}</p>
+                  )}
                   <p className="text-xs text-muted">{day(b.date)} · {b.to?.name || "—"} · brought by {b.by?.name || "someone"}</p>
                   <p className="inline-flex rounded-lg bg-brand-soft px-2 py-1 text-xs font-medium text-brand">{changeText(b.floatAmount, b.billAmount, money)}</p>
                   {b.voucherReason && <p className="rounded-xl bg-surface-2 px-3 py-2 text-sm text-fg">&ldquo;{b.voucherReason}&rdquo;</p>}
@@ -130,7 +148,7 @@ export default function BillInbox({ companyId, branchId, user, bills, loading })
                 ) : (
                   <>
                     <Button size="sm" icon={Check} loading={busy === b.id} onClick={() => approve(b)} className="min-w-28 flex-1 sm:flex-none">Approve</Button>
-                    <Button size="sm" variant="secondary" icon={PencilLine} disabled={busy === b.id} onClick={() => setCorrecting(b)} className="min-w-28 flex-1 sm:flex-none">Correct</Button>
+                    {!b.supplier && <Button size="sm" variant="secondary" icon={PencilLine} disabled={busy === b.id} onClick={() => setCorrecting(b)} className="min-w-28 flex-1 sm:flex-none">Correct</Button>}
                     <Button size="sm" variant="ghost" icon={Undo2} disabled={busy === b.id} onClick={() => back(b)} className="flex-1 sm:ml-auto sm:flex-none">Send back</Button>
                   </>
                 )}

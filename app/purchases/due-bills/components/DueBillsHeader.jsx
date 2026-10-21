@@ -1,7 +1,7 @@
 'use client'
 import React from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { AlertTriangle, CalendarClock, Download, FileSpreadsheet, FileText, Wallet } from 'lucide-react'
+import { AlertTriangle, CalendarClock, Download, FileSpreadsheet, FileText, HandCoins, Wallet } from 'lucide-react'
 import { Button, Menu } from '@/app/components/ui'
 import StatTiles from '@/app/components/purchases/StatTiles'
 
@@ -11,7 +11,8 @@ import StatTiles from '@/app/components/purchases/StatTiles'
  * a bar at the bottom with their total and Pay.
  * bills carry `balance` and `__dueInDays` (negative = overdue).
  */
-const DueBillsHeader = ({ bills = [], selectedCount = 0, totalSelectedBalance, canPay, onPayClick, fmtRM, onExportPDF, onExportExcel, isExporting }) => {
+// onSendCash: hand the money out of the till to someone who pays the supplier (a pay-out, 4.10)
+const DueBillsHeader = ({ bills = [], selectedCount = 0, totalSelectedBalance, canPay, onPayClick, onSendCash, fmtRM, onExportPDF, onExportExcel, isExporting }) => {
   const sum = list => list.reduce((n, b) => n + Number(b.balance || 0), 0)
   const overdue = bills.filter(b => b.__dueInDays < 0)
   const soon = bills.filter(b => b.__dueInDays >= 0 && b.__dueInDays <= 7)
@@ -64,6 +65,11 @@ const DueBillsHeader = ({ bills = [], selectedCount = 0, totalSelectedBalance, c
                 <p className='truncate text-lg font-bold tabular-nums text-fg'>{fmtRM(totalSelectedBalance)}</p>
                 {!canPay && <p className='text-[11px] font-medium text-warning'>Pick bills from one vendor at a time</p>}
               </div>
+              {onSendCash && (
+                <Button size='lg' variant='secondary' icon={HandCoins} disabled={!canPay} onClick={onSendCash} title='Give cash from the till to someone who takes it to the supplier'>
+                  Send cash
+                </Button>
+              )}
               <Button size='lg' icon={Wallet} disabled={!canPay} onClick={onPayClick}>
                 Pay
               </Button>
