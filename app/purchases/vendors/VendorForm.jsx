@@ -7,6 +7,7 @@ const BLANK = {
   name: "",
   code: "",
   termsDays: "",
+  leadDays: "",
   maxOpenBills: "",
   phone: "",
   email: "",
@@ -22,11 +23,12 @@ const BLANK = {
 
 const fromVendor = (v) => Object.fromEntries(Object.keys(BLANK).map((k) => [k, v?.[k] ?? ""]));
 
-// what gets saved: text trimmed, the two numbers as numbers (blank = none)
+// what gets saved: text trimmed, the numbers as numbers (blank = none)
 export const toVendorPatch = (f) => ({
   ...Object.fromEntries(Object.keys(BLANK).map((k) => [k, String(f[k] ?? "").trim()])),
   termsDays: f.termsDays === "" || f.termsDays == null ? null : Number(f.termsDays),
   maxOpenBills: f.maxOpenBills === "" || f.maxOpenBills == null ? null : Number(f.maxOpenBills),
+  leadDays: f.leadDays === "" || f.leadDays == null ? null : Number(f.leadDays),
 });
 
 const Group = ({ title, children }) => (
@@ -90,6 +92,10 @@ export default function VendorForm({ open, vendor, onClose, onSave }) {
           {text("name", "Name", { wide: true, placeholder: "e.g. Fresh Farm Supplies" })}
           {text("code", "Code", { hint: "Optional", placeholder: "e.g. FFS" })}
           {text("registrationNumber", "Registration no. (SSM)", { hint: "Optional" })}
+        </Group>
+
+        <Group title="Ordering">
+          {text("leadDays", "Delivers in (days)", { type: "number", inputMode: "numeric", hint: "After an order is sent — sets the day it's due (blank = next day)", placeholder: "e.g. 2" })}
         </Group>
 
         <Group title="Paying them">

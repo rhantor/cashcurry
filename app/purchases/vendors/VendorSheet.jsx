@@ -86,6 +86,7 @@ export default function VendorSheet({ open, vendor, companyId, branchId, onClose
           <div className="space-y-5">
             <Group title="Paying them">
               <Line label="Pays in">{v.termsDays != null && v.termsDays !== "" ? `${v.termsDays} days` : null}</Line>
+              <Line label="Delivers in">{v.leadDays != null && v.leadDays !== "" ? `${v.leadDays} day${Number(v.leadDays) === 1 ? "" : "s"} after the order` : null}</Line>
               <Line label="Unpaid bills allowed">{v.maxOpenBills ? v.maxOpenBills : "No limit"}</Line>
               <Line label="Bank">{v.bankName}</Line>
               <Line label="Account number" mono>

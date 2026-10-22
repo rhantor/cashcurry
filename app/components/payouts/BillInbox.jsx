@@ -18,6 +18,7 @@ import { canReviewBill, changeText } from "@/lib/payouts/model";
 import { FileThumb, FilesSheet } from "@/app/components/common/Files";
 import { approveBillNow, approveSupplierNow, sendBillBack } from "@/lib/payouts/client";
 import { linesTotal, supplierText } from "@/lib/payouts/supplier";
+import { priceRise } from "@/lib/purchases/orders";
 
 const day = (d) => (d ? format(parseISO(d), "EEE d MMM") : "");
 
@@ -140,12 +141,17 @@ export default function BillInbox({ companyId, branchId, user, bills, loading })
                     <ul className="rounded-xl bg-surface-2 px-3 py-2 text-xs text-fg">
                       {(b.supplier.lines || []).map((l, i) => {
                         const short = Number(l.receivedQty) < Number(l.requestedQty);
+                        const rise = priceRise(l.finalPrice, l.estPrice);
                         return (
                           <li key={l.itemId || i} className="flex justify-between gap-3 py-0.5">
                             <span className="min-w-0 truncate">{l.name}</span>
                             <span className="shrink-0 tabular-nums">
                               <span className={cn(short && "font-semibold text-warning")}>{l.receivedQty}</span>
-                              <span className="text-muted"> of {l.requestedQty} {l.unit} × {money(l.finalPrice)}</span>
+                              <span className="text-muted"> of {l.requestedQty} {l.unit} × </span>
+                              <span className={cn(rise ? "font-semibold text-warning" : "text-muted")} title={rise ? `Was ${money(rise.was)} (+${rise.pct}%)` : undefined}>
+                                {money(l.finalPrice)}
+                                {rise ? ` ↑ was ${money(rise.was)}` : ""}
+                              </span>
                             </span>
                           </li>
                         );

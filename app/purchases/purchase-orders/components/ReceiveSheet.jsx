@@ -7,6 +7,7 @@ import Sheet from "@/app/components/purchases/Sheet";
 import QtyStepper from "@/app/components/purchases/QtyStepper";
 import MoneyInput from "@/app/components/purchases/MoneyInput";
 import { lineTotal } from "../shared";
+import { priceRise } from "@/lib/purchases/orders";
 import { useOrdersContext } from "../OrdersContext";
 
 export default function ReceiveSheet() {
@@ -95,6 +96,7 @@ export default function ReceiveSheet() {
           <div className="space-y-2.5">
             {receiveData.items.map((item) => {
               const short = Number(item.receivedQty || 0) !== Number(item.requestedQty || 0);
+              const rise = priceRise(item.finalPrice, item.estPrice);
               return (
                 <div
                   key={item.itemId}
@@ -134,6 +136,11 @@ export default function ReceiveSheet() {
                       size="sm"
                     />
                   </div>
+                  {rise && (
+                    <p className="mt-2 text-xs font-semibold text-warning">
+                      ↑ {fmtMoney(rise.up)} more each than last time ({fmtMoney(rise.was)}) · +{rise.pct}%
+                    </p>
+                  )}
                 </div>
               );
             })}

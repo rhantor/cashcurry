@@ -150,6 +150,8 @@ exports.notifyDailySummary = onSchedule({ schedule: "0 * * * *", timeZone: "UTC"
   await notify.dailySummaries(now);
   // task reminders (4.11) ride on the same hourly run
   await notify.taskReminders(now);
+  // and orders not delivered by their day (22 Oct)
+  await notify.lateOrders(now);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────

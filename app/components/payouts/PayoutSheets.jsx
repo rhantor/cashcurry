@@ -550,6 +550,7 @@ export function BillSheet({
                     requestedQty: Number(l.requestedQty) || 0,
                     receivedQty: Number(l.receivedQty) || 0,
                     finalPrice: Number(l.finalPrice) || 0,
+                    estPrice: Number(l.estPrice) || 0,
                   })),
                   invoiceNo: String(supplier.invoiceNo || "").trim(),
                   invoiceDate: supplier.invoiceDate || date,

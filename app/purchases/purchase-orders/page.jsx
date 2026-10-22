@@ -9,6 +9,7 @@ import { skipToken } from "@reduxjs/toolkit/query";
 import useResolvedCompanyBranch from "@/app/hooks/useResolvedCompanyBranch";
 import {
   useGetRequisitionsQuery, // Using requisitionsApiSlice as our PO storage
+  useAddRequisitionMutation,
   useUpdateRequisitionMutation,
   useReceivePurchaseOrderMutation,
 } from "@/lib/redux/api/requisitionsApiSlice";
@@ -40,11 +41,15 @@ import {
   Paperclip,
   Search,
   RotateCcw,
+  Repeat,
+  ListPlus,
 } from "lucide-react";
+import { SENT_VIA, dueText, followUpOrder, lateDays, missingLines, repeatOrder } from "@/lib/purchases/orders";
 import { useRouter } from "next/navigation";
 import { OrdersContext } from "./OrdersContext";
 import EditOrderSheet from "./components/EditOrderSheet";
 import ReceiveSheet from "./components/ReceiveSheet";
+import SendOrderSheet from "./components/SendOrderSheet";
 import { lineTotal } from "./shared";
 import { can } from "@/lib/authz/permissions";
 
@@ -103,6 +108,8 @@ export default function PurchaseOrdersPage() {
   const canApprove = can(user?.role, "purchases.approve");
 
   const [updateOrder, { isLoading: updating }] = useUpdateRequisitionMutation();
+  const [addOrder, { isLoading: adding }] = useAddRequisitionMutation();
+  const today = todayISO();
   const [receiveOrder, { isLoading: receiving }] = useReceivePurchaseOrderMutation();
   const [recordBranchPrice] = useRecordBranchPurchasePriceMutation();
 
@@ -111,7 +118,7 @@ export default function PurchaseOrdersPage() {
   const [uploadPct, setUploadPct] = useState(0);
   const [uploading, setUploading] = useState(false);
 
-  const busy = ordersLoading || updating || receiving || uploading;
+  const busy = ordersLoading || updating || receiving || uploading || adding;
 
   const [selectedOrder, setSelectedOrder] = useState(null);
 
@@ -123,7 +130,7 @@ export default function PurchaseOrdersPage() {
 
   const visibleOrders = useMemo(() => {
     const needle = search.trim().toLowerCase();
-    return orders.filter((order) => {
+    const shown = orders.filter((order) => {
       const status = normalizeStatus(order.status);
       const settled = status === "Received" || status === "Cancelled" || status === "Rejected";
       if (statusFilter === "Open" && settled) return false;
@@ -137,7 +144,9 @@ export default function PurchaseOrdersPage() {
       }
       return true;
     });
-  }, [orders, statusFilter, search]);
+    // late deliveries first — they need a phone call
+    return [...shown].sort((a, b) => lateDays(b, today) - lateDays(a, today));
+  }, [orders, statusFilter, search, today]);
 
   /* ------------------------------ receive (GRN) ----------------------------- */
   const [openReceiveSheet, setOpenReceiveSheet] = useState(false);
@@ -159,6 +168,7 @@ export default function PurchaseOrdersPage() {
         requestedQty: i.requestedQty,
         receivedQty: String(i.requestedQty ?? ""), // default to receiving exactly what was ordered
         finalPrice: String(i.estPrice ?? ""), // default to est price
+        estPrice: Number(i.estPrice) || 0, // what was expected — a dearer price is flagged
       })),
     });
     setOpenReceiveSheet(true);
@@ -397,8 +407,35 @@ export default function PurchaseOrdersPage() {
     }
   };
 
-  const handleSend = (order) =>
-    runStatusChange(order, { status: "Sent" }, `Marked as sent to ${order.vendorName}.`);
+  // sending opens the send sheet: WhatsApp, PDF, email (components/SendOrderSheet)
+  const [sendingOrder, setSendingOrder] = useState(null);
+  const handleSend = (order) => setSendingOrder(order);
+
+  /* ------------------------ order again / what's missing --------------------- */
+  const startOrder = async (data, okMessage) => {
+    try {
+      const res = await addOrder({ companyId, branchId, requisition: data }).unwrap();
+      setStatusFilter("Open");
+      toastOk(okMessage(res?.poNo));
+      return res;
+    } catch (e) {
+      console.error(e);
+      toastError("Could not make the order.");
+      return null;
+    }
+  };
+
+  const orderMissing = async (order) => {
+    const res = await startOrder(followUpOrder(order, { uid: user?.uid, name: personName(user) }), (no) => `${no || "New order"} made for what was missing — send it when ready.`);
+    if (res) await updateOrder({ companyId, branchId, requisitionId: order.id, patch: { followUpPoId: res.id, followUpPoNo: res.poNo || "" } }).unwrap().catch(() => {});
+  };
+
+  const orderAgain = (order) => {
+    const byId = new Map(catalog.map((i) => [i.id, i]));
+    const data = repeatOrder(order, { uid: user?.uid, name: personName(user) }, { inCatalog: (id) => byId.has(id), priceOf: (id) => branchLastPrice(byId.get(id), branchId) });
+    if (!data.items.length) return toastError("None of these items are sold at this branch any more.");
+    return startOrder(data, (no) => `${no || "New order"} made — change it if you need, then send it.`);
+  };
 
   const confirmPendingAction = async (reason) => {
     const { kind, order } = pendingAction;
@@ -524,7 +561,7 @@ export default function PurchaseOrdersPage() {
     "w-11 h-11 flex items-center justify-center rounded-xl text-muted bg-surface-2/60 active:bg-surface-2 transition-colors";
 
   return (
-    <OrdersContext.Provider value={{ receiving, ready, companyId, branchId, user, currency, fmtMoney, router, dispatch, toastOk, toastError, toastNode, args, companyArgs, orders, ordersLoading, vendors, catalog, branchSettings, branch, company, requireApproval, canApprove, invoiceFile, setInvoiceFile, invoicePreview, setInvoicePreview, uploadPct, setUploadPct, uploading, setUploading, busy, selectedOrder, setSelectedOrder, statusFilter, setStatusFilter, search, setSearch, visibleOrders, openReceiveSheet, setOpenReceiveSheet, receiveData, setReceiveData, handleOpenReceive, updateReceiveRow, receiveTotal, handleReceiveOrder, openEditSheet, setOpenEditSheet, editData, setEditData, showPicker, setShowPicker, pickSearch, setPickSearch, pickCategory, setPickCategory, confirmReapproval, setConfirmReapproval, canEdit, canCancel, handleOpenEdit, updateEditRow, removeEditRow, addableItems, pickableItems, handleAddEditRow, editTotal, saveEdit, handleSaveEdit, pendingAction, setPendingAction, runStatusChange, handleSend, confirmPendingAction, actionCopy, printing, setPrinting, exportPDF }}>
+    <OrdersContext.Provider value={{ receiving, ready, companyId, branchId, user, currency, fmtMoney, router, dispatch, toastOk, toastError, toastNode, args, companyArgs, orders, ordersLoading, vendors, catalog, branchSettings, branch, company, requireApproval, canApprove, invoiceFile, setInvoiceFile, invoicePreview, setInvoicePreview, uploadPct, setUploadPct, uploading, setUploading, busy, selectedOrder, setSelectedOrder, statusFilter, setStatusFilter, search, setSearch, visibleOrders, openReceiveSheet, setOpenReceiveSheet, receiveData, setReceiveData, handleOpenReceive, updateReceiveRow, receiveTotal, handleReceiveOrder, openEditSheet, setOpenEditSheet, editData, setEditData, showPicker, setShowPicker, pickSearch, setPickSearch, pickCategory, setPickCategory, confirmReapproval, setConfirmReapproval, canEdit, canCancel, handleOpenEdit, updateEditRow, removeEditRow, addableItems, pickableItems, handleAddEditRow, editTotal, saveEdit, handleSaveEdit, pendingAction, setPendingAction, runStatusChange, handleSend, sendingOrder, setSendingOrder, confirmPendingAction, actionCopy, printing, setPrinting, exportPDF }}>
     <div className="mx-auto max-w-7xl space-y-4 px-4 py-5 pb-24">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
@@ -599,6 +636,17 @@ export default function PurchaseOrdersPage() {
 
               <p className="text-xs text-muted mb-3">{STATUS_HINT[status] || ""}</p>
 
+              {status === "Sent" && order.deliverBy && !order.payoutHold && (
+                <p
+                  className={`-mt-1.5 mb-3 inline-flex self-start rounded-lg px-2 py-1 text-xs font-semibold ${
+                    lateDays(order, today) > 0 ? "bg-danger-soft text-danger" : "bg-info-soft text-info"
+                  }`}
+                >
+                  {dueText(order, today)}
+                  {lateDays(order, today) > 0 ? " — call the supplier" : ""} · {format(new Date(`${order.deliverBy}T12:00:00`), "d MMM")}
+                </p>
+              )}
+
               <div className="flex items-baseline justify-between gap-2 mb-3">
                 <p className="text-2xl font-bold text-fg tabular-nums">
                   {fmtMoney(status === "Received" ? order.finalTotal : order.totalEst)}
@@ -627,6 +675,23 @@ export default function PurchaseOrdersPage() {
                     )}
                   </p>
                 )}
+
+                {order.sentAt && ["Sent", "Received"].includes(status) && (
+                  <p>
+                    Sent {order.sentVia && order.sentVia !== "other" ? `by ${SENT_VIA[order.sentVia]} ` : ""}
+                    {format(new Date(order.sentAt), "d MMM, h:mm a")}
+                    {order.sentByName ? ` · ${order.sentByName}` : ""}
+                  </p>
+                )}
+
+                {status === "Received" && missingLines(order).length > 0 && (
+                  <p className="text-warning font-medium">
+                    Came short: {missingLines(order).map((l) => `${l.name} ${l.requestedQty} ${l.unit}`.trim()).join(", ")}
+                    {order.followUpPoNo ? ` — ordered again on ${order.followUpPoNo}` : order.followUpPoId ? " — ordered again" : ""}
+                  </p>
+                )}
+
+                {(order.followUpOf || order.repeatOf) && order.notes && <p className="text-subtle">{order.notes}</p>}
 
                 {status === "Rejected" && order.rejectionReason && (
                   <p className="text-danger">
@@ -710,6 +775,17 @@ export default function PurchaseOrdersPage() {
                   </button>
                 )}
 
+                {status === "Received" && missingLines(order).length > 0 && !order.followUpPoId && (
+                  <button
+                    onClick={() => orderMissing(order)}
+                    disabled={busy}
+                    className="w-full min-h-[48px] rounded-2xl bg-warning-soft text-fg font-bold
+                               flex items-center justify-center gap-2 active:brightness-95 disabled:opacity-50 transition-colors"
+                  >
+                    <ListPlus className="w-5 h-5" /> Order the missing ({missingLines(order).length})
+                  </button>
+                )}
+
                 {status === "Rejected" && canApprove && (
                   <button
                     onClick={() => setPendingAction({ kind: "reopen", order })}
@@ -724,6 +800,16 @@ export default function PurchaseOrdersPage() {
                   {canEdit(order) && (
                     <button onClick={() => handleOpenEdit(order)} aria-label="Edit order" className={iconBtn}>
                       <Pencil className="w-4 h-4" />
+                    </button>
+                  )}
+                  {status === "Sent" && !order.payoutHold && (
+                    <button onClick={() => handleSend(order)} aria-label="Send again" title="Send again" className={iconBtn}>
+                      <Send className="w-4 h-4" />
+                    </button>
+                  )}
+                  {["Received", "Cancelled"].includes(status) && (
+                    <button onClick={() => orderAgain(order)} disabled={busy} aria-label="Order again" title="Order again" className={`${iconBtn} disabled:opacity-50`}>
+                      <Repeat className="w-4 h-4" />
                     </button>
                   )}
                   <button
@@ -775,6 +861,8 @@ export default function PurchaseOrdersPage() {
       <EditOrderSheet />
 
       <ReceiveSheet />
+
+      <SendOrderSheet today={today} />
 
       <ConfirmSheet
         open={!!pendingAction}
