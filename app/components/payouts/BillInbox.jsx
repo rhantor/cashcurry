@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { format, parseISO } from "date-fns";
 import { Check, PencilLine, ReceiptText, Undo2 } from "lucide-react";
-import { Badge, Button, EmptyState, Field, Select, Sheet, Skeleton, toast } from "@/app/components/ui";
+import { Badge, Button, EmptyState, Field, Select, Sheet, Skeleton, cn, toast } from "@/app/components/ui";
 import { promptDialog } from "@/app/components/ui/notify";
 import MoneyInput from "@/app/components/entry/MoneyInput";
 import useCurrency from "@/app/hooks/useCurrency";
@@ -17,7 +17,7 @@ import { useCostCategories } from "@/lib/costs/client";
 import { canReviewBill, changeText } from "@/lib/payouts/model";
 import { FileThumb, FilesSheet } from "@/app/components/common/Files";
 import { approveBillNow, approveSupplierNow, sendBillBack } from "@/lib/payouts/client";
-import { supplierText } from "@/lib/payouts/supplier";
+import { linesTotal, supplierText } from "@/lib/payouts/supplier";
 
 const day = (d) => (d ? format(parseISO(d), "EEE d MMM") : "");
 
@@ -134,6 +134,27 @@ export default function BillInbox({ companyId, branchId, user, bills, loading })
                     </p>
                   ) : (
                     <p className="text-sm font-medium text-fg">{b.category || "—"}{b.purpose && b.purpose !== b.category ? ` · ${b.purpose}` : ""}</p>
+                  )}
+                  {b.supplier?.mode === "po" && (
+                    // what came against the order, to check against the invoice before approving
+                    <ul className="rounded-xl bg-surface-2 px-3 py-2 text-xs text-fg">
+                      {(b.supplier.lines || []).map((l, i) => {
+                        const short = Number(l.receivedQty) < Number(l.requestedQty);
+                        return (
+                          <li key={l.itemId || i} className="flex justify-between gap-3 py-0.5">
+                            <span className="min-w-0 truncate">{l.name}</span>
+                            <span className="shrink-0 tabular-nums">
+                              <span className={cn(short && "font-semibold text-warning")}>{l.receivedQty}</span>
+                              <span className="text-muted"> of {l.requestedQty} {l.unit} × {money(l.finalPrice)}</span>
+                            </span>
+                          </li>
+                        );
+                      })}
+                      <li className="mt-1 flex justify-between gap-3 border-t border-line pt-1 font-semibold">
+                        <span>Invoice {b.supplier.invoiceNo}</span>
+                        <span className="tabular-nums">{money(linesTotal(b.supplier.lines))}</span>
+                      </li>
+                    </ul>
                   )}
                   <p className="text-xs text-muted">{day(b.date)} · {b.to?.name || "—"} · brought by {b.by?.name || "someone"}</p>
                   <p className="inline-flex rounded-lg bg-brand-soft px-2 py-1 text-xs font-medium text-brand">{changeText(b.floatAmount, b.billAmount, money)}</p>

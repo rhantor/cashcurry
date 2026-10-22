@@ -261,8 +261,9 @@ export default function PurchaseOrdersPage() {
   const [pickCategory, setPickCategory] = useState("");
   const [confirmReapproval, setConfirmReapproval] = useState(false);
 
-  const canEdit = (order) => ["Pending", "Approved", "Sent", "Rejected"].includes(normalizeStatus(order.status));
-  const canCancel = (order) => ["Pending", "Approved", "Sent"].includes(normalizeStatus(order.status));
+  // an order collected with a pay-out waits on that bill: nothing changes it meanwhile
+  const canEdit = (order) => !order.payoutHold && ["Pending", "Approved", "Sent", "Rejected"].includes(normalizeStatus(order.status));
+  const canCancel = (order) => !order.payoutHold && ["Pending", "Approved", "Sent"].includes(normalizeStatus(order.status));
 
   const handleOpenEdit = (order) => {
     setSelectedOrder(order);
@@ -683,7 +684,13 @@ export default function PurchaseOrdersPage() {
                   </div>
                 )}
 
-                {(status === "Approved" || (status === "Pending" && !requireApproval)) && (
+                {order.payoutHold && status !== "Received" && (
+                  <div className="min-h-[48px] rounded-2xl bg-warning-soft px-3 py-2 text-sm font-medium text-fg flex items-center justify-center text-center">
+                    Arrived with a pay-out — its bill is waiting for approval in Pay-outs
+                  </div>
+                )}
+
+                {!order.payoutHold && (status === "Approved" || (status === "Pending" && !requireApproval)) && (
                   <button
                     onClick={() => handleSend(order)}
                     className="w-full min-h-[48px] rounded-2xl bg-info text-white font-bold
@@ -693,7 +700,7 @@ export default function PurchaseOrdersPage() {
                   </button>
                 )}
 
-                {status === "Sent" && (
+                {status === "Sent" && !order.payoutHold && (
                   <button
                     onClick={() => handleOpenReceive(order)}
                     className="w-full min-h-[48px] rounded-2xl bg-brand text-brand-fg font-bold
