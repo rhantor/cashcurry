@@ -1,5 +1,6 @@
 "use client";
 import { Check } from "lucide-react";
+import { isActive } from "@/lib/purchases/vendors";
 
 /** Shared field styling — one place so every input keeps a thumb-sized target. */
 export const FIELD =
@@ -185,7 +186,7 @@ export default function ItemFields({ form, setForm, vendors, branches, categorie
       <div>
         <label className="block text-sm font-semibold text-fg mb-1.5">Suppliers</label>
         <CheckList
-          options={vendors.map((v) => ({ id: v.id, label: v.name }))}
+          options={vendors.filter((v) => isActive(v) || (form.vendorIds || []).includes(v.id)).map((v) => ({ id: v.id, label: v.name }))}
           selected={form.vendorIds || []}
           onToggle={toggleVendor}
           empty="No suppliers added yet."

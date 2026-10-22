@@ -2,6 +2,13 @@
 import { useMemo, useState, useRef } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
 import useResolvedCompanyBranch from "@/app/hooks/useResolvedCompanyBranch";
+import { useGetVendorBillsQuery } from "@/lib/redux/api/vendorBillsApiSlice";
+import { businessToday } from "@/lib/region";
+import { itemStats, itemsSummary, lineKey, lookAlikes, missingInfo, notBought, purchaseLines } from "@/lib/purchases/items";
+import { Chip } from "@/app/components/entry/Choices";
+import StatTiles from "@/app/components/purchases/StatTiles";
+import ItemDetailSheet from "./components/ItemDetailSheet";
+import ItemTidy from "./components/ItemTidy";
 import { useGetItemsQuery, useAddItemMutation, useUpdateItemMutation, useRetireItemMutation, useRestoreItemMutation, useAddItemToBranchMutation, useRemoveItemFromBranchMutation, useAddMultipleItemsMutation, itemKey, itemInBranch } from "@/lib/redux/api/itemsApiSlice";
 import { useGetVendorsQuery } from "@/lib/redux/api/vendorsApiSlice";
 import { useGetBranchesBasicQuery } from "@/lib/redux/api/branchApiSlice";
@@ -12,7 +19,7 @@ import { SCOPE_BRANCH, SCOPE_COMPANY, SCOPE_RETIRED } from "./shared";
 import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/lib/region/currency";
 import { Button, Menu } from "@/app/components/ui";
-import { Upload, FileSpreadsheet, Plus, DownloadCloud } from "lucide-react";
+import { Upload, FileSpreadsheet, Plus, DownloadCloud, Wallet, TrendingUp, Sparkles } from "lucide-react";
 import { ItemsContext } from "./ItemsContext";
 import ItemList from "./components/ItemList";
 import ItemSheets from "./components/ItemSheets";
@@ -52,12 +59,33 @@ export default function ItemsCatalogPage() {
   const branchItems = active.filter((i) => itemInBranch(i, branchId));
   const otherBranchCount = active.length - branchItems.length;
 
-  const items =
+  // what each item really costs here: the item lines on this branch's supplier bills (lib/purchases/items.js)
+  const { data: bills = [] } = useGetVendorBillsQuery(ready && companyId && branchId ? { companyId, branchId } : skipToken);
+  const today = businessToday();
+  const stats = useMemo(() => itemStats(purchaseLines(bills), today), [bills, today]);
+  const summary = useMemo(() => itemsSummary(stats), [stats]);
+  const statOf = (item) => stats[item?.id] || stats[lineKey({ name: item?.name })] || null;
+  const tidy = useMemo(() => {
+    const last = (i) => (stats[i.id] || stats[lineKey({ name: i.name })])?.lastBought || "";
+    const price = (i) => (stats[i.id] || stats[lineKey({ name: i.name })])?.last.price || Number(i.lastPurchaseByBranch?.[branchId]?.price) || Number(i.lastPurchasePrice) || 0;
+    return { alike: lookAlikes(branchItems), missing: missingInfo(branchItems, price), idle: notBought(branchItems, last, today) };
+  }, [branchItems, stats, branchId, today]);
+  const tidyCount = tidy.alike.length + tidy.missing.length + tidy.idle.length;
+  const [view, setView] = useState("all"); // all | risen | top | tidy (this branch's items)
+  const [detailItem, setDetailItem] = useState(null);
+
+  const scoped =
     scope === SCOPE_RETIRED
       ? allItems.filter((i) => i.isActive === false)
       : scope === SCOPE_COMPANY
       ? active
       : branchItems;
+  const items =
+    scope !== SCOPE_BRANCH || view === "all" || view === "tidy"
+      ? scoped
+      : view === "risen"
+        ? scoped.filter((i) => statOf(i)?.change > 0)
+        : scoped.filter((i) => statOf(i)?.spend90 > 0).sort((a, b) => statOf(b).spend90 - statOf(a).spend90);
 
   const [addItem, { isLoading: adding }] = useAddItemMutation();
   const [updateItem, { isLoading: updating }] = useUpdateItemMutation();
@@ -302,12 +330,12 @@ export default function ItemsCatalogPage() {
     }, {});
 
   return (
-    <ItemsContext.Provider value={{ canManage, busy, bulkAdding, dropping, retiring, ready, companyId, branchId, toastOk, toastError, toastNode, allItems, isLoading, isFetching, vendors, vendorNameById, currency, money, branches, allBranchIds, branchNameById, scope, setScope, active, retiredCount, branchItems, otherBranchCount, openAdd, setOpenAdd, addForm, setAddForm, editOpen, setEditOpen, editForm, setEditForm, search, setSearch, category, setCategory, fileInputRef, handleSaveNew, handlePullToBranch, itemToDrop, setItemToDrop, itemToRetire, setItemToRetire, confirmDropFromBranch, handleOpenEdit, handleSaveEdit, confirmRetire, handleRestore, importToBranchOnly, pendingImport, setPendingImport, handleFileUpload, runImport, downloadTemplate, itemsByCategory }}>
+    <ItemsContext.Provider value={{ canManage, busy, bulkAdding, dropping, retiring, ready, companyId, branchId, toastOk, toastError, toastNode, allItems, isLoading, isFetching, vendors, vendorNameById, currency, money, branches, allBranchIds, branchNameById, scope, setScope, active, retiredCount, branchItems, otherBranchCount, openAdd, setOpenAdd, addForm, setAddForm, editOpen, setEditOpen, editForm, setEditForm, search, setSearch, category, setCategory, fileInputRef, handleSaveNew, handlePullToBranch, itemToDrop, setItemToDrop, itemToRetire, setItemToRetire, confirmDropFromBranch, handleOpenEdit, handleSaveEdit, confirmRetire, handleRestore, importToBranchOnly, pendingImport, setPendingImport, handleFileUpload, runImport, downloadTemplate, itemsByCategory, stats, statOf, setDetailItem, tidy }}>
     <div className="mx-auto max-w-7xl space-y-4 px-4 py-5 pb-24">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-fg">Items catalog</h1>
-          <p className="text-muted text-sm mt-0.5">The products this branch can order.</p>
+          <p className="text-muted text-sm mt-0.5">The products this branch orders — what each costs here, and how its price moves. Tap one for its history.</p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -379,6 +407,35 @@ export default function ItemsCatalogPage() {
         )}
       </div>
 
+      {scope === SCOPE_BRANCH && (
+        <>
+          <StatTiles
+            loading={isLoading}
+            tiles={[
+              { label: "Spent on items this month", value: money(summary.spendMonth), note: "From bills with their items listed", icon: Wallet, tone: "bg-brand-soft text-brand" },
+              {
+                label: "Price went up",
+                value: `${summary.risen.length} item${summary.risen.length === 1 ? "" : "s"}`,
+                note: "Last price above the one before",
+                icon: TrendingUp,
+                tone: summary.risen.length ? "bg-warning-soft text-warning" : "bg-surface-2 text-muted",
+              },
+              { label: "Needs a look", value: String(tidyCount), note: "Look-alikes, missing details, not bought lately", icon: Sparkles, tone: tidyCount ? "bg-info-soft text-info" : "bg-success-soft text-success" },
+            ]}
+          />
+          <div className="flex flex-wrap gap-1.5">
+            <Chip on={view === "all"} onClick={() => setView("all")}>All</Chip>
+            <Chip on={view === "risen"} onClick={() => setView("risen")}>Price went up ({summary.risen.length})</Chip>
+            <Chip on={view === "top"} onClick={() => setView("top")}>Most spent (90 days)</Chip>
+            <Chip on={view === "tidy"} onClick={() => setView("tidy")}>Needs a look ({tidyCount})</Chip>
+          </div>
+        </>
+      )}
+
+      {scope === SCOPE_BRANCH && view === "tidy" ? (
+        <ItemTidy />
+      ) : (
+      <>
       <ItemFilterBar
         items={items}
         search={search}
@@ -397,8 +454,12 @@ export default function ItemsCatalogPage() {
       )}
 
       <ItemList />
+      </>
+      )}
 
       <ItemSheets />
+
+      <ItemDetailSheet item={detailItem} stat={statOf(detailItem)} onClose={() => setDetailItem(null)} />
 
       {toastNode}
     </div>
