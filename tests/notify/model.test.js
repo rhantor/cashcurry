@@ -116,3 +116,25 @@ describe("who may get each kind (canGet)", () => {
     expect(recipientsFor("costs.approval", { config: { recipients: { "costs.approval": ["c", "m"] } }, people })).toEqual(["m"]);
   });
 });
+
+describe("late deliveries (22 Oct)", () => {
+  it("go to whoever runs the branch's buying; anyone who can order may be chosen", async () => {
+    const { NOTIFY_TYPES, mayGet } = await import("@/lib/notify/model");
+    const t = NOTIFY_TYPES["purchases.late"];
+    for (const r of ["branchAdmin", "manager", "inCharge"]) expect(t.defaultFor(r)).toBe(true);
+    for (const r of ["owner", "gm", "accountant", "cashier", "staff"]) expect(t.defaultFor(r)).toBe(false);
+    expect(mayGet("purchases.late", "supervisor")).toBe(true);
+    expect(mayGet("purchases.late", "cashier")).toBe(false);
+  });
+  it("one message, most late first", async () => {
+    const { lateOrdersMessage } = await import("@/lib/notify/model");
+    expect(lateOrdersMessage([])).toBeNull();
+    expect(lateOrdersMessage([{ vendorName: "Rice Co", poNo: "PO-1", days: 1 }], { branchName: "KL" })).toEqual({ title: "Delivery late · KL", body: "Rice Co · PO-1 (1 day late)" });
+    const m = lateOrdersMessage(
+      [1, 4, 2, 3].map((d) => ({ vendorName: `V${d}`, poNo: `PO-${d}`, days: d })),
+      { branchName: "KL" }
+    );
+    expect(m.title).toBe("4 deliveries late · KL");
+    expect(m.body).toBe("V4 · PO-4 (4 days late)\nV3 · PO-3 (3 days late)\n…and 2 more");
+  });
+});

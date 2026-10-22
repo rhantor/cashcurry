@@ -255,6 +255,52 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
     }
   }
 
+  // ── late deliveries (22 Oct 2026) ───────────────────────────────────────────
+  /**
+   * Once an hour: at a branch's summary time (settings/notifications.dailyAt,
+   * default 09:00) the orders sent to a supplier and not here by their day go
+   * to those chosen for "Late deliveries" and to whoever sent each one. A
+   * marker per branch and day means it goes out once.
+   */
+  async function lateOrders(now = new Date()) {
+    for (const company of await db.collection("companies").listDocuments()) {
+      let all = null;
+      for (const branchRef of await company.collection("branches").listDocuments()) {
+        try {
+          const b = await branch(company.id, branchRef.id);
+          if (N.localHour(now, b.timeZone) !== N.hourOf(b.config.dailyAt)) continue;
+          const today = N.businessDateFor(now, b.cutoff, b.timeZone);
+          const sent = (await branchRef.collection("requisitions").where("status", "==", "Sent").get()).docs.map((d) => ({ id: d.id, ...d.data() }));
+          const late = sent.map((o) => ({ ...o, days: N.lateDays(o, today) })).filter((o) => o.days > 0);
+          if (!late.length) continue;
+          try {
+            await branchRef.collection("notifyLog").doc(`orders-late-${today}`).create({ at: FieldValue.serverTimestamp() });
+          } catch {
+            continue; // already sent
+          }
+          all = all || (await people(company.id));
+          const office = N.branchPeople(all, branchRef.id);
+          const chosen = N.recipientsFor("purchases.late", { config: b.config, people: office });
+          const mayHear = (uid) => office.some((p) => p.uid === uid && N.mayGet("purchases.late", p.role));
+          // each person hears about the orders that are theirs to chase: all of
+          // them if chosen for the branch, else the ones they sent
+          const forWhom = new Map(chosen.map((u) => [u, late]));
+          for (const o of late) {
+            const by = o.sentBy || o.createdBy;
+            if (by && mayHear(by) && !forWhom.has(by)) forWhom.set(by, late.filter((x) => (x.sentBy || x.createdBy) === by));
+          }
+          for (const [uid, list] of forWhom) {
+            const message = N.lateOrdersMessage(list, { branchName: b.name });
+            if (!message) continue;
+            await deliver({ companyId: company.id, branchId: branchRef.id, uids: [uid], type: "purchases.late", message, link: "/purchases/purchase-orders", ref: `requisitions/late-${today}`, tag: "orders_late" });
+          }
+        } catch (err) {
+          console.error("[notify late orders]", company.id, branchRef.id, err);
+        }
+      }
+    }
+  }
+
   // ── the daily summary ──────────────────────────────────────────────────────
   /**
    * Once an hour: every branch whose clock has reached its summary time
@@ -473,5 +519,5 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
     });
   }
 
-  return { deliver, onRequest, onPurchaseOrder, onPayout, onCostVoucher, dailySummaries, onChatMessage, onUser, onIssue, onIssueComment, onTask, onTaskComment, taskReminders, onStaffLogin };
+  return { deliver, onRequest, onPurchaseOrder, lateOrders, onPayout, onCostVoucher, dailySummaries, onChatMessage, onUser, onIssue, onIssueComment, onTask, onTaskComment, taskReminders, onStaffLogin };
 };

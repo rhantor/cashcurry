@@ -17,6 +17,7 @@ import {
   useSuppliers,
 } from "@/lib/payouts/client";
 import { linesTotal, poLines } from "@/lib/payouts/supplier";
+import { priceRise } from "@/lib/purchases/orders";
 
 const MODE_LABEL = {
   pays: "Paid bills already in Purchases",
@@ -234,6 +235,7 @@ export default function SupplierPicker({
                     {(v.lines || []).map((l, i) => {
                       const short =
                         Number(l.receivedQty) < Number(l.requestedQty);
+                      const rise = priceRise(l.finalPrice, l.estPrice);
                       return (
                         <tr key={l.itemId || i}>
                           <td className="px-3 py-2">
@@ -274,8 +276,9 @@ export default function SupplierPicker({
                                 setLine(i, "finalPrice", e.target.value)
                               }
                               aria-label={`${l.name} price each`}
-                              className="w-24"
+                              className={cn("w-24", rise && "border-warning")}
                             />
+                            {rise && <span className="mt-0.5 block text-[11px] font-semibold text-warning">↑ was {money(rise.was)}</span>}
                           </td>
                           <td className="px-3 py-2 text-right tabular-nums text-fg">
                             {money(
