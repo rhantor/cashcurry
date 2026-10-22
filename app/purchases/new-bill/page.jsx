@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { choosable } from "@/lib/purchases/vendors";
 import { skipToken } from "@reduxjs/toolkit/query";
 import useResolvedCompanyBranch from "@/app/hooks/useResolvedCompanyBranch";
 import Link from "next/link";
@@ -390,7 +391,7 @@ export default function NewBillPage() {
             ) : (
               <Select id={id} className="h-12" value={vendorId} onChange={(e) => setVendorId(e.target.value)}>
                 <option value="">Choose a vendor…</option>
-                {vendors.map((v) => (
+                {choosable(vendors, vendorId).map((v) => (
                   <option key={v.id} value={v.id}>
                     {v.name}
                   </option>

@@ -2,7 +2,8 @@
 import { personName } from "@/lib/people";
 import { Select } from "@/app/components/ui";
 import { formatMoney } from "@/lib/region/currency";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { choosable } from "@/lib/purchases/vendors";
 import { skipToken } from "@reduxjs/toolkit/query";
 import useResolvedCompanyBranch from "@/app/hooks/useResolvedCompanyBranch";
 import {
@@ -74,7 +75,15 @@ export default function OrderGuidesPage() {
   const [builderSearch, setBuilderSearch] = useState("");
   const [builderCategory, setBuilderCategory] = useState("");
 
-  const handleOpenBuilder = (guide = null) => {
+  // from a vendor's page (?vendor=…): only that supplier's guides
+  const [onlyVendor, setOnlyVendor] = useState("");
+  useEffect(() => {
+    setOnlyVendor(new URLSearchParams(window.location.search).get("vendor") || "");
+  }, []);
+  const onlyVendorName = vendors.find((v) => v.id === onlyVendor)?.name || "this supplier";
+  const shownGuides = onlyVendor ? guides.filter((g) => g.vendorId === onlyVendor) : guides;
+
+  const handleOpenBuilder = (guide = null, vendorId = "") => {
     setBuilderSearch("");
     setBuilderCategory("");
     if (guide) {
@@ -85,7 +94,7 @@ export default function OrderGuidesPage() {
         rows: guideRows(guide).map((r) => ({ itemId: r.itemId, parQty: r.parQty ?? "" })),
       });
     } else {
-      setBuilderForm({ id: null, name: "", vendorId: "", rows: [] });
+      setBuilderForm({ id: null, name: "", vendorId, rows: [] });
     }
     setOpenGuideBuilder(true);
   };
@@ -286,8 +295,27 @@ export default function OrderGuidesPage() {
         </button>
       </div>
 
+      {onlyVendor && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-brand-soft px-4 py-3 text-sm">
+          <span className="font-medium text-fg">
+            Guides for {onlyVendorName}
+            {shownGuides.length === 0 && guides.length > 0 ? " — none yet" : ""}
+          </span>
+          <span className="flex gap-2">
+            {shownGuides.length === 0 && (
+              <button onClick={() => handleOpenBuilder(null, onlyVendor)} className="min-h-[40px] rounded-xl bg-brand px-3 font-semibold text-brand-fg active:brightness-95">
+                Make a guide for them
+              </button>
+            )}
+            <button onClick={() => setOnlyVendor("")} className="min-h-[40px] rounded-xl bg-surface px-3 font-semibold text-fg active:bg-surface-2">
+              Show all
+            </button>
+          </span>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {guides.map((guide) => {
+        {shownGuides.map((guide) => {
           const rows = guideRows(guide);
           const missing = missingCount(guide);
           return (
@@ -506,7 +534,7 @@ export default function OrderGuidesPage() {
               className="h-12"
             >
               <option value="">Choose a supplier…</option>
-              {vendors.map((v) => (
+              {choosable(vendors, builderForm.vendorId).map((v) => (
                 <option key={v.id} value={v.id}>
                   {v.name}
                 </option>
