@@ -1,14 +1,17 @@
 "use client";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { skipToken } from "@reduxjs/toolkit/query";
-import { Archive, ArchiveRestore, Banknote, CircleDollarSign, HandCoins, Info, MessageCircle, Pencil, Phone, ReceiptText, ShoppingCart, Trash2 } from "lucide-react";
+import { Archive, ArchiveRestore, Banknote, CircleDollarSign, ClipboardList, HandCoins, Info, MessageCircle, Package, Pencil, Phone, ReceiptText, ScrollText, ShoppingCart, Trash2 } from "lucide-react";
 import { Button, Sheet, Tabs, cn } from "@/app/components/ui";
 import { formatMoney } from "@/lib/region/currency";
 import useCurrency from "@/app/hooks/useCurrency";
 import ExportVendorOverviewBtn from "./ExportVendorOverviewBtn";
 import VendorUnpaidBills from "./VendorUnpaidBills";
 import VendorPaidBills from "./VendorPaidBills";
+import VendorOrders from "./VendorOrders";
+import VendorItems from "./VendorItems";
+import VendorStatement from "./VendorStatement";
 import { niceDate } from "./parts";
 import useSession from "@/app/hooks/useSession";
 import { can, canOpen } from "@/lib/authz/permissions";
@@ -63,9 +66,14 @@ export default function VendorSheet({ open, vendor, companyId, branchId, onClose
   const role = user?.role;
   const { data: settings } = useGetBranchSettingsQuery(open && companyId && branchId ? { companyId, branchId } : skipToken);
   const [sendCash, setSendCash] = useState(false);
+  const tabsRef = useRef(null);
   const currency = useCurrency();
   const money = (v) => formatMoney(Number(v ?? 0), currency);
   const [tab, setTab] = useState("owed");
+  // the chosen tab stays in view when the tabs scroll sideways (a phone)
+  useEffect(() => {
+    tabsRef.current?.querySelector('[aria-selected="true"]')?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+  }, [tab]);
   useEffect(() => {
     if (open) setTab("owed");
   }, [open, vendor?.id]);
@@ -133,15 +141,22 @@ export default function VendorSheet({ open, vendor, companyId, branchId, onClose
         )}
 
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <Tabs
-            value={tab}
-            onChange={setTab}
-            tabs={[
-              { value: "owed", label: "Owed", icon: CircleDollarSign },
-              { value: "paid", label: "Paid", icon: ReceiptText },
-              { value: "details", label: "Details", icon: Info },
-            ]}
-          />
+          {/* six tabs: they scroll sideways on a phone */}
+          <div ref={tabsRef} className="-mx-1 w-full max-w-full overflow-x-auto px-1 [scrollbar-width:none]">
+            <Tabs
+              size="sm"
+              value={tab}
+              onChange={setTab}
+              tabs={[
+                { value: "owed", label: "Owed", icon: CircleDollarSign },
+                { value: "paid", label: "Paid", icon: ReceiptText },
+                { value: "orders", label: "Orders", icon: ClipboardList },
+                { value: "items", label: "Items", icon: Package },
+                { value: "statement", label: "Statement", icon: ScrollText },
+                { value: "details", label: "Details", icon: Info },
+              ]}
+            />
+          </div>
           <div className="flex gap-1.5">
             <ExportVendorOverviewBtn companyId={companyId} branchId={branchId} vendor={v} />
             {onEdit && (
@@ -154,6 +169,9 @@ export default function VendorSheet({ open, vendor, companyId, branchId, onClose
 
         {tab === "owed" && <VendorUnpaidBills companyId={companyId} branchId={branchId} vendorId={v.id} />}
         {tab === "paid" && <VendorPaidBills companyId={companyId} branchId={branchId} vendorId={v.id} />}
+        {tab === "orders" && <VendorOrders companyId={companyId} branchId={branchId} vendorId={v.id} />}
+        {tab === "items" && <VendorItems companyId={companyId} branchId={branchId} vendorId={v.id} />}
+        {tab === "statement" && <VendorStatement companyId={companyId} branchId={branchId} vendor={v} />}
         {tab === "details" && (
           <div className="space-y-5">
             <Group title="Paying them">
