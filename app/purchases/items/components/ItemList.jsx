@@ -2,11 +2,11 @@
 
 import { itemInBranch, branchLastPrice, branchLastPriceDate } from "@/lib/redux/api/itemsApiSlice";
 import { SCOPE_BRANCH, SCOPE_COMPANY } from "../shared";
-import { FileSpreadsheet, Archive, ArchiveRestore, Pencil, Store, DownloadCloud, MinusCircle } from "lucide-react";
+import { FileSpreadsheet, Archive, ArchiveRestore, Pencil, Store, DownloadCloud, MinusCircle, TrendingUp, TrendingDown } from "lucide-react";
 import { useItemsContext } from "../ItemsContext";
 
 export default function ItemList() {
-  const { canManage, branchId, vendorNameById, money, branchNameById, scope, setScope, active, setOpenAdd, search, handlePullToBranch, setItemToDrop, setItemToRetire, handleOpenEdit, handleRestore, itemsByCategory, busy } = useItemsContext();
+  const { canManage, branchId, vendorNameById, money, branchNameById, scope, setScope, active, setOpenAdd, search, handlePullToBranch, setItemToDrop, setItemToRetire, handleOpenEdit, handleRestore, itemsByCategory, busy, statOf, setDetailItem } = useItemsContext();
   return (
     <>
       {busy ? (
@@ -61,10 +61,11 @@ export default function ItemList() {
                   const localPrice = branchLastPrice(item, branchId);
                   const localDate = branchLastPriceDate(item, branchId);
                   const hasOwnPrice = Number(item.lastPurchaseByBranch?.[branchId]?.price) > 0;
+                  const st = statOf(item);
                   return (
                     <li key={item.id} className={`p-4 ${here ? "" : "bg-surface-2/60"}`}>
                       <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
+                        <button type="button" onClick={() => setDetailItem(item)} className="min-w-0 flex-1 text-left">
                           <div className="flex items-center gap-2 flex-wrap">
                             <span className={`font-semibold text-[15px] ${here ? "text-fg" : "text-muted"}`}>
                               {item.name}
@@ -96,7 +97,23 @@ export default function ItemList() {
                             )}
                             {item.vendorIds?.length > 0 && <span className="min-w-0 basis-full truncate">From {item.vendorIds.map((id) => vendorNameById.get(id)).filter(Boolean).join(", ") || `${item.vendorIds.length} supplier${item.vendorIds.length === 1 ? "" : "s"}`}</span>}
                           </div>
-                        </div>
+                          {st && (st.change != null || st.month.spend > 0) && (
+                            <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs font-medium">
+                              {st.change != null && (
+                                <span className={`inline-flex items-center gap-0.5 ${st.change > 0 ? "text-warning" : "text-success"}`}>
+                                  {st.change > 0 ? <TrendingUp className="size-3.5" /> : <TrendingDown className="size-3.5" />}
+                                  {st.change > 0 ? "+" : ""}
+                                  {st.change}% · was {money(st.prev.price)}
+                                </span>
+                              )}
+                              {st.month.spend > 0 && (
+                                <span className="text-muted">
+                                  This month {money(st.month.spend)} · {st.month.qty} {item.unit}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </button>
 
                         {canManage && <div className="flex items-center gap-1 shrink-0 -mr-1.5 -mt-1">
                           {item.isActive === false ? (
