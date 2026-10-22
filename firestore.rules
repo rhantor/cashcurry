@@ -1049,8 +1049,19 @@ service cloud.firestore {
         // ── Purchase Requisitions ────────────────────────────────────────────
         match /requisitions/{docId} {
           allow read, create, delete: if canPurchasesOrder(companyId, branchId);
+          // those who hand out pay-outs pick an order to collect (4.10)
+          allow read: if canPayoutsHandOut(companyId, branchId);
           allow update: if canPurchasesApprove(companyId, branchId) ||
             (canPurchasesOrder(companyId, branchId) && !isApprovalChange());
+          // the goods came with a pay-out bill: the order waits for that bill's
+          // approval (it can't be received twice) — set by whoever brought it,
+          // pointing at their own pending bill for this very order
+          allow update: if canPayoutsHandOut(companyId, branchId) &&
+            changedKeys().hasOnly(['payoutHold', 'updatedAt']) &&
+            !(resource.data.get('status', '') in ['Received', 'Cancelled', 'Rejected']) &&
+            getAfter(/databases/$(database)/documents/companies/$(companyId)/branches/$(branchId)/payouts/$(request.resource.data.payoutHold)).data.get('status', '') == 'pending' &&
+            getAfter(/databases/$(database)/documents/companies/$(companyId)/branches/$(branchId)/payouts/$(request.resource.data.payoutHold)).data.get('supplier', {}).get('poId', '') == docId &&
+            getAfter(/databases/$(database)/documents/companies/$(companyId)/branches/$(branchId)/payouts/$(request.resource.data.payoutHold)).data.by.uid == request.auth.uid;
         }
 
         // ── Document number counters (PO numbers, etc.) ───────────────────────

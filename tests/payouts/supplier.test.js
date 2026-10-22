@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { allocate, approveSupplier, billStatus, checkSupplier, supplierPaid, supplierText } from "@/lib/payouts/supplier";
+import { allocate, approveSupplier, billStatus, canCollect, checkSupplier, linesTotal, poLines, supplierPaid, supplierText } from "@/lib/payouts/supplier";
 
 const manager = { uid: "m1", name: "KL Manager", role: "manager" };
 const cashier = { uid: "c1", name: "KL Cashier", role: "cashier" };
@@ -68,5 +68,46 @@ describe("approving a supplier bill", () => {
     const s = settle({ vendorId: "rice", vendorName: "Rice Co", mode: "pays", pays: [{ billId: "x", amount: 100 }] });
     expect(() => approveSupplier(s, [{ id: "x", vendorId: "oil", total: 100, paid: 0 }], manager, now, { paymentId: "vp" })).toThrow(/another supplier/);
     expect(() => approveSupplier(s, [{ id: "x", vendorId: "rice", total: 100, paid: 100 }], manager, now, { paymentId: "vp" })).toThrow(/already paid/);
+  });
+});
+
+describe("collecting a purchase order", () => {
+  const po = { vendorId: "rice", poNo: "PO-0042", status: "Sent", items: [{ itemId: "rice", name: "Rice", unit: "kg", requestedQty: 50, estPrice: 22 }, { itemId: "oil", name: "Oil", unit: "L", requestedQty: 10, estPrice: 15 }] };
+  const lines = [
+    { ...poLines(po)[0] },
+    { ...poLines(po)[1], receivedQty: 8, finalPrice: 15.5 }, // two short, dearer
+  ];
+  const sup = (extra = {}) => ({ vendorId: "rice", vendorName: "Rice Co", mode: "po", poId: "po1", poNo: "PO-0042", lines, invoiceNo: "INV-2201", invoiceDate: "2026-10-22", paid: 1224, ...extra });
+  it("lines start as ordered, at the planned price; the bill is what came at the real price", () => {
+    expect(poLines(po)[0]).toMatchObject({ requestedQty: 50, receivedQty: 50, finalPrice: 22 });
+    expect(linesTotal(lines)).toBe(1224); // 50 × 22 + 8 × 15.50
+  });
+  it("can be collected unless received, cancelled or waiting on another bill", () => {
+    expect(canCollect(po)).toBe(true);
+    expect(canCollect({ ...po, status: "Received" })).toBe(false);
+    expect(canCollect({ ...po, payoutHold: "other" }, "s1")).toBe(false);
+    expect(canCollect({ ...po, payoutHold: "s1" }, "s1")).toBe(true);
+  });
+  it("names what is missing", () => {
+    expect(checkSupplier(sup())).toEqual({});
+    expect(checkSupplier(sup({ invoiceNo: "" }))).toEqual({ invoiceNo: "The invoice number on the bill" });
+    expect(checkSupplier(sup({ paid: 2000 }))).toEqual({ paid: "Paid can't be more than the bill" });
+    expect(supplierPaid(sup({ paid: 1000 }))).toBe(1000);
+    expect(supplierText(sup({ paid: 1000 }), (v) => `RM ${v}`)).toBe("Rice Co · PO-0042 received (RM 224 still due)");
+  });
+  it("approving receives the order, raises its bill with the lines (due on the supplier's terms) and pays it", () => {
+    const r = approveSupplier(settle(sup({ paid: 1000 }), { floatAmount: 1200 }), [], manager, now, { paymentId: "vp1", newBillId: "nb1" }, { po, termsDays: 14 });
+    expect(r.billWrites[0]).toMatchObject({ id: "nb1", create: true, data: { total: 1224, paid: 1000, balance: 224, status: "partially_paid", sourcePoId: "po1", dueDate: "2026-11-05", invoiceNo: "INV-2201" } });
+    expect(r.billWrites[0].data.items).toHaveLength(2);
+    expect(r.poPatch).toMatchObject({ status: "Received", finalTotal: 1224, billId: "nb1", invoiceNo: "INV-2201", payoutHold: null });
+    expect(r.vendorDelta).toEqual({ billed: 1224, paid: 1000 });
+    expect(r.settlePatch).toMatchObject({ billAmount: 1000, change: 200 });
+    expect(r.cost).toMatchObject({ amount: 1000, meta: { type: "vendor_payment" } });
+  });
+  it("refuses an order already received, gone, or another supplier's", () => {
+    const s = settle(sup());
+    expect(() => approveSupplier(s, [], manager, now, { paymentId: "vp", newBillId: "nb" }, { po: { ...po, status: "Received" } })).toThrow(/already been received/);
+    expect(() => approveSupplier(s, [], manager, now, { paymentId: "vp", newBillId: "nb" }, { po: null })).toThrow(/no longer exists/);
+    expect(() => approveSupplier(s, [], manager, now, { paymentId: "vp", newBillId: "nb" }, { po: { ...po, vendorId: "oil" } })).toThrow(/another supplier/);
   });
 });

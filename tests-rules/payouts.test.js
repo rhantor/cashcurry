@@ -168,6 +168,28 @@ describe("a pay-out spent at a supplier (Purchases)", () => {
   it("not whoever brought the bill back", async () => {
     expect(await ok(approveAs("klCashier"))).toBe(false);
   });
+  it("collecting a purchase order: the till sees it and marks it as waiting on their own bill — nothing more", async () => {
+    const PO = `${B}/requisitions/po1`;
+    await env.withSecurityRulesDisabled((ctx) => ctx.firestore().doc(PO).set({ vendorId: "rice", poNo: "PO-1", status: "Sent", items: [] }));
+    const poSup = { vendorId: "rice", vendorName: "Rice Co", mode: "po", poId: "po1", lines: [], invoiceNo: "I", paid: 80 };
+    expect(await ok(db("klCashier").doc(PO).get())).toBe(true);
+    expect(await ok(db("klStaff").doc(PO).get())).toBe(false);
+    // the bill and the mark together
+    const d = db("klCashier");
+    const b = d.batch();
+    b.set(d.doc(`${P}/pos1`), settle("klCashier", { supplier: poSup }));
+    b.update(d.doc(PO), { payoutHold: "pos1" });
+    expect(await ok(b.commit())).toBe(true);
+    // not pointing at someone else's bill, another order's, or changing anything else
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`${P}/byOther`).set(settle("klSupervisor", { supplier: poSup }));
+      await ctx.firestore().doc(`${P}/otherPo`).set(settle("klCashier", { supplier: { ...poSup, poId: "po2" } }));
+      await ctx.firestore().doc(PO).update({ payoutHold: null });
+    });
+    expect(await ok(d.doc(PO).update({ payoutHold: "byOther" }))).toBe(false);
+    expect(await ok(d.doc(PO).update({ payoutHold: "otherPo" }))).toBe(false);
+    expect(await ok(d.doc(PO).update({ payoutHold: "pos1", status: "Received" }))).toBe(false);
+  });
   it("a new bill bought and paid on the spot is raised as the pay-out is approved", async () => {
     await env.withSecurityRulesDisabled((ctx) =>
       ctx.firestore().doc(`${P}/nb`).set(settle("klCashier", { supplier: { vendorId: "rice", vendorName: "Rice Co", mode: "newBill", newBill: { total: 120, paid: 80 } } }))
