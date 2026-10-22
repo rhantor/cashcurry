@@ -1,13 +1,17 @@
 "use client";
 import React, { useMemo, useState } from "react";
 import { skipToken } from "@reduxjs/toolkit/query";
-import { Download, Eye, FileSpreadsheet, FileText, MoreHorizontal, Pencil, Plus, RefreshCcw, Search, Store, Trash2, Wallet, CheckCircle2 } from "lucide-react";
+import { Archive, ArchiveRestore, CalendarClock, Download, Eye, FileSpreadsheet, FileText, MoreHorizontal, Pencil, Plus, RefreshCcw, Search, Store, Trash2, Wallet, AlertTriangle } from "lucide-react";
 import { useGetVendorsQuery, useAddVendorMutation, useUpdateVendorMutation, useDeleteVendorMutation } from "@/lib/redux/api/vendorsApiSlice";
 import useResolvedCompanyBranch from "@/app/hooks/useResolvedCompanyBranch";
 import useCurrency from "@/app/hooks/useCurrency";
 import useSession from "@/app/hooks/useSession";
 import { formatMoney } from "@/lib/region/currency";
-import { Button, DataTable, Input, Menu, cn } from "@/app/components/ui";
+import { Badge, Button, DataTable, Input, Menu, cn } from "@/app/components/ui";
+import { Chip } from "@/app/components/entry/Choices";
+import { useGetVendorBillsQuery } from "@/lib/redux/api/vendorBillsApiSlice";
+import { businessToday } from "@/lib/region";
+import { duesTotal, isActive, payFirst, vendorDues } from "@/lib/purchases/vendors";
 import { toast, confirmDialog } from "@/app/components/ui/notify";
 import StatTiles from "@/app/components/purchases/StatTiles";
 import VendorForm from "./VendorForm";
@@ -18,7 +22,10 @@ import { niceDate } from "./parts";
 import { can, isCompanyRole } from "@/lib/authz/permissions";
 
 
-/** The company's vendors: who is owed what, their details and bills. */
+/**
+ * The company's vendors: who is owed what at this branch and when — overdue
+ * and due this week first — their details and bills (lib/purchases/vendors.js).
+ */
 export default function VendorsPage() {
   const { companyId, branchId } = useResolvedCompanyBranch();
   const { user } = useSession();
@@ -32,20 +39,30 @@ export default function VendorsPage() {
   const [updateVendor] = useUpdateVendorMutation();
   const [deleteVendor] = useDeleteVendorMutation();
 
+  // this branch's open bills: what each vendor is owed here, and when
+  const branchArgs = companyId && branchId ? { companyId, branchId } : null;
+  const { data: unpaid = [] } = useGetVendorBillsQuery(branchArgs ? { ...branchArgs, status: "unpaid" } : skipToken);
+  const { data: partial = [] } = useGetVendorBillsQuery(branchArgs ? { ...branchArgs, status: "partially_paid" } : skipToken);
+  const openBills = useMemo(() => [...unpaid, ...partial], [unpaid, partial]);
+  const today = businessToday();
+  const dues = useMemo(() => vendorDues(openBills, today), [openBills, today]);
+  const totals = duesTotal(dues);
+
   const [q, setQ] = useState("");
+  const [view, setView] = useState("inUse"); // inUse | overdue | dueWeek | inactive
   const [form, setForm] = useState({ open: false, vendor: null });
   const [viewId, setViewId] = useState(null);
   const viewing = vendors.find((v) => v.id === viewId) || null; // stays fresh after an edit
 
+  const inactive = vendors.filter((v) => !isActive(v)).length;
   const shown = useMemo(() => {
     const k = q.trim().toLowerCase();
-    if (!k) return vendors;
-    return vendors.filter((v) => [v.name, v.code, v.phone, v.email, v.ownerName].some((x) => String(x || "").toLowerCase().includes(k)));
-  }, [vendors, q]);
-
-  const owed = vendors.reduce((s, v) => s + Number(v.currentBalance || 0), 0);
-  const owing = vendors.filter((v) => Number(v.currentBalance || 0) > 0).length;
-  const paid = vendors.reduce((s, v) => s + Number(v.totalPaid || 0), 0);
+    const inView = vendors.filter((v) =>
+      view === "inactive" ? !isActive(v) : view === "overdue" ? dues[v.id]?.overdue > 0 : view === "dueWeek" ? dues[v.id]?.dueWeek > 0 : isActive(v)
+    );
+    if (!k) return inView;
+    return inView.filter((v) => [v.name, v.code, v.phone, v.email, v.ownerName].some((x) => String(x || "").toLowerCase().includes(k)));
+  }, [vendors, q, view, dues]);
 
   const save = async (patch) => {
     if (form.vendor) {
@@ -65,6 +82,18 @@ export default function VendorsPage() {
     } catch (e) {
       console.error(e);
       toast.error("Couldn't change the limit.");
+    }
+  };
+
+  // a vendor with history isn't deleted: it is put away (kept for its bills, not offered any more)
+  const hasHistory = (v) => Number(v.totalBilled || 0) > 0 || Number(v.currentBalance || 0) > 0 || !!dues[v.id];
+  const setActive = async (v, active) => {
+    try {
+      await updateVendor({ companyId, vendorId: v.id, patch: { active } }).unwrap();
+      toast.success(active ? `${v.name} is in use again` : `${v.name} put away — kept with its bills, no longer offered`);
+    } catch (e) {
+      console.error(e);
+      toast.error("Couldn't change the vendor.");
     }
   };
 
@@ -113,11 +142,32 @@ export default function VendorsPage() {
     }
   };
 
+  const plural = (n, w) => `${n} ${w}${n === 1 ? "" : "s"}`;
   const tiles = [
-    { label: "Owed to vendors", value: money(owed), note: `${owing} of ${vendors.length} vendor${vendors.length === 1 ? "" : "s"} waiting on money`, icon: Wallet, tone: owed > 0 ? "bg-danger-soft text-danger" : "bg-surface-2 text-muted" },
-    { label: "Paid so far", value: money(paid), note: "To all vendors, all time", icon: CheckCircle2, tone: "bg-success-soft text-success" },
-    { label: "Vendors", value: String(vendors.length), note: "Shared by every branch", icon: Store, tone: "bg-brand-soft text-brand" },
+    {
+      label: "Overdue",
+      value: money(totals.overdue),
+      note: totals.overdue > 0 ? `${plural(totals.overdueVendors, "supplier")} past the due date — pay first` : "Nothing past its due date",
+      icon: AlertTriangle,
+      tone: totals.overdue > 0 ? "bg-danger-soft text-danger" : "bg-success-soft text-success",
+    },
+    {
+      label: "Due this week",
+      value: money(totals.dueWeek),
+      note: totals.dueWeek > 0 ? `${plural(totals.dueWeekVendors, "supplier")} in the next 7 days` : "Nothing due in the next 7 days",
+      icon: CalendarClock,
+      tone: totals.dueWeek > 0 ? "bg-warning-soft text-warning" : "bg-surface-2 text-muted",
+    },
+    { label: "Owed at this branch", value: money(totals.owed), note: `${plural(openBills.length, "open bill")} · all branches ${money(vendors.reduce((s, v) => s + Number(v.currentBalance || 0), 0))}`, icon: Wallet, tone: "bg-brand-soft text-brand" },
   ];
+
+  // owed here, and when: "RM 750 overdue · 10 days" / "RM 100 due 25 Oct"
+  const whenText = (d) =>
+    d.overdue > 0
+      ? <span className="text-danger">{money(d.overdue)} overdue · {d.oldestLate} day{d.oldestLate === 1 ? "" : "s"}</span>
+      : d.nextDue
+        ? <span className={d.dueWeek > 0 ? "text-warning" : "text-muted"}>Next due {niceDate(d.nextDue)}</span>
+        : null;
 
   const columns = [
     {
@@ -127,22 +177,35 @@ export default function VendorsPage() {
       sortable: true,
       render: (v) => (
         <div className="min-w-0">
-          <p className="truncate font-semibold text-fg">{v.name}</p>
+          <p className="truncate font-semibold text-fg">
+            {v.name}
+            {!isActive(v) && <Badge tone="neutral" className="ml-1.5 px-2 py-px text-[10px]">Put away</Badge>}
+          </p>
           {(v.code || v.ownerName) && <p className="truncate text-[11px] font-normal text-muted">{[v.code, v.ownerName].filter(Boolean).join(" · ")}</p>}
         </div>
       ),
     },
-    { key: "phone", label: "Phone", hideOnMobile: true, render: (v) => v.phone || <span className="text-subtle">—</span> },
+    { key: "phone", label: "Phone", hideOnMobile: true, render: (v) => (v.phone ? <span className="whitespace-nowrap">{v.phone}</span> : <span className="text-subtle">—</span>) },
     { key: "terms", label: "Pays in", sortValue: (v) => Number(v.termsDays ?? -1), render: (v) => (v.termsDays != null && v.termsDays !== "" ? `${v.termsDays} days` : "—") },
-    { key: "billed", label: "Billed", align: "right", hideOnMobile: true, sortValue: (v) => Number(v.totalBilled || 0), render: (v) => money(v.totalBilled) },
-    { key: "last", label: "Last paid", sortValue: (v) => v.lastPaymentDate || "", render: (v) => (v.lastPaymentDate ? niceDate(v.lastPaymentDate) : <span className="text-subtle">Never</span>) },
+    { key: "all", label: "All branches", align: "right", hideOnMobile: true, sortValue: (v) => Number(v.currentBalance || 0), render: (v) => <span className="text-muted">{money(v.currentBalance)}</span> },
+    { key: "last", label: "Last paid", sortValue: (v) => v.lastPaymentDate || "", render: (v) => (v.lastPaymentDate ? <span className="whitespace-nowrap">{niceDate(v.lastPaymentDate)}</span> : <span className="text-subtle">Never</span>) },
     {
       key: "owed",
-      label: "Owed",
+      label: "Owed here",
       align: "right",
       aside: true,
-      sortValue: (v) => Number(v.currentBalance || 0),
-      render: (v) => <span className={cn("font-semibold", Number(v.currentBalance || 0) > 0 ? "text-danger" : "text-muted")}>{money(v.currentBalance)}</span>,
+      // who to pay first: overdue money, then due this week, then owed
+      sortValue: payFirst(dues),
+      render: (v) => {
+        const d = dues[v.id];
+        if (!d) return <span className="text-muted">{money(0)}</span>;
+        return (
+          <span className="inline-flex flex-col items-end">
+            <span className={cn("font-semibold", d.overdue > 0 ? "text-danger" : "text-fg")}>{money(d.owed)}</span>
+            <span className="whitespace-nowrap text-[11px] font-medium">{whenText(d)}</span>
+          </span>
+        );
+      },
     },
     {
       key: "actions",
@@ -167,7 +230,10 @@ export default function VendorsPage() {
                     { label: "Edit", icon: Pencil, onSelect: () => setForm({ open: true, vendor: v }) },
                     { label: "Allow one more unpaid bill", icon: Plus, onSelect: () => allowOneMore(v) },
                     "divider",
-                    { label: "Delete", icon: Trash2, danger: true, onSelect: () => remove(v) },
+                    isActive(v)
+                      ? { label: "Put away (no longer used)", icon: Archive, onSelect: () => setActive(v, false) }
+                      : { label: "Use again", icon: ArchiveRestore, onSelect: () => setActive(v, true) },
+                    ...(hasHistory(v) ? [] : [{ label: "Delete", icon: Trash2, danger: true, onSelect: () => remove(v) }]),
                   ]
                 : []),
             ]}
@@ -182,7 +248,7 @@ export default function VendorsPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-fg">Vendors</h1>
-          <p className="text-sm text-muted">Your suppliers and what each is owed. Tap one for their bills.</p>
+          <p className="text-sm text-muted">Who to pay first, and what each supplier is owed here. Tap one to call, pay or order.</p>
         </div>
         <div className="flex gap-2">
           <Menu
@@ -210,6 +276,13 @@ export default function VendorsPage() {
 
       <StatTiles tiles={tiles} loading={isLoading} />
 
+      <div className="flex flex-wrap gap-1.5">
+        <Chip on={view === "inUse"} onClick={() => setView("inUse")}>In use ({vendors.length - inactive})</Chip>
+        <Chip on={view === "overdue"} onClick={() => setView("overdue")}>Overdue ({totals.overdueVendors})</Chip>
+        <Chip on={view === "dueWeek"} onClick={() => setView("dueWeek")}>Due this week ({totals.dueWeekVendors})</Chip>
+        {inactive > 0 && <Chip on={view === "inactive"} onClick={() => setView("inactive")}>Put away ({inactive})</Chip>}
+      </div>
+
       {vendors.length > 5 && (
         <div className="relative">
           <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-subtle" />
@@ -227,7 +300,9 @@ export default function VendorsPage() {
         empty={
           q
             ? { icon: Search, title: "No vendor matches", description: `Nothing for “${q}”.` }
-            : {
+            : view !== "inUse"
+              ? { icon: Store, title: view === "overdue" ? "Nothing overdue" : view === "dueWeek" ? "Nothing due this week" : "None put away", description: "Every supplier in that list shows up here." }
+              : {
                 icon: Store,
                 title: "No vendors yet",
                 description: "Add the suppliers you buy from, then save their bills.",
@@ -249,6 +324,10 @@ export default function VendorsPage() {
         onClose={() => setViewId(null)}
         onEdit={canManage ? (v) => setForm({ open: true, vendor: v }) : undefined}
         onDelete={canManage ? remove : undefined}
+        onSetActive={canManage ? setActive : undefined}
+        removable={(v) => !hasHistory(v)}
+        dues={viewing ? dues[viewing.id] : null}
+        openBills={viewing ? openBills.filter((b) => b.vendorId === viewing.id) : []}
       />
     </div>
   );

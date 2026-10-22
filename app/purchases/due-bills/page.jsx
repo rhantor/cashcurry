@@ -4,7 +4,7 @@ import { HandOutSheet } from '@/app/components/payouts/PayoutSheets'
 import { can } from '@/lib/authz/permissions'
 import { businessToday } from "@/lib/region";
 import { formatMoney } from '@/lib/region/currency'
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { skipToken } from '@reduxjs/toolkit/query'
 import { useRouter } from 'next/navigation'
 import { Edit3, AlertCircle, Trash2, Eye, Paperclip, ChevronRight, PartyPopper } from 'lucide-react'
@@ -66,6 +66,11 @@ export default function DueBillsPage () {
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [billToEdit, setBillToEdit] = useState(null)
   const [selectedVendor, setSelectedVendor] = useState(null)
+  // from a vendor's page (?vendor=…): their bills
+  useEffect(() => {
+    const v = new URLSearchParams(window.location.search).get('vendor')
+    if (v) setSelectedVendor(v)
+  }, [])
 
   // --- Queries & Mutations ---
   const baseArgs =

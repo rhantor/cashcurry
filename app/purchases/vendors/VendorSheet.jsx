@@ -1,6 +1,8 @@
 "use client";
-import React, { useEffect, useState } from "react";
-import { CircleDollarSign, Info, Pencil, ReceiptText, Trash2 } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { skipToken } from "@reduxjs/toolkit/query";
+import { Archive, ArchiveRestore, Banknote, CircleDollarSign, HandCoins, Info, MessageCircle, Pencil, Phone, ReceiptText, ShoppingCart, Trash2 } from "lucide-react";
 import { Button, Sheet, Tabs, cn } from "@/app/components/ui";
 import { formatMoney } from "@/lib/region/currency";
 import useCurrency from "@/app/hooks/useCurrency";
@@ -8,6 +10,33 @@ import ExportVendorOverviewBtn from "./ExportVendorOverviewBtn";
 import VendorUnpaidBills from "./VendorUnpaidBills";
 import VendorPaidBills from "./VendorPaidBills";
 import { niceDate } from "./parts";
+import useSession from "@/app/hooks/useSession";
+import { can, canOpen } from "@/lib/authz/permissions";
+import { regionOf } from "@/lib/region";
+import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
+import { waNumber } from "@/lib/purchases/orders";
+import { billBalance, isActive } from "@/lib/purchases/vendors";
+import { HandOutSheet } from "@/app/components/payouts/PayoutSheets";
+
+/** One quick action: a big icon button, a link or a click. */
+const Action = ({ icon: Icon, label, href, onClick, external, tone = "bg-surface-2 text-fg" }) => {
+  const cls = cn("flex min-h-[64px] flex-col items-center justify-center gap-1 rounded-2xl px-2 text-xs font-semibold transition-colors active:brightness-95", tone);
+  const body = (
+    <>
+      <Icon className="size-5" />
+      {label}
+    </>
+  );
+  return href ? (
+    <a href={href} className={cls} {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}>
+      {body}
+    </a>
+  ) : (
+    <button type="button" onClick={onClick} className={cls}>
+      {body}
+    </button>
+  );
+};
 
 const Line = ({ label, children, mono }) => (
   <div className="flex items-start justify-between gap-4 py-2 text-sm">
@@ -23,8 +52,17 @@ const Group = ({ title, children }) => (
   </section>
 );
 
-/** One vendor: what is owed and paid, their details, and their bills in this branch. */
-export default function VendorSheet({ open, vendor, companyId, branchId, onClose, onEdit, onDelete }) {
+/**
+ * One vendor: what is owed here and when, one tap to call, WhatsApp, pay,
+ * order or send cash, their details, and their bills in this branch.
+ * dues: lib/purchases/vendors.js vendorDues for this vendor; openBills: theirs here.
+ */
+export default function VendorSheet({ open, vendor, companyId, branchId, onClose, onEdit, onDelete, onSetActive, removable = () => true, dues = null, openBills = [] }) {
+  const router = useRouter();
+  const { user } = useSession();
+  const role = user?.role;
+  const { data: settings } = useGetBranchSettingsQuery(open && companyId && branchId ? { companyId, branchId } : skipToken);
+  const [sendCash, setSendCash] = useState(false);
   const currency = useCurrency();
   const money = (v) => formatMoney(Number(v ?? 0), currency);
   const [tab, setTab] = useState("owed");
@@ -34,12 +72,29 @@ export default function VendorSheet({ open, vendor, companyId, branchId, onClose
 
   const v = vendor || {};
   const owed = Number(v.currentBalance || 0);
+  const wa = waNumber(v.phone, regionOf(settings).timeZone);
+  // send cash: for their bills here, oldest due first
+  const cashPreset = useMemo(
+    () =>
+      sendCash && v.id
+        ? { vendorId: v.id, vendorName: v.name, bills: [...openBills].sort((a, b) => String(a.dueDate || "9").localeCompare(String(b.dueDate || "9"))).map((b) => ({ ...b, balance: billBalance(b) })) }
+        : null,
+    [sendCash, v.id, v.name, openBills]
+  );
   const figures = [
-    { label: "Owed now", value: money(owed), tone: owed > 0 ? "text-danger" : "text-success" },
+    { label: "Owed here", value: money(dues?.owed || 0), tone: dues?.owed > 0 ? "text-danger" : "text-success" },
+    { label: "All branches", value: money(owed) },
     { label: "Billed in all", value: money(v.totalBilled) },
-    { label: "Paid in all", value: money(v.totalPaid) },
     { label: "Last paid", value: v.lastPaymentDate ? niceDate(v.lastPaymentDate) : "Never" },
   ];
+
+  const actions = [
+    v.phone && { icon: Phone, label: "Call", href: `tel:${v.phone}` },
+    wa && { icon: MessageCircle, label: "WhatsApp", href: `https://wa.me/${wa}`, external: true, tone: "bg-[#25D366]/15 text-[#128C7E]" },
+    dues?.owed > 0 && canOpen(role, "/purchases/due-bills") && { icon: Banknote, label: "Pay bills", onClick: () => router.push(`/purchases/due-bills?vendor=${v.id}`), tone: "bg-brand-soft text-brand" },
+    isActive(v) && canOpen(role, "/purchases/order-guides") && { icon: ShoppingCart, label: "New order", onClick: () => router.push(`/purchases/order-guides?vendor=${v.id}`) },
+    isActive(v) && can(role, "payouts.handOut") && { icon: HandCoins, label: "Send cash", onClick: () => setSendCash(true) },
+  ].filter(Boolean);
 
   return (
     <Sheet
@@ -58,7 +113,24 @@ export default function VendorSheet({ open, vendor, companyId, branchId, onClose
             </div>
           ))}
         </div>
-        <p className="-mt-3 text-[11px] text-subtle">Totals are for the whole company; the bills below are this branch&apos;s.</p>
+        {dues?.overdue > 0 ? (
+          <p className="-mt-2 rounded-xl bg-danger-soft px-3 py-2 text-sm font-medium text-danger">
+            {money(dues.overdue)} overdue — {dues.overdueBills} bill{dues.overdueBills === 1 ? "" : "s"}, the oldest {dues.oldestLate} day{dues.oldestLate === 1 ? "" : "s"} past its due date
+          </p>
+        ) : dues?.dueWeek > 0 ? (
+          <p className="-mt-2 rounded-xl bg-warning-soft px-3 py-2 text-sm font-medium text-fg">
+            {money(dues.dueWeek)} due this week — next on {niceDate(dues.nextDue)}
+          </p>
+        ) : null}
+        {!isActive(v) && <p className="-mt-2 rounded-xl bg-surface-2 px-3 py-2 text-sm text-muted">Put away — kept with its bills, not offered for new bills, orders or pay-outs.</p>}
+
+        {actions.length > 0 && (
+          <div className={cn("grid gap-2", actions.length >= 5 ? "grid-cols-5" : actions.length === 4 ? "grid-cols-4" : "grid-cols-3")}>
+            {actions.map((a) => (
+              <Action key={a.label} {...a} />
+            ))}
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center justify-between gap-2">
           <Tabs
@@ -109,14 +181,28 @@ export default function VendorSheet({ open, vendor, companyId, branchId, onClose
               </Line>
               <Line label="Address">{v.address && <span className="whitespace-pre-wrap">{v.address}</span>}</Line>
             </Group>
-            {onDelete && (
-              <Button variant="ghost" icon={Trash2} className="text-danger hover:bg-danger-soft" onClick={() => onDelete(v)}>
-                Delete this vendor
-              </Button>
-            )}
+            <div className="flex flex-wrap gap-2">
+              {onSetActive &&
+                (isActive(v) ? (
+                  <Button variant="secondary" icon={Archive} onClick={() => onSetActive(v, false)}>
+                    Put away (no longer used)
+                  </Button>
+                ) : (
+                  <Button variant="secondary" icon={ArchiveRestore} onClick={() => onSetActive(v, true)}>
+                    Use again
+                  </Button>
+                ))}
+              {/* only a vendor with no bills can go for good; one with history is put away */}
+              {onDelete && removable(v) && (
+                <Button variant="ghost" icon={Trash2} className="text-danger hover:bg-danger-soft" onClick={() => onDelete(v)}>
+                  Delete this vendor
+                </Button>
+              )}
+            </div>
           </div>
         )}
       </div>
+      <HandOutSheet open={!!cashPreset} onClose={() => setSendCash(false)} companyId={companyId} branchId={branchId} user={user} preset={cashPreset} />
     </Sheet>
   );
 }
