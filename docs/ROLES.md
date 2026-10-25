@@ -116,6 +116,8 @@ Branch settings**, though the database lets the owner change staff and settings.
 | Who gets notifications (4.3) | M | M | M | M (branch) | — | — | — | — | — | — |
 | Audit log | V | V | V | V (branch) | V (branch) | — | — | — | — | — |
 | Tools (invoice, appointment letter) | ✓ | ✓ | ✓ | ✓ | ✓ | — | ✓ | — | — | — |
+| Reservation receipts: make and send (25 Oct) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | — |
+| Reservation receipts: mark used / refunded / cancelled | M | M | M | M | M | M | M | M | own | — |
 | Chat / issues (4.4, 4.5) | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
 Settled while building it:

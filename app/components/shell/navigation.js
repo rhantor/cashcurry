@@ -116,6 +116,7 @@ export const sidebarItems = [
     section: "More",
     icon: "MdAppRegistration",
     children: [
+      { label: "Reservation Receipt", path: "/tools/reservation-receipt" },
       { label: "Invoice Generator", path: "/tools/invoice-generator" },
       { label: "Appointment Letter", path: "/tools/appointment-letter" },
     ],
