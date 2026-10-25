@@ -14,6 +14,7 @@ import {
 } from "@/utils/export/exportSalary";
 import { FaCalendarAlt, FaMoneyBillWave, FaEdit, FaFilePdf } from "react-icons/fa";
 import useCurrency from "@/app/hooks/useCurrency";
+import { salaryRows } from "@/utils/salaryRows";
 import { getCurrentUser, hasRole, ALLOWED_EDIT_ROLES } from "@/lib/authz/roles";
 
 export default function SalaryReport() {
@@ -28,9 +29,10 @@ export default function SalaryReport() {
 
   const { data: entries = [], isLoading, error: salaryError } = useGetSalaryEntriesQuery(args);
 
-  // Prepare data: inject dateForFilter based on dateMode
+  // Prepare data: a payroll run is one line (its staff inside), then
+  // inject dateForFilter based on dateMode
   const prepared = useMemo(() => {
-    return (entries || []).map((e) => {
+    return salaryRows(entries || []).map((e) => {
       const salaryDateISO = e.month ? `${e.month}-01` : e.monthStart || "";
       const paymentISO = e.paymentDate || "";
       return {
@@ -52,7 +54,7 @@ export default function SalaryReport() {
         <div className="flex flex-col">
           <span className="font-medium text-gray-800">{val || "Branch Total"}</span>
           <span className="text-[10px] text-gray-400 uppercase tracking-tight">
-            {row.source === 'payroll' ? 'Individual' : 'Manual Entry'}
+            {row.source === 'payroll-run' ? 'Payroll — tap for each staff' : row.source === 'payroll' ? 'Individual' : 'Manual Entry'}
           </span>
         </div>
       ),
@@ -115,7 +117,11 @@ export default function SalaryReport() {
     columns.push({
       key: "actions",
       label: "Actions",
-      render: (_, row) => (
+      // a payroll line is changed from Payroll (revert the run), never here —
+      // editing or deleting one staff's entry would drop them from the books
+      render: (_, row) => row.source === 'payroll-run' ? (
+        <span className="text-[10px] text-gray-400">From payroll</span>
+      ) : (
         <button
           onClick={(e) => {
             e.stopPropagation(); // Prevent opening the view modal
@@ -178,7 +184,7 @@ export default function SalaryReport() {
         columns={columns}
         filterConfig={{
           dateField: "dateForFilter",
-          searchFields: ["staffName", "createdBy.username", "notes"], // Added notes to search
+          searchFields: ["staffName", "staffNames", "createdBy.username", "notes"], // staffNames: who is inside a payroll line
         }}
         exportFunctions={{
           exportPDF: (data, branch, type, range, month, q) =>
@@ -194,7 +200,7 @@ export default function SalaryReport() {
           />
         )}
         searchBarShow
-        searchPlaceholder="Search creator or notes..."
+        searchPlaceholder="Search staff, creator or notes..."
       />
 
       {/* Edit Modal (Rendered only when editingItem is set) */}

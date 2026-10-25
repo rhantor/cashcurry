@@ -12,6 +12,13 @@ const branchLabel = (branchData) =>
 
 const toRM = (n) => Number(n || 0).toFixed(2);
 
+// a payroll run is one line; its staff are listed under it (utils/salaryRows.js)
+const typeOf = (e) => (e.source === "payroll-run" ? `Payroll (${e.staffCount} staff)` : e.source === "payroll" ? e.staffName || "Payroll" : "Manual");
+const staffLines = (list) =>
+  (list || [])
+    .filter((e) => e.source === "payroll-run")
+    .flatMap((e) => e.staff.map((s) => [e.month || "-", e.paymentDate || "-", s.staffName || s.staffId || "-", toRM(s.totalSalary ?? s.netPay)]));
+
 export function exportSalariesToPDF(list = [], branchData, meta = {}) {
   try {
     const doc = new jsPDF();
@@ -29,6 +36,7 @@ export function exportSalariesToPDF(list = [], branchData, meta = {}) {
 
     const rows = (list || []).map((e) => [
       e.month || "-",
+      typeOf(e),
       e.paymentDate || "-",
       toRM(e.totalSalary),
       e.createdBy?.username || "-",
@@ -36,7 +44,7 @@ export function exportSalariesToPDF(list = [], branchData, meta = {}) {
 
     autoTable(doc, {
       startY: 34,
-      head: [["Salary Period", "Payment Date", "Total (RM)", "Created By"]],
+      head: [["Salary Period", "Type", "Payment Date", "Total (RM)", "Created By"]],
       body: rows,
       styles: { fontSize: 9 },
     });
@@ -46,6 +54,16 @@ export function exportSalariesToPDF(list = [], branchData, meta = {}) {
       0
     );
     doc.text(`Total: RM ${toRM(total)}`, 14, doc.lastAutoTable.finalY + 8);
+
+    const staff = staffLines(list);
+    if (staff.length) {
+      autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 16,
+        head: [["Salary Period", "Payment Date", "Staff (payroll)", "Net (RM)"]],
+        body: staff,
+        styles: { fontSize: 8.5 },
+      });
+    }
 
     doc.save(`Salary_Report.pdf`);
   } catch (err) {
@@ -65,9 +83,10 @@ export function exportSalariesToExcel(list = [], branchData, meta = {}) {
           : "Filtered by Payment Date",
       ],
       [],
-      ["Salary Period", "Payment Date", "Total (RM)", "Created By"],
+      ["Salary Period", "Type", "Payment Date", "Total (RM)", "Created By"],
       ...(list || []).map((e) => [
         e.month || "-",
+        typeOf(e),
         e.paymentDate || "-",
         toRM(e.totalSalary),
         e.createdBy?.username || "-",
@@ -77,6 +96,10 @@ export function exportSalariesToExcel(list = [], branchData, meta = {}) {
     const ws = XLSX.utils.aoa_to_sheet(wsData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Salary Report");
+    const staff = staffLines(list);
+    if (staff.length) {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["Salary Period", "Payment Date", "Staff", "Net (RM)"], ...staff]), "Payroll staff");
+    }
     XLSX.writeFile(wb, "Salary_Report.xlsx");
   } catch (err) {
     console.error("Export failed:", err);
@@ -96,6 +119,7 @@ export function exportOneSalaryToPDF(item, branchData) {
 
     const rows = [
       ["Salary Period", item.month || "-"],
+      ["Type", typeOf(item)],
       ["Payment Date", item.paymentDate || "-"],
       ["Total (RM)", toRM(item.totalSalary)],
       ["Notes", item.notes || "-"],
@@ -109,6 +133,14 @@ export function exportOneSalaryToPDF(item, branchData) {
       styles: { fontSize: 10, cellPadding: 2 },
       columnStyles: { 0: { fontStyle: "bold" } },
     });
+    if (item.source === "payroll-run") {
+      autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 8,
+        head: [["Staff", "Net (RM)"]],
+        body: item.staff.map((s) => [s.staffName || s.staffId || "-", toRM(s.totalSalary ?? s.netPay)]),
+        styles: { fontSize: 9 },
+      });
+    }
 
     doc.save(`Salary_${item.month || "entry"}.pdf`);
   } catch (err) {
