@@ -299,6 +299,9 @@ service cloud.firestore {
     function canPurchasesApprove(c, b){ return may(c, b, leadRoles().concat(['inCharge'])); }
     function canPurchasesBills(c, b)  { return may(c, b, leadRoles().concat(['accountant'])); }
     function canBranchSettings(c, b)  { return may(c, b, leadRoles()); }
+    // reservation deposit receipts (lib/reservations/receipt.js)
+    function canReservationReceipt(c, b) { return may(c, b, officeBranchRoles()); }
+    function canReservationManage(c, b)  { return may(c, b, leadRoles().concat(['inCharge', 'accountant', 'supervisor'])); }
     function canMoneySettings(c, b) {
       let u = userData();
       return isAuth() && u.companyId == c && (
@@ -1069,7 +1072,27 @@ service cloud.firestore {
         // allowed to raise the underlying document must be able to draw a
         // number, so this mirrors the requisitions write rule.
         match /counters/{seriesId} {
-          allow read, write: if canPurchasesOrder(companyId, branchId);
+          allow read, write: if canPurchasesOrder(companyId, branchId) ||
+            (seriesId == 'reservationDeposits' && canReservationReceipt(companyId, branchId));
+        }
+
+        // ── Reservation deposit receipts (Tools → Reservation Receipt) ─────────
+        // Everyone at the branch makes a receipt when a customer pays a deposit;
+        // numbers come from counters/reservationDeposits. Receipts are never
+        // deleted — only their status changes (held / used / refunded /
+        // cancelled), by those who manage them or by whoever made it, and
+        // nothing else on the receipt. Not money in the books: no report reads it.
+        match /reservationDeposits/{docId} {
+          allow read: if canReservationReceipt(companyId, branchId);
+          allow create: if canReservationReceipt(companyId, branchId) &&
+                           request.resource.data.status == 'held' &&
+                           request.resource.data.createdBy.uid == request.auth.uid &&
+                           request.resource.data.amount is number && request.resource.data.amount > 0;
+          allow update: if (canReservationManage(companyId, branchId) ||
+                            (canReservationReceipt(companyId, branchId) && resource.data.createdBy.uid == request.auth.uid)) &&
+                           request.resource.data.status in ['held', 'used', 'refunded', 'cancelled'] &&
+                           changedKeys().hasOnly(['status', 'statusBy', 'statusAt', 'statusNote', 'updatedAt']);
+          allow delete: if false;
         }
 
         // ── POS: Order Guides ────────────────────────────────────────────────

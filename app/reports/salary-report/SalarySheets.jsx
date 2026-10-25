@@ -5,7 +5,8 @@ import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 import { useDeleteSalaryEntryMutation, useUpdateSalaryEntryMutation } from "@/lib/redux/api/salaryApiSlice";
 import { getSessionUser } from "@/lib/session";
-import { exportOneSalaryToExcel, exportOneSalaryToPDF, shareSalary } from "@/app/export/exportSalary";
+import { exportOneSalaryToExcel, exportOneSalaryToPDF, exportPayrollRunPDF, shareSalary } from "@/app/export/exportSalary";
+import { salaryStaffName } from "@/lib/payroll/salaryRows";
 import RecordSheet from "@/app/components/entry/RecordSheet";
 import MoneyInput from "@/app/components/entry/MoneyInput";
 import ProofUpload from "@/app/components/entry/ProofUpload";
@@ -23,8 +24,8 @@ const day = (v, f = "EEE, d MMM yyyy") => {
 export const fromPayroll = (s) => s?.source === "payroll";
 export const amountOf = (s) => Number(s.totalSalary ?? s.amount ?? s.netPay) || 0;
 
-/** One salary record as a slip; a payroll one shows its pay breakdown and is changed from Payroll. */
-export function SalaryRecord({ s, branch, money, canEdit, onClose, onEdit, onDelete }) {
+/** A payroll entry's earnings and deductions, as [label, amount] rows (only those above zero). */
+function payLines(s) {
   const payroll = fromPayroll(s);
   const pos = (v) => Number(v) > 0;
   const earn = payroll
@@ -46,6 +47,39 @@ export function SalaryRecord({ s, branch, money, canEdit, onClose, onEdit, onDel
         ["Other deductions", s.otherDeductions],
       ].filter(([, v]) => pos(v))
     : [];
+  return { earn, less };
+}
+
+/** One payroll entry's pay: earnings, deductions, net. */
+export function SalaryBreakdown({ s, money }) {
+  const { earn, less } = payLines(s);
+  if (!earn.length && !less.length) return null;
+  return (
+    <div className="mt-4 rounded-2xl border border-line p-3 text-sm">
+      {earn.map(([k, v]) => (
+        <p key={k} className="flex justify-between gap-3 py-0.5">
+          <span className="text-muted">{k}</span>
+          <span className="tabular-nums text-fg">{money(v)}</span>
+        </p>
+      ))}
+      {less.length > 0 && <div className="my-1.5 border-t border-dashed border-line" />}
+      {less.map(([k, v]) => (
+        <p key={k} className="flex justify-between gap-3 py-0.5">
+          <span className="text-muted">{k}</span>
+          <span className="tabular-nums text-danger">−{money(v)}</span>
+        </p>
+      ))}
+      <p className="mt-1.5 flex justify-between gap-3 border-t border-line pt-1.5 font-semibold">
+        <span className="text-fg">Net pay</span>
+        <span className="tabular-nums text-fg">{money(amountOf(s))}</span>
+      </p>
+    </div>
+  );
+}
+
+/** One salary record as a slip; a payroll one shows its pay breakdown and is changed from Payroll. */
+export function SalaryRecord({ s, branch, money, canEdit, onClose, onEdit, onDelete }) {
+  const payroll = fromPayroll(s);
   return (
     <RecordSheet
       onClose={onClose}
@@ -71,27 +105,58 @@ export function SalaryRecord({ s, branch, money, canEdit, onClose, onEdit, onDel
       onEdit={payroll || !canEdit ? undefined : onEdit}
       onDelete={payroll || !canEdit ? undefined : onDelete}
     >
-      {payroll && (earn.length > 0 || less.length > 0) && (
-        <div className="mt-4 rounded-2xl border border-line p-3 text-sm">
-          {earn.map(([k, v]) => (
-            <p key={k} className="flex justify-between gap-3 py-0.5">
-              <span className="text-muted">{k}</span>
-              <span className="tabular-nums text-fg">{money(v)}</span>
-            </p>
-          ))}
-          {less.length > 0 && <div className="my-1.5 border-t border-dashed border-line" />}
-          {less.map(([k, v]) => (
-            <p key={k} className="flex justify-between gap-3 py-0.5">
-              <span className="text-muted">{k}</span>
-              <span className="tabular-nums text-danger">−{money(v)}</span>
-            </p>
-          ))}
-          <p className="mt-1.5 flex justify-between gap-3 border-t border-line pt-1.5 font-semibold">
-            <span className="text-fg">Net pay</span>
-            <span className="tabular-nums text-fg">{money(amountOf(s))}</span>
-          </p>
-        </div>
-      )}
+      {payroll && <SalaryBreakdown s={s} money={money} />}
+    </RecordSheet>
+  );
+}
+
+/**
+ * A payroll run as one line of the report (lib/payroll/salaryRows.js): the
+ * month's total, every staff member paid in it — tap one for their pay — and
+ * the month's salary sheet as a PDF. Changed from Payroll, never here.
+ */
+export function SalaryRunRecord({ run, branch, money, onClose }) {
+  const [open, setOpen] = useState(null);
+  return (
+    <RecordSheet
+      onClose={onClose}
+      title={`Payroll · ${monthText(run.month)}`}
+      branch={branch?.name}
+      amount={run.totalSalary}
+      amountLabel={`Net pay · ${run.staffCount} staff`}
+      tone="out"
+      money={money}
+      note="From a payroll run — change it from Payroll."
+      rows={[
+        { label: "Salary month", value: monthText(run.month) },
+        { label: "Paid on", value: day(run.paymentDate) },
+        { label: "Staff", value: String(run.staffCount) },
+      ]}
+      files={null}
+      by={personName(run.createdBy)}
+      pdf={() => exportPayrollRunPDF(run, branch)}
+    >
+      <ul className="mt-4 divide-y divide-line overflow-hidden rounded-2xl border border-line">
+        {run.staff.map((x) => {
+          const key = x.id || x.staffId;
+          return (
+            <li key={key}>
+              <button type="button" onClick={() => setOpen(open === key ? null : key)} className="flex w-full items-center justify-between gap-3 px-3 py-2.5 text-left text-sm hover:bg-surface-2/60">
+                <span className="min-w-0">
+                  <span className="block truncate font-medium text-fg">{salaryStaffName(x)}</span>
+                  {x.designation && !salaryStaffName(x).endsWith(x.designation) && <span className="block truncate text-xs text-muted">{x.designation}</span>}
+                </span>
+                <span className="shrink-0 font-semibold tabular-nums text-fg">{money(amountOf(x))}</span>
+              </button>
+              {open === key && (
+                <div className="px-3 pb-3">
+                  <SalaryBreakdown s={x} money={money} />
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
     </RecordSheet>
   );
 }
