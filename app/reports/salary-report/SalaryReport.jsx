@@ -14,7 +14,9 @@ import {
 } from "@/utils/export/exportSalary";
 import { FaCalendarAlt, FaMoneyBillWave, FaEdit, FaFilePdf } from "react-icons/fa";
 import useCurrency from "@/app/hooks/useCurrency";
-import { salaryRows } from "@/utils/salaryRows";
+import { salaryRows, staffRecordName } from "@/utils/salaryRows";
+import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
+import { exportPayrollRunPDF } from "@/utils/export/exportSalary";
 import { getCurrentUser, hasRole, ALLOWED_EDIT_ROLES } from "@/lib/authz/roles";
 
 export default function SalaryReport() {
@@ -28,11 +30,14 @@ export default function SalaryReport() {
   const args = { ...baseArgs, dateField: dateMode === "salary" ? "month" : "paymentDate" };
 
   const { data: entries = [], isLoading, error: salaryError } = useGetSalaryEntriesQuery(args);
+  // names for payroll entries saved without one (looked up by staff id)
+  const { data: staffList = [] } = useGetStaffListQuery({ companyId, branchId }, { skip: !companyId || !branchId });
+  const staffNames = useMemo(() => new Map(staffList.map((s) => [s.id, staffRecordName(s)]).filter(([, name]) => name)), [staffList]);
 
   // Prepare data: a payroll run is one line (its staff inside), then
   // inject dateForFilter based on dateMode
   const prepared = useMemo(() => {
-    return salaryRows(entries || []).map((e) => {
+    return salaryRows(entries || [], { staffNames }).map((e) => {
       const salaryDateISO = e.month ? `${e.month}-01` : e.monthStart || "";
       const paymentISO = e.paymentDate || "";
       return {
@@ -40,7 +45,7 @@ export default function SalaryReport() {
         dateForFilter: dateMode === "salary" ? salaryDateISO : paymentISO,
       };
     });
-  }, [entries, dateMode]);
+  }, [entries, dateMode, staffNames]);
 
   if (salaryError) return <ReportErrorState error={salaryError} title="Failed to load salary data" />;
   if (!ready) return <p className="p-4">Preparing…</p>;
@@ -86,8 +91,19 @@ export default function SalaryReport() {
     {
       key: "pdfUrl",
       label: "Sheet",
-      render: (val) =>
-        val ? (
+      // a payroll month has no uploaded sheet: its sheet is made from the run's staff
+      render: (val, row) =>
+        row.source === "payroll-run" ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              exportPayrollRunPDF(row, branchData);
+            }}
+            className="flex items-center gap-1 text-xs font-semibold px-2 py-1 bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors border border-red-100"
+          >
+            <FaFilePdf /> PDF
+          </button>
+        ) : val ? (
           <button
             onClick={(e) => {
               e.stopPropagation();

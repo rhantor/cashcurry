@@ -107,10 +107,58 @@ export function exportSalariesToExcel(list = [], branchData, meta = {}) {
   }
 }
 
+/**
+ * A payroll month as a salary sheet: one row per staff member — designation,
+ * earnings, deductions, net — and the totals. Made from the paid run's entries
+ * (row.staff from utils/salaryRows.js), so a payroll month has a sheet like a
+ * month entered by hand with its PDF.
+ */
+export function exportPayrollRunPDF(row, branchData) {
+  try {
+    if (!row?.staff?.length) return;
+    const doc = new jsPDF({ orientation: "landscape" });
+    doc.setFontSize(14);
+    doc.text(`Salary Sheet - ${row.month || ""}`, 14, 16);
+    doc.setFontSize(10);
+    doc.text(`Branch: ${branchLabel(branchData)}`, 14, 22);
+    doc.text(`Paid: ${row.paymentDate || "-"} (payroll, ${row.staffCount} staff)`, 14, 28);
+
+    const num = (v) => Number(v || 0);
+    const earn = (s) => num(s.allowance) + num(s.otPay) + num(s.phPay) + num(s.bonus) + num(s.otherEarnings);
+    const ded = (s) => num(s.totalStatutoryEmployee) + num(s.advanceAmt) + num(s.loanAmt) + num(s.penalty) + num(s.otherDeductions) + num(s.absentAmount);
+    const body = row.staff.map((s, i) => [
+      i + 1,
+      s.staffName || "-",
+      s.designation || "-",
+      toRM(s.basePay ?? s.basicSalary),
+      toRM(earn(s)),
+      toRM(s.grossEarnings),
+      toRM(s.totalDeductions ?? ded(s)),
+      toRM(s.totalSalary ?? s.netPay),
+    ]);
+    const sum = (f) => row.staff.reduce((t, s) => t + num(f(s)), 0);
+    autoTable(doc, {
+      startY: 34,
+      head: [["#", "Staff", "Designation", "Basic (RM)", "OT / allowance / bonus (RM)", "Gross (RM)", "Deductions (RM)", "Net (RM)"]],
+      body,
+      foot: [["", "Total", "", toRM(sum((s) => s.basePay ?? s.basicSalary)), toRM(sum(earn)), toRM(sum((s) => s.grossEarnings)), toRM(sum((s) => s.totalDeductions ?? ded(s))), toRM(row.totalSalary)]],
+      styles: { fontSize: 8.5 },
+      footStyles: { fillColor: [241, 245, 249], textColor: 20, fontStyle: "bold" },
+      columnStyles: { 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" }, 6: { halign: "right" }, 7: { halign: "right" } },
+    });
+    doc.save(`Salary_Sheet_${row.month || "payroll"}.pdf`);
+  } catch (err) {
+    console.error("Export failed:", err);
+    alert("Failed to export. Please try again.");
+  }
+}
+
 // Single item exports
 export function exportOneSalaryToPDF(item, branchData) {
   try {
     if (!item) return;
+    // a payroll month: its full salary sheet
+    if (item.source === "payroll-run") return exportPayrollRunPDF(item, branchData);
     const doc = new jsPDF();
     doc.setFontSize(14);
     doc.text("Salary Entry", 14, 16);
@@ -133,14 +181,6 @@ export function exportOneSalaryToPDF(item, branchData) {
       styles: { fontSize: 10, cellPadding: 2 },
       columnStyles: { 0: { fontStyle: "bold" } },
     });
-    if (item.source === "payroll-run") {
-      autoTable(doc, {
-        startY: doc.lastAutoTable.finalY + 8,
-        head: [["Staff", "Net (RM)"]],
-        body: item.staff.map((s) => [s.staffName || s.staffId || "-", toRM(s.totalSalary ?? s.netPay)]),
-        styles: { fontSize: 9 },
-      });
-    }
 
     doc.save(`Salary_${item.month || "entry"}.pdf`);
   } catch (err) {
