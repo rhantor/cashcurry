@@ -14,6 +14,9 @@ import {
 } from "@/utils/export/exportSalary";
 import { FaCalendarAlt, FaMoneyBillWave, FaEdit, FaFilePdf } from "react-icons/fa";
 import useCurrency from "@/app/hooks/useCurrency";
+import { salaryRows, staffRecordName } from "@/utils/salaryRows";
+import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
+import { exportPayrollRunPDF } from "@/utils/export/exportSalary";
 import { getCurrentUser, hasRole, ALLOWED_EDIT_ROLES } from "@/lib/authz/roles";
 
 export default function SalaryReport() {
@@ -27,10 +30,14 @@ export default function SalaryReport() {
   const args = { ...baseArgs, dateField: dateMode === "salary" ? "month" : "paymentDate" };
 
   const { data: entries = [], isLoading, error: salaryError } = useGetSalaryEntriesQuery(args);
+  // names for payroll entries saved without one (looked up by staff id)
+  const { data: staffList = [] } = useGetStaffListQuery({ companyId, branchId }, { skip: !companyId || !branchId });
+  const staffNames = useMemo(() => new Map(staffList.map((s) => [s.id, staffRecordName(s)]).filter(([, name]) => name)), [staffList]);
 
-  // Prepare data: inject dateForFilter based on dateMode
+  // Prepare data: a payroll run is one line (its staff inside), then
+  // inject dateForFilter based on dateMode
   const prepared = useMemo(() => {
-    return (entries || []).map((e) => {
+    return salaryRows(entries || [], { staffNames }).map((e) => {
       const salaryDateISO = e.month ? `${e.month}-01` : e.monthStart || "";
       const paymentISO = e.paymentDate || "";
       return {
@@ -38,7 +45,7 @@ export default function SalaryReport() {
         dateForFilter: dateMode === "salary" ? salaryDateISO : paymentISO,
       };
     });
-  }, [entries, dateMode]);
+  }, [entries, dateMode, staffNames]);
 
   if (salaryError) return <ReportErrorState error={salaryError} title="Failed to load salary data" />;
   if (!ready) return <p className="p-4">Preparing…</p>;
@@ -52,7 +59,7 @@ export default function SalaryReport() {
         <div className="flex flex-col">
           <span className="font-medium text-gray-800">{val || "Branch Total"}</span>
           <span className="text-[10px] text-gray-400 uppercase tracking-tight">
-            {row.source === 'payroll' ? 'Individual' : 'Manual Entry'}
+            {row.source === 'payroll-run' ? 'Payroll — tap for each staff' : row.source === 'payroll' ? 'Individual' : 'Manual Entry'}
           </span>
         </div>
       ),
@@ -84,8 +91,19 @@ export default function SalaryReport() {
     {
       key: "pdfUrl",
       label: "Sheet",
-      render: (val) =>
-        val ? (
+      // a payroll month has no uploaded sheet: its sheet is made from the run's staff
+      render: (val, row) =>
+        row.source === "payroll-run" ? (
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              exportPayrollRunPDF(row, branchData);
+            }}
+            className="flex items-center gap-1 text-xs font-semibold px-2 py-1 bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors border border-red-100"
+          >
+            <FaFilePdf /> PDF
+          </button>
+        ) : val ? (
           <button
             onClick={(e) => {
               e.stopPropagation();
@@ -115,7 +133,11 @@ export default function SalaryReport() {
     columns.push({
       key: "actions",
       label: "Actions",
-      render: (_, row) => (
+      // a payroll line is changed from Payroll (revert the run), never here —
+      // editing or deleting one staff's entry would drop them from the books
+      render: (_, row) => row.source === 'payroll-run' ? (
+        <span className="text-[10px] text-gray-400">From payroll</span>
+      ) : (
         <button
           onClick={(e) => {
             e.stopPropagation(); // Prevent opening the view modal
@@ -178,7 +200,7 @@ export default function SalaryReport() {
         columns={columns}
         filterConfig={{
           dateField: "dateForFilter",
-          searchFields: ["staffName", "createdBy.username", "notes"], // Added notes to search
+          searchFields: ["staffName", "staffNames", "createdBy.username", "notes"], // staffNames: who is inside a payroll line
         }}
         exportFunctions={{
           exportPDF: (data, branch, type, range, month, q) =>
@@ -194,7 +216,7 @@ export default function SalaryReport() {
           />
         )}
         searchBarShow
-        searchPlaceholder="Search creator or notes..."
+        searchPlaceholder="Search staff, creator or notes..."
       />
 
       {/* Edit Modal (Rendered only when editingItem is set) */}

@@ -9,10 +9,13 @@ import {
   shareSalary,
 } from "@/utils/export/exportSalary";
 import useCurrency from "@/app/hooks/useCurrency";
+import { salaryStaffName } from "@/utils/salaryRows";
 
 export default function SalaryReportModal({ item, branchData, onClose }) {
   const currency = useCurrency();
+  const [openStaff, setOpenStaff] = React.useState(null);
   if (!item) return null;
+  const isRun = item.source === "payroll-run";
 
   const branchName = Array.isArray(branchData)
     ? branchData.map((b) => b.name).join(", ")
@@ -24,7 +27,7 @@ export default function SalaryReportModal({ item, branchData, onClose }) {
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-lg shadow-lg p-6 w-full max-w-md max-h-[90vh] overflow-y-auto"
+        className={`bg-white rounded-lg shadow-lg p-6 w-full ${isRun ? "max-w-lg" : "max-w-md"} max-h-[90vh] overflow-y-auto`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -61,8 +64,95 @@ export default function SalaryReportModal({ item, branchData, onClose }) {
             </div>
           )}
 
-          {/* Payroll Breakdown (only for payroll source) */}
-          {item.source === 'payroll' && (
+          {/* A payroll run: every staff member paid in it; tap one for their breakdown */}
+          {isRun && (
+            <div className="mt-4 pt-4 border-t border-dashed space-y-2">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">
+                Paid through payroll · {item.staffCount} staff
+              </p>
+              <ul className="divide-y divide-gray-100 rounded-lg border border-gray-100">
+                {item.staff.map((s) => {
+                  const key = s.id || s.staffId;
+                  return (
+                    <li key={key}>
+                      <button
+                        type="button"
+                        onClick={() => setOpenStaff(openStaff === key ? null : key)}
+                        className="w-full flex justify-between items-center gap-3 px-3 py-2 text-left hover:bg-gray-50"
+                      >
+                        <span className="truncate">{salaryStaffName(s)}</span>
+                        <span className="font-semibold tabular-nums shrink-0">{Number(s.totalSalary ?? s.netPay ?? 0).toFixed(2)}</span>
+                      </button>
+                      {openStaff === key && (
+                        <div className="px-3 pb-3">
+                          <PayrollBreakdown item={s} currency={currency} />
+                        </div>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+
+          {/* Payroll Breakdown (one staff member's payroll entry) */}
+          {item.source === 'payroll' && <PayrollBreakdown item={item} currency={currency} />}
+
+          <div className="flex justify-between border-t pt-2 mt-2 text-gray-600 text-sm">
+            <span>Added By</span>
+            <span>{item.createdBy?.username || "Unknown"}</span>
+          </div>
+
+          {/* PDF link */}
+          {item.pdfUrl && (
+            <div className="mt-3">
+              <a
+                href={item.pdfUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-block px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm"
+              >
+                Open Salary Sheet (PDF)
+              </a>
+            </div>
+          )}
+        </div>
+
+        {/* Footer Buttons */}
+        <div className="flex flex-wrap justify-end gap-2 sm:gap-3 mt-6 text-xs">
+          <button
+            onClick={onClose}
+            className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700"
+          >
+            Close
+          </button>
+          <button
+            onClick={() => exportOneSalaryToPDF(item, branchData)}
+            className="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white"
+          >
+            Export PDF
+          </button>
+          <button
+            onClick={() => exportOneSalaryToExcel(item, branchData)}
+            className="px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white"
+          >
+            Export Excel
+          </button>
+          <button
+            onClick={() => shareSalary(item, branchData)}
+            className="px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white"
+          >
+            Share
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** One staff member's payroll pay: earnings, deductions, net. */
+function PayrollBreakdown({ item, currency }) {
+  return (
             <div className="mt-4 pt-4 border-t border-dashed space-y-3">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Breakdown</p>
               
@@ -141,56 +231,5 @@ export default function SalaryReportModal({ item, branchData, onClose }) {
                 <span>{currency} {Number(item.netPay || item.totalSalary).toFixed(2)}</span>
               </div>
             </div>
-          )}
-
-          <div className="flex justify-between border-t pt-2 mt-2 text-gray-600 text-sm">
-            <span>Added By</span>
-            <span>{item.createdBy?.username || "Unknown"}</span>
-          </div>
-
-          {/* PDF link */}
-          {item.pdfUrl && (
-            <div className="mt-3">
-              <a
-                href={item.pdfUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-block px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg text-sm"
-              >
-                Open Salary Sheet (PDF)
-              </a>
-            </div>
-          )}
-        </div>
-
-        {/* Footer Buttons */}
-        <div className="flex flex-wrap justify-end gap-2 sm:gap-3 mt-6 text-xs">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 rounded-lg bg-gray-200 hover:bg-gray-300 text-gray-700"
-          >
-            Close
-          </button>
-          <button
-            onClick={() => exportOneSalaryToPDF(item, branchData)}
-            className="px-4 py-2 rounded-lg bg-red-500 hover:bg-red-600 text-white"
-          >
-            Export PDF
-          </button>
-          <button
-            onClick={() => exportOneSalaryToExcel(item, branchData)}
-            className="px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-600 text-white"
-          >
-            Export Excel
-          </button>
-          <button
-            onClick={() => shareSalary(item, branchData)}
-            className="px-4 py-2 rounded-lg bg-green-500 hover:bg-green-600 text-white"
-          >
-            Share
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }
