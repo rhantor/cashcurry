@@ -823,6 +823,34 @@ export default function PayrollBuilder () {
     }
   }
 
+  // A paid run reopened to correct it (25 Oct 2026): says why, keeps what was paid
+  async function handleReopen () {
+    if (!runId) return
+    const reason = window.prompt('Reopen this PAID payroll to correct it?\n\nIt goes back to draft: change the slips, finalize, then Mark as Paid again (the same payment day is filled in). Until then the reports keep the old amounts.\n\nWhy is it reopened?')
+    if (reason == null) return
+    if (!reason.trim()) { flash('error', 'Write why it is reopened.'); return }
+    setBusy(true); setError('')
+    try {
+      await revert({ companyId, branchId, runId, user: currentUser, reason }).unwrap()
+      flash('ok', 'Reopened as draft. Correct it, finalize, then mark it paid again.')
+    } catch (e) {
+      flash('error', e.message || 'Failed to reopen')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // Mark as Paid: a reopened run starts from what was paid before
+  function openPaidModal () {
+    const r = existingRun?.reopened
+    if (r) {
+      const at = r.paidAt?.seconds ? new Date(r.paidAt.seconds * 1000) : r.paidAt ? new Date(r.paidAt) : null
+      const day = at && !isNaN(at) ? `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}` : ''
+      setPaidForm({ method: r.paymentMethod || '', reference: r.paymentReference || '', paidAt: day })
+    }
+    setShowPaidModal(true)
+  }
+
   async function handleMarkPaid () {
     if (!runId) return
     setBusy(true); setError('')
@@ -965,6 +993,12 @@ export default function PayrollBuilder () {
         {success && <div className='bg-green-50 border border-green-200 text-green-700 text-sm rounded-xl px-4 py-3'>{success}</div>}
 
         {/* Action buttons */}
+        {existingRun?.reopened && existingRun?.status !== 'paid' && (
+          <div className='mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900'>
+            <b>Reopened to correct</b> by {existingRun.reopened.by?.name || existingRun.reopened.by?.username || 'someone'}: “{existingRun.reopened.reason}”.
+            {' '}It was paid before — finalize, then <b>Mark as Paid</b> again (the same payment day is filled in). Until then the reports keep the old amounts.
+          </div>
+        )}
         <div className='flex flex-wrap gap-2'>
           {staffList.length > 0 && (
             <>
@@ -1019,7 +1053,7 @@ export default function PayrollBuilder () {
           {runId && existingRun?.status === 'finalized' && (
             <>
               <button
-                onClick={() => setShowPaidModal(true)}
+                onClick={openPaidModal}
                 disabled={busy}
                 className='px-5 py-2.5 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold disabled:opacity-50 transition-colors'
               >
@@ -1034,7 +1068,16 @@ export default function PayrollBuilder () {
               </button>
             </>
           )}
-          {runId && existingRun?.status === 'draft' && (
+          {runId && existingRun?.status === 'paid' && isAdminOrManager && (
+            <button
+              onClick={handleReopen}
+              disabled={busy}
+              className='px-5 py-2.5 rounded-xl border border-amber-300 text-amber-700 text-sm font-semibold hover:bg-amber-50 disabled:opacity-50 transition-colors'
+            >
+              Reopen to correct
+            </button>
+          )}
+          {runId && existingRun?.status === 'draft' && !existingRun?.reopened && (
             <button
               onClick={handleDelete}
               disabled={busy}
