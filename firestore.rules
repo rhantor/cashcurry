@@ -83,6 +83,19 @@ service cloud.firestore {
       );
     }
 
+    // Managers are given a restricted slice of /branch-settings by the UI
+    // (see app/components/settings/rolePolicy.js: contact details, tender
+    // labels/order, reporting defaults, notes). They are routed there by
+    // middleware.js too, so they need write access to the settings DOCUMENT —
+    // but not to branch metadata, which stays with canManageSettings.
+    // Field-level enforcement is UI-only; see SECURITY notes.
+    function canWriteBranchSettings(companyId, branchId) {
+      let u = userData();
+      return canManageSettings(companyId, branchId) ||
+        (isAuth() && u.companyId == companyId &&
+         u.role == 'manager' && u.branchId == branchId);
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Public Collections (no auth required)
     // ─────────────────────────────────────────────────────────────────────────
@@ -240,7 +253,7 @@ service cloud.firestore {
         // ── Branch Settings ─────────────────────────────────────────────────
         match /settings/{docId} {   // Fixed typo from branchSettings to settings!
           allow read: if canRead(companyId, branchId);
-          allow write: if canManageSettings(companyId, branchId);
+          allow write: if canWriteBranchSettings(companyId, branchId);
         }
 
         // ── Branch Admins ─────────────────────────────────────────────────────
