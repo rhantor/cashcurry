@@ -14,6 +14,13 @@ const branchLabel = (branchData) =>
 
 const toRM = (n) => Number(n || 0).toFixed(2);
 
+// a payroll run is one line; its staff are listed under it (lib/payroll/salaryRows.js)
+const typeOf = (e) => (e.source === "payroll-run" ? `Payroll (${e.staffCount} staff)` : e.source === "payroll" ? e.staffName || "Payroll" : "Manual");
+const staffLines = (list) =>
+  (list || [])
+    .filter((e) => e.source === "payroll-run")
+    .flatMap((e) => e.staff.map((s) => [e.month || "-", e.paymentDate || "-", s.staffName || s.staffId || "-", toRM(s.totalSalary ?? s.netPay)]));
+
 export function exportSalariesToPDF(list = [], branchData, meta = {}) {
   try {
     const doc = new jsPDF();
@@ -31,6 +38,7 @@ export function exportSalariesToPDF(list = [], branchData, meta = {}) {
 
     const rows = (list || []).map((e) => [
       e.month || "-",
+      typeOf(e),
       e.paymentDate || "-",
       toRM(e.totalSalary),
       personName(e.createdBy) || "-",
@@ -38,7 +46,7 @@ export function exportSalariesToPDF(list = [], branchData, meta = {}) {
 
     autoTable(doc, {
       startY: 34,
-      head: [["Salary Period", "Payment Date", "Total (RM)", "Created By"]],
+      head: [["Salary Period", "Type", "Payment Date", "Total (RM)", "Created By"]],
       body: rows,
       styles: { fontSize: 9 },
     });
@@ -48,6 +56,16 @@ export function exportSalariesToPDF(list = [], branchData, meta = {}) {
       0
     );
     doc.text(`Total: RM ${toRM(total)}`, 14, doc.lastAutoTable.finalY + 8);
+
+    const staff = staffLines(list);
+    if (staff.length) {
+      autoTable(doc, {
+        startY: doc.lastAutoTable.finalY + 16,
+        head: [["Salary Period", "Payment Date", "Staff (payroll)", "Net (RM)"]],
+        body: staff,
+        styles: { fontSize: 8.5 },
+      });
+    }
 
     doc.save(`Salary_Report.pdf`);
   } catch (err) {
@@ -67,9 +85,10 @@ export function exportSalariesToExcel(list = [], branchData, meta = {}) {
           : "Filtered by Payment Date",
       ],
       [],
-      ["Salary Period", "Payment Date", "Total (RM)", "Created By"],
+      ["Salary Period", "Type", "Payment Date", "Total (RM)", "Created By"],
       ...(list || []).map((e) => [
         e.month || "-",
+        typeOf(e),
         e.paymentDate || "-",
         toRM(e.totalSalary),
         personName(e.createdBy) || "-",
@@ -79,7 +98,57 @@ export function exportSalariesToExcel(list = [], branchData, meta = {}) {
     const ws = XLSX.utils.aoa_to_sheet(wsData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Salary Report");
+    const staff = staffLines(list);
+    if (staff.length) {
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([["Salary Period", "Payment Date", "Staff", "Net (RM)"], ...staff]), "Payroll staff");
+    }
     XLSX.writeFile(wb, "Salary_Report.xlsx");
+  } catch (err) {
+    console.error("Export failed:", err);
+    toast.error("Failed to export. Please try again.");
+  }
+}
+
+/**
+ * A payroll month as a salary sheet: one row per staff member — designation,
+ * earnings, deductions, net — and the totals. Made from the paid run's entries
+ * (row.staff from lib/payroll/salaryRows.js), so a payroll month has a sheet
+ * like a month entered by hand with its PDF.
+ */
+export function exportPayrollRunPDF(row, branchData) {
+  try {
+    if (!row?.staff?.length) return;
+    const doc = new jsPDF({ orientation: "landscape" });
+    doc.setFontSize(14);
+    doc.text(`Salary Sheet - ${row.month || ""}`, 14, 16);
+    doc.setFontSize(10);
+    doc.text(`Branch: ${branchLabel(branchData)}`, 14, 22);
+    doc.text(`Paid: ${row.paymentDate || "-"} (payroll, ${row.staffCount} staff)`, 14, 28);
+
+    const num = (v) => Number(v || 0);
+    const earn = (s) => num(s.allowance) + num(s.otPay) + num(s.phPay) + num(s.bonus) + num(s.otherEarnings);
+    const ded = (s) => num(s.totalStatutoryEmployee) + num(s.advanceAmt) + num(s.loanAmt) + num(s.penalty) + num(s.otherDeductions) + num(s.absentAmount);
+    const body = row.staff.map((s, i) => [
+      i + 1,
+      s.staffName || "-",
+      s.designation || "-",
+      toRM(s.basePay ?? s.basicSalary),
+      toRM(earn(s)),
+      toRM(s.grossEarnings),
+      toRM(s.totalDeductions ?? ded(s)),
+      toRM(s.totalSalary ?? s.netPay),
+    ]);
+    const sum = (f) => row.staff.reduce((t, s) => t + num(f(s)), 0);
+    autoTable(doc, {
+      startY: 34,
+      head: [["#", "Staff", "Designation", "Basic (RM)", "OT / allowance / bonus (RM)", "Gross (RM)", "Deductions (RM)", "Net (RM)"]],
+      body,
+      foot: [["", "Total", "", toRM(sum((s) => s.basePay ?? s.basicSalary)), toRM(sum(earn)), toRM(sum((s) => s.grossEarnings)), toRM(sum((s) => s.totalDeductions ?? ded(s))), toRM(row.totalSalary)]],
+      styles: { fontSize: 8.5 },
+      footStyles: { fillColor: [241, 245, 249], textColor: 20, fontStyle: "bold" },
+      columnStyles: { 3: { halign: "right" }, 4: { halign: "right" }, 5: { halign: "right" }, 6: { halign: "right" }, 7: { halign: "right" } },
+    });
+    doc.save(`Salary_Sheet_${row.month || "payroll"}.pdf`);
   } catch (err) {
     console.error("Export failed:", err);
     toast.error("Failed to export. Please try again.");
@@ -90,6 +159,8 @@ export function exportSalariesToExcel(list = [], branchData, meta = {}) {
 export function exportOneSalaryToPDF(item, branchData) {
   try {
     if (!item) return;
+    // a payroll month: its full salary sheet
+    if (item.source === "payroll-run") return exportPayrollRunPDF(item, branchData);
     const doc = new jsPDF();
     doc.setFontSize(14);
     doc.text("Salary Entry", 14, 16);
