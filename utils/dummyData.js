@@ -188,6 +188,7 @@ export const sidebarItems = {
         'branchAdmin'
       ],
       children: [
+        { label: 'Reservation Receipt', path: '/tools/reservation-receipt' },
         { label: 'Invoice Generator', path: '/tools/invoice-generator' },
         { label: 'Appointment Letter', path: '/tools/appointment-letter' }
       ]
@@ -332,6 +333,7 @@ export const sidebarItems = {
       icon: 'MdAppRegistration',
       allowedRoles: ['gm', 'superAdmin', 'owner'],
       children: [
+        { label: 'Reservation Receipt', path: '/tools/reservation-receipt' },
         { label: 'Invoice Generator', path: '/tools/invoice-generator' },
         { label: 'Appointment Letter', path: '/tools/appointment-letter' }
       ]

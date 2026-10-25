@@ -371,6 +371,27 @@ service cloud.firestore {
                           (isAuth() && userData().companyId == companyId && userData().branchId == branchId);
         }
 
+        // ── Reservation deposit receipts (Tools → Reservation Receipt) ─────────
+        // Anyone working at the branch (not staff-app users) makes a receipt
+        // when a customer pays a deposit; numbers come from counters/
+        // reservationDeposits. Receipts are never deleted — only their status
+        // changes (held / used / refunded / cancelled), by a manager or by
+        // whoever made it, and nothing else on the receipt.
+        match /reservationDeposits/{docId} {
+          allow read: if canRead(companyId, branchId);
+          allow create: if (canWrite(companyId, branchId) ||
+                            (isAuth() && userData().companyId == companyId && userData().branchId == branchId && userData().role != 'staff')) &&
+                           request.resource.data.status == 'held' &&
+                           request.resource.data.createdBy.uid == request.auth.uid &&
+                           request.resource.data.amount is number && request.resource.data.amount > 0;
+          allow update: if (canWrite(companyId, branchId) ||
+                            (isAuth() && userData().companyId == companyId && userData().branchId == branchId &&
+                             resource.data.createdBy.uid == request.auth.uid)) &&
+                           request.resource.data.status in ['held', 'used', 'refunded', 'cancelled'] &&
+                           request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'statusBy', 'statusAt', 'statusNote', 'updatedAt']);
+          allow delete: if false;
+        }
+
         // ── POS: Order Guides ────────────────────────────────────────────────
         match /orderGuides/{docId} {
           allow read: if canRead(companyId, branchId);
