@@ -44,6 +44,29 @@ function getStaffName (s) {
   return s.name || s.staffName || ''
 }
 
+// The inputs a saved slip (or a paid salary entry, which carries the slip) was made from
+function inputsFromSlip (slip) {
+  return {
+    workedHours:          String(slip.workedHours      ?? ''),
+    workedDays:           String(slip.workedDays       ?? ''),
+    otHours:              String(slip.otHours          ?? ''),
+    phHours:              String(slip.phHours          ?? ''),
+    phDays:               String(slip.phDays           ?? ''),
+    allowanceOverride:    String(slip.allowanceOverride ?? ''),
+    bonus:                String(slip.bonus            ?? ''),
+    bonusNote:            slip.bonusNote               || '',
+    otherEarnings:        String(slip.otherEarnings    ?? ''),
+    otherEarningsNote:    slip.otherEarningsNote       || '',
+    penalty:              String(slip.penalty          ?? ''),
+    penaltyNote:          slip.penaltyNote             || '',
+    otherDeductions:      String(slip.otherDeductions  ?? ''),
+    otherDeductionsNote:  slip.otherDeductionsNote     || '',
+    loanOverride:         slip.loanOverride != null ? String(slip.loanOverride) : '',
+    loanNote:             slip.loanNote               || '',
+    extraNote:            slip.extraNote              || '',
+  }
+}
+
 function buildDefaultInputs () {
   return {
     workedHours: '',  workedDays: '',
@@ -509,6 +532,10 @@ export default function PayrollBuilder () {
       if (!on && inBase) removed.push(id)
       return { added, removed }
     })
+    // staff paid this month put back after their slip was saved away: start
+    // from what they were paid (hours, OT, bonus…), not from blank
+    const paid = on && !savedSlips.some(s => s.staffId === id) && paidEntries.find(e => e.staffId === id)
+    if (paid) setSlipInputs(prev => ({ ...prev, [id]: inputsFromSlip(paid) }))
   }
 
   // Reset inputs when period changes so stale inputs from previous period don't carry over
@@ -528,25 +555,7 @@ export default function PayrollBuilder () {
     if (inputsRestoredFor === runId) return   // already restored for this run
     const restored = {}
     for (const slip of savedSlips) {
-      restored[slip.staffId] = {
-        workedHours:          String(slip.workedHours      ?? ''),
-        workedDays:           String(slip.workedDays       ?? ''),
-        otHours:              String(slip.otHours          ?? ''),
-        phHours:              String(slip.phHours          ?? ''),
-        phDays:               String(slip.phDays           ?? ''),
-        allowanceOverride:    String(slip.allowanceOverride ?? ''),
-        bonus:                String(slip.bonus            ?? ''),
-        bonusNote:            slip.bonusNote               || '',
-        otherEarnings:        String(slip.otherEarnings    ?? ''),
-        otherEarningsNote:    slip.otherEarningsNote       || '',
-        penalty:              String(slip.penalty          ?? ''),
-        penaltyNote:          slip.penaltyNote             || '',
-        otherDeductions:      String(slip.otherDeductions  ?? ''),
-        otherDeductionsNote:  slip.otherDeductionsNote     || '',
-        loanOverride:         slip.loanOverride != null ? String(slip.loanOverride) : '',
-        loanNote:             slip.loanNote               || '',
-        extraNote:            slip.extraNote              || '',
-      }
+      restored[slip.staffId] = inputsFromSlip(slip)
     }
     setSlipInputs(restored)
     setInputsRestoredFor(runId)
