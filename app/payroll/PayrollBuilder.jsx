@@ -11,6 +11,7 @@ import { useGetStaffLoansQuery } from '@/lib/redux/api/staffLoanApiSlice'
 import {
   useGetPayrollRunsQuery,
   useGetPayrollSlipsQuery,
+  useGetRunPaidEntriesQuery,
   useCreatePayrollDraftMutation,
   useSaveDraftSlipsMutation,
   useFinalizePayrollRunMutation,
@@ -41,6 +42,29 @@ function getStaffName (s) {
   if (!s) return ''
   if (s.firstName || s.lastName) return `${s.firstName || ''} ${s.lastName || ''}`.trim()
   return s.name || s.staffName || ''
+}
+
+// The inputs a saved slip (or a paid salary entry, which carries the slip) was made from
+function inputsFromSlip (slip) {
+  return {
+    workedHours:          String(slip.workedHours      ?? ''),
+    workedDays:           String(slip.workedDays       ?? ''),
+    otHours:              String(slip.otHours          ?? ''),
+    phHours:              String(slip.phHours          ?? ''),
+    phDays:               String(slip.phDays           ?? ''),
+    allowanceOverride:    String(slip.allowanceOverride ?? ''),
+    bonus:                String(slip.bonus            ?? ''),
+    bonusNote:            slip.bonusNote               || '',
+    otherEarnings:        String(slip.otherEarnings    ?? ''),
+    otherEarningsNote:    slip.otherEarningsNote       || '',
+    penalty:              String(slip.penalty          ?? ''),
+    penaltyNote:          slip.penaltyNote             || '',
+    otherDeductions:      String(slip.otherDeductions  ?? ''),
+    otherDeductionsNote:  slip.otherDeductionsNote     || '',
+    loanOverride:         slip.loanOverride != null ? String(slip.loanOverride) : '',
+    loanNote:             slip.loanNote               || '',
+    extraNote:            slip.extraNote              || '',
+  }
 }
 
 function buildDefaultInputs () {
@@ -99,6 +123,7 @@ function StaffSlipCard ({
   loanDed,
   locked,
   onPrint,
+  onRemove,
 }) {
   const mode = staff.salaryMode || payrollConfig?.defaultPayMode || 'hours'
   const stdHours = parseFloat(staff.standardHours) || parseFloat(payrollConfig?.standardHoursPerMonth) || 208
@@ -153,7 +178,14 @@ function StaffSlipCard ({
       {/* Staff header */}
       <div className='flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100'>
         <div>
-          <p className='text-sm font-semibold text-gray-800'>{getStaffName(staff)}</p>
+          <p className='text-sm font-semibold text-gray-800'>
+            {getStaffName(staff)}
+            {staff.notOnStaffList && <span className='ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-gray-100 text-gray-500'>not on staff list now</span>}
+            {staff.addedToSheet && <span className='ml-2 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-sky-100 text-sky-700'>added to this sheet</span>}
+            {onRemove && !locked && (
+              <button type='button' onClick={onRemove} className='ml-2 text-[11px] font-semibold text-red-600 hover:underline'>Remove from sheet</button>
+            )}
+          </p>
           <p className='text-xs text-gray-400 capitalize mt-0.5'>
             {staff.role || 'staff'} · {mode} mode · Basic {fmtAmt(staffConfig.basicSalary)}
           </p>
@@ -409,6 +441,103 @@ export default function PayrollBuilder () {
     companyId && branchId && runId ? { companyId, branchId, runId } : skipToken
   )
 
+  // ── A month that was paid before (27 Oct 2026) ─────────────────────────────
+  // Reopened to correct it, it is shown as it was paid: the staff paid that
+  // month and their salary terms then (basic, mode, hours/days, allowance,
+  // OT rate, EPF/SOCSO rates), from its salary entries — not today's staff
+  // list, so staff who joined later aren't added, changed salaries aren't
+  // applied backwards, and staff no longer on the list are still there.
+  const wasPaid = !!(existingRun?.reopened || existingRun?.reopenHistory?.length || existingRun?.status === 'paid')
+  const paidQuery = useGetRunPaidEntriesQuery(
+    companyId && branchId && runId && wasPaid ? { companyId, branchId, runId } : skipToken
+  )
+  const paidEntries = paidQuery.data || []
+  const paidReady = paidQuery.isSuccess && !paidQuery.isFetching
+  // until a paid month's entries are in, show nobody and save nothing — never today's list in its place
+  const pastPending = wasPaid && !paidReady
+  const pastMonth = wasPaid && paidReady && paidEntries.length > 0
+  const noPaidRecord = wasPaid && paidReady && paidEntries.length === 0
+
+  // ── Who is on this sheet (28 Oct 2026) ─────────────────────────────────────
+  // Everyone on the staff list — or, for a month paid before, the staff paid
+  // then — unless the manager takes them off; others can be added. Kept on
+  // the run (sheetRemoved / sheetAdded) when the draft is saved.
+  const [sheet, setSheet] = useState({ added: [], removed: [] })
+  const sheetKey = `${period}|${runId || ''}`
+  const [sheetFor, setSheetFor] = useState(null)
+  if (sheetFor !== sheetKey) {
+    setSheetFor(sheetKey)
+    setSheet({ added: existingRun?.sheetAdded || [], removed: existingRun?.sheetRemoved || [] })
+  }
+  const statutoryConfig = branchSettings?.payroll?.statutoryDeductions
+  const baseList = useMemo(() => {
+    if (pastPending) return []
+    if (!pastMonth) return staffList
+    const byId = new Map(staffList.map(s => [s.id, s]))
+    const asPaid = (e) => {
+      const now = byId.get(e.staffId) || {}
+      const num = (v, fallback) => (v === undefined || v === null || v === '' ? fallback : v)
+      // OT at the rate per hour it was paid; each EPF/SOCSO… at the rate taken then
+      const otRate = parseFloat(e.otHours) > 0 && parseFloat(e.otPay) > 0 ? parseFloat(e.otPay) / parseFloat(e.otHours) : null
+      let deductionSettings = now.deductionSettings
+      if (Array.isArray(e.statutory)) {
+        const paid = new Map(e.statutory.map(d => [d.key, d]))
+        deductionSettings = { ...(now.deductionSettings || {}) }
+        for (const d of statutoryConfig || []) {
+          const p = paid.get(d.key)
+          deductionSettings[d.key] = p
+            ? { ...deductionSettings[d.key], enabled: true, employeeRateOverride: p.employeeRate, employerRateOverride: p.employerRate }
+            : { ...deductionSettings[d.key], enabled: false }
+        }
+      }
+      return {
+        ...now,
+        id: e.staffId,
+        ...(now.firstName || now.lastName || now.name ? {} : { name: e.staffName || 'Former staff' }),
+        designation: e.designation || now.designation || '',
+        department: e.department || now.department || '',
+        basicSalary: num(e.basicSalary, now.basicSalary),
+        allowance: num(e.allowance, now.allowance),
+        salaryMode: e.salaryMode || now.salaryMode,
+        standardHours: num(e.standardHours, now.standardHours),
+        workingDays: num(e.workingDays, now.workingDays),
+        OTPerHour: otRate ?? now.OTPerHour,
+        deductionSettings,
+        notOnStaffList: !byId.has(e.staffId),
+      }
+    }
+    return paidEntries.map(asPaid).sort((a, b) => getStaffName(a).localeCompare(getStaffName(b)))
+  }, [pastPending, pastMonth, staffList, paidEntries, statutoryConfig])
+  const roster = useMemo(() => {
+    const removed = new Set(sheet.removed)
+    const baseIds = new Set(baseList.map(s => s.id))
+    const byId = new Map(staffList.map(s => [s.id, s]))
+    const extra = [...new Set(sheet.added)]
+      .filter(id => !baseIds.has(id) && !removed.has(id) && byId.has(id))
+      .map(id => ({ ...byId.get(id), addedToSheet: true }))
+    return [...baseList.filter(s => !removed.has(s.id)), ...extra]
+  }, [baseList, staffList, sheet])
+  // everyone who could be on the sheet: the base, then anyone else on the staff list
+  const sheetChoices = useMemo(() => {
+    const ids = new Set(baseList.map(s => s.id))
+    return [...baseList.map(s => ({ staff: s, inBase: true })), ...staffList.filter(s => !ids.has(s.id)).map(s => ({ staff: s, inBase: false }))]
+  }, [baseList, staffList])
+  const [showSheetPicker, setShowSheetPicker] = useState(false)
+  function setOnSheet (id, on) {
+    const inBase = baseList.some(s => s.id === id)
+    setSheet(prev => {
+      const added = prev.added.filter(x => x !== id)
+      const removed = prev.removed.filter(x => x !== id)
+      if (on && !inBase) added.push(id)
+      if (!on && inBase) removed.push(id)
+      return { added, removed }
+    })
+    // staff paid this month put back after their slip was saved away: start
+    // from what they were paid (hours, OT, bonus…), not from blank
+    const paid = on && !savedSlips.some(s => s.staffId === id) && paidEntries.find(e => e.staffId === id)
+    if (paid) setSlipInputs(prev => ({ ...prev, [id]: inputsFromSlip(paid) }))
+  }
+
   // Reset inputs when period changes so stale inputs from previous period don't carry over
   const [lastPeriod, setLastPeriod] = useState(period)
   useEffect(() => {
@@ -426,25 +555,7 @@ export default function PayrollBuilder () {
     if (inputsRestoredFor === runId) return   // already restored for this run
     const restored = {}
     for (const slip of savedSlips) {
-      restored[slip.staffId] = {
-        workedHours:          String(slip.workedHours      ?? ''),
-        workedDays:           String(slip.workedDays       ?? ''),
-        otHours:              String(slip.otHours          ?? ''),
-        phHours:              String(slip.phHours          ?? ''),
-        phDays:               String(slip.phDays           ?? ''),
-        allowanceOverride:    String(slip.allowanceOverride ?? ''),
-        bonus:                String(slip.bonus            ?? ''),
-        bonusNote:            slip.bonusNote               || '',
-        otherEarnings:        String(slip.otherEarnings    ?? ''),
-        otherEarningsNote:    slip.otherEarningsNote       || '',
-        penalty:              String(slip.penalty          ?? ''),
-        penaltyNote:          slip.penaltyNote             || '',
-        otherDeductions:      String(slip.otherDeductions  ?? ''),
-        otherDeductionsNote:  slip.otherDeductionsNote     || '',
-        loanOverride:         slip.loanOverride != null ? String(slip.loanOverride) : '',
-        loanNote:             slip.loanNote               || '',
-        extraNote:            slip.extraNote              || '',
-      }
+      restored[slip.staffId] = inputsFromSlip(slip)
     }
     setSlipInputs(restored)
     setInputsRestoredFor(runId)
@@ -464,13 +575,13 @@ export default function PayrollBuilder () {
   const isAdminOrManager = role === 'branchAdmin' || role === 'manager'
 
   const filteredStaff = useMemo(() => {
-    if (!searchTerm) return staffList
+    if (!searchTerm) return roster
     const s = searchTerm.toLowerCase()
-    return staffList.filter(st => {
+    return roster.filter(st => {
       const name = getStaffName(st).toLowerCase()
       return name.includes(s)
     })
-  }, [staffList, searchTerm])
+  }, [roster, searchTerm])
 
   // ── Advance/loan deductions per staff for this period ─────────────────────
   const advanceByStaff = useMemo(() => {
@@ -502,7 +613,7 @@ export default function PayrollBuilder () {
   // ── Totals for header ─────────────────────────────────────────────────────
   const totals = useMemo(() => {
     let gross = 0, net = 0, empCost = 0
-    for (const staff of staffList) {
+    for (const staff of roster) {
       const inputs  = slipInputs[staff.id] || buildDefaultInputs()
       const advDed  = (advanceByStaff[staff.id] || []).reduce((s, a) => s + a.amount, 0)
       const loanDed = (loanByStaff[staff.id]    || []).reduce((s, a) => s + a.amount, 0)
@@ -550,7 +661,7 @@ export default function PayrollBuilder () {
       net:     Math.round(net * 100) / 100,
       empCost: Math.round(empCost * 100) / 100,
     }
-  }, [staffList, slipInputs, advanceByStaff, loanByStaff, payrollConfig])
+  }, [roster, slipInputs, advanceByStaff, loanByStaff, payrollConfig])
 
   function flash (type, msg) {
     if (type === 'error') setError(msg)
@@ -560,7 +671,7 @@ export default function PayrollBuilder () {
 
   // ── Build slips array from current inputs ─────────────────────────────────
   function buildSlips () {
-    return staffList.map(staff => {
+    return roster.map(staff => {
       const inputs  = slipInputs[staff.id] || buildDefaultInputs()
       const advItems = advanceByStaff[staff.id] || []
       const lnItems  = loanByStaff[staff.id]    || []
@@ -677,7 +788,7 @@ export default function PayrollBuilder () {
   async function handleImportAttendance () {
     if (!isAdminOrManager || locked) return
 
-    const hasExisting = staffList.some(s => {
+    const hasExisting = roster.some(s => {
       const inp = slipInputs[s.id]
       return inp && (inp.workedHours || inp.workedDays || inp.otHours)
     })
@@ -724,7 +835,7 @@ export default function PayrollBuilder () {
       let skippedFixed = 0
       let pendingOt = 0
       let lateDays = 0
-      for (const staff of staffList) {
+      for (const staff of roster) {
         if (staff.fixedSalaryNoAttendance) { skippedFixed++; continue }
         const mine = (punches || []).filter(p => p.staffId === staff.id)
         if (!mine.length) continue
@@ -772,11 +883,13 @@ export default function PayrollBuilder () {
 
   async function handleSaveDraft () {
     if (!isAdminOrManager) return
+    if (pastPending) { flash('error', 'Still loading this month as it was paid — try again in a moment.'); return }
+    if (!roster.length) { flash('error', 'No staff on this sheet — choose staff first.'); return }
     setBusy(true); setError('')
     try {
       let activeRunId = runId
       if (!activeRunId) {
-        const res = await createDraft({ companyId, branchId, period, createdBy: currentUser }).unwrap()
+        const res = await createDraft({ companyId, branchId, period, createdBy: currentUser, sheet }).unwrap()
         activeRunId = res.id
       }
       await saveDraftSlips({
@@ -785,6 +898,7 @@ export default function PayrollBuilder () {
         period,
         slips: buildSlips(),
         user: currentUser,
+        sheet,
       }).unwrap()
       flash('ok', 'Draft saved.')
     } catch (e) {
@@ -796,10 +910,12 @@ export default function PayrollBuilder () {
 
   async function handleFinalize () {
     if (!runId) return
+    if (pastPending) { flash('error', 'Still loading this month as it was paid — try again in a moment.'); return }
+    if (!roster.length) { flash('error', 'No staff on this sheet — choose staff first.'); return }
     setBusy(true); setError('')
     try {
       // Save latest inputs first, then finalize
-      await saveDraftSlips({ companyId, branchId, runId, period, slips: buildSlips(), user: currentUser }).unwrap()
+      await saveDraftSlips({ companyId, branchId, runId, period, slips: buildSlips(), user: currentUser, sheet }).unwrap()
       await finalize({ companyId, branchId, runId, finalizedBy: currentUser }).unwrap()
       flash('ok', 'Payroll finalized. Advance/loan installments marked as paid.')
     } catch (e) {
@@ -992,6 +1108,56 @@ export default function PayrollBuilder () {
         {error   && <div className='bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3'>{error}</div>}
         {success && <div className='bg-green-50 border border-green-200 text-green-700 text-sm rounded-xl px-4 py-3'>{success}</div>}
 
+        {pastPending && (
+          <div className='mb-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-600'>
+            {paidQuery.isError ? 'Could not load this month as it was paid — reload the page.' : 'Loading this month as it was paid…'}
+          </div>
+        )}
+        {noPaidRecord && (
+          <div className='mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900'>
+            No record of what was paid this month was found, so today&apos;s staff list and salaries are shown — untick anyone who was not in this month.
+          </div>
+        )}
+
+        {/* A month paid before: shown as it was paid */}
+        {pastMonth && (
+          <div className='mb-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900'>
+            <b>Paid before — shown as it was paid:</b> the {paidEntries.length} staff paid this month, with their salary then.
+            {' '}Staff who joined later aren&apos;t included, and today&apos;s salary changes aren&apos;t applied.
+            {baseList.some(r => r.notOnStaffList) && <> Staff no longer on the staff list are still here (marked).</>}
+          </div>
+        )}
+
+        {/* Who is on this sheet */}
+        {!locked && !pastPending && sheetChoices.length > 0 && (
+          <div className='mb-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-sm'>
+            <div className='flex flex-wrap items-center justify-between gap-2'>
+              <p className='text-gray-700'>
+                <b>{roster.length}</b> of {sheetChoices.length} staff on this sheet
+                {(sheet.removed.length > 0 || sheet.added.length > 0) && <span className='text-gray-400'> · changes are kept when you save the draft</span>}
+              </p>
+              <button type='button' onClick={() => setShowSheetPicker(v => !v)} className='px-3 py-1.5 rounded-lg border border-gray-200 text-gray-700 text-xs font-semibold hover:bg-gray-50'>
+                {showSheetPicker ? 'Done' : 'Choose staff'}
+              </button>
+            </div>
+            {showSheetPicker && (
+              <div className='mt-3 grid sm:grid-cols-2 lg:grid-cols-3 gap-1.5 max-h-80 overflow-y-auto'>
+                {sheetChoices.map(({ staff: s, inBase }) => {
+                  const on = roster.some(r => r.id === s.id)
+                  return (
+                    <label key={s.id} className={`flex items-center gap-2 rounded-lg border px-2.5 py-1.5 cursor-pointer ${on ? 'border-mint-200 bg-mint-50' : 'border-gray-100 bg-gray-50 text-gray-500'}`}>
+                      <input type='checkbox' checked={on} onChange={e => setOnSheet(s.id, e.target.checked)} />
+                      <span className='truncate'>{getStaffName(s) || s.id}</span>
+                      {pastMonth && !inBase && <span className='ml-auto shrink-0 text-[10px] text-sky-700'>not paid this month</span>}
+                      {s.notOnStaffList && <span className='ml-auto shrink-0 text-[10px] text-gray-500'>not on staff list now</span>}
+                    </label>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Action buttons */}
         {existingRun?.reopened && existingRun?.status !== 'paid' && (
           <div className='mb-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900'>
@@ -1000,7 +1166,7 @@ export default function PayrollBuilder () {
           </div>
         )}
         <div className='flex flex-wrap gap-2'>
-          {staffList.length > 0 && (
+          {roster.length > 0 && (
             <>
               <button
                 onClick={() => setPrintTarget({ mode: 'all' })}
@@ -1022,7 +1188,7 @@ export default function PayrollBuilder () {
               </button>
             </>
           )}
-          {!locked && staffList.length > 0 && (
+          {!locked && roster.length > 0 && (
             <button
               onClick={handleImportAttendance}
               disabled={busy}
@@ -1035,7 +1201,7 @@ export default function PayrollBuilder () {
           {!locked && (
             <button
               onClick={handleSaveDraft}
-              disabled={busy || staffList.length === 0}
+              disabled={busy || roster.length === 0}
               className='px-5 py-2.5 rounded-xl bg-mint-500 hover:bg-mint-600 text-white text-sm font-semibold disabled:opacity-50 transition-colors'
             >
               {busy ? 'Saving…' : runId ? 'Update Draft' : 'Save Draft'}
@@ -1044,7 +1210,7 @@ export default function PayrollBuilder () {
           {runId && existingRun?.status === 'draft' && (
             <button
               onClick={handleFinalize}
-              disabled={busy}
+              disabled={busy || roster.length === 0}
               className='px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold disabled:opacity-50 transition-colors'
             >
               Finalize Payroll
@@ -1106,6 +1272,7 @@ export default function PayrollBuilder () {
                 loanDed={(loanByStaff[staff.id] || []).reduce((s, a) => s + a.amount, 0)}
                 locked={locked}
                 onPrint={() => setPrintTarget({ mode: 'single', slip: buildSingleSlipForPrint(staff) })}
+                onRemove={() => setOnSheet(staff.id, false)}
                 onExportPDF={() => {
                   const slip = buildSingleSlipForPrint(staff)
                   if (slip) exportPayslipToPDF(slip, branchName, period, companyName)
