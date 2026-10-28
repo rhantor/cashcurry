@@ -2,7 +2,8 @@
 // My pay (roadmap 4.6): this period so far, what's left to pay back, and every
 // payslip since payroll started sharing them.
 import { useState } from "react";
-import { Landmark, Receipt, ScrollText } from "lucide-react";
+import Link from "next/link";
+import { CalendarDays, ChevronRight, Landmark, Receipt, ScrollText } from "lucide-react";
 import useSession from "@/app/hooks/useSession";
 import useCurrency from "@/app/hooks/useCurrency";
 import { EmptyState, Skeleton } from "@/app/components/ui";
@@ -26,6 +27,16 @@ export default function MyPayPage() {
         <p className="-mt-3 px-1 text-xs text-subtle">
           From your clock-ins at {Number(priv?.basicPerHour) || 0} an hour and {Number(priv?.OTPerHour) || 0} for overtime. Your payslip is the final word.
         </p>
+      )}
+      {!stats.isFixed && staff && (
+        <Link href="/my-attendance" className="flex items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3.5 transition hover:bg-surface-2">
+          <span className="inline-flex size-9 items-center justify-center rounded-xl bg-brand-soft text-brand"><CalendarDays className="size-5" /></span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold">My attendance</span>
+            <span className="block text-xs text-muted">Every day&apos;s clock-ins, hours and overtime</span>
+          </span>
+          <ChevronRight className="size-4 text-subtle" />
+        </Link>
       )}
 
       <div className="grid grid-cols-2 gap-3">

@@ -5,7 +5,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { Home, ListChecks, MessageCircle, FileText, TriangleAlert, User, Wallet, LogOut } from "lucide-react";
+import { CalendarDays, Home, ListChecks, MessageCircle, FileText, TriangleAlert, User, Wallet, LogOut } from "lucide-react";
 import NotificationBell from "@/app/components/notifications/NotificationBell";
 import useSession from "@/app/hooks/useSession";
 import { useChats } from "@/app/components/chat/useChat";
@@ -16,6 +16,7 @@ import { useMyStaff } from "./useStaffApp";
 const NAV = [
   { label: "Home", href: "/staff-portal", icon: Home },
   { label: "Pay", href: "/my-pay", icon: Wallet },
+  { label: "Attendance", href: "/my-attendance", icon: CalendarDays, wide: true }, // phones: from Pay
   { label: "Requests", href: "/requests", icon: FileText },
   { label: "Chat", href: "/messages", icon: MessageCircle },
   { label: "Tasks", href: "/my-tasks", icon: ListChecks, wide: true }, // phones: from Home (4.11)
@@ -23,7 +24,7 @@ const NAV = [
   { label: "Me", href: "/profile", icon: User },
 ];
 
-const TITLES = { "/staff-portal": "Home", "/my-pay": "My pay", "/requests": "Requests", "/my-issues": "Issues", "/my-tasks": "Tasks", "/profile": "Me" };
+const TITLES = { "/staff-portal": "Home", "/my-pay": "My pay", "/my-attendance": "My attendance", "/requests": "Requests", "/my-issues": "Issues", "/my-tasks": "Tasks", "/profile": "Me" };
 
 export default function StaffLayout({ children }) {
   const pathname = usePathname();
@@ -115,7 +116,7 @@ export default function StaffLayout({ children }) {
       {/* Bottom bar (phones) */}
       <nav className="fixed inset-x-0 bottom-0 z-50 flex border-t border-line bg-surface/95 pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
         {NAV.filter((n) => !n.wide).map(({ label, href, icon: Icon }) => {
-          const active = pathname === href;
+          const active = pathname === href || (href === "/my-pay" && pathname === "/my-attendance"); // reached from Pay
           return (
             <Link key={href} href={href} className={cn("relative flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] font-medium", active ? "text-brand" : "text-muted")}>
               <span className="relative flex h-8 w-14 items-center justify-center">

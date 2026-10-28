@@ -34,7 +34,7 @@ Staff **cannot** change the personal details they joined with — name, IC / pas
 
 ## 3b. What is built (19 Oct)
 
-- Screens: Home, My pay (payslips), Requests, Chat, Issues, Me — `app/(staff)/`.
+- Screens: Home, My pay (payslips), My attendance (29 Oct — each day's clock-ins, hours and OT, earlier periods, missing punches flagged), Requests, Chat, Issues, Me — `app/(staff)/`.
 - Me: photo, contact number (changing it changes the sign-in number; a number already used by another login is refused), emergency contact, change PIN (current PIN first; 111111 / 123456 refused), notifications, sign out. Joined-with details read-only, IC and bank masked.
 - Fingerprint shows as "Soon": it comes with the Android app (step 4).
 - Payslips: payroll writes each person's own copy when a run is finalized or paid (`lib/payroll/payslipCopy.js`), so staff never read the run itself (it carries the branch's totals).
@@ -64,5 +64,5 @@ Before the Play Store (release checklist):
 
 - Firebase console → the project → add an **Android app** with package `com.cashcurry.staff`; put its `google-services.json` in `android/app/` (kept out of git). Without it the app works but gets no push.
 - `CAP_SERVER_URL=https://<app domain> npm run android:sync`.
-- App icon and splash (from `public/icons/icon-512.png`, e.g. `npx @capacitor/assets generate`).
+- ~~App icon and splash~~ — done 29 Oct: `npm run android:icons` draws them from `public/icons/icon.svg` (run again if the logo changes).
 - A signing key (kept safe, never in git), then `./gradlew bundleRelease` → upload the `.aab` in Play Console under the existing developer account: new app "Cash Curry Staff", internal testing first, privacy policy page, data-safety form (name, phone, photo, pay shown to the person themselves).
