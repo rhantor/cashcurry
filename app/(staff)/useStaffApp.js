@@ -11,7 +11,7 @@ import { useGetBranchAttendanceByPeriodQuery, useGetOtRequestsQuery } from "@/li
 import { useGetStaffLoansQuery } from "@/lib/redux/api/staffLoanApiSlice";
 import { useGetAdvanceEntriesQuery } from "@/lib/redux/api/AdvanceApiSlice";
 import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
-import { computeAttendance, toLocalDateStr } from "@/lib/attendance/computeHours";
+import { computeAttendance, formatClock, getAttendanceDate, toLocalDateStr } from "@/lib/attendance/computeHours";
 import { shiftsEnabled } from "@/lib/attendance/shifts";
 import { byPeriodDesc } from "@/lib/payroll/payslipCopy";
 
@@ -72,24 +72,30 @@ const MONEY_ADVANCE_TYPES = ["personal", "salary", "emergency"];
 /**
  * This pay period so far: hours, OT, pay earned (or the fixed salary), lateness,
  * early OT waiting for approval — the same engine as payroll — and what they owe.
+ * `offset` steps back whole periods (-1 = last month / last week); `days` is
+ * each day of the period with its clock-ins (My attendance).
  */
-export function useMyWork(user, publicStaff, priv) {
+export function useMyWork(user, publicStaff, priv, offset = 0) {
   // Pay rates live in the private half (lib/staff/private.js)
   const staff = useMemo(() => (publicStaff ? { ...publicStaff, ...(priv || {}) } : null), [publicStaff, priv]);
   const period = useMemo(() => {
     if (!staff) return null;
     const now = new Date();
     const type = staff.attendancePeriod || "monthly";
-    let start;
+    let start, end;
     if (type === "weekly") {
       const day = now.getDay(); // 0 = Sun
-      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (day === 0 ? 6 : day - 1));
+      start = new Date(now.getFullYear(), now.getMonth(), now.getDate() - (day === 0 ? 6 : day - 1) + offset * 7);
+      end = new Date(start.getFullYear(), start.getMonth(), start.getDate() + 6);
     } else {
-      start = new Date(now.getFullYear(), now.getMonth(), 1);
+      start = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+      end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
     }
     start.setHours(0, 0, 0, 0);
-    return { start, startStr: toLocalDateStr(start), type };
-  }, [staff]);
+    const todayStr = toLocalDateStr(now);
+    const endStr = toLocalDateStr(end) < todayStr ? toLocalDateStr(end) : todayStr;
+    return { start, startStr: toLocalDateStr(start), end, endStr, type, current: offset === 0 };
+  }, [staff, offset]);
 
   const skip = !user?.companyId || !user?.branchId;
   const where_ = skip ? null : { companyId: user.companyId, branchId: user.branchId };
@@ -98,8 +104,8 @@ export function useMyWork(user, publicStaff, priv) {
   const { data: branchSettings } = useGetBranchSettingsQuery(where_ || skipToken);
   const attendanceSettings = useMemo(() => branchSettings?.attendance || {}, [branchSettings]);
 
-  // From a day before the period (overnight shifts) up to today
-  const todayStr = toLocalDateStr(new Date());
+  // From a day before the period (overnight shifts) up to its end (today at most)
+  const todayStr = period?.endStr || toLocalDateStr(new Date());
   const bufStartStr = period ? toLocalDateStr(new Date(period.start.getTime() - 86400000)) : null;
   const canAttendance = !skip && !!period && !!user?.staffId && !staff?.fixedSalaryNoAttendance;
   const { data: punches = [], isLoading: punchesLoading } = useGetBranchAttendanceByPeriodQuery(
@@ -115,7 +121,7 @@ export function useMyWork(user, publicStaff, priv) {
   const { data: advances = [] } = useGetAdvanceEntriesQuery(where_ ? { ...where_, mine } : skipToken);
 
   const stats = useMemo(() => {
-    const base = { isFixed: false, basicHours: 0, otHours: 0, earnings: 0, loanDebt: 0, advanceDebt: 0, lateDays: 0, lateMinutes: 0, pendingOtDays: 0, daysWorked: 0 };
+    const base = { isFixed: false, basicHours: 0, otHours: 0, earnings: 0, loanDebt: 0, advanceDebt: 0, lateDays: 0, lateMinutes: 0, pendingOtDays: 0, daysWorked: 0, days: [] };
     if (!staff) return base;
     const loanDebt = loans.filter((l) => l.staffId === staff.id && l.status !== "closed").reduce((s, l) => s + (l.remainingAmount || 0), 0);
     const advanceDebt = advances
@@ -126,8 +132,21 @@ export function useMyWork(user, publicStaff, priv) {
 
     const otApprovals = {};
     otRequests.filter((r) => r.staffId === staff.id).forEach((r) => { if (r.date) otApprovals[r.date] = r.status; });
-    const { days } = computeAttendance({ punches: punches.filter((p) => p.staffId === staff.id), staff, settings: attendanceSettings, otApprovals });
-    const inPeriod = days.filter((d) => d.date >= period.startStr);
+    const own = punches.filter((p) => p.staffId === staff.id);
+    // A day whose clock-ins and clock-outs don't pair up (a punch is missing,
+    // or they are still at work) — those hours aren't counted yet.
+    const unpaired = {};
+    const lastIn = {};
+    own.forEach((p) => {
+      const d = getAttendanceDate(p.timestamp, attendanceSettings.dayCutoffTime) || p.date;
+      if (!d) return;
+      unpaired[d] = (unpaired[d] || 0) + (p.type === "in" ? 1 : p.type === "out" ? -1 : 0);
+      if (p.type === "in" && (p.timestamp?.seconds || 0) > (lastIn[d]?.seconds || 0)) lastIn[d] = p.timestamp;
+    });
+    const { days } = computeAttendance({ punches: own, staff, settings: attendanceSettings, otApprovals });
+    const inPeriod = days
+      .filter((d) => d.date >= period.startStr && d.date <= period.endStr)
+      .map((d) => ({ ...d, unpaired: !!unpaired[d.date], openIn: unpaired[d.date] > 0 ? formatClock(lastIn[d.date]) : null }));
     const basicHours = inPeriod.reduce((s, d) => s + d.basic, 0);
     const otHours = inPeriod.reduce((s, d) => s + d.ot, 0);
     return {
@@ -141,6 +160,7 @@ export function useMyWork(user, publicStaff, priv) {
       lateDays: inPeriod.filter((d) => d.lateMinutes > 0).length,
       lateMinutes: inPeriod.reduce((s, d) => s + d.lateMinutes, 0),
       pendingOtDays: inPeriod.filter((d) => d.otApproval === "pending").length,
+      days: inPeriod,
     };
   }, [staff, period, punches, attendanceSettings, otRequests, loans, advances, user?.uid]);
 
