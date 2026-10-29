@@ -106,7 +106,7 @@ describe("the menu", () => {
 
   it("each role's menu, at a glance", () => {
     const top = (r) => navFor(r).flatMap((s) => s.items.map((i) => i.label));
-    expect(top("cashier")).toEqual(["Entries", "Pay-outs", "My Requests", "Issues", "Tasks", "Loans", "Tools", "Support"]); // chat: its own workspace, from the top bar // Loans: the staff loan tracker, to hand out approved ones
+    expect(top("cashier")).toEqual(["Entries", "Pay-outs", "My Requests", "Issues", "Tasks", "Loans", "My pay & attendance", "Tools", "Support"]); // chat: its own workspace, from the top bar // Loans: the staff loan tracker, to hand out approved ones
     expect(top("staff")).toEqual([]);
     // a cashier's Tools: only the reservation receipt (25 Oct 2026)
     expect(navFor("cashier").flatMap((x) => x.items).find((i) => i.label === "Tools").children.map((c) => c.label)).toEqual(["Reservation Receipt"]);
