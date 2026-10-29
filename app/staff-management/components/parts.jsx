@@ -31,7 +31,7 @@ export function Section ({ icon: Icon, title, description, children, className }
 }
 
 /** Label with a quiet "required" mark. */
-const Label = ({ text, required, optional }) => (
+export const Label = ({ text, required, optional }) => (
   <>
     {text}
     {required && <span className='ml-0.5 text-danger'>*</span>}

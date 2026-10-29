@@ -10,6 +10,33 @@ import { RULES, validate } from '../lib/validation'
 import { isOvernight, shiftWindow, staffShift as resolveShiftFromForm } from '@/lib/attendance/shifts'
 import useCurrency from '@/app/hooks/useCurrency'
 import { StaffFormContext } from "./StaffFormContext";
+
+// A new staff member's details as typed, kept on this device until saved —
+// so a form closed by mistake (or a page reload) comes back as it was.
+const DRAFT_KEY = 'cc.staffDraft'
+const readDraft = () => {
+  try {
+    const d = JSON.parse(sessionStorage.getItem(DRAFT_KEY) || 'null')
+    return d && typeof d === 'object' ? d : null
+  } catch {
+    return null
+  }
+}
+const writeDraft = form => {
+  try {
+    if (JSON.stringify(form) === JSON.stringify(EMPTY_FORM)) sessionStorage.removeItem(DRAFT_KEY)
+    else sessionStorage.setItem(DRAFT_KEY, JSON.stringify(form))
+  } catch {
+    // no storage here (private window): the form just isn't kept
+  }
+}
+export const dropDraft = () => {
+  try {
+    sessionStorage.removeItem(DRAFT_KEY)
+  } catch {
+    // no storage here (private window): the form just isn't kept
+  }
+}
 import PersonalTab from "./tabs/PersonalTab";
 import ContactTab from "./tabs/ContactTab";
 import JobTab from "./tabs/JobTab";
@@ -37,6 +64,7 @@ export default function StaffModal ({
 }) {
   const currency = useCurrency()
   const [form, setForm] = useState(EMPTY_FORM)
+  const [restored, setRestored] = useState(false) // the form came back from a draft
   const [errors, setErrors] = useState({})
   const [touched, setTouched] = useState({})
   const [saving, setSaving] = useState(false)
@@ -88,7 +116,10 @@ export default function StaffModal ({
     }
 
     if (mode === 'add') {
-      setForm(EMPTY_FORM)
+      // what was typed last time and not saved, if anything
+      const draft = readDraft()
+      setForm(draft ? { ...EMPTY_FORM, ...draft } : EMPTY_FORM)
+      setRestored(!!draft)
       startRef.current = EMPTY_FORM
       setPhotoPreview(null)
       setPhotoFile(null)
@@ -257,6 +288,20 @@ export default function StaffModal ({
     setActiveTab(TABS[stepIndex + 1].key)
   }
 
+  // keep the new staff member's details as they are typed (not the photo)
+  useEffect(() => {
+    if (mode === 'add') writeDraft(form)
+  }, [mode, form])
+
+  const startOver = () => {
+    dropDraft()
+    setForm(EMPTY_FORM)
+    setRestored(false)
+    setErrors({})
+    setTouched({})
+    setActiveTab('personal')
+  }
+
   const asking = useRef(false)
   const close = useCallback(async () => {
     if (saving || asking.current) return
@@ -266,6 +311,7 @@ export default function StaffModal ({
       asking.current = false
       if (!ok) return
     }
+    if (mode === 'add') dropDraft()
     onClose()
   }, [dirty, saving, onClose])
 
@@ -316,7 +362,7 @@ export default function StaffModal ({
       // if user removed photo & didn't add a new one
       if (photoCleared && !photoFile) payload.data.photoUrl = null
 
-      await onSave(payload)
+      await onSave(payload) // the page clears the draft once a new staff member is saved
     } finally {
       setSaving(false)
     }
@@ -328,7 +374,7 @@ export default function StaffModal ({
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        onClick={close}
+        // a tap outside doesn't close it: only ✕, Cancel or Esc (asking first)
         className='absolute inset-0 bg-black/40 backdrop-blur-[2px]'
       />
       <motion.div
@@ -421,6 +467,14 @@ export default function StaffModal ({
 
           {/* Body */}
           <div className='min-h-0 flex-1 overflow-y-auto px-5 py-6 sm:px-7'>
+            {adding && restored && (
+              <div className='mb-4 flex items-center gap-3 rounded-xl border border-brand/30 bg-brand-soft/50 px-3 py-2 text-sm text-fg'>
+                <p className='flex-1'>Picked up where you left off — what you typed last time is back.</p>
+                <button type='button' onClick={startOver} className='shrink-0 text-xs font-semibold text-brand hover:underline'>
+                  Start over
+                </button>
+              </div>
+            )}
             <AnimatePresence mode='wait' initial={false}>
               <motion.div
                 key={activeTab}

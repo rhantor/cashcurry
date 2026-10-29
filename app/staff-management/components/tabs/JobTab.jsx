@@ -1,12 +1,70 @@
 "use client";
 
 import { Briefcase, NotebookPen } from 'lucide-react';
-import { DatePicker, Field, Select } from '@/app/components/ui';
+import { useState } from 'react';
+import { DatePicker, Field, Input, Select } from '@/app/components/ui';
+import { useGetStaffListQuery } from '@/lib/redux/api/staffApiSlice';
 import useSession from '@/app/hooks/useSession';
 import { useChatPeople } from '@/app/components/chat/useChat';
-import { ROLES } from '../../lib/constants';
+import { ROLES, ROLE_GROUPS } from '../../lib/constants';
 import { useStaffFormContext } from "../StaffFormContext";
-import { Choice, Row, Section, TextField } from '../parts';
+import { Label, Row, Section, TextField } from '../parts';
+
+const LISTED = new Set(ROLES.map(r => r.value).filter(Boolean));
+const OTHER = '__other';
+
+/**
+ * Their job: the restaurant's usual ones in groups, the ones typed in before
+ * for this branch's staff, or "Other…" to type a new one.
+ */
+function RoleField() {
+  const { form, errors, change } = useStaffFormContext();
+  const { companyId, branchId } = useSession();
+  const { data: staffList = [] } = useGetStaffListQuery({ companyId, branchId }, { skip: !companyId || !branchId });
+  const used = [...new Set(staffList.map(s => String(s.role || '').trim()).filter(v => v && !LISTED.has(v)))].sort((a, b) => a.localeCompare(b));
+  const value = form.role || '';
+  const known = !value || LISTED.has(value) || used.includes(value);
+  const [typing, setTyping] = useState(!known);
+  const set = v => change({ target: { name: 'role', value: v } });
+  return (
+    <Field label={<Label text='Role' required />} hint='Their job at the restaurant. Not on the list? Choose Other and type it.' error={errors.role}>
+      {({ id, invalid }) => (
+        <div className='space-y-2'>
+          <Select
+            id={id}
+            invalid={invalid}
+            value={typing ? OTHER : value}
+            onChange={e => {
+              const v = e.target.value;
+              if (v === OTHER) {
+                setTyping(true);
+                set('');
+              } else {
+                setTyping(false);
+                set(v);
+              }
+            }}
+            className='h-12'
+          >
+            <option value=''>Choose…</option>
+            {ROLE_GROUPS.map(([group, roles]) => (
+              <optgroup key={group} label={group}>
+                {roles.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+              </optgroup>
+            ))}
+            {used.length > 0 && (
+              <optgroup label='Added at this branch'>
+                {used.map(r => <option key={r} value={r}>{r}</option>)}
+              </optgroup>
+            )}
+            <option value={OTHER}>Other — type it…</option>
+          </Select>
+          {typing && <Input size='lg' autoFocus value={value} invalid={invalid} onChange={e => set(e.target.value)} placeholder='e.g. Pizza maker, Shawarma master' aria-label='Role' maxLength={40} />}
+        </div>
+      )}
+    </Field>
+  );
+}
 
 // Suggestions for the department box; anything else can be typed.
 const DEPARTMENTS = ['Kitchen', 'Front', 'Bar', 'Delivery', 'Cleaning', 'Office'];
@@ -24,7 +82,7 @@ export default function JobTab() {
   return (
     <div className='space-y-8'>
       <Section icon={Briefcase} title='Their job'>
-        <Choice name='role' label='Role' required options={ROLES.filter(r => r.value)} />
+        <RoleField />
         <Row>
           <TextField name='department' label='Department' placeholder='Kitchen' list='staff-departments' autoComplete='off' />
           <Field label='Started on' error={errors.startDate}>

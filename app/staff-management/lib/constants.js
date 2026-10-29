@@ -1,12 +1,43 @@
+// A staff member's job (what they do — not their login role). The first
+// seven were here from the start and stay as they were saved; anything else
+// can be typed in ("Other…") and is then offered for the branch's next staff.
 export const ROLES = [
   { value: '', label: '— Select role —' },
-  { value: 'staff', label: 'Staff' },
-  { value: 'accountant', label: 'Accountant' },
-  { value: 'manager', label: 'Manager' },
-  { value: 'driver', label: 'Driver' },
-  { value: 'technician', label: 'Technician' },
-  { value: 'intern', label: 'Intern' }
+  { value: 'staff', label: 'Staff', group: 'General' },
+  { value: 'manager', label: 'Manager', group: 'Management' },
+  { value: 'assistantManager', label: 'Assistant manager', group: 'Management' },
+  { value: 'supervisor', label: 'Supervisor', group: 'Management' },
+  { value: 'captain', label: 'Captain', group: 'Front of house' },
+  { value: 'waiter', label: 'Waiter / Server', group: 'Front of house' },
+  { value: 'cashier', label: 'Cashier', group: 'Front of house' },
+  { value: 'barista', label: 'Barista', group: 'Front of house' },
+  { value: 'host', label: 'Host / Receptionist', group: 'Front of house' },
+  { value: 'headChef', label: 'Head chef', group: 'Kitchen' },
+  { value: 'chef', label: 'Chef', group: 'Kitchen' },
+  { value: 'cook', label: 'Cook', group: 'Kitchen' },
+  { value: 'tandoor', label: 'Tandoor / Grill', group: 'Kitchen' },
+  { value: 'kitchenHelper', label: 'Kitchen helper', group: 'Kitchen' },
+  { value: 'steward', label: 'Dishwasher / Steward', group: 'Kitchen' },
+  { value: 'storeKeeper', label: 'Store keeper', group: 'Support' },
+  { value: 'cleaner', label: 'Cleaner', group: 'Support' },
+  { value: 'rider', label: 'Delivery rider', group: 'Support' },
+  { value: 'driver', label: 'Driver', group: 'Support' },
+  { value: 'technician', label: 'Technician', group: 'Support' },
+  { value: 'security', label: 'Security', group: 'Support' },
+  { value: 'accountant', label: 'Accountant', group: 'Office' },
+  { value: 'intern', label: 'Intern', group: 'General' }
 ]
+
+/** A job's name: a listed one's label, or the typed-in name as it is. */
+export const roleLabelOf = value => ROLES.find(r => r.value && r.value === value)?.label || value || ''
+
+/** The listed jobs in their groups, in order: [[group, [roles]]]. */
+export const ROLE_GROUPS = ROLES.filter(r => r.value).reduce((m, r) => {
+  const g = m.find(x => x[0] === r.group)
+  if (g) g[1].push(r)
+  else m.push([r.group, [r]])
+  return m
+}, [])
 
 export const STATES_MY = [
   'Johor',

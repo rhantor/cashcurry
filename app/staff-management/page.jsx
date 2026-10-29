@@ -22,9 +22,9 @@ import StatTiles from '@/app/components/purchases/StatTiles'
 import StatusScreen from '@/app/components/common/StatusScreen'
 import useCurrency from '@/app/hooks/useCurrency'
 import { formatMoney } from '@/lib/region/currency'
-import { ROLES } from './lib/constants'
+import { ROLES, roleLabelOf } from './lib/constants'
 
-import StaffModal from './components/StaffModal'
+import StaffModal, { dropDraft } from './components/StaffModal'
 import StaffDetailModal from './components/StaffDetailModal'
 
 const fullName = s => `${s?.firstName || ''} ${s?.lastName || ''}`.trim() || s?.name || 'Unnamed'
@@ -110,6 +110,7 @@ export default function StaffManagementPage () {
     try {
       if (modalMode === 'add') {
         await addStaff({ companyId, branchId, data, photoFile }).unwrap()
+        dropDraft() // saved: the form's draft is done with
         toast.success(`${data.firstName} ${data.lastName} added`)
       } else {
         await updateStaff({ companyId, branchId, id, staffId: id, data, photoFile, oldPhotoUrl }).unwrap()
@@ -179,7 +180,7 @@ export default function StaffManagementPage () {
 
   const withLogin = staffList.filter(s => s.uid).length
   const payTotal = staffList.reduce((n, s) => n + (Number(s.basicSalary) || 0), 0)
-  const roleLabel = r => ROLES.find(x => x.value === r)?.label || r || 'Staff'
+  const roleLabel = r => roleLabelOf(r) || 'Staff'
 
   const columns = [
     {
@@ -278,11 +279,14 @@ export default function StaffManagementPage () {
           </div>
           <Select className='sm:w-52' value={roleFilter} onChange={e => setRoleFilter(e.target.value)} aria-label='Role'>
             <option value=''>Every role</option>
-            {ROLES.slice(1).map(r => (
-              <option key={r.value} value={r.value}>
-                {r.label}
-              </option>
-            ))}
+            {/* the jobs this branch's staff have: listed ones in order, then any typed in */}
+            {[...ROLES.slice(1).map(r => r.value), ...new Set(staffList.map(x => x.role).filter(v => v && !ROLES.some(r => r.value === v)))]
+              .filter(v => staffList.some(x => x.role === v))
+              .map(v => (
+                <option key={v} value={v}>
+                  {roleLabelOf(v)}
+                </option>
+              ))}
           </Select>
         </div>
       )}

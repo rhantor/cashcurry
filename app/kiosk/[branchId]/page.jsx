@@ -13,6 +13,7 @@ import { verifyBiometric } from "@/lib/attendance/biometric";
 import { getAttendanceDate, todayLocalStr } from "@/lib/attendance/computeHours";
 import { otRequestId, resolveStaffShift, shiftRules, shiftWindow } from "@/lib/attendance/shifts";
 import { getSessionUser } from "@/lib/session";
+import { roleLabelOf } from "@/app/staff-management/lib/constants";
 // `toast` here is the kiosk's own punch popup; app messages are `notify`.
 import { toast as notify } from "@/app/components/ui/notify";
 
@@ -573,7 +574,7 @@ export default function KioskPage() {
                     <span className="text-white font-semibold text-sm text-center leading-tight">
                       {s.firstName} {s.lastName?.[0]}.
                     </span>
-                    <span className="text-[10px] text-white/40 font-medium mt-1 capitalize">{s.role || "Staff"}</span>
+                    <span className="text-[10px] text-white/40 font-medium mt-1 capitalize">{roleLabelOf(s.role) || "Staff"}</span>
 
                     {/* Status indicator */}
                     <div className={`absolute top-3 right-3 w-3 h-3 rounded-full ${isPunchedIn ? "bg-green-400 animate-pulse" : "bg-gray-600"}`} />

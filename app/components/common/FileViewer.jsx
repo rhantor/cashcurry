@@ -115,7 +115,7 @@ function Photo({ url, zoom, setZoom }) {
   };
 
   return (
-    <div className="flex min-h-full min-w-full items-center justify-center" style={{ touchAction: zoom > 1 ? "pan-x pan-y" : "pan-y" }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onClick={tap}>
+    <div className={cn("flex items-center justify-center", zoom > 1 ? "min-h-full min-w-full" : "h-full w-full")} style={{ touchAction: zoom > 1 ? "pan-x pan-y" : "pan-y" }} onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onClick={tap}>
       {loading && <Skeleton className="absolute inset-10" rounded="rounded-2xl" />}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
