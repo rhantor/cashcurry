@@ -106,7 +106,8 @@ export default function BillInbox({ companyId, branchId, user, bills, loading })
             <li key={b.id} className="overflow-hidden rounded-2xl border border-line bg-surface">
               <div className="flex gap-4 p-4">
                 <div className="flex shrink-0 flex-col gap-2">
-                  {(b.attachments || []).slice(0, 1).map((u) => <FileThumb key={u} url={u} label="Bill" />)}
+                  {/* the bill's first page, or the payment receipt when there's no bill paper */}
+                  {b.attachments?.length ? <FileThumb url={b.attachments[0]} label="Bill" /> : b.receipts?.length ? <FileThumb url={b.receipts[0]} label="Payment receipt" /> : null}
                   {/* every page and receipt in one sheet */}
                   {(b.attachments?.length || 0) + (b.receipts?.length || 0) > 1 && (
                     <button type="button" onClick={() => setViewing(b)} className="flex size-20 flex-col items-center justify-center rounded-xl border border-line bg-surface-2 text-xs font-semibold text-fg hover:bg-surface">
@@ -114,7 +115,7 @@ export default function BillInbox({ companyId, branchId, user, bills, loading })
                       files
                     </button>
                   )}
-                  {!b.attachments?.length && (
+                  {!b.attachments?.length && !b.receipts?.length && (
                     b.supplier ? (
                       <span className="flex size-20 items-center justify-center rounded-xl bg-surface-2 text-center text-[11px] font-semibold leading-tight text-muted">No<br />receipt</span>
                     ) : (
