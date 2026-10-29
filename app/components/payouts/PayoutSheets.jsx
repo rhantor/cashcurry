@@ -2,7 +2,7 @@
 // The two steps a till person does (roadmap 4.10): hand money out, and bring
 // the bill back (or try again when a bill was sent back).
 import { useEffect, useMemo, useState } from "react";
-import { Camera, FileText, Paperclip, X } from "lucide-react";
+import { Camera, FileText, Paperclip, ScanLine, X } from "lucide-react";
 import {
   Button,
   DatePicker,
@@ -32,6 +32,7 @@ import {
 } from "@/lib/payouts/client";
 import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
 import { FileThumb } from "@/app/components/common/Files";
+import ScanToPdf from "@/app/components/common/ScanToPdf";
 import SupplierPicker from "./SupplierPicker";
 import { checkSupplier, poLines, supplierPaid } from "@/lib/payouts/supplier";
 import { getOrder } from "@/lib/payouts/client";
@@ -438,6 +439,7 @@ export function BillSheet({
   const [deliveryCat, setDeliveryCat] = useState("");
   const [deliveryFiles, setDeliveryFiles] = useState([]);
   const [keptDelivery, setKeptDelivery] = useState([]);
+  const [scanning, setScanning] = useState(false); // many pages → one PDF
   const float = Number(retry ? retry.floatAmount : payout?.amount) || 0;
   // the branch's "Transport & delivery" category, to start the delivery in
   const deliveryDefault = useMemo(() => {
@@ -848,10 +850,28 @@ export function BillSheet({
             />
           )}
           {!noPaper && (
-            <p className="mt-2 text-xs text-muted">
-              A long bill: one PDF, or a photo of each page (up to 12 files).
-            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                icon={ScanLine}
+                onClick={() => setScanning(true)}
+                disabled={files.length + kept.length >= 12}
+              >
+                Scan pages into one PDF
+              </Button>
+              <p className="min-w-0 flex-1 text-xs text-muted">
+                A long bill (20 pages or more): scan every page here into one PDF — no other app needed.
+              </p>
+            </div>
           )}
+          <ScanToPdf
+            open={scanning}
+            onClose={() => setScanning(false)}
+            maxMb={MAX_MB}
+            onDone={(pdf) => setFiles((list) => [...list, pdf].slice(0, 12 - kept.length))}
+          />
           {errors.files && (
             <p className="mt-2 text-xs font-medium text-danger">
               {errors.files}
