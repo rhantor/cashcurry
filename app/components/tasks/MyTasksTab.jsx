@@ -5,11 +5,13 @@
 // week (counted late). `readOnly` shows someone else's list (management).
 import { useEffect, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { CalendarClock, Camera, Check, Flag, ListChecks, Repeat, X } from "lucide-react";
-import { Badge, Button, EmptyState, Sheet, Skeleton, Textarea, cn, toast } from "@/app/components/ui";
+import Link from "next/link";
+import { CalendarClock, Camera, Check, Flag, ListChecks, Repeat, TriangleAlert, X } from "lucide-react";
+import { Badge, Button, EmptyState, Input, Sheet, Skeleton, Textarea, cn, toast } from "@/app/components/ui";
 import { FileThumb } from "@/app/components/common/Files";
-import { CATCH_UP_DAYS, addDays, agenda, dayList, repeatText } from "@/lib/tasks/model";
+import { CATCH_UP_DAYS, addDays, agenda, answersFor, checklistState, dayList, issueHref, itemsOf, problemsIn, repeatText } from "@/lib/tasks/model";
 import { completeOnce, reopenOnce, tickDay, untickDay, uploadProof, useChecks } from "@/lib/tasks/client";
+import { resolveIssue } from "@/lib/issues/client";
 import TaskDetailSheet from "./TaskDetailSheet";
 import MessageBadge from "./MessageBadge";
 import { unreadOn } from "@/lib/tasks/model";
@@ -22,32 +24,98 @@ const weekStart = (d) => {
   return addDays(d, dow === 0 ? -6 : 1 - dow);
 };
 
-/** Finish with a photo and/or a note. */
+/** One checklist line: OK, or Problem with what is wrong. */
+function ChecklistLine({ n, text, answer, onChange }) {
+  const ok = answer?.ok === true;
+  const bad = answer?.ok === false;
+  return (
+    <li className={cn("space-y-2 rounded-xl border p-3", bad ? "border-danger/40 bg-danger-soft/40" : ok ? "border-brand/40 bg-brand-soft/30" : "border-line")}>
+      <div className="flex items-start gap-3">
+        <span className="mt-0.5 w-5 shrink-0 text-right text-xs font-semibold tabular-nums text-subtle">{n}</span>
+        <p className="min-w-0 flex-1 text-sm text-fg">{text}</p>
+      </div>
+      <div className="flex gap-2 pl-8">
+        <button type="button" onClick={() => onChange({ ok: true, note: "" })} aria-pressed={ok} className={cn("inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border text-xs font-semibold transition", ok ? "border-brand bg-brand text-brand-fg" : "border-line text-fg hover:bg-surface-2")}>
+          <Check className="size-4" /> OK
+        </button>
+        <button type="button" onClick={() => onChange({ ok: false, note: answer?.note || "" })} aria-pressed={bad} className={cn("inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border text-xs font-semibold transition", bad ? "border-danger bg-danger text-white" : "border-line text-fg hover:bg-surface-2")}>
+          <TriangleAlert className="size-4" /> Problem
+        </button>
+      </div>
+      {bad && (
+        <div className="pl-8">
+          <Input value={answer?.note || ""} onChange={(e) => onChange({ ok: false, note: e.target.value })} placeholder="What is wrong?" aria-label={`What is wrong: ${text}`} autoFocus />
+        </div>
+      )}
+    </li>
+  );
+}
+
+/**
+ * Finish a task: its checklist answered line by line (OK / Problem), a photo
+ * if it needs one, a note. A task made from an issue asks what was done —
+ * finishing it resolves the issue.
+ */
 function DoneSheet({ item, onClose, onDone }) {
   const [files, setFiles] = useState([]);
   const [note, setNote] = useState("");
+  const [answers, setAnswers] = useState([]);
   const [busy, setBusy] = useState(false);
   const needs = item?.task.needsPhoto;
+  const items = itemsOf(item?.task);
+  const list = checklistState(items, answers);
+  const fromIssue = !!item?.task.issueId;
   const previews = useMemo(() => files.map((f) => URL.createObjectURL(f)), [files]);
   useEffect(() => () => previews.forEach((u) => URL.revokeObjectURL(u)), [previews]);
   const go = async () => {
     setBusy(true);
     try {
-      await onDone(item, { files, note });
+      await onDone(item, { files, note, items: items.length ? answersFor(items, answers) : [] });
       onClose();
     } finally {
       setBusy(false);
     }
   };
+  const allOk = () => setAnswers(items.map(() => ({ ok: true, note: "" })));
+  const blocked = (needs && !files.length) || !list.ready;
+  const description = fromIssue
+    ? "Say what was done — the issue is marked resolved."
+    : items.length
+      ? `Check each line: OK, or Problem with what is wrong.${needs ? " A photo is needed too." : ""}`
+      : needs
+        ? "Add a photo of the work to finish it."
+        : "Add a photo or a note if it helps.";
   return (
     <Sheet
       open={!!item}
       onClose={onClose}
       title={item?.task.title || ""}
-      description={needs ? "Add a photo of the work to finish it." : "Add a photo or a note if it helps."}
-      footer={<Button onClick={go} loading={busy} disabled={needs && !files.length} icon={Check}>Mark done</Button>}
+      description={description}
+      footer={
+        <div className="flex w-full items-center gap-3">
+          <p className="min-w-0 flex-1 text-xs text-muted">
+            {items.length > 0 && (list.left ? `${list.left} of ${items.length} left` : list.needNote ? "Say what is wrong" : list.problems ? `${list.problems} problem${list.problems === 1 ? "" : "s"}` : "All OK")}
+          </p>
+          <Button onClick={go} loading={busy} disabled={blocked} icon={Check}>
+            {fromIssue ? "Fixed — resolve the issue" : "Mark done"}
+          </Button>
+        </div>
+      }
     >
       <div className="space-y-4">
+        {items.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-xs font-semibold text-muted">Checklist · {items.length}</p>
+              <button type="button" onClick={allOk} className="text-xs font-semibold text-brand hover:underline">Everything OK</button>
+            </div>
+            <ol className="space-y-2">
+              {items.map((text, i) => (
+                <ChecklistLine key={`${i}-${text}`} n={i + 1} text={text} answer={answers[i]} onChange={(a) => setAnswers((l) => { const next = [...l]; next[i] = a; return next; })} />
+              ))}
+            </ol>
+          </div>
+        )}
         <div className="flex flex-wrap gap-2">
           {previews.map((url, i) => (
             <div key={url} className="relative size-20 overflow-hidden rounded-xl border border-line">
@@ -64,18 +132,20 @@ function DoneSheet({ item, onClose, onDone }) {
             </label>
           )}
         </div>
-        <Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder="Note (optional)" aria-label="Note" />
+        <Textarea rows={2} value={note} onChange={(e) => setNote(e.target.value)} placeholder={fromIssue ? "What was done to fix it" : "Note (optional)"} aria-label="Note" />
       </div>
     </Sheet>
   );
 }
 
 /** One task on the list. `showDate`: say which day it is for (late and coming-up items). */
-function Row({ item, onTick, onOpen, busy, canUndo, showDate, readOnly, unread }) {
+function Row({ item, onTick, onOpen, busy, canUndo, showDate, readOnly, unread, role }) {
   const { task, done } = item;
   const check = item.check;
   const proof = done ? (item.kind === "repeat" ? check?.photos : task.done?.photos) || [] : [];
   const note = done ? (item.kind === "repeat" ? check?.note : task.done?.note) : "";
+  const lines = itemsOf(task).length;
+  const problems = done ? problemsIn(item.kind === "repeat" ? check?.items : task.done?.items) : [];
   const tickable = !readOnly && (done ? canUndo : item.canTick !== false);
   return (
     <li className="flex gap-3 rounded-2xl border border-line bg-surface p-3.5">
@@ -119,8 +189,24 @@ function Row({ item, onTick, onOpen, busy, canUndo, showDate, readOnly, unread }
           {task.createdBy?.name && <span>· from {task.createdBy.name}</span>}
           {task.priority === "urgent" && !done && <Badge tone="danger" className="px-2 py-px text-[10px]"><Flag className="size-3" />Urgent</Badge>}
           {task.needsPhoto && !done && <Badge className="px-2 py-px text-[10px]"><Camera className="size-3" />Photo</Badge>}
+          {lines > 0 && !done && <Badge className="px-2 py-px text-[10px]"><ListChecks className="size-3" />{lines} to check</Badge>}
+          {task.issueId && (
+            <Link href={issueHref(task, role)} className="inline-flex">
+              <Badge tone="warning" className="px-2 py-px text-[10px] hover:underline"><TriangleAlert className="size-3" />Issue</Badge>
+            </Link>
+          )}
           {done && item.check?.doneOn > item.date && <Badge tone="warning" className="px-2 py-px text-[10px]">Done late</Badge>}
         </div>
+        {problems.length > 0 && (
+          <ul className="space-y-0.5 rounded-lg bg-danger-soft/50 px-2.5 py-1.5 text-xs text-danger">
+            {problems.map((x, i) => (
+              <li key={i}>
+                <span className="font-semibold">✗ {x.text}</span>
+                {x.note ? ` — ${x.note}` : ""}
+              </li>
+            ))}
+          </ul>
+        )}
         {(proof.length > 0 || note) && (
           <div className="flex flex-wrap items-center gap-2 pt-1">
             {proof.map((u) => <FileThumb key={u} url={u} label="Proof" className="size-14" />)}
@@ -165,13 +251,21 @@ export default function MyTasksTab({ tasks, loading, companyId, branchId, user, 
   const list = useMemo(() => agenda(tasks, checks, today), [tasks, checks, today]);
   const single = useMemo(() => (day ? dayList(tasks, checks, day, today).map((x) => ({ ...x, date: day, canTick: x.kind === "once" || day <= today })) : []), [tasks, checks, day, today]);
 
-  const finish = async (item, { files = [], note = "" } = {}) => {
+  const finish = async (item, { files = [], note = "", items = [] } = {}) => {
     setBusy(`${item.task.id}-${item.date}`);
     try {
       const photos = files.length ? await uploadProof(companyId, branchId, user, files) : [];
-      if (item.kind === "repeat") await tickDay(companyId, branchId, item.task, user, { date: item.date, doneOn: today, photos, note });
-      else await completeOnce(companyId, branchId, item.task, user, { date: today, photos, note });
-      toast.success(item.kind === "repeat" && item.date < today ? "Done — counted late" : "Done");
+      // a task made from an issue: resolving the issue marks it done (with the note)
+      if (item.task.issueId) {
+        await resolveIssue(companyId, branchId, { id: item.task.issueId, taskId: item.task.id }, user, note);
+        if (photos.length) await completeOnce(companyId, branchId, item.task, user, { date: today, photos, note }).catch(() => {});
+        toast.success("Done — the issue is resolved");
+        return;
+      }
+      if (item.kind === "repeat") await tickDay(companyId, branchId, item.task, user, { date: item.date, doneOn: today, photos, note, items });
+      else await completeOnce(companyId, branchId, item.task, user, { date: today, photos, note, items });
+      const bad = items.filter((x) => !x.ok).length;
+      toast.success(item.kind === "repeat" && item.date < today ? "Done — counted late" : "Done", bad ? { description: `${bad} problem${bad === 1 ? "" : "s"} noted — your manager sees them` } : undefined);
     } catch (e) {
       toast.error("Couldn't save", { description: e.message });
     } finally {
@@ -191,13 +285,13 @@ export default function MyTasksTab({ tasks, loading, companyId, branchId, user, 
   };
   const onTick = (item) => {
     if (item.done) return undo(item);
-    if (item.task.needsPhoto) return setAsking(item);
+    if (item.task.needsPhoto || itemsOf(item.task).length || item.task.issueId) return setAsking(item);
     return finish(item);
   };
-  // your own tick, or a one-off you finished — today only
-  const canUndo = (item) => (item.kind === "repeat" ? item.check?.by?.uid === user.uid && item.check?.doneOn === today : item.task.done?.by?.uid === user.uid && item.task.done?.date === today);
+  // your own tick, or a one-off you finished — today only (an issue's task opens again with the issue)
+  const canUndo = (item) => !item.task.issueId && (item.kind === "repeat" ? item.check?.by?.uid === user.uid && item.check?.doneOn === today : item.task.done?.by?.uid === user.uid && item.task.done?.date === today);
   const row = (item, showDate) => (
-    <Row key={`${item.task.id}-${item.date}`} item={item} unread={unreadOn(item.task, reads, user.uid)} onTick={onTick} onOpen={(t) => setOpenId(t.id)} busy={busy === `${item.task.id}-${item.date}`} canUndo={canUndo(item)} showDate={showDate} readOnly={readOnly} />
+    <Row key={`${item.task.id}-${item.date}`} item={item} unread={unreadOn(item.task, reads, user.uid)} onTick={onTick} onOpen={(t) => setOpenId(t.id)} busy={busy === `${item.task.id}-${item.date}`} canUndo={canUndo(item)} showDate={showDate} readOnly={readOnly} role={user.role} />
   );
 
   // a dot under a day of the strip: something still to do that day

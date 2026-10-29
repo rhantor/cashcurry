@@ -1,11 +1,13 @@
 "use client";
 // Give a task, or change one (roadmap 4.11): what, who, once (by a day) or
-// repeating (every day / chosen weekdays / a day each month), and whether it
-// needs a photo to count as done.
+// repeating (every day / chosen weekdays / a day each month), whether it
+// needs a photo to count as done, and a checklist to go through (30 Oct) —
+// typed, or started from a ready-made one (Opening check, Closing check…).
 import { useEffect, useState } from "react";
+import { ArrowDown, ArrowUp, ListChecks, Plus, X } from "lucide-react";
 import { Button, DatePicker, Field, Input, Select, Sheet, Switch, Textarea, toast } from "@/app/components/ui";
 import { Chip } from "@/app/components/entry/Choices";
-import { WEEKDAYS, checkTask } from "@/lib/tasks/model";
+import { MAX_ITEMS, TEMPLATES, WEEKDAYS, checkTask, cleanItems } from "@/lib/tasks/model";
 import { roleLabel } from "@/lib/authz/permissions";
 import { saveTask } from "@/lib/tasks/client";
 
@@ -16,7 +18,47 @@ const HOW = [
   { value: "month", label: "Monthly" },
 ];
 
-const blank = (today) => ({ title: "", details: "", assigneeUid: "", how: "once", dueDate: today, days: [1, 2, 3, 4, 5], monthDay: 1, startDate: today, needsPhoto: false, urgent: false });
+const blank = (today) => ({ title: "", details: "", assigneeUid: "", how: "once", dueDate: today, days: [1, 2, 3, 4, 5], monthDay: 1, startDate: today, needsPhoto: false, urgent: false, items: [] });
+
+/** The checklist: one line each, added, changed, moved or removed. */
+function ChecklistEditor({ items, onChange }) {
+  const [draft, setDraft] = useState("");
+  const add = () => {
+    const lines = draft.split("\n").map((x) => x.trim()).filter(Boolean);
+    if (!lines.length) return;
+    onChange([...items, ...lines].slice(0, MAX_ITEMS));
+    setDraft("");
+  };
+  const move = (i, step) => {
+    const next = [...items];
+    const [x] = next.splice(i, 1);
+    next.splice(i + step, 0, x);
+    onChange(next);
+  };
+  return (
+    <div className="space-y-2">
+      {items.length > 0 && (
+        <ol className="divide-y divide-line overflow-hidden rounded-xl border border-line">
+          {items.map((text, i) => (
+            <li key={i} className="flex items-center gap-2 px-2 py-1.5">
+              <span className="w-5 shrink-0 text-right text-xs font-semibold tabular-nums text-subtle">{i + 1}</span>
+              <input value={text} onChange={(e) => onChange(items.map((x, j) => (j === i ? e.target.value : x)))} aria-label={`Line ${i + 1}`} className="min-w-0 flex-1 rounded-md bg-transparent px-1.5 py-1 text-sm text-fg outline-none focus:bg-surface-2" />
+              <button type="button" onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up" className="rounded p-1 text-muted hover:text-fg disabled:opacity-30"><ArrowUp className="size-3.5" /></button>
+              <button type="button" onClick={() => move(i, 1)} disabled={i === items.length - 1} aria-label="Move down" className="rounded p-1 text-muted hover:text-fg disabled:opacity-30"><ArrowDown className="size-3.5" /></button>
+              <button type="button" onClick={() => onChange(items.filter((_, j) => j !== i))} aria-label="Remove" className="rounded p-1 text-muted hover:text-danger"><X className="size-3.5" /></button>
+            </li>
+          ))}
+        </ol>
+      )}
+      {items.length < MAX_ITEMS && (
+        <div className="flex gap-2">
+          <Input value={draft} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }} placeholder={items.length ? "Another thing to check" : "e.g. Tables clean and set"} aria-label="Add a line to the checklist" />
+          <Button variant="secondary" icon={Plus} onClick={add} disabled={!draft.trim()} aria-label="Add the line" />
+        </div>
+      )}
+    </div>
+  );
+}
 
 function fromTask(t, today) {
   const r = t.repeat;
@@ -31,6 +73,7 @@ function fromTask(t, today) {
     startDate: t.startDate || today,
     needsPhoto: !!t.needsPhoto,
     urgent: t.priority === "urgent",
+    items: t.items || [],
   };
 }
 
@@ -54,7 +97,7 @@ export default function TaskSheet({ open, onClose, task, defaultAssigneeUid, def
     const repeat = f.how === "once" ? null : f.how === "day" ? { every: "day" } : f.how === "week" ? { every: "week", days: [...f.days].sort() } : { every: "month", day: Number(f.monthDay) };
     // who leads it: kept while the person stays the same, else theirs (leadFor)
     const teamLeadUid = (task && task.assigneeUid === f.assigneeUid && task.teamLeadUid) || (leadFor ? leadFor(f.assigneeUid) : null);
-    const data = { teamLeadUid, title: f.title, details: f.details, assignee, repeat, dueDate: f.how === "once" ? f.dueDate || null : null, startDate: repeat ? f.startDate || today : null, needsPhoto: f.needsPhoto, priority: f.urgent ? "urgent" : "normal" };
+    const data = { teamLeadUid, title: f.title, details: f.details, assignee, repeat, dueDate: f.how === "once" ? f.dueDate || null : null, startDate: repeat ? f.startDate || today : null, needsPhoto: f.needsPhoto, priority: f.urgent ? "urgent" : "normal", items: cleanItems(f.items) };
     const e = checkTask(data);
     setErrors(e);
     if (Object.keys(e).length) return;
@@ -80,6 +123,33 @@ export default function TaskSheet({ open, onClose, task, defaultAssigneeUid, def
       footer={<Button onClick={save} loading={busy}>{task ? "Save" : "Give the task"}</Button>}
     >
       <div className="space-y-5">
+        {!task && (
+          // a ready-made checklist to start from: its name, lines and when — all changeable
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-muted">Start from a checklist</p>
+            <div className="flex flex-wrap gap-1.5">
+              {TEMPLATES.map((t) => (
+                <Chip
+                  key={t.id}
+                  on={f.title === t.title}
+                  onClick={() =>
+                    setF((x) => ({
+                      ...x,
+                      title: t.title,
+                      items: t.items,
+                      needsPhoto: t.needsPhoto,
+                      how: t.repeat.every,
+                      days: t.repeat.days || x.days,
+                    }))
+                  }
+                >
+                  <ListChecks className="mr-1 inline size-3.5" />
+                  {t.title}
+                </Chip>
+              ))}
+            </div>
+          </div>
+        )}
         <Field label="What needs doing?" error={errors.title}>
           {({ id, invalid }) => <Input id={id} invalid={invalid} value={f.title} onChange={(e) => set("title")(e.target.value)} placeholder="e.g. Clean the fryer" size="lg" />}
         </Field>
@@ -124,6 +194,12 @@ export default function TaskSheet({ open, onClose, task, defaultAssigneeUid, def
           )}
           {f.how !== "once" && <Field label="Starting">{() => <DatePicker value={f.startDate} onChange={set("startDate")} />}</Field>}
           {errors.repeat && <p className="text-xs font-medium text-danger">{errors.repeat}</p>}
+        </div>
+
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-muted">Checklist (optional)</p>
+          <p className="-mt-1 text-xs text-muted">Each line is marked OK or Problem to finish. Problems show here for you.</p>
+          <ChecklistEditor items={f.items} onChange={set("items")} />
         </div>
 
         <div className="divide-y divide-line rounded-2xl border border-line">

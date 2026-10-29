@@ -95,6 +95,44 @@ describe("working on issues", () => {
   });
 });
 
+describe("an issue's task (30 Oct)", () => {
+  const T = `${B}/tasks`;
+  const both = (uid, issueId, issuePatch, taskPatch) => {
+    const d = db(uid);
+    const b = d.batch();
+    b.update(d.doc(`${I}/${issueId}`), issuePatch);
+    b.update(d.doc(`${T}/issue_${issueId}`), taskPatch);
+    return b.commit();
+  };
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      const d = ctx.firestore();
+      const t = (issueId, status) => ({ title: "Fix: Fryer broken", assigneeUid: "kumar", assignee: { uid: "kumar" }, creatorUid: "klManager", repeat: null, status, issueId });
+      await d.doc(`${T}/issue_byAli`).set(t("byAli", "open"));
+      await d.doc(`${T}/issue_done`).set(t("done", "done"));
+    });
+  });
+  it("management gives the task with the issue", async () => {
+    const d = db("klManager");
+    const b = d.batch();
+    b.update(d.doc(`${I}/byCashier`), { assigneeUid: "ali", assignedTo: { uid: "ali" }, taskId: "issue_byCashier" });
+    b.set(d.doc(`${T}/issue_byCashier`), { title: "Fix: Fryer broken", assigneeUid: "ali", assignee: { uid: "ali" }, creatorUid: "klManager", repeat: null, status: "open", issueId: "byCashier" });
+    expect(await ok(b.commit())).toBe(true);
+  });
+  it("whoever resolves the issue marks its task done with it", async () => {
+    expect(await ok(both("kumar", "byAli", { status: "resolved", resolution: "new fuse" }, { status: "done", done: { by: { uid: "kumar" } } }))).toBe(true);
+  });
+  it("whoever raised it reopens the task with the issue — but can't move the task alone or the wrong way", async () => {
+    expect(await ok(db("ali").doc(`${T}/issue_done`).update({ status: "open", done: null }))).toBe(false); // the issue is still resolved
+    expect(await ok(both("ali", "done", { status: "open", resolution: "" }, { status: "done" }))).toBe(false); // doesn't match the issue
+    expect(await ok(both("ali", "done", { status: "open", resolution: "" }, { status: "open", done: null }))).toBe(true);
+  });
+  it("nobody else changes the task through the issue", async () => {
+    expect(await ok(both("ali", "done", { status: "open" }, { status: "open", title: "Something else" }))).toBe(false);
+    expect(await ok(db("siti").doc(`${T}/issue_byAli`).update({ status: "done" }))).toBe(false);
+  });
+});
+
 describe("the discussion", () => {
   const comment = (uid) => ({ kind: "comment", byUid: uid, byName: uid, text: "on it", createdAt: serverTimestamp() });
   it("those who can see the issue write, as themselves; others can't read or write", async () => {

@@ -7,7 +7,8 @@ import { format, parseISO } from "date-fns";
 import { ArrowLeft, ChevronRight, Flag, MoreHorizontal, Pause, Pencil, Play, Plus, Repeat, Trash2, Users } from "lucide-react";
 import { Avatar, Badge, Button, EmptyState, Menu, Skeleton, Tabs, cn, toast } from "@/app/components/ui";
 import { confirmDialog } from "@/app/components/ui/notify";
-import { CATCH_UP_DAYS, addDays, repeatText, todayCount, unreadOn } from "@/lib/tasks/model";
+import Link from "next/link";
+import { CATCH_UP_DAYS, addDays, issueHref, itemsOf, repeatText, todayCount, unreadOn } from "@/lib/tasks/model";
 import { deleteTask, setTaskActive, useChecks } from "@/lib/tasks/client";
 import TaskSheet from "./TaskSheet";
 import MyTasksTab from "./MyTasksTab";
@@ -60,21 +61,30 @@ function GivenList({ tasks, onEdit, onOpen, companyId, branchId, today, reads, u
               {t.repeat ? <span className="inline-flex items-center gap-1"><Repeat className="size-3" />{repeatText(t)}</span> : <span>{t.dueDate ? `By ${label(t.dueDate)}` : "Once, any time"}</span>}
               {t.priority === "urgent" && <Flag className="size-3 text-danger" aria-label="Urgent" />}
               {t.needsPhoto && <span>· photo needed</span>}
+              {itemsOf(t).length > 0 && <span>· {itemsOf(t).length} to check</span>}
+              {t.issueId && <Badge tone="warning" className="px-2 py-px text-[10px]">From an issue</Badge>}
               {t.active === false && <Badge className="px-2 py-px text-[10px]">Stopped</Badge>}
               {!t.repeat && t.status === "done" && <Badge tone="success" className="px-2 py-px text-[10px]">Done {t.done?.date ? label(t.done.date) : ""}</Badge>}
             </div>
           </div>
-          <Menu
-            align="end"
-            width={190}
-            trigger={(p) => <Button {...p} variant="ghost" size="sm" icon={MoreHorizontal} aria-label={`More for ${t.title}`} />}
-            items={[
-              { label: "Change", icon: Pencil, onSelect: () => onEdit(t) },
-              ...(t.repeat ? [{ label: t.active === false ? "Start again" : "Stop it", icon: t.active === false ? Play : Pause, onSelect: () => pause(t) }] : []),
-              "divider",
-              { label: "Delete", icon: Trash2, danger: true, onSelect: () => remove(t) },
-            ]}
-          />
+          {t.issueId ? (
+            // made from an issue: changed (or taken off them) from the issue itself
+            <Link href={issueHref(t)} className="shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-brand hover:bg-surface-2">
+              Open the issue
+            </Link>
+          ) : (
+            <Menu
+              align="end"
+              width={190}
+              trigger={(p) => <Button {...p} variant="ghost" size="sm" icon={MoreHorizontal} aria-label={`More for ${t.title}`} />}
+              items={[
+                { label: "Change", icon: Pencil, onSelect: () => onEdit(t) },
+                ...(t.repeat ? [{ label: t.active === false ? "Start again" : "Stop it", icon: t.active === false ? Play : Pause, onSelect: () => pause(t) }] : []),
+                "divider",
+                { label: "Delete", icon: Trash2, danger: true, onSelect: () => remove(t) },
+              ]}
+            />
+          )}
         </li>
       ))}
     </ul>
