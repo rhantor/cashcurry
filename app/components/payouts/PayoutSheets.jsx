@@ -23,7 +23,7 @@ import { formatMoney } from "@/lib/region/currency";
 import { categoryFields, findCategory, pickable } from "@/lib/costs/categories";
 import { useCostCategories } from "@/lib/costs/client";
 import { NO_INVOICE_REASONS } from "@/lib/costs/vouchers";
-import { changeOf } from "@/lib/payouts/model";
+import { changeOf, deliveryOf, goodsOf } from "@/lib/payouts/model";
 import {
   bringBill,
   handOut,
@@ -432,7 +432,18 @@ export function BillSheet({
   const [busy, setBusy] = useState(false);
   const [where, setWhere] = useState("shop"); // "shop" | "supplier"
   const [supplier, setSupplier] = useState(null);
+  // a delivery / transport charge paid on top: its own cost, category and receipt
+  const [deliveryOn, setDeliveryOn] = useState(false);
+  const [deliveryAmt, setDeliveryAmt] = useState("");
+  const [deliveryCat, setDeliveryCat] = useState("");
+  const [deliveryFiles, setDeliveryFiles] = useState([]);
+  const [keptDelivery, setKeptDelivery] = useState([]);
   const float = Number(retry ? retry.floatAmount : payout?.amount) || 0;
+  // the branch's "Transport & delivery" category, to start the delivery in
+  const deliveryDefault = useMemo(() => {
+    const all = pickable(groups).flatMap((g) => g.categories);
+    return (all.find((c) => c.id === "delivery") || all.find((c) => /deliver|transport/i.test(c.name)) || {}).id || "";
+  }, [groups]);
 
   useEffect(() => {
     if (!open) return;
@@ -487,7 +498,14 @@ export function BillSheet({
         })
         .catch(() => {});
     }
-    setAmount(retry ? String(retry.billAmount) : "");
+    // a bill sent back: its amount without the delivery, which has its own box
+    setAmount(retry ? String(goodsOf(retry)) : "");
+    const d = retry ? deliveryOf(retry) : null;
+    setDeliveryOn(!!d);
+    setDeliveryAmt(d ? String(d.amount) : "");
+    setDeliveryCat(d?.categoryId || "");
+    setDeliveryFiles([]);
+    setKeptDelivery(d?.receipts || []);
     setFiles([]);
     setKept(retry?.attachments || []);
     setReceipts([]);
@@ -501,8 +519,10 @@ export function BillSheet({
   }, [open, retry, payout?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const atSupplier = where === "supplier";
-  // at a supplier, what was spent is what went to their bills
-  const bill = atSupplier ? supplierPaid(supplier) : Number(amount) || 0;
+  // at a supplier, what was spent is what went to their bills; a delivery charge comes on top
+  const delivery = deliveryOn ? Number(deliveryAmt) || 0 : 0;
+  const bill = (atSupplier ? supplierPaid(supplier) : Number(amount) || 0) + delivery;
+  const deliveryCatId = deliveryCat || deliveryDefault;
   const change = changeOf(float, bill);
 
   const save = async () => {
@@ -516,13 +536,15 @@ export function BillSheet({
       )
         e.files = "Add the supplier's bill (photo or PDF)";
     } else {
-      if (!(bill > 0)) e.amount = "The amount on the bill";
+      if (!(Number(amount) > 0)) e.amount = "The amount on the bill";
       if (!findCategory(groups, categoryId)) e.category = "What was it for?";
       if (!files.length && !kept.length && !noPaper)
         e.files = "Add the bill (photo or PDF) — or say there is none";
       if (noPaper && !files.length && !reason.trim())
         e.reason = "Why is there no bill?";
     }
+    if (deliveryOn && !(delivery > 0)) e.delivery = "How much was the delivery?";
+    if (deliveryOn && !findCategory(groups, deliveryCatId)) e.deliveryCat = "Which category?";
     setErrors(e);
     if (Object.keys(e).length) return;
     setBusy(true);
@@ -532,6 +554,9 @@ export function BillSheet({
         : [];
       const paid = receipts.length
         ? await uploadBillFiles(companyId, branchId, user.uid, receipts)
+        : [];
+      const deliveryPaid = deliveryOn && deliveryFiles.length
+        ? await uploadBillFiles(companyId, branchId, user.uid, deliveryFiles)
         : [];
       const supplierData = atSupplier
         ? {
@@ -588,6 +613,13 @@ export function BillSheet({
             : "",
         note,
         supplier: supplierData,
+        delivery: deliveryOn
+          ? {
+              amount: delivery,
+              fields: categoryFields(groups, deliveryCatId),
+              receipts: [...keptDelivery, ...deliveryPaid],
+            }
+          : null,
       };
       if (retry) await resubmitBill(companyId, branchId, user, retry, data);
       else await bringBill(companyId, branchId, user, payout, data);
@@ -676,6 +708,81 @@ export function BillSheet({
             <Field label="Day">
               {() => <DatePicker size="lg" value={date} onChange={setDate} />}
             </Field>
+          )}
+        </div>
+        {/* a delivery / transport charge on top: its own cost in its own category */}
+        <div
+          className={cn(
+            "rounded-2xl border p-3",
+            deliveryOn ? "border-brand/30 bg-brand-soft/30" : "border-line",
+          )}
+        >
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium text-fg">
+                Delivery / transport charge
+              </p>
+              <p className="text-xs text-muted">
+                Paid on top — kept as its own cost.
+              </p>
+            </div>
+            <Switch checked={deliveryOn} onChange={setDeliveryOn} aria-label="Delivery / transport charge" />
+          </div>
+          {deliveryOn && (
+            <div className="mt-3 space-y-3">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Field label="Delivery amount" error={errors.delivery}>
+                  {({ id, invalid }) => (
+                    <MoneyInput
+                      id={id}
+                      currency={currency}
+                      value={deliveryAmt}
+                      invalid={invalid}
+                      onValueChange={setDeliveryAmt}
+                    />
+                  )}
+                </Field>
+                <Field label="Category" error={errors.deliveryCat}>
+                  {({ id, invalid }) => (
+                    <Select
+                      id={id}
+                      value={deliveryCatId}
+                      invalid={invalid}
+                      onChange={(e) => setDeliveryCat(e.target.value)}
+                      className="h-12"
+                    >
+                      <option value="">Choose…</option>
+                      {pickable(groups).map((g) => (
+                        <optgroup key={g.id} label={g.kind === "notCost" ? `${g.name} — not a cost` : g.name}>
+                          {g.categories.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
+                    </Select>
+                  )}
+                </Field>
+              </div>
+              <div>
+                <p className="mb-2 text-xs font-semibold text-muted">
+                  Delivery receipt (optional)
+                </p>
+                <FilePicker
+                  files={deliveryFiles}
+                  setFiles={setDeliveryFiles}
+                  existing={keptDelivery}
+                  setExisting={setKeptDelivery}
+                  max={4}
+                />
+              </div>
+              {bill > 0 && (
+                <p className="text-xs font-medium text-muted">
+                  Total spent: {money(bill - delivery)} + {money(delivery)} delivery = {money(bill)}
+                </p>
+              )}
+            </div>
           )}
         </div>
         {bill > 0 && (

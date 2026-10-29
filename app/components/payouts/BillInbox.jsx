@@ -14,7 +14,7 @@ import { formatMoney } from "@/lib/region/currency";
 import { can } from "@/lib/authz/permissions";
 import { categoryFields, pickable } from "@/lib/costs/categories";
 import { useCostCategories } from "@/lib/costs/client";
-import { canReviewBill, changeText } from "@/lib/payouts/model";
+import { canReviewBill, changeText, deliveryOf, goodsOf } from "@/lib/payouts/model";
 import { FileThumb, FilesSheet } from "@/app/components/common/Files";
 import { approveBillNow, approveSupplierNow, sendBillBack } from "@/lib/payouts/client";
 import { linesTotal, supplierText } from "@/lib/payouts/supplier";
@@ -28,6 +28,7 @@ function CorrectSheet({ bill, onClose, onApprove, groups, currency }) {
   const [categoryId, setCategoryId] = useState(bill?.categoryId || "");
   const [busy, setBusy] = useState(false);
   if (!bill) return null;
+  const delivery = deliveryOf(bill)?.amount || 0;
   const go = async () => {
     setBusy(true);
     await onApprove(bill, { billAmount: Number(amount), fields: categoryFields(groups, categoryId) || undefined });
@@ -35,9 +36,9 @@ function CorrectSheet({ bill, onClose, onApprove, groups, currency }) {
     onClose();
   };
   return (
-    <Sheet open={!!bill} onClose={onClose} title="Correct and approve" description="The amount and category as brought back are kept on the bill." footer={<Button onClick={go} loading={busy} disabled={!(Number(amount) > 0)}>Approve corrected</Button>}>
+    <Sheet open={!!bill} onClose={onClose} title="Correct and approve" description="The amount and category as brought back are kept on the bill." footer={<Button onClick={go} loading={busy} disabled={!(Number(amount) > delivery)}>Approve corrected</Button>}>
       <div className="space-y-4">
-        <Field label="Real amount">{({ id }) => <MoneyInput id={id} currency={currency} value={amount} onValueChange={setAmount} />}</Field>
+        <Field label={delivery ? "Real amount, delivery included" : "Real amount"} hint={delivery ? `Delivery ${formatMoney(delivery, currency)} stays a cost of its own.` : undefined}>{({ id }) => <MoneyInput id={id} currency={currency} value={amount} onValueChange={setAmount} />}</Field>
         <Field label="What it was for">
           {({ id }) => (
             <Select id={id} value={categoryId} onChange={(e) => setCategoryId(e.target.value)} className="h-12">
@@ -107,15 +108,15 @@ export default function BillInbox({ companyId, branchId, user, bills, loading })
               <div className="flex gap-4 p-4">
                 <div className="flex shrink-0 flex-col gap-2">
                   {/* the bill's first page, or the payment receipt when there's no bill paper */}
-                  {b.attachments?.length ? <FileThumb url={b.attachments[0]} label="Bill" /> : b.receipts?.length ? <FileThumb url={b.receipts[0]} label="Payment receipt" /> : null}
+                  {b.attachments?.length ? <FileThumb url={b.attachments[0]} label="Bill" /> : b.receipts?.length ? <FileThumb url={b.receipts[0]} label="Payment receipt" /> : b.delivery?.receipts?.length ? <FileThumb url={b.delivery.receipts[0]} label="Delivery receipt" /> : null}
                   {/* every page and receipt in one sheet */}
-                  {(b.attachments?.length || 0) + (b.receipts?.length || 0) > 1 && (
+                  {(b.attachments?.length || 0) + (b.receipts?.length || 0) + (b.delivery?.receipts?.length || 0) > 1 && (
                     <button type="button" onClick={() => setViewing(b)} className="flex size-20 flex-col items-center justify-center rounded-xl border border-line bg-surface-2 text-xs font-semibold text-fg hover:bg-surface">
-                      <span className="text-base">{(b.attachments?.length || 0) + (b.receipts?.length || 0)}</span>
+                      <span className="text-base">{(b.attachments?.length || 0) + (b.receipts?.length || 0) + (b.delivery?.receipts?.length || 0)}</span>
                       files
                     </button>
                   )}
-                  {!b.attachments?.length && !b.receipts?.length && (
+                  {!b.attachments?.length && !b.receipts?.length && !b.delivery?.receipts?.length && (
                     b.supplier ? (
                       <span className="flex size-20 items-center justify-center rounded-xl bg-surface-2 text-center text-[11px] font-semibold leading-tight text-muted">No<br />receipt</span>
                     ) : (
@@ -166,6 +167,13 @@ export default function BillInbox({ companyId, branchId, user, bills, loading })
                   <p className="text-xs text-muted">{day(b.date)} · {b.to?.name || "—"} · brought by {b.by?.name || "someone"}</p>
                   <p className="inline-flex rounded-lg bg-brand-soft px-2 py-1 text-xs font-medium text-brand">{changeText(b.floatAmount, b.billAmount, money)}</p>
                   {b.voucherReason && <p className="rounded-xl bg-surface-2 px-3 py-2 text-sm text-fg">&ldquo;{b.voucherReason}&rdquo;</p>}
+                  {deliveryOf(b) && (
+                    <p className="text-xs text-fg">
+                      <span className="text-muted">{money(goodsOf(b))} + </span>
+                      <span className="font-semibold">{money(deliveryOf(b).amount)} delivery</span>
+                      <span className="text-muted"> · {deliveryOf(b).category || "Transport & delivery"}{deliveryOf(b).receipts?.length ? " · with its receipt" : ""}</span>
+                    </p>
+                  )}
                   {b.receipts?.length > 0 && <p className="text-xs text-muted">With a payment receipt</p>}
                   {b.note && <p className="text-xs text-muted">{b.note}</p>}
                 </div>
@@ -189,7 +197,7 @@ export default function BillInbox({ companyId, branchId, user, bills, loading })
         open={!!viewing}
         onClose={() => setViewing(null)}
         title={viewing ? `${money(viewing.billAmount)} · ${viewing.category || viewing.purpose || "Bill"}` : "Files"}
-        groups={viewing ? [{ title: "Bill", urls: viewing.attachments || [] }, { title: "Payment receipt", urls: viewing.receipts || [] }] : []}
+        groups={viewing ? [{ title: "Bill", urls: viewing.attachments || [] }, { title: "Payment receipt", urls: viewing.receipts || [] }, { title: "Delivery receipt", urls: viewing.delivery?.receipts || [] }] : []}
       />
       {correcting && <CorrectSheet bill={correcting} onClose={() => setCorrecting(null)} onApprove={approve} groups={groups} currency={currency} />}
     </>
