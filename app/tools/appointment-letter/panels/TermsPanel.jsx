@@ -3,6 +3,7 @@
 import React from "react";
 import { Trash2, Plus, Briefcase, DollarSign } from "lucide-react";
 import { useLetter } from "../LetterContext";
+import { ROLES } from "@/app/staff-management/lib/constants";
 
 export default function TermsPanel() {
   const { activeTab, templateType, jobTerms, setJobTerms, allowances, handleAllowanceChange, addAllowance, removeAllowance } = useLetter();
@@ -19,12 +20,18 @@ export default function TermsPanel() {
                 <div className="grid grid-cols-2 gap-2">
                   <div>
                     <label className="block text-[9px] font-bold text-subtle uppercase mb-1">Job Title</label>
+                    {/* the restaurant's jobs (as in Staff management) to pick, or any title typed in */}
                     <input 
                       type="text" 
+                      list="letter-job-titles"
+                      autoComplete="off"
                       className="w-full text-xs font-medium border border-line p-2.5 rounded-lg text-fg bg-surface focus:ring-2" 
                       value={jobTerms.title} 
                       onChange={(e) => setJobTerms({...jobTerms, title: e.target.value})} 
                     />
+                    <datalist id="letter-job-titles">
+                      {ROLES.filter((r) => r.value && r.value !== "staff").map((r) => <option key={r.value} value={r.label} />)}
+                    </datalist>
                   </div>
                   <div>
                     <label className="block text-[9px] font-bold text-subtle uppercase mb-1">Branch / Dept</label>
