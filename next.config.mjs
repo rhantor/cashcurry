@@ -7,6 +7,10 @@ const nextConfig = {
   },
   // `npm run dev:phone`: the dev server is opened from this machine's Wi-Fi address.
   ...(process.env.CC_LAN_HOST ? { allowedDevOrigins: [process.env.CC_LAN_HOST] } : {}),
+  // Dev only: keep pages built for an hour, not a minute. Otherwise a page not
+  // opened lately is rebuilt on the next visit, and a button that moves there
+  // (an order guide's Submit → Purchase orders) seems to do nothing for seconds.
+  onDemandEntries: { maxInactiveAge: 60 * 60 * 1000, pagesBufferLength: 100 },
   // Old addresses (roadmap 4.7): chat moved to its own workspace (4.4), and the
   // feed page was only ever a placeholder. Links in old notifications and
   // bookmarks still land somewhere useful (the ?c= of a chat is kept).

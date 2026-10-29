@@ -3,7 +3,7 @@ import { format } from "date-fns";
 import { personName } from "@/lib/people";
 import { formatMoney } from "@/lib/region/currency";
 import { businessToday } from "@/lib/region";
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
 import { skipToken } from "@reduxjs/toolkit/query";
 import useResolvedCompanyBranch from "@/app/hooks/useResolvedCompanyBranch";
@@ -92,7 +92,8 @@ export default function PurchaseOrdersPage() {
   const args = ready && companyId && branchId ? { companyId, branchId } : skipToken;
   const companyArgs = ready && companyId ? { companyId } : skipToken;
 
-  const { data: orders = [], isLoading: ordersLoading } = useGetRequisitionsQuery(args);
+  // always fresh on arrival — an order made from a guide a moment ago must be here
+  const { data: orders = [], isLoading: ordersLoading } = useGetRequisitionsQuery(args, { refetchOnMountOrArgChange: true });
   const { data: vendors = [] } = useGetVendorsQuery(companyArgs);
   // Only what this branch stocks — adding another branch's product to an order
   // would be a mistake, not a convenience.
@@ -126,6 +127,11 @@ export default function PurchaseOrdersPage() {
   // Open orders are what people come here to act on, so hide the settled ones
   // by default rather than making users scroll past months of history.
   const [statusFilter, setStatusFilter] = useState("Open");
+  // ?new=… : the order just made from an order guide — first, marked, in view
+  const [justMade, setJustMade] = useState("");
+  useEffect(() => {
+    setJustMade(new URLSearchParams(window.location.search).get("new") || "");
+  }, []);
   const [search, setSearch] = useState("");
 
   const visibleOrders = useMemo(() => {
@@ -145,8 +151,13 @@ export default function PurchaseOrdersPage() {
       return true;
     });
     // late deliveries first — they need a phone call
-    return [...shown].sort((a, b) => lateDays(b, today) - lateDays(a, today));
-  }, [orders, statusFilter, search, today]);
+    return [...shown].sort((a, b) => (b.id === justMade) - (a.id === justMade) || lateDays(b, today) - lateDays(a, today));
+  }, [orders, statusFilter, search, today, justMade]);
+
+  const justMadeShown = !!justMade && visibleOrders.some((o) => o.id === justMade);
+  useEffect(() => {
+    if (justMadeShown) document.getElementById(`po-${justMade}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [justMadeShown, justMade]);
 
   /* ------------------------------ receive (GRN) ----------------------------- */
   const [openReceiveSheet, setOpenReceiveSheet] = useState(false);
@@ -619,8 +630,14 @@ export default function PurchaseOrdersPage() {
           return (
             <div
               key={order.id}
-              className="bg-surface rounded-3xl border border-line shadow-[0_2px_12px_rgba(0,0,0,0.03)] p-5 flex flex-col"
+              id={`po-${order.id}`}
+              className={`bg-surface rounded-3xl border shadow-[0_2px_12px_rgba(0,0,0,0.03)] p-5 flex flex-col ${
+                order.id === justMade ? "border-brand ring-2 ring-brand/30" : "border-line"
+              }`}
             >
+              {order.id === justMade && (
+                <p className="mb-2 self-start rounded-full bg-brand-soft px-2.5 py-1 text-xs font-bold text-brand">Just created{order.poNo ? ` · ${order.poNo}` : ""}</p>
+              )}
               <div className="flex items-start justify-between gap-2 mb-2">
                 <h3 className="font-bold text-fg text-lg leading-snug min-w-0 truncate">
                   {order.vendorName}
