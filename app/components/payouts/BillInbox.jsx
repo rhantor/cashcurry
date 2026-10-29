@@ -15,12 +15,19 @@ import { can } from "@/lib/authz/permissions";
 import { categoryFields, pickable } from "@/lib/costs/categories";
 import { useCostCategories } from "@/lib/costs/client";
 import { canReviewBill, changeText, deliveryOf, goodsOf } from "@/lib/payouts/model";
-import { FileThumb, FilesSheet } from "@/app/components/common/Files";
+import { FileThumb, FilesSheet, viewerItems } from "@/app/components/common/Files";
 import { approveBillNow, approveSupplierNow, sendBillBack } from "@/lib/payouts/client";
 import { linesTotal, supplierText } from "@/lib/payouts/supplier";
 import { priceRise } from "@/lib/purchases/orders";
 
 const day = (d) => (d ? format(parseISO(d), "EEE d MMM") : "");
+
+/** A bill's files, in groups: the bill paper, the payment receipt, the delivery's receipt. */
+const filesOf = (b) => [
+  { title: "Bill", urls: b.attachments || [] },
+  { title: "Payment receipt", urls: b.receipts || [] },
+  { title: "Delivery receipt", urls: b.delivery?.receipts || [] },
+];
 
 /** Approve with a correction: the real amount and/or what it was for. */
 function CorrectSheet({ bill, onClose, onApprove, groups, currency }) {
@@ -108,7 +115,11 @@ export default function BillInbox({ companyId, branchId, user, bills, loading })
               <div className="flex gap-4 p-4">
                 <div className="flex shrink-0 flex-col gap-2">
                   {/* the bill's first page, or the payment receipt when there's no bill paper */}
-                  {b.attachments?.length ? <FileThumb url={b.attachments[0]} label="Bill" /> : b.receipts?.length ? <FileThumb url={b.receipts[0]} label="Payment receipt" /> : b.delivery?.receipts?.length ? <FileThumb url={b.delivery.receipts[0]} label="Delivery receipt" /> : null}
+                  {(() => {
+                    // opens in the app's viewer, and goes on through every file of the bill
+                    const items = viewerItems(filesOf(b));
+                    return items.length ? <FileThumb url={items[0].url} label={items[0].label} items={items} /> : null;
+                  })()}
                   {/* every page and receipt in one sheet */}
                   {(b.attachments?.length || 0) + (b.receipts?.length || 0) + (b.delivery?.receipts?.length || 0) > 1 && (
                     <button type="button" onClick={() => setViewing(b)} className="flex size-20 flex-col items-center justify-center rounded-xl border border-line bg-surface-2 text-xs font-semibold text-fg hover:bg-surface">
@@ -197,7 +208,7 @@ export default function BillInbox({ companyId, branchId, user, bills, loading })
         open={!!viewing}
         onClose={() => setViewing(null)}
         title={viewing ? `${money(viewing.billAmount)} · ${viewing.category || viewing.purpose || "Bill"}` : "Files"}
-        groups={viewing ? [{ title: "Bill", urls: viewing.attachments || [] }, { title: "Payment receipt", urls: viewing.receipts || [] }, { title: "Delivery receipt", urls: viewing.delivery?.receipts || [] }] : []}
+        groups={viewing ? filesOf(viewing) : []}
       />
       {correcting && <CorrectSheet bill={correcting} onClose={() => setCorrecting(null)} onApprove={approve} groups={groups} currency={currency} />}
     </>
