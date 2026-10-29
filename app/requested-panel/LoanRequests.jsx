@@ -1,6 +1,6 @@
 "use client";
 import { format } from "date-fns";
-import { ExternalLink } from "lucide-react";
+import { FileThumb } from "@/app/components/common/Files";
 import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/lib/region";
 import { RequestCard, RequestList } from "./RequestCard";
@@ -43,9 +43,9 @@ export default function LoanRequests({ loading, error, errorMsg, items = [], wor
             onReject={() => onAction(req, "rejected")}
           >
             {repay && req.proofUrl && (
-              <a href={req.proofUrl} target="_blank" rel="noreferrer" className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-brand hover:underline">
-                See the proof <ExternalLink className="size-3" />
-              </a>
+              <div className="mt-3">
+                <FileThumb url={req.proofUrl} label="Repayment proof" className="size-16" />
+              </div>
             )}
           </RequestCard>
         );

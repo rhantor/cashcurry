@@ -2,42 +2,21 @@
 import { useState } from "react";
 import { format, isValid, parseISO } from "date-fns";
 import { motion } from "framer-motion";
-import { Building2, ExternalLink, FileSpreadsheet, FileText, Info, MoreHorizontal, Pencil, Share2, Trash2 } from "lucide-react";
-import { Button, CountUp, Menu, Sheet, Skeleton } from "@/app/components/ui";
+import { Building2, FileSpreadsheet, FileText, Info, MoreHorizontal, Pencil, Share2, Trash2 } from "lucide-react";
+import { Button, CountUp, Menu, Sheet } from "@/app/components/ui";
 
 const when = (v) => {
   const d = typeof v === "string" ? parseISO(v) : v?.toDate ? v.toDate() : v?.seconds ? new Date(v.seconds * 1000) : v ? new Date(v) : null;
   return d && isValid(d) ? d : null;
 };
-import { isPdfUrl } from "@/app/components/common/Files";
+import { FileLarge } from "@/app/components/common/Files";
+import FileViewer from "@/app/components/common/FileViewer";
 
 const TONE = {
   bank: "from-[#2a78d6] to-[#1a4f94]",
   brand: "from-[#1f9a7c] to-[#0f5c4c]",
   out: "from-[#eb6834] to-[#a8431d]",
 };
-
-/** One attachment: the photo itself, or a file card for a PDF (opens in a new tab). */
-function Attachment({ url, i }) {
-  const [loading, setLoading] = useState(true);
-  if (isPdfUrl(url)) {
-    return (
-      <a href={url} target="_blank" rel="noreferrer" className="flex items-center gap-3 rounded-2xl border border-line bg-surface-2/60 p-3 transition hover:bg-surface-2">
-        <span className="flex size-10 items-center justify-center rounded-xl bg-danger-soft text-danger">
-          <FileText className="size-5" />
-        </span>
-        <span className="flex-1 text-sm font-semibold text-fg">Document {i + 1} (PDF)</span>
-        <ExternalLink className="size-4 text-subtle" />
-      </a>
-    );
-  }
-  return (
-    <a href={url} target="_blank" rel="noreferrer" className="relative block overflow-hidden rounded-2xl border border-line bg-surface-2">
-      {loading && <Skeleton className="absolute inset-0" rounded="rounded-none" />}
-      <img src={url} alt={`Attachment ${i + 1}`} className="max-h-80 w-full object-contain" onLoad={() => setLoading(false)} onError={() => setLoading(false)} />
-    </a>
-  );
-}
 
 /**
  * One saved record, like a slip: the amount on a coloured card, its details,
@@ -51,6 +30,7 @@ function Attachment({ url, i }) {
  */
 export default function RecordSheet({ open = true, onClose, title, branch, amount, money, amountLabel = "Amount", tone = "brand", rows = [], files = [], by, at, share, pdf, excel, onEdit, onDelete, note, children }) {
   const created = when(at);
+  const [viewing, setViewing] = useState(null); // the attachment open in the viewer
   const menu = [
     share && { label: "Share", icon: Share2, onSelect: share },
     pdf && { label: "Download PDF", icon: FileText, onSelect: pdf },
@@ -132,9 +112,11 @@ export default function RecordSheet({ open = true, onClose, title, branch, amoun
       {files === null ? null : files.length > 0 ? (
         <div className="mt-4 space-y-2">
           <p className="text-xs font-semibold text-muted">{files.length > 1 ? `Attachments (${files.length})` : "Attachment"}</p>
+          {/* each opens in the app's viewer, which goes on through the rest */}
           {files.map((u, i) => (
-            <Attachment key={u} url={u} i={i} />
+            <FileLarge key={u} url={u} label={`Attachment ${files.length > 1 ? i + 1 : ""}`.trim()} onOpen={() => setViewing(i)} />
           ))}
+          <FileViewer open={viewing != null} items={files.map((u, i) => ({ url: u, label: `Attachment ${files.length > 1 ? i + 1 : ""}`.trim() }))} index={viewing ?? 0} onClose={() => setViewing(null)} />
         </div>
       ) : (
         <p className="mt-4 rounded-xl bg-surface-2 px-3 py-2.5 text-center text-xs text-muted">No attachment</p>

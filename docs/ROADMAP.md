@@ -197,6 +197,8 @@ rehearsed on the local copy first.
       `npm run chat:migrate -- --project <id>` then `--write --confirm` (copies the old branch chat).
       Set the storage bucket's CORS for the app's address (forwarding and downloading read files in the browser):
       `gsutil cors set cors.json gs://pos-system-448bc.appspot.com` with origin https://<app domain>, method GET
+      The file viewer (30 Oct: bills, receipts and attachments open inside the app) draws PDFs with pdf.js, which
+      reads them the same way — without that CORS setting it falls back to the browser's own PDF view (blank in the Android app).
 - [ ] **Production rules (25 Oct):** live rules = main's firestore.rules (deployed 25 Oct with reservationDeposits). Before deploying dev's rules, diff them against the live ones (managers' branch-settings write is in both, written differently). Nothing to migrate
 - [ ] **Purchase orders (22 Oct):** deploy the functions (the hourly `notifyDailySummary` now also sends Late deliveries). Then add each supplier's phone and "Delivers in (days)" in Purchases → Vendors so WhatsApp and the due day work. Nothing to migrate
 - [ ] **Pay-outs at suppliers (21 Oct):** deploy `firestore.rules` (till roles read vendor names and bills; approvers write a supplier bill's payment only as part of approving it; 22 Oct: till roles read purchase orders and mark one as waiting on their own bill). Nothing to migrate
