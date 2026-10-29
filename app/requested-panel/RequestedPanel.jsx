@@ -23,6 +23,7 @@ import { serverTimestamp } from "firebase/firestore";
 import LoanRequests from "./LoanRequests";
 import VoucherInbox, { useWaitingVouchers } from "@/app/components/costs/VoucherInbox";
 import BillInbox from "@/app/components/payouts/BillInbox";
+import CashInHand, { seesCash } from "@/app/components/requests/CashInHand";
 import { useLivePayouts } from "@/lib/payouts/client";
 import OtRequests from "./OtRequests";
 import { confirmDialog, promptDialog } from "@/app/components/ui/notify";
@@ -55,6 +56,9 @@ export default function RequestedPanel() {
   }, []);
   const { vouchers } = useWaitingVouchers(canVouchers ? companyId : null, branchId);
   const { waiting: bills, loading: billsLoading } = useLivePayouts(canVouchers ? companyId : null, branchId);
+
+  // what the till has free to give (null: not shown, or not counted yet)
+  const [free, setFree] = useState(null);
 
   // local action states
   const [loanWorkingId, setLoanWorkingId] = useState(null);
@@ -237,6 +241,7 @@ export default function RequestedPanel() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-4 px-4 py-5 sm:px-6 sm:py-6">
+      {seesCash(user?.role) && <CashInHand companyId={companyId} branchId={branchId} onFree={setFree} />}
       <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         <Tabs
           value={currentTab}
@@ -256,7 +261,7 @@ export default function RequestedPanel() {
           <div className="flex justify-end">
             <Button variant="secondary" icon={CalendarPlus} onClick={() => setLeaveOpen(true)}>Record leave</Button>
           </div>
-          <RequestInbox companyId={companyId} branchId={branchId} user={user} branches={branches || []} />
+          <RequestInbox companyId={companyId} branchId={branchId} user={user} branches={branches || []} free={free} />
           <LeaveSheet open={leaveOpen} onClose={() => setLeaveOpen(false)} companyId={companyId} branchId={branchId} user={user} staff={staff} staffLoading={staffLoading} />
         </>
       )}
