@@ -199,6 +199,11 @@ rehearsed on the local copy first.
       `gsutil cors set cors.json gs://pos-system-448bc.appspot.com` with origin https://<app domain>, method GET
       The file viewer (30 Oct: bills, receipts and attachments open inside the app) draws PDFs with pdf.js, which
       reads them the same way — without that CORS setting it falls back to the browser's own PDF view (blank in the Android app).
+- [ ] **30 Oct changes:** dev's firestore.rules carry a new tasks rule (an issue's task follows the issue when it is
+      resolved or reopened) — deployed with the rest of dev's rules. Issues given to someone before this have no task;
+      they get one the next time they are given to someone. Office logins see "My pay & attendance" only after Staff
+      management → a person → **Link an office login** (needs the new API route app/api/auth/link-office-login, so the
+      Vercel deploy and the rules go out together).
 - [ ] **Production rules (25 Oct):** live rules = main's firestore.rules (deployed 25 Oct with reservationDeposits). Before deploying dev's rules, diff them against the live ones (managers' branch-settings write is in both, written differently). Nothing to migrate
 - [ ] **Purchase orders (22 Oct):** deploy the functions (the hourly `notifyDailySummary` now also sends Late deliveries). Then add each supplier's phone and "Delivers in (days)" in Purchases → Vendors so WhatsApp and the due day work. Nothing to migrate
 - [ ] **Pay-outs at suppliers (21 Oct):** deploy `firestore.rules` (till roles read vendor names and bills; approvers write a supplier bill's payment only as part of approving it; 22 Oct: till roles read purchase orders and mark one as waiting on their own bill). Nothing to migrate
