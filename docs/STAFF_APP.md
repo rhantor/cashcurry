@@ -62,7 +62,7 @@ Build and try it (Android Studio installed):
 
 Before the Play Store (release checklist):
 
-- Firebase console → the project → add an **Android app** with package `com.cashcurry.staff`; put its `google-services.json` in `android/app/` (kept out of git). Without it the app works but gets no push.
+- Firebase console → the project → add an **Android app** with package `com.cashcurry.staff`; put its `google-services.json` in `android/app/` (kept out of git). Without it the app works but gets no push. Done 29 Oct 2026 (app `Cash Curry Staff`, `firebase apps:sdkconfig ANDROID 1:856030481645:android:a2a35e3e98d430f058d0e4 --out android/app/google-services.json` fetches it again). A build without the file no longer crashes: lib/native asks the app's PushSetup plugin first and skips push.
 - `CAP_SERVER_URL=https://<app domain> npm run android:sync`.
 - ~~App icon and splash~~ — done 29 Oct: `npm run android:icons` draws them from `public/icons/icon.svg` (run again if the logo changes).
 - A signing key (kept safe, never in git), then `./gradlew bundleRelease` → upload the `.aab` in Play Console under the existing developer account: new app "Cash Curry Staff", internal testing first, privacy policy page, data-safety form (name, phone, photo, pay shown to the person themselves).
