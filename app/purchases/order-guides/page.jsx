@@ -270,7 +270,8 @@ export default function OrderGuidesPage() {
 
       setOpenOrderSheet(false);
       toastOk(res?.poNo ? `Order ${res.poNo} created.` : "Purchase order created.");
-      router.push("/purchases/purchase-orders");
+      // straight to the new order, shown first and marked
+      router.push(res?.id ? `/purchases/purchase-orders?new=${res.id}` : "/purchases/purchase-orders");
     } catch (e) {
       console.error(e);
       toastError("Could not submit the order. Please try again.");
