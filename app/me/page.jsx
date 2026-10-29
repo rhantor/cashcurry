@@ -12,8 +12,8 @@ import useSession from "@/app/hooks/useSession";
 import { EmptyState, Skeleton, Tabs } from "@/app/components/ui";
 import { personName } from "@/lib/people";
 import { roleLabel } from "@/lib/authz/permissions";
-import MyPayPage from "@/app/(staff)/my-pay/page";
-import MyAttendancePage from "@/app/(staff)/my-attendance/page";
+import MyPay from "@/app/components/me/MyPay";
+import MyAttendance from "@/app/components/me/MyAttendance";
 
 export default function MePage() {
   return (
@@ -57,7 +57,7 @@ function Me() {
             value={tab}
             onChange={setTab}
           />
-          {tab === "pay" ? <MyPayPage who={who} attendanceHref="/me?tab=attendance" /> : <MyAttendancePage who={who} payHref="/me" />}
+          {tab === "pay" ? <MyPay who={who} attendanceHref="/me?tab=attendance" /> : <MyAttendance who={who} payHref="/me" />}
           <Link href="/tasks" className="flex items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3.5 text-sm transition hover:bg-surface-2">
             <span className="inline-flex size-9 items-center justify-center rounded-xl bg-brand-soft text-brand">
               <ListChecks className="size-5" />
