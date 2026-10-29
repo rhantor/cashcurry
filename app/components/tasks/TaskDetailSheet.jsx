@@ -9,7 +9,8 @@ import { Camera, Forward, Repeat, Send, X } from "lucide-react";
 import { Avatar, Badge, Button, Select, Sheet, Textarea, cn, toast } from "@/app/components/ui";
 import { FileThumb } from "@/app/components/common/Files";
 import { timeOf } from "@/lib/chat/model";
-import { canHandOver, chainText, repeatText } from "@/lib/tasks/model";
+import Link from "next/link";
+import { canHandOver, chainText, issueHref, itemsOf, problemsIn, repeatText } from "@/lib/tasks/model";
 import { addTaskComment, handOver, markTaskRead, useTaskComments } from "@/lib/tasks/client";
 import useVoiceRecorder, { whyNoVoice } from "@/app/hooks/useVoiceRecorder";
 import { MicButton, RecordingBar, VoicePlayer } from "@/app/components/common/Voice";
@@ -103,6 +104,33 @@ export default function TaskDetailSheet({ task, onClose, companyId, branchId, us
             {task.status === "done" && <Badge tone="success" className="px-2 py-px text-[10px]">Done</Badge>}
           </div>
           {task.details && <p className="whitespace-pre-line rounded-xl bg-surface-2 px-3 py-2 text-sm text-fg">{task.details}</p>}
+          {task.issueId && (
+            <Link href={issueHref(task, user?.role)} className="flex items-center justify-between gap-3 rounded-xl border border-warning/40 bg-warning-soft/50 px-3 py-2 text-sm text-fg hover:bg-warning-soft">
+              <span>From an issue — finishing the task resolves it.</span>
+              <span className="shrink-0 text-xs font-semibold text-brand">Open the issue</span>
+            </Link>
+          )}
+          {itemsOf(task).length > 0 && (
+            <div className="space-y-1.5">
+              <p className="text-xs font-semibold text-muted">Checklist · {itemsOf(task).length}</p>
+              <ol className="space-y-1 rounded-xl border border-line px-3 py-2 text-sm text-fg">
+                {itemsOf(task).map((x, i) => {
+                  const answer = task.status === "done" ? task.done?.items?.[i] : null;
+                  return (
+                    <li key={i} className="flex gap-2">
+                      <span className="w-5 shrink-0 text-right text-xs tabular-nums text-subtle">{i + 1}</span>
+                      <span className={cn("min-w-0 flex-1", answer && !answer.ok && "text-danger")}>
+                        {x}
+                        {answer && !answer.ok && answer.note ? ` — ${answer.note}` : ""}
+                      </span>
+                      {answer && <span className={cn("text-xs font-semibold", answer.ok ? "text-brand" : "text-danger")}>{answer.ok ? "OK" : "Problem"}</span>}
+                    </li>
+                  );
+                })}
+              </ol>
+              {task.status === "done" && problemsIn(task.done?.items).length > 0 && <p className="text-xs font-medium text-danger">{problemsIn(task.done.items).length} problem(s) found when it was done.</p>}
+            </div>
+          )}
         </div>
 
         {handing && (

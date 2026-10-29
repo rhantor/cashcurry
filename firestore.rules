@@ -906,6 +906,11 @@ service cloud.firestore {
             // whoever has a one-off marks it done (or not)
             (isBranchMember(companyId, branchId) && resource.data.get('assigneeUid', '') == request.auth.uid &&
               resource.data.get('repeat', null) == null && isTaskWork()) ||
+            // a task made from an issue follows it (30 Oct): whoever resolves or reopens the
+            // issue in the same write marks the task done or open to match — nothing else
+            (resource.data.get('issueId', '') != '' && isTaskWork() &&
+              canSeeIssue(companyId, branchId, getAfter(/databases/$(database)/documents/companies/$(companyId)/branches/$(branchId)/issues/$(resource.data.issueId)).data) &&
+              (request.resource.data.status == 'done') == (getAfter(/databases/$(database)/documents/companies/$(companyId)/branches/$(branchId)/issues/$(resource.data.issueId)).data.status == 'resolved')) ||
             // a supervisor changes the tasks they lead, still within their team
             (canTasksTeam(companyId, branchId) && resource.data.get('teamLeadUid', '') == request.auth.uid &&
               request.resource.data.teamLeadUid == request.auth.uid &&
