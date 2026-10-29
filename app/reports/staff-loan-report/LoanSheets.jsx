@@ -5,6 +5,7 @@ import { format, isValid, parseISO } from "date-fns";
 import { ChevronRight, ExternalLink, FileSpreadsheet, FileText } from "lucide-react";
 import { useDeleteStaffLoanMutation, useUpdateStaffLoanMutation } from "@/lib/redux/api/staffLoanApiSlice";
 import { getSessionUser } from "@/lib/session";
+import { loanSplit } from "@/lib/payroll/loanSplit";
 import { exportStaffLoansToExcel, exportStaffLoansToPDF } from "@/app/export/exportStaffLoans";
 import RecordSheet from "@/app/components/entry/RecordSheet";
 import MoneyInput from "@/app/components/entry/MoneyInput";
@@ -177,7 +178,8 @@ export function LoanEditSheet({ l, companyId, branchId, currency, money, onClose
 
   const n = Math.max(1, Math.round(Number(months) || 1));
   const total = Number(amount) || 0;
-  const emi = Math.ceil(total / n);
+  const split = loanSplit(total, n);
+  const emi = split[0];
 
   const save = async () => {
     if (!(total > 0)) return toast.warning("Enter the amount");
@@ -185,13 +187,13 @@ export function LoanEditSheet({ l, companyId, branchId, currency, money, onClose
     // the same schedule the loan form builds: equal months, the last takes the rest
     const base = start ? new Date(start) : new Date();
     base.setDate(1);
-    const installments = Array.from({ length: n }, (_, i) => {
+    const installments = split.map((amt, i) => {
       const d = new Date(base);
       d.setMonth(d.getMonth() + i);
       return {
         index: i + 1,
         month: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`,
-        amount: i === n - 1 ? total - emi * (n - 1) : emi,
+        amount: amt,
         status: "pending",
         paidAt: null,
       };

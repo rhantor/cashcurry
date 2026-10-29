@@ -13,13 +13,14 @@ import { useAddAdvanceEntryMutation } from '@/lib/redux/api/AdvanceApiSlice'
 import { useGetStaffListQuery } from '@/lib/redux/api/staffApiSlice'
 import { useAddStaffLoanMutation } from '@/lib/redux/api/staffLoanApiSlice'
 import { getSessionUser } from '@/lib/session'
-import { Button, CountUp, DatePicker, Field, Switch, Tabs, Textarea, cn, toast } from '@/app/components/ui'
+import { Button, CountUp, DatePicker, Field, Input, Switch, Tabs, Textarea, cn, toast } from '@/app/components/ui'
 import MoneyInput from '@/app/components/entry/MoneyInput'
 import StaffPicker, { staffName } from '@/app/components/entry/StaffPicker'
 import { Chip, PaidFromChoice } from '@/app/components/entry/Choices'
 import { EntryLayout, EntrySection, SummaryLine } from '@/app/components/entry/EntryLayout'
 import { can } from '@/lib/authz/permissions'
 import { newRequestFields } from '@/lib/requests/model'
+import { loanSplit } from '@/lib/payroll/loanSplit'
 
 const ADVANCE_TYPES = [
   { value: 'salary', label: 'Salary advance' },
@@ -27,6 +28,7 @@ const ADVANCE_TYPES = [
   { value: 'personal', label: 'Personal' }
 ]
 const LOAN_DURATIONS = [3, 6, 9, 12, 18, 24]
+const MAX_LOAN_MONTHS = 60 // a typed-in ("Custom") number of months: 1 to this
 
 // Who paid, for paidOut.by — the same shape the pay-out action records.
 const payerOf = user => ({ uid: user?.uid || '', name: personName(user) || '', role: user?.role || '' })
@@ -242,7 +244,8 @@ function LoanForm ({ head, staff, staffLoading, companyId, branchId, manager, mo
   const [staffId, setStaffId] = useState('')
   const [amount, setAmount] = useState('')
   const [date, setDate] = useState(today)
-  const [duration, setDuration] = useState(6)
+  const [preset, setPreset] = useState(6)
+  const [custom, setCustom] = useState(null) // null = a preset; else the typed number of months
   const [startMonth, setStartMonth] = useState(null) // null = the month of the date
   const [reason, setReason] = useState('')
   const [office, setOffice] = useState('front')
@@ -257,24 +260,29 @@ function LoanForm ({ head, staff, staffLoading, companyId, branchId, manager, mo
   const firstMonth = startMonth || ym(when)
   const person = staff.find(s => s.id === staffId)
   const total = Number(amount) || 0
-  const emi = total > 0 ? Math.ceil(total / duration) : 0
-  const alreadyPaid = migration ? Math.min(alreadyPaidMonths, duration - 1) : 0
+  const typed = Number(custom)
+  const customOk = Number.isInteger(typed) && typed >= 1 && typed <= MAX_LOAN_MONTHS
+  // 0 while the custom box holds no usable number: no schedule until it does
+  const duration = custom === null ? preset : customOk ? typed : 0
+  const alreadyPaid = migration ? Math.max(0, Math.min(alreadyPaidMonths, duration - 1)) : 0
 
   // the instalments, as the server will create them
   const schedule = useMemo(() => {
-    if (!emi) return []
-    return Array.from({ length: duration }, (_, i) => ({
+    if (!(total > 0) || !duration) return []
+    return loanSplit(total, duration).map((amount, i) => ({
       month: format(addMonths(parseISO(`${firstMonth}-01`), i), 'MMM yyyy'),
-      amount: i === duration - 1 ? total - emi * (duration - 1) : emi,
+      amount,
       paid: i < alreadyPaid
     }))
-  }, [emi, duration, firstMonth, total, alreadyPaid])
+  }, [duration, firstMonth, total, alreadyPaid])
+  const emi = schedule[0]?.amount || 0
 
   const save = async () => {
     const problems = {}
     if (!staffId) problems.staff = 'Who is it for?'
     if (!(total > 0)) problems.amount = 'Enter the amount'
     if (!reason.trim()) problems.reason = 'Say what the loan is for'
+    if (!duration) problems.months = `Enter 1 to ${MAX_LOAN_MONTHS} months`
     setErrors(problems)
     if (Object.keys(problems).length) return toast.error('Check the highlighted fields')
 
@@ -314,6 +322,8 @@ function LoanForm ({ head, staff, staffLoading, companyId, branchId, manager, mo
       setReason('')
       setNotes('')
       setStartMonth(null)
+      setPreset(6)
+      setCustom(null)
       setMigration(false)
       setAlreadyPaidMonths(0)
       setOffice('front')
@@ -411,11 +421,46 @@ function LoanForm ({ head, staff, staffLoading, companyId, branchId, manager, mo
         <p className='mb-2 text-xs font-semibold text-muted'>Over how many months</p>
         <div className='flex flex-wrap gap-2'>
           {LOAN_DURATIONS.map(n => (
-            <Chip key={n} on={duration === n} onClick={() => setDuration(n)}>
+            <Chip
+              key={n}
+              on={custom === null && preset === n}
+              onClick={() => {
+                setPreset(n)
+                setCustom(null)
+                setErrors(e => ({ ...e, months: undefined }))
+              }}
+            >
               {n} months
             </Chip>
           ))}
+          <Chip on={custom !== null} onClick={() => custom === null && setCustom('')}>
+            Custom
+          </Chip>
         </div>
+        {/* any other number of months, typed in */}
+        {custom !== null && (
+          <Field label='Number of months' error={errors.months} className='mt-3 max-w-48'>
+            {({ id, invalid }) => (
+              <Input
+                id={id}
+                size='lg'
+                type='number'
+                inputMode='numeric'
+                min={1}
+                max={MAX_LOAN_MONTHS}
+                step={1}
+                autoFocus
+                invalid={invalid || (custom !== '' && !customOk)}
+                value={custom}
+                placeholder={`1 – ${MAX_LOAN_MONTHS}`}
+                onChange={e => {
+                  setCustom(e.target.value.replace(/[^0-9]/g, ''))
+                  setErrors(x => ({ ...x, months: undefined }))
+                }}
+              />
+            )}
+          </Field>
+        )}
         <p className='mb-2 mt-4 text-xs font-semibold text-muted'>First instalment from</p>
         <div className='flex flex-wrap gap-2'>
           {monthsFrom(when).map(m => (
