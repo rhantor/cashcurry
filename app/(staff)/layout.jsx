@@ -12,6 +12,7 @@ import { useChats } from "@/app/components/chat/useChat";
 import { Avatar, LogoMark, cn } from "@/app/components/ui";
 import { signOut } from "@/lib/session";
 import { useMyStaff } from "./useStaffApp";
+import { roleLabelOf } from "@/app/staff-management/lib/constants";
 import { useIssuesWaiting } from "@/app/components/issues/useIssues";
 
 const NAV = [
@@ -88,7 +89,7 @@ export default function StaffLayout({ children }) {
             <Avatar name={name} src={staff?.photoUrl} size="md" />
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-semibold">{name}</span>
-              <span className="block truncate text-xs text-muted">{staff?.department || staff?.role || "Staff"}</span>
+              <span className="block truncate text-xs text-muted">{staff?.department || roleLabelOf(staff?.role) || "Staff"}</span>
             </span>
           </Link>
           <button onClick={handleLogout} className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted transition hover:bg-danger/10 hover:text-danger">

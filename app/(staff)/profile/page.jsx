@@ -13,7 +13,7 @@ import { signOut } from "@/lib/session";
 import { enablePush, pushState } from "@/lib/notify/push";
 import { fingerprintAvailable, isNativeApp, lockEnabled, nativePushState, setFingerprintLock, startNativePush } from "@/lib/native";
 import { removeMyPhoto, saveMyPhoto } from "@/lib/staff/self";
-import { ROLES } from "@/app/staff-management/lib/constants";
+import { roleLabelOf } from "@/app/staff-management/lib/constants";
 import { useMyStaff } from "../useStaffApp";
 import { ContactSheet, PinSheet } from "./sheets";
 
@@ -171,7 +171,7 @@ export default function MePage() {
     );
   }
 
-  const role = ROLES.find((r) => r.value === staff?.role)?.label || staff?.role || "Staff";
+  const role = roleLabelOf(staff?.role) || "Staff";
   const address = priv ? [priv.addressLine1, priv.addressLine2, [priv.postalCode, priv.city].filter(Boolean).join(" "), priv.state].filter(Boolean).join(", ") : "";
 
   return (

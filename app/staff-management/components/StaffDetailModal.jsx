@@ -5,6 +5,7 @@ import { Pencil, Phone, Trash2 } from 'lucide-react'
 import useCurrency from '@/app/hooks/useCurrency'
 import { formatMoney } from '@/lib/region/currency'
 import { Avatar, Badge, Button, Sheet, cn } from '@/app/components/ui'
+import { roleLabelOf } from '../lib/constants'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 const fmtDate = val => {
@@ -79,7 +80,7 @@ export default function StaffDetailModal ({ isOpen, onClose, staff, onEdit, onDe
       onClose={onClose}
       size='lg'
       title={fullName}
-      description={[capitalize(s.role) || 'Staff', s.department].filter(Boolean).join(' · ')}
+      description={[roleLabelOf(s.role) || 'Staff', s.department].filter(Boolean).join(' · ')}
       footer={
         <div className='flex items-center justify-between gap-2'>
           {onDelete ? (
