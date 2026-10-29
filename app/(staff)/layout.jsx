@@ -12,6 +12,7 @@ import { useChats } from "@/app/components/chat/useChat";
 import { Avatar, LogoMark, cn } from "@/app/components/ui";
 import { signOut } from "@/lib/session";
 import { useMyStaff } from "./useStaffApp";
+import { useIssuesWaiting } from "@/app/components/issues/useIssues";
 
 const NAV = [
   { label: "Home", href: "/staff-portal", icon: Home },
@@ -32,6 +33,8 @@ export default function StaffLayout({ children }) {
   const { staff } = useMyStaff(user);
   // chats with something new (4.4)
   const { unread } = useChats(user, user?.branchId ? [{ id: user.branchId }] : []);
+  // issues given to them, not resolved yet
+  const issues = useIssuesWaiting(user, [user?.branchId]);
   const name = [user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.username || "";
 
   const handleLogout = async () => {
@@ -43,7 +46,8 @@ export default function StaffLayout({ children }) {
     window.location.href = "/login";
   };
 
-  const badge = (href) => href === "/messages" && unread > 0;
+  const counts = { "/messages": unread, "/my-issues": issues, "/staff-portal": issues }; // phones: Issues is reached from Home
+  const badge = (href) => counts[href] > 0;
 
   return (
     <div className="flex h-[100dvh] overflow-hidden bg-bg text-fg">
@@ -74,7 +78,7 @@ export default function StaffLayout({ children }) {
                 {active && <motion.span layoutId="staff-nav" className="absolute inset-0 rounded-xl bg-brand-soft" transition={{ type: "spring", stiffness: 520, damping: 34 }} />}
                 <Icon className="relative size-5" strokeWidth={active ? 2.4 : 2} />
                 <span className="relative flex-1">{label}</span>
-                {badge(href) && <span className="relative rounded-full bg-danger px-1.5 text-[11px] font-bold text-white">{unread}</span>}
+                {badge(href) && href !== "/staff-portal" && <span className="relative rounded-full bg-danger px-1.5 text-[11px] font-bold text-white">{counts[href]}</span>}
               </Link>
             );
           })}

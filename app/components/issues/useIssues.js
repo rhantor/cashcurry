@@ -6,6 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 import { onSnapshot, orderBy, query, where } from "firebase/firestore";
 import { commentsCol, issuesCol } from "@/lib/issues/client";
 import { timeOf } from "@/lib/chat/model";
+import { issuesWaiting } from "@/lib/issues/model";
+import { useBusinessToday } from "@/app/hooks/useRegion";
 
 const shape = (d, branchId) => {
   const x = d.data({ serverTimestamps: "estimate" });
@@ -48,6 +50,33 @@ export function useIssues(user, branchIds = []) {
     return [...seen.values()];
   }, [byKey]);
   return { issues, ready };
+}
+
+/**
+ * How many issues wait on this person (lib/issues/model.js issuesWaiting),
+ * live — the red count on Issues in the menu. Office roles read the open ones
+ * of `branchIds`; staff only the ones given to them (what the rules allow).
+ */
+export function useIssuesWaiting(user, branchIds = []) {
+  const today = useBusinessToday();
+  const [byBranch, setByBranch] = useState({});
+  const key = branchIds.filter(Boolean).join(",");
+  const staff = user?.role === "staff";
+  useEffect(() => {
+    setByBranch({});
+    if (!user?.companyId || !user?.uid || !key) return;
+    const stops = key.split(",").map((b) => {
+      const col = issuesCol(user.companyId, b);
+      const q = staff ? query(col, where("assigneeUid", "==", user.uid)) : query(col, where("status", "in", ["open", "in_progress"]));
+      return onSnapshot(
+        q,
+        (s) => setByBranch((m) => ({ ...m, [b]: s.docs.map((d) => shape(d, b)) })),
+        () => {}
+      );
+    });
+    return () => stops.forEach((s) => s());
+  }, [user?.companyId, user?.uid, key, staff]);
+  return useMemo(() => issuesWaiting(Object.values(byBranch).flat(), user, today).length, [byBranch, user, today]);
 }
 
 /** One issue's discussion, oldest first. */
