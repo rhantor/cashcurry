@@ -94,6 +94,7 @@ export default function IssueSheet({ issue, onClose, user, people = [], branchNa
             <dt className="text-subtle">Who has it</dt>
             <dd className="font-semibold text-fg">{issue.assignedTo?.name || "No one yet"}</dd>
             {issue.assignedTo?.role && <dd className="text-muted">{roleLabel(issue.assignedTo.role)}</dd>}
+            {issue.taskId && <dd className="text-xs text-muted">On their tasks too — counts in their performance</dd>}
           </div>
           {issue.status === "resolved" && (
             <div className="col-span-2">
