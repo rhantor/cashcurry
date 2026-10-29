@@ -11,6 +11,17 @@ import { REQUEST_TYPES, STAGES, leaveKindLabel, stageOf } from "@/lib/requests/m
 
 const TYPE_TONE = { advance: "brand", staffLoan: "info", leave: "warning" };
 
+/** Under a money request: what is left in the till if it is given (`free`: CashInHand's figure). */
+function AfterThis({ free, amount, currency }) {
+  if (free == null || !(Number(amount) > 0)) return null;
+  const left = free - Number(amount);
+  return (
+    <p className={cn("mt-2 rounded-lg px-2.5 py-1.5 text-xs font-medium", left < 0 ? "bg-danger-soft text-danger" : "bg-surface-2 text-muted")}>
+      {left < 0 ? `Not enough cash — ${formatMoney(-left, currency)} short` : `After this: ${formatMoney(left, currency)} left in the till`}
+    </p>
+  );
+}
+
 export const showDay = (v, pattern = "d MMM yyyy") => {
   const d = typeof v === "string" ? parseISO(v) : null;
   return d && isValid(d) ? format(d, pattern) : v || "";
@@ -64,7 +75,7 @@ function Trail({ req }) {
  * spans branches) · showWho (lists of
  * everyone's requests show the person; My requests too, for requests made for someone).
  */
-export default function RequestItem({ req, actions = [], onAction, busy, currency, branchName, showWho = true }) {
+export default function RequestItem({ req, actions = [], onAction, busy, currency, branchName, showWho = true, free = null }) {
   const type = REQUEST_TYPES[req.type];
   const stage = stageOf(req);
   const st = STAGES[stage] || STAGES.waiting;
@@ -108,6 +119,8 @@ export default function RequestItem({ req, actions = [], onAction, busy, currenc
         {!isLeave && <span className="shrink-0 text-right text-base font-bold tabular-nums text-fg">{formatMoney(req.amount, currency)}</span>}
       </div>
 
+      {/* the till after giving it, for whoever approves (Requested panel, cash roles) */}
+      {!isLeave && actions.includes("approve") && <AfterThis free={free} amount={req.amount} currency={currency} />}
       <Trail req={req} />
       {stage === "rejected" && req.rejectReason && <p className="mt-2 text-xs text-danger">Why: {req.rejectReason}</p>}
 

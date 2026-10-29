@@ -16,7 +16,7 @@ import useRequestActions from "./useRequestActions";
 
 const oldestFirst = (a, b) => String(a.askedAt).localeCompare(String(b.askedAt));
 
-export default function RequestInbox({ companyId, branchId, user, branches = [] }) {
+export default function RequestInbox({ companyId, branchId, user, branches = [], free = null }) {
   const currency = useCurrency();
   const company = isCompanyRole(user?.role) && branches.length > 1;
   const [scope, setScope] = useState("all"); // company roles: "all" branches or "this" one
@@ -66,7 +66,7 @@ export default function RequestInbox({ companyId, branchId, user, branches = [] 
       </div>
       <RequestList loading={isLoading} error={isError && "Couldn't load the requests."} count={shown.length} empty="No advances, staff loans or leave waiting for a decision.">
         {shown.map(({ r, actions }) => (
-          <RequestItem key={`${r.branchId}-${r.type}-${r.id}`} req={r} actions={actions} onAction={run} busy={busyId === r.id} currency={currency} branchName={branchIds ? nameOf[r.branchId] : null} />
+          <RequestItem key={`${r.branchId}-${r.type}-${r.id}`} req={r} actions={actions} onAction={run} busy={busyId === r.id} currency={currency} branchName={branchIds ? nameOf[r.branchId] : null} free={r.branchId === branchId ? free : null} />
         ))}
       </RequestList>
     </div>
