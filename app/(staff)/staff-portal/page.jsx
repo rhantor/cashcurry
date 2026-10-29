@@ -12,6 +12,7 @@ import AdvanceAskSheet from "@/app/components/requests/AdvanceAskSheet";
 import LeaveSheet from "@/app/components/requests/LeaveSheet";
 import NewIssueSheet from "@/app/components/issues/NewIssueSheet";
 import TodayTasksCard from "@/app/components/tasks/TodayTasksCard";
+import { useIssuesWaiting } from "@/app/components/issues/useIssues";
 import { useMyPayslips, useMyStaff, useMyWork } from "../useStaffApp";
 import { Heading, MoneyTile, PayslipRow, PayslipSheet, PeriodCard } from "../parts";
 
@@ -22,6 +23,7 @@ const greeting = () => {
 
 export default function StaffHome() {
   const { user } = useSession();
+  const issuesForMe = useIssuesWaiting(user, [user?.branchId]);
   const currency = useCurrency();
   const { staff, priv, loading } = useMyStaff(user);
   const me = user ? { ...user, staffId: user.staffId || staff?.id } : null;
@@ -99,7 +101,7 @@ export default function StaffHome() {
       <TodayTasksCard user={user} />
 
       <section className="space-y-2">
-        <Heading href="/my-issues" more="My issues">Something wrong at work?</Heading>
+        <Heading href="/my-issues" more={issuesForMe ? `My issues · ${issuesForMe} for you` : "My issues"}>Something wrong at work?</Heading>
         <button type="button" onClick={() => setSheet("issue")} className="flex w-full items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3.5 text-left text-sm text-muted hover:bg-surface-2">
           <TriangleAlert className="size-5 text-warning" />
           Broken equipment, stock running out, a safety problem… tell your manager here.

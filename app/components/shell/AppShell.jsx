@@ -14,6 +14,7 @@ import MobileNav from "./MobileNav";
 import CommandPalette, { rememberPage } from "./CommandPalette";
 import usePendingRequests from "./usePendingRequests";
 import { useChats } from "@/app/components/chat/useChat";
+import { useIssuesWaiting } from "@/app/components/issues/useIssues";
 
 const COLLAPSE_KEY = "cc-nav-collapsed";
 
@@ -48,7 +49,10 @@ export default function AppShell({ onSignOut, children }) {
   // …and chats with something new (4.4)
   const chatBranches = useMemo(() => (isCompany ? branches : myBranch && branchId ? [{ id: branchId, name: myBranch.name }] : []), [isCompany, branches, myBranch, branchId]);
   const chat = useChats(user, chatBranches);
-  const badges = useMemo(() => ({ "/requested-panel": pending.total }), [pending.total]);
+  // …and issues waiting on this person (company roles: every branch's)
+  const issueBranchIds = useMemo(() => (isCompany ? branches.map((b) => b.id) : [branchId]), [isCompany, branches, branchId]);
+  const issuesWaiting = useIssuesWaiting(user, issueBranchIds);
+  const badges = useMemo(() => ({ "/requested-panel": pending.total, "/issues": issuesWaiting }), [pending.total, issuesWaiting]);
   const { data: company } = useGetCompanyDetailsQuery(companyId ?? skipToken);
 
   // Owners/GMs with no branch chosen yet start in their default branch (or the first).
