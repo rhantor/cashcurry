@@ -96,6 +96,8 @@ export const sidebarItems = [
   },
 
   { label: "Staff Management", section: "Team", icon: "MdPeopleOutline", path: "/staff-management" },
+  // Their own pay, payslips and attendance — for office logins linked to a staff record (30 Oct)
+  { label: "My pay & attendance", section: "Team", icon: "MdOutlinePayments", path: "/me" },
 
   { label: "Branch Settings", section: "Admin", icon: "IoSettingsSharp", path: "/branch-settings" },
   {

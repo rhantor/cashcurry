@@ -9,13 +9,14 @@ import {
   useUpdateStaffMutation,
   useDeleteStaffMutation,
   useGenerateStaffLoginMutation,
-  useResetStaffPinMutation
+  useResetStaffPinMutation,
+  useLinkOfficeLoginMutation
 } from '@/lib/redux/api/staffApiSlice'
 import { useGetSingleBranchQuery } from '@/lib/redux/api/branchApiSlice'
 import { useGetBranchSettingsQuery } from '@/lib/redux/api/branchSettingsApiSlice'
 import { skipToken } from '@reduxjs/toolkit/query'
 import { shiftsEnabled } from '@/lib/attendance/shifts'
-import { Check, Copy, Eye, KeyRound, MoreHorizontal, Pencil, Plus, Search, Smartphone, Store, Trash2, Users, Wallet } from 'lucide-react'
+import { Check, Copy, Eye, KeyRound, Link2, Link2Off, MoreHorizontal, Pencil, Plus, Search, Smartphone, Store, Trash2, Users, Wallet } from 'lucide-react'
 import { Avatar, Badge, Button, DataTable, Input, Menu, Select, Sheet, Skeleton, cn } from '@/app/components/ui'
 import { toast, confirmDialog } from '@/app/components/ui/notify'
 import StatTiles from '@/app/components/purchases/StatTiles'
@@ -23,6 +24,8 @@ import StatusScreen from '@/app/components/common/StatusScreen'
 import useCurrency from '@/app/hooks/useCurrency'
 import { formatMoney } from '@/lib/region/currency'
 import { ROLES, roleLabelOf } from './lib/constants'
+import { useChatPeople } from '@/app/components/chat/useChat'
+import { isCompanyRole, roleLabel as loginRoleLabel } from '@/lib/authz/permissions'
 
 import StaffModal, { dropDraft } from './components/StaffModal'
 import StaffDetailModal from './components/StaffDetailModal'
@@ -62,6 +65,34 @@ export default function StaffManagementPage () {
   const money = n => formatMoney(Number(n) || 0, currency)
 
   const { data: staffList = [], isLoading } = useGetStaffListQuery({ companyId, branchId }, { skip: !companyId || !branchId })
+  // office logins that can be linked to a staff record (30 Oct): this branch's, and the company roles
+  const people = useChatPeople(companyId)
+  const officeLogins = useMemo(
+    () => people.filter(p => p.role !== 'staff' && (isCompanyRole(p.role) || p.branchId === branchId) && !staffList.some(s => s.officeUid === p.uid)),
+    [people, branchId, staffList]
+  )
+  const [linkFor, setLinkFor] = useState(null)
+  const [linkUid, setLinkUid] = useState('')
+  const [linkOfficeLogin, { isLoading: linking }] = useLinkOfficeLoginMutation()
+  const linkOffice = async () => {
+    if (!linkFor || !linkUid) return
+    try {
+      await linkOfficeLogin({ companyId, branchId, staffId: linkFor.id, uid: linkUid }).unwrap()
+      toast.success('Linked', { description: `${fullName(linkFor)} sees their pay and attendance under Me now.` })
+      setLinkFor(null)
+    } catch (err) {
+      toast.error("Couldn't link it", { description: err?.message })
+    }
+  }
+  const unlinkOffice = async s => {
+    if (!(await confirmDialog({ title: `Unlink ${s.officeName || 'the office login'}?`, message: 'Their login stays; it just no longer shows this staff record\'s pay and attendance.', confirmLabel: 'Unlink' }))) return
+    try {
+      await linkOfficeLogin({ companyId, branchId, staffId: s.id, unlink: true }).unwrap()
+      toast.success('Unlinked')
+    } catch (err) {
+      toast.error("Couldn't unlink it", { description: err?.message })
+    }
+  }
   const { data: branchData = {} } = useGetSingleBranchQuery(args)
   const { data: branchSettings } = useGetBranchSettingsQuery(companyId && branchId ? { companyId, branchId } : skipToken)
   const payrollConfig = branchSettings?.payroll || null
@@ -213,7 +244,7 @@ export default function StaffManagementPage () {
       key: 'login',
       label: 'Staff app',
       sortValue: s => (s.uid ? 1 : 0),
-      render: s => (s.uid ? <Badge tone='success' dot>Has a login</Badge> : <Badge>No login yet</Badge>)
+      render: s => (s.uid ? <Badge tone='success' dot>Has a login</Badge> : s.officeUid ? <Badge tone='info' dot>Office login · {s.officeName || 'linked'}</Badge> : <Badge>No login yet</Badge>)
     },
     {
       key: 'actions',
@@ -235,6 +266,8 @@ export default function StaffManagementPage () {
               { label: 'Edit', icon: Pencil, onSelect: () => openEdit(s) },
               !s.uid && { label: generatingFor === s.id ? 'Making the login…' : 'Make a staff app login', icon: KeyRound, onSelect: () => handleGenerateLogin(s) },
               s.uid && { label: 'Reset PIN', icon: KeyRound, onSelect: () => handleResetPin(s) },
+              !s.uid && !s.officeUid && { label: 'Link an office login', icon: Link2, onSelect: () => { setLinkUid(''); setLinkFor(s) } },
+              s.officeUid && { label: 'Unlink the office login', icon: Link2Off, onSelect: () => unlinkOffice(s) },
               'divider',
               { label: 'Delete', icon: Trash2, danger: true, onSelect: () => handleDelete(s) }
             ].filter(Boolean)}
@@ -335,7 +368,41 @@ export default function StaffManagementPage () {
         staff={detailTarget}
         onEdit={openEdit}
         onDelete={handleDelete}
+        onLinkOffice={s => { setLinkUid(''); setLinkFor(s) }}
+        onUnlinkOffice={unlinkOffice}
       />
+
+      {/* an office login linked to this staff record: they see their own pay under Me */}
+      <Sheet
+        open={!!linkFor}
+        onClose={() => setLinkFor(null)}
+        title='Link an office login'
+        description={linkFor ? `${fullName(linkFor)} works in the office too (manager, cashier, supervisor…). Linked, they see this record's pay, payslips and attendance under Me.` : undefined}
+        footer={
+          <div className='flex justify-end'>
+            <Button icon={Link2} onClick={linkOffice} loading={linking} disabled={!linkUid}>Link</Button>
+          </div>
+        }
+      >
+        {officeLogins.length ? (
+          <ul className='space-y-2'>
+            {officeLogins.map(p => (
+              <li key={p.uid}>
+                <button type='button' onClick={() => setLinkUid(p.uid)} aria-pressed={linkUid === p.uid} className={cn('flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition', linkUid === p.uid ? 'border-brand bg-brand-soft' : 'border-line hover:bg-surface-2')}>
+                  <Avatar name={p.name} size='sm' />
+                  <span className='min-w-0 flex-1'>
+                    <span className='block truncate text-sm font-semibold text-fg'>{p.name}</span>
+                    <span className='block text-xs text-muted'>{loginRoleLabel(p.role)}</span>
+                  </span>
+                  {linkUid === p.uid && <Check className='size-4 text-brand' />}
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className='rounded-xl bg-surface-2 p-4 text-sm text-muted'>No office logins left to link at this branch.</p>
+        )}
+      </Sheet>
 
       <Sheet
         open={!!generatedCreds}
