@@ -64,6 +64,14 @@ describe("approving a supplier bill", () => {
     expect(r.billWrites[0]).toMatchObject({ id: "nb1", create: true, data: { vendorId: "rice", total: 800, paid: 500, balance: 300, status: "partially_paid", payoutSettleId: "s1" } });
     expect(r.vendorDelta).toEqual({ billed: 800, paid: 500 });
   });
+  it("the payment's file: the payment receipt, else the bill paper", () => {
+    const sup = { vendorId: "rice", vendorName: "Rice Co", mode: "pays", pays: [{ billId: "b1", amount: 300 }] };
+    const pay = (extra) => approveSupplier(settle(sup, extra), bills, manager, now, { paymentId: "vp1" }).payment;
+    expect(pay({ attachments: ["bill.jpg"], receipts: [] })).toMatchObject({ receiptURL: "bill.jpg", attachments: ["bill.jpg"] });
+    expect(pay({ attachments: [], receipts: ["slip.pdf"] })).toMatchObject({ receiptURL: "slip.pdf", attachments: ["slip.pdf"] });
+    expect(pay({ attachments: ["bill.jpg"], receipts: ["slip.pdf"] })).toMatchObject({ receiptURL: "slip.pdf", attachments: ["bill.jpg", "slip.pdf"] });
+    expect(pay({ attachments: [], receipts: [] }).receiptURL).toBeNull();
+  });
   it("refuses another supplier's bill, and a bill with nothing left to pay", () => {
     const s = settle({ vendorId: "rice", vendorName: "Rice Co", mode: "pays", pays: [{ billId: "x", amount: 100 }] });
     expect(() => approveSupplier(s, [{ id: "x", vendorId: "oil", total: 100, paid: 0 }], manager, now, { paymentId: "vp" })).toThrow(/another supplier/);
