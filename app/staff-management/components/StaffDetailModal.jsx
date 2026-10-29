@@ -59,7 +59,7 @@ const Group = ({ title, children }) => {
 }
 
 /** One staff member: pay at a glance, then contact, work, ID and bank. */
-export default function StaffDetailModal ({ isOpen, onClose, staff, onEdit, onDelete }) {
+export default function StaffDetailModal ({ isOpen, onClose, staff, onEdit, onDelete, onLinkOffice, onUnlinkOffice }) {
   const currency = useCurrency()
   const money = v => (v && Number(v) > 0 ? formatMoney(Number(v), currency) : null)
   const s = staff || {}
@@ -118,9 +118,20 @@ export default function StaffDetailModal ({ isOpen, onClose, staff, onEdit, onDe
             <Avatar name={fullName} src={s.photoUrl} size='lg' />
             <div className='min-w-0 space-y-1.5'>
               <div className='flex flex-wrap gap-1.5'>
-                {s.uid ? <Badge tone='success' dot>Staff app login</Badge> : <Badge>No staff app login</Badge>}
+                {s.uid ? <Badge tone='success' dot>Staff app login</Badge> : s.officeUid ? <Badge tone='info' dot>Office login · {s.officeName || 'linked'}</Badge> : <Badge>No staff app login</Badge>}
                 {s.salaryMode && <Badge tone='info'>Paid by the {s.salaryMode === 'hours' ? 'hour' : s.salaryMode === 'days' ? 'day' : 'month'}</Badge>}
               </div>
+              {/* an office login sees this record's pay under Me (30 Oct) */}
+              {!s.uid && !s.officeUid && onLinkOffice && (
+                <button type='button' onClick={() => onLinkOffice(staff)} className='block text-xs font-semibold text-brand hover:underline'>
+                  Link an office login
+                </button>
+              )}
+              {s.officeUid && onUnlinkOffice && (
+                <button type='button' onClick={() => onUnlinkOffice(staff)} className='block text-xs font-semibold text-muted hover:text-danger'>
+                  Unlink the office login
+                </button>
+              )}
               {s.phone && (
                 <a href={`tel:${s.phone}`} className='inline-flex items-center gap-1.5 text-sm font-semibold text-brand hover:underline'>
                   <Phone className='size-3.5' /> {s.phone}

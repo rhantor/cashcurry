@@ -23,6 +23,12 @@ describe("approving — one approval is enough", () => {
     expect(actionsFor(done, owner)).not.toContain("approve");
     expect(() => approvalPatch(done, owner, now)).toThrow(/already/);
   });
+  it("a manager whose login is linked to their own staff record can't approve their own advance — they can cancel it", () => {
+    const own = asked("advance", 300, { staffId: "st-mgr", createdBy: { uid: "m" } });
+    expect(actionsFor(own, { ...manager, staffId: "st-mgr" })).toEqual(["cancel"]);
+    expect(actionsFor(own, owner)).toEqual(["approve", "reject"]);
+    expect(actionsFor(asked("advance", 300), { ...manager, staffId: "st-mgr" })).toEqual(["approve", "reject"]);
+  });
   it("rejecting keeps who and why", () => {
     expect(rejectPatch(asked("leave", 0), manager, "busy week", now)).toMatchObject({ status: "rejected", rejectReason: "busy week", rejectedBy: { uid: "m" } });
   });

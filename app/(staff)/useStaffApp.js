@@ -15,15 +15,29 @@ import { computeAttendance, formatClock, getAttendanceDate, toLocalDateStr } fro
 import { shiftsEnabled } from "@/lib/attendance/shifts";
 import { byPeriodDesc } from "@/lib/payroll/payslipCopy";
 
-/** { staff, priv, loading } — the person's staff record and its private half. */
+/**
+ * { staff, priv, loading } — the person's staff record and its private half:
+ * the one their login is linked to (users.staffId — staff, and office logins
+ * linked from Staff management, 30 Oct), else the record carrying their uid.
+ */
 export function useMyStaff(user) {
   const [staff, setStaff] = useState(null);
   const [priv, setPriv] = useState(null);
   const [loading, setLoading] = useState(true);
-  const { uid, companyId, branchId } = user || {};
+  const { uid, companyId, branchId, staffId: linked } = user || {};
 
   useEffect(() => {
     if (!uid || !companyId || !branchId) return;
+    if (linked) {
+      return onSnapshot(
+        doc(db, "companies", companyId, "branches", branchId, "staff", linked),
+        (snap) => {
+          setStaff(snap.exists() ? { id: snap.id, ...snap.data() } : null);
+          setLoading(false);
+        },
+        () => setLoading(false)
+      );
+    }
     const q = query(collection(db, "companies", companyId, "branches", branchId, "staff"), where("uid", "==", uid));
     return onSnapshot(
       q,
@@ -34,7 +48,7 @@ export function useMyStaff(user) {
       },
       () => setLoading(false)
     );
-  }, [uid, companyId, branchId]);
+  }, [uid, companyId, branchId, linked]);
 
   const staffId = user?.staffId || staff?.id;
   useEffect(() => {

@@ -24,8 +24,10 @@ function periodLabel(period) {
   return period.start.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
 }
 
-export default function MyAttendancePage() {
-  const { user } = useSession();
+/** `who`: the person, when shown in the office app's Me page (else the signed-in staff member). */
+export default function MyAttendancePage({ who, payHref = "/my-pay" }) {
+  const { user: signedIn } = useSession();
+  const user = who || signedIn;
   const currency = useCurrency();
   const { staff, priv } = useMyStaff(user);
   const me = user ? { ...user, staffId: user.staffId || staff?.id } : null;
@@ -35,7 +37,7 @@ export default function MyAttendancePage() {
 
   return (
     <div className="space-y-5 p-4 md:p-0">
-      <h1 className="hidden text-2xl font-semibold tracking-tight md:block">My attendance</h1>
+      {!who && <h1 className="hidden text-2xl font-semibold tracking-tight md:block">My attendance</h1>}
 
       <div className="flex items-center justify-between gap-2 rounded-2xl border border-line bg-surface p-1.5">
         <button type="button" onClick={() => setOffset((o) => o - 1)} aria-label="Earlier" className="inline-flex size-10 items-center justify-center rounded-xl text-muted hover:bg-surface-2 hover:text-fg">
@@ -51,7 +53,7 @@ export default function MyAttendancePage() {
         <EmptyState icon={CalendarDays} title="Your hours are not counted" description="You are on a fixed monthly salary, so your pay doesn't depend on clock-ins." />
       ) : (
         <>
-          {offset === 0 && <PeriodCard staff={staff} period={period} stats={stats} loading={loading} currency={currency} href="/my-pay" />}
+          {offset === 0 && <PeriodCard staff={staff} period={period} stats={stats} loading={loading} currency={currency} href={payHref} />}
           {offset !== 0 && !loading && (
             <div className="grid grid-cols-3 gap-2 text-center">
               {[["Hours", hrs(stats.basicHours)], ["Overtime", `+${hrs(stats.otHours)}`], ["Days", stats.daysWorked]].map(([k, v]) => (

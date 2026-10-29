@@ -10,8 +10,10 @@ import { EmptyState, Skeleton } from "@/app/components/ui";
 import { useMyPayslips, useMyStaff, useMyWork } from "../useStaffApp";
 import { Heading, MoneyTile, PayslipRow, PayslipSheet, PeriodCard } from "../parts";
 
-export default function MyPayPage() {
-  const { user } = useSession();
+/** `who`: the person, when shown in the office app's Me page (else the signed-in staff member). */
+export default function MyPayPage({ who, attendanceHref = "/my-attendance" }) {
+  const { user: signedIn } = useSession();
+  const user = who || signedIn;
   const currency = useCurrency();
   const { staff, priv } = useMyStaff(user);
   const me = user ? { ...user, staffId: user.staffId || staff?.id } : null;
@@ -21,7 +23,7 @@ export default function MyPayPage() {
 
   return (
     <div className="space-y-6 p-4 md:p-0">
-      <h1 className="hidden text-2xl font-semibold tracking-tight md:block">My pay</h1>
+      {!who && <h1 className="hidden text-2xl font-semibold tracking-tight md:block">My pay</h1>}
       <PeriodCard staff={staff} period={period} stats={stats} loading={loading} currency={currency} />
       {!stats.isFixed && staff && (
         <p className="-mt-3 px-1 text-xs text-subtle">
@@ -29,7 +31,7 @@ export default function MyPayPage() {
         </p>
       )}
       {!stats.isFixed && staff && (
-        <Link href="/my-attendance" className="flex items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3.5 transition hover:bg-surface-2">
+        <Link href={attendanceHref} className="flex items-center gap-3 rounded-2xl border border-line bg-surface px-4 py-3.5 transition hover:bg-surface-2">
           <span className="inline-flex size-9 items-center justify-center rounded-xl bg-brand-soft text-brand"><CalendarDays className="size-5" /></span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-semibold">My attendance</span>

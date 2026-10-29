@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import admin from "firebase-admin";
-import { adminAuth } from "@/lib/server/firebaseAdmin";
+import { adminAuth, adminDb } from "@/lib/server/firebaseAdmin";
 import { staffManager, staffRecord, writeStaffLogins } from "@/lib/server/staffAccess";
 import { isPin, randomPin } from "@/lib/staff/login";
 
@@ -20,6 +20,9 @@ export async function POST(req) {
     const staff = await staffRecord(companyId, branchId, staffId);
     if (!staff.exists) return fail(404, "Staff record not found in this branch.");
     if (!staff.data.uid) return fail(409, "This staff member has no login yet.");
+    // only a staff app login: never an office login's password
+    const login = await adminDb.collection("users").doc(staff.data.uid).get();
+    if (login.exists && login.data().role !== "staff") return fail(409, "That is an office login — its password is changed from its own account.");
     if (pin && !isPin(pin)) return fail(400, "The PIN must be 6 digits.");
 
     const newPin = pin || randomPin();
