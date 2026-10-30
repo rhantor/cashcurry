@@ -212,6 +212,12 @@ rehearsed on the local copy first.
       Deploy the new index (taskChecks doerUid + date, firestore.indexes.json) before the app, or "My tasks" fails to load
       for those on a rota. Deploy the functions too (the task reminders follow the rota and days off). Nothing to migrate:
       tasks without `doers` keep working through assigneeUid; days off start empty (Staff management → Job → Weekly day off).
+- [ ] **Never one's own; duty through the server (30 Oct):** dev's firestore.rules — an approver whose login is linked to
+      a staff record can't give, approve, re-amount or re-assign their own advance, staff loan or leave (it is only ever a
+      request; another approver decides) nor delete their own once given; a supervisor can't write a task's rota or covers
+      (new API route app/api/tasks/duty saves them, checking everyone named is in their team — Vercel deploy) and adds no
+      one new to a task's `doers` but its assignee. Deploy the rules and the app together (the app's rota / Give go
+      through the route). Nothing to migrate.
 - [ ] **Production rules (25 Oct):** live rules = main's firestore.rules (deployed 25 Oct with reservationDeposits). Before deploying dev's rules, diff them against the live ones (managers' branch-settings write is in both, written differently). Nothing to migrate
 - [ ] **Purchase orders (22 Oct):** deploy the functions (the hourly `notifyDailySummary` now also sends Late deliveries). Then add each supplier's phone and "Delivers in (days)" in Purchases → Vendors so WhatsApp and the due day work. Nothing to migrate
 - [ ] **Pay-outs at suppliers (21 Oct):** deploy `firestore.rules` (till roles read vendor names and bills; approvers write a supplier bill's payment only as part of approving it; 22 Oct: till roles read purchase orders and mark one as waiting on their own bill). Nothing to migrate

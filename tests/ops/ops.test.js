@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { alsoAway, onShift, owedBy, shiftSummary, shiftText } from "@/lib/ops/model";
-import { awayByStaff, dutyGaps, dutyRows } from "@/lib/tasks/model";
+import { awayByStaff, coverPatch, dutyGaps, dutyNamed, dutyRows, rotaPatch } from "@/lib/tasks/model";
 
 // 2026-10-30 is a Friday (5)
 const DATE = "2026-10-30";
@@ -122,5 +122,25 @@ describe("who does what today (shared by Tasks and Ops)", () => {
     const done = dutyRows(tasks, { "fridge_2026-10-30": true }, DATE, away);
     expect(done.map((r) => r.task.id)).toEqual(["opening", "fridge"]);
     expect(dutyGaps(done)).toBe(0);
+  });
+});
+
+describe("who does it day by day, as the server writes it (30 Oct)", () => {
+  const me = { uid: "sup", role: "supervisor" };
+  const base = { id: "t", repeat: { every: "day" }, assigneeUid: "sup", teamLeadUid: null, covers: { "2026-10-01": { uid: "old" }, "2026-10-29": { uid: "ali" } } };
+  it("a rota from today, led by whoever set it; old covers dropped; doers follow", () => {
+    const p = rotaPatch(base, me, { 5: { uid: "ali", name: "Ali", extra: 1 }, 6: null }, DATE);
+    expect(p).toEqual({ rota: { 5: { uid: "ali", name: "Ali", role: "" } }, rotaSince: DATE, covers: { "2026-10-29": { uid: "ali" } }, doers: ["sup", "ali"], teamLeadUid: "sup" });
+  });
+  it("a day given and taken back", () => {
+    const given = coverPatch(base, DATE, { uid: "kumar", name: "Kumar" }, DATE);
+    expect(given.covers[DATE]).toEqual({ uid: "kumar", name: "Kumar", role: "" });
+    expect(given.doers).toEqual(["sup", "ali", "kumar"]);
+    expect(coverPatch({ ...base, covers: given.covers }, DATE, null, DATE).covers[DATE]).toBeUndefined();
+  });
+  it("everyone named, once — what the server checks", () => {
+    expect(dutyNamed({ rota: { 1: { uid: "ali" }, 2: { uid: "ali" }, 3: null } })).toEqual(["ali"]);
+    expect(dutyNamed({ cover: { date: DATE, person: { uid: "kumar" } } })).toEqual(["kumar"]);
+    expect(dutyNamed({ cover: { date: DATE, person: null } })).toEqual([]);
   });
 });
