@@ -1,8 +1,8 @@
 // The roles matrix (docs/ROLES.md, agreed 18 Oct 2026): the owner's answers
 // as tests, and the menu checked against the page guard.
 import { describe, it, expect } from "vitest";
-import { CAN, PAGES, can, canOpen, pageNeeds, normalizeRole } from "@/lib/authz/permissions";
-import { navFor, pagesFor, sidebarItems } from "@/app/components/shell/navigation";
+import { CAN, OFFICE_ROLES, PAGES, can, canOpen, pageNeeds, normalizeRole } from "@/lib/authz/permissions";
+import { bottomNavFor, navFor, pagesFor, sidebarItems } from "@/app/components/shell/navigation";
 
 const ALL = ["owner", "superAdmin", "gm", "branchAdmin", "manager", "inCharge", "accountant", "supervisor", "cashier", "staff"];
 const who = (cap) => ALL.filter((r) => can(r, cap));
@@ -113,7 +113,7 @@ describe("the menu", () => {
 
   it("each role's menu, at a glance", () => {
     const top = (r) => navFor(r).flatMap((s) => s.items.map((i) => i.label));
-    expect(top("cashier")).toEqual(["Entries", "Pay-outs", "My Requests", "Issues", "Tasks", "Loans", "My pay & attendance", "Tools", "Support"]); // chat: its own workspace, from the top bar // Loans: the staff loan tracker, to hand out approved ones
+    expect(top("cashier")).toEqual(["Operations", "Entries", "Pay-outs", "My Requests", "Issues", "Tasks", "Loans", "My pay & attendance", "Tools", "Support"]); // chat: its own workspace, from the top bar // Loans: the staff loan tracker, to hand out approved ones
     expect(top("staff")).toEqual([]);
     // a cashier's Tools: only the reservation receipt (25 Oct 2026)
     expect(navFor("cashier").flatMap((x) => x.items).find((i) => i.label === "Tools").children.map((c) => c.label)).toEqual(["Reservation Receipt"]);
@@ -125,5 +125,13 @@ describe("the menu", () => {
     expect(top("inCharge")).not.toContain("Payroll");
     expect(top("inCharge")).toContain("Requested Panel"); // vouchers and bills (4.9, 4.10)
     expect(top("accountant")).not.toContain("Pay-outs");
+  });
+
+  it("Ops (30 Oct): every office role, second on the phone's bottom bar; never staff", () => {
+    for (const r of OFFICE_ROLES) {
+      expect(canOpen(r, "/ops")).toBe(true);
+      expect(bottomNavFor(r).map((i) => i.path).slice(0, 2)).toEqual(["/", "/ops"]);
+    }
+    expect(canOpen("staff", "/ops")).toBe(false);
   });
 });

@@ -10,23 +10,20 @@ import { ArrowLeft, Check, ChevronRight, Flag, MoreHorizontal, Pause, Pencil, Pl
 import { Avatar, Badge, Button, EmptyState, Menu, Skeleton, Tabs, cn, toast } from "@/app/components/ui";
 import { confirmDialog } from "@/app/components/ui/notify";
 import Link from "next/link";
-import { CATCH_UP_DAYS, addDays, canSetDuty, checkId, dutyOn, hasRota, issueHref, itemsOf, occursOn, repeatText, rotaText, todayCount, unreadOn } from "@/lib/tasks/model";
+import { CATCH_UP_DAYS, addDays, canSetDuty, dutyGaps, dutyRows, hasRota, issueHref, itemsOf, repeatText, rotaText, todayCount, unreadOn } from "@/lib/tasks/model";
 import { deleteTask, setTaskActive, useChecks } from "@/lib/tasks/client";
 import TaskSheet from "./TaskSheet";
 import MyTasksTab from "./MyTasksTab";
 import MessageBadge from "./MessageBadge";
 import { CoverSheet, RotaSheet } from "./DutySheets";
 
-/** Each repeating task due today and who does it — anyone off shows, to be given to someone. */
-function TodaysDuty({ tasks, checks, today, away, user, nameOf, onGive, onOpen }) {
-  const rows = tasks
-    .filter((t) => t.repeat && occursOn(t, today))
-    .map((t) => ({ task: t, duty: dutyOn(t, today, away), done: !!checks[checkId(t.id, today)] }))
-    .sort((a, b) => Number(a.done) - Number(b.done) || Number(b.duty.via === "lead") - Number(a.duty.via === "lead") || String(a.task.title).localeCompare(String(b.task.title)));
+/** Each repeating task due today and who does it — anyone off shows, to be given to someone (here and on Ops). */
+export function TodaysDuty({ tasks, checks, today, away, user, nameOf, onGive, onOpen, id }) {
+  const rows = dutyRows(tasks, checks, today, away);
   if (!rows.length) return null;
-  const waiting = rows.filter((r) => r.duty.via === "lead" && !r.done).length;
+  const waiting = dutyGaps(rows);
   return (
-    <section className="space-y-2">
+    <section id={id} className="scroll-mt-20 space-y-2">
       <h3 className="flex items-baseline gap-2 px-1 text-sm font-semibold text-fg">
         Who does what today
         {waiting > 0 && <span className="text-xs font-medium text-warning">{waiting} need{waiting === 1 ? "s" : ""} someone</span>}

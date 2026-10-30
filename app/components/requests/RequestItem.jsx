@@ -75,7 +75,7 @@ function Trail({ req }) {
  * spans branches) · showWho (lists of
  * everyone's requests show the person; My requests too, for requests made for someone).
  */
-export default function RequestItem({ req, actions = [], onAction, busy, currency, branchName, showWho = true, free = null }) {
+export default function RequestItem({ req, actions = [], onAction, busy, currency, branchName, showWho = true, free = null, hints = [] }) {
   const type = REQUEST_TYPES[req.type];
   const stage = stageOf(req);
   const st = STAGES[stage] || STAGES.waiting;
@@ -119,6 +119,12 @@ export default function RequestItem({ req, actions = [], onAction, busy, currenc
         {!isLeave && <span className="shrink-0 text-right text-base font-bold tabular-nums text-fg">{formatMoney(req.amount, currency)}</span>}
       </div>
 
+      {/* what to know before deciding: who else is off then, what they already owe (useRequestHints) */}
+      {hints.map((h) => (
+        <p key={h.text} className={cn("mt-2 rounded-lg px-2.5 py-1.5 text-xs font-medium", h.tone === "warning" ? "bg-warning-soft text-warning" : "bg-surface-2 text-muted")}>
+          {h.text}
+        </p>
+      ))}
       {/* the till after giving it, for whoever approves (Requested panel, cash roles) */}
       {!isLeave && actions.includes("approve") && <AfterThis free={free} amount={req.amount} currency={currency} />}
       <Trail req={req} />

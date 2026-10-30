@@ -65,7 +65,21 @@ function FromTheBooks({ onTill }) {
 
 /** Just the figure, from the server, for those who may not read the books — counted again when what is held back changes (something handed over). */
 function FromTheServer({ companyId, branchId, onTill, recount }) {
-  const today = useBusinessToday();
+  const till = useServerCash(companyId, branchId, recount);
+  useEffect(() => onTill(till), [till, onTill]);
+  return null;
+}
+
+/**
+ * A branch's cash in hand from the server (app/api/branch/cash-in-hand):
+ * { ready, cash, failed? }. Counted again when `recount` changes. Also for
+ * the GM's all-branches view on Ops, one branch per card (`day`: that
+ * branch's own business day; else the active branch's).
+ */
+export function useServerCash(companyId, branchId, recount, day) {
+  const active = useBusinessToday();
+  const today = day || active;
+  const [till, setTill] = useState({ ready: false, cash: 0 });
   useEffect(() => {
     if (!companyId || !branchId || !today) return;
     let live = true;
@@ -79,17 +93,17 @@ function FromTheServer({ companyId, branchId, onTill, recount }) {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error);
-        if (live) onTill({ ready: true, cash: Number(data.cash) || 0 });
+        if (live) setTill({ ready: true, cash: Number(data.cash) || 0 });
       } catch (err) {
         console.warn("[CashInHand]", err?.message);
-        if (live) onTill({ ready: false, cash: 0, failed: true });
+        if (live) setTill({ ready: false, cash: 0, failed: true });
       }
     })();
     return () => {
       live = false;
     };
-  }, [companyId, branchId, today, onTill, recount]);
-  return null;
+  }, [companyId, branchId, today, recount]);
+  return till;
 }
 
 function TillCard({ till, held, onFree }) {

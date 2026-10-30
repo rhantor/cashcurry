@@ -13,6 +13,7 @@ import { Chip } from "@/app/components/entry/Choices";
 import { RequestList } from "@/app/requested-panel/RequestCard";
 import RequestItem from "./RequestItem";
 import useRequestActions from "./useRequestActions";
+import useRequestHints from "./useRequestHints";
 
 const oldestFirst = (a, b) => String(a.askedAt).localeCompare(String(b.askedAt));
 
@@ -33,6 +34,8 @@ export default function RequestInbox({ companyId, branchId, user, branches = [],
   const items = useMemo(() => [...data].sort(oldestFirst).map((r) => ({ r, actions: actionsFor(r, { role, uid, staffId }) })), [data, role, uid, staffId]);
   const shown = type === "all" ? items : items.filter((x) => x.r.type === type);
   const counts = useMemo(() => data.reduce((m, r) => ((m[r.type] = (m[r.type] || 0) + 1), m), {}), [data]);
+  // who else is off then (leave) and what they already owe (money), at this branch
+  const hintsFor = useRequestHints({ companyId, branchId, requests: data, currency });
 
   return (
     <div className="space-y-3">
@@ -66,7 +69,7 @@ export default function RequestInbox({ companyId, branchId, user, branches = [],
       </div>
       <RequestList loading={isLoading} error={isError && "Couldn't load the requests."} count={shown.length} empty="No advances, staff loans or leave waiting for a decision.">
         {shown.map(({ r, actions }) => (
-          <RequestItem key={`${r.branchId}-${r.type}-${r.id}`} req={r} actions={actions} onAction={run} busy={busyId === r.id} currency={currency} branchName={branchIds ? nameOf[r.branchId] : null} free={r.branchId === branchId ? free : null} />
+          <RequestItem key={`${r.branchId}-${r.type}-${r.id}`} req={r} actions={actions} onAction={run} busy={busyId === r.id} currency={currency} branchName={branchIds ? nameOf[r.branchId] : null} free={r.branchId === branchId ? free : null} hints={actions.includes("approve") ? hintsFor(r) : undefined} />
         ))}
       </RequestList>
     </div>

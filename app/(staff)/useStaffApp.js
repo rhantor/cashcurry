@@ -14,6 +14,7 @@ import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlic
 import { computeAttendance, formatClock, getAttendanceDate, toLocalDateStr } from "@/lib/attendance/computeHours";
 import { shiftsEnabled } from "@/lib/attendance/shifts";
 import { byPeriodDesc } from "@/lib/payroll/payslipCopy";
+import { MONEY_ADVANCE_TYPES } from "@/lib/ops/model";
 
 /**
  * { staff, priv, loading } — the person's staff record and its private half:
@@ -77,11 +78,6 @@ export function useMyPayslips(user, staffId) {
   }, [staffId, companyId, branchId]);
   return { slips: slips || [], loading: slips === null };
 }
-
-// Only money advances count as owed — leave used to live in the same
-// collection. "personal" is the staff form's salary advance; "salary" and
-// "emergency" come from the office.
-const MONEY_ADVANCE_TYPES = ["personal", "salary", "emergency"];
 
 /**
  * This pay period so far: hours, OT, pay earned (or the fixed salary), lateness,
