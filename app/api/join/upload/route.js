@@ -1,6 +1,6 @@
 import { Buffer } from "node:buffer";
 import { NextResponse } from "next/server";
-import { bucket, openLink } from "@/lib/server/hires";
+import { openLink, putFile, removeFile } from "@/lib/server/hires";
 import { MAX_HEALTH_FILES, fileProblem } from "@/lib/hires/model";
 
 // A document sent from a join link (30 Oct): IC or passport, photo, bank
@@ -30,7 +30,7 @@ export async function POST(req) {
       const list = many ? now || [] : now ? [now] : [];
       const gone = list[Number(body.remove) || 0];
       if (!gone) return NextResponse.json({ ok: true });
-      await bucket().file(gone.path).delete().catch(() => {});
+      await removeFile(gone.path);
       await ref.update({ [`files.${kind}`]: many ? list.filter((f) => f !== gone) : null, updatedAt: new Date().toISOString() });
       return NextResponse.json({ ok: true });
     }
@@ -42,9 +42,9 @@ export async function POST(req) {
     if (many && (now || []).length >= MAX_HEALTH_FILES) return fail(400, `Up to ${MAX_HEALTH_FILES} certificates`);
 
     const path = `newHires/${link.companyId}/${link.branchId}/${hire.id}/${kind}-${Date.now()}.${EXT[file.type] || "bin"}`;
-    await bucket().file(path).save(Buffer.from(await file.arrayBuffer()), { contentType: file.type, resumable: false });
+    await putFile(path, Buffer.from(await file.arrayBuffer()), file.type);
     const saved = { path, name: String(file.name || kind).slice(0, 120), contentType: file.type, size: file.size, at: new Date().toISOString() };
-    if (!many && now?.path) await bucket().file(now.path).delete().catch(() => {}); // replaced
+    if (!many && now?.path) await removeFile(now.path); // replaced
     await ref.update({ [`files.${kind}`]: many ? [...(now || []), saved] : saved, updatedAt: new Date().toISOString() });
     return NextResponse.json({ ok: true, file: { name: saved.name, contentType: saved.contentType } });
   } catch (error) {
