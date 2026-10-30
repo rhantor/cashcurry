@@ -99,9 +99,7 @@ spawnSync("node", ["scripts/build-functions-engine.mjs"], { cwd: ROOT, stdio: "i
 const fast = process.argv.includes("--fast");
 const NEXT_ENV = { ...NEXT_LOCAL_ENV, ...localLoginEnv(), ...(lanIp ? { CC_LAN_HOST: lanIp } : {}), ...(fast ? { NEXT_DIST_DIR: ".next-fast" } : {}) };
 if (fast && !process.argv.includes("--no-build")) {
-  console.log("
-  Building the app once — 2 to 3 minutes…
-");
+  console.log("\n  Building the app once — 2 to 3 minutes…\n");
   const built = spawnSync("npx", ["next", "build"], { cwd: ROOT, stdio: "inherit", shell: true, env: { ...process.env, ...NEXT_ENV } });
   if (built.status !== 0) {
     console.error("The build failed — see above.");
