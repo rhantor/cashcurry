@@ -19,6 +19,16 @@ import SignaturesPanel from "./panels/SignaturesPanel";
 import ClausesPanel from "./panels/ClausesPanel";
 import LetterPreview from "./LetterPreview";
 import SignaturePad from "./SignaturePad";
+import { useRouter } from "next/navigation";
+import { doc, getDoc } from "firebase/firestore";
+import { format, parseISO } from "date-fns";
+import { UserPlus } from "lucide-react";
+import { db } from "@/lib/firebase";
+import { getLetter, saveLetter } from "@/lib/hires/client";
+import { hireName } from "@/lib/hires/model";
+import { roleLabelOf } from "@/app/staff-management/lib/constants";
+import { Button } from "@/app/components/ui";
+import { LETTER_KEYS } from "./letterForHire";
 
 
 
@@ -275,6 +285,75 @@ export default function AppointmentLetterGenerator() {
     return templateType === "partTime" ? `${text}/hour` : text;
   };
 
+  // --- A new hire's letter (30 Oct) ---
+  // ?hire=<id> (from Staff → a new hire → Prepare the letter): the job, start
+  // day and pay come from the new hire; "Save for …" keeps the letter for them
+  // to read and sign on their join link (their own details go in as they fill them).
+  const router = useRouter();
+  const [hire, setHire] = useState(null);
+  const [savingForHire, setSavingForHire] = useState(false);
+  const applyLetter = (d) => {
+    setTemplateType(d.templateType || "fullTime");
+    setLogo(d.logo || null);
+    setStamp(d.stamp || null);
+    setCompanyDetails(d.companyDetails);
+    setLetterMeta(d.letterMeta);
+    setEmployeeDetails(d.employeeDetails);
+    setJobTerms(d.jobTerms);
+    setAllowances(d.allowances || []);
+    setSignatory(d.signatory);
+    setClauses(d.clauses);
+    setSignatorySignature(d.signatorySignature || null);
+    if (d.stylingOptions) setStylingOptions(d.stylingOptions);
+  };
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("hire");
+    if (!id || !companyId || !branchId) return;
+    let live = true;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, "companies", companyId, "branches", branchId, "newHires", id));
+        if (!live) return;
+        if (!snap.exists()) return toast.error("That new hire is no longer here");
+        const h = { id, ...snap.data() };
+        setHire(h);
+        const saved = await getLetter(companyId, branchId, id);
+        if (!live) return;
+        if (saved) return applyLetter(saved);
+        setEmployeeDetails({ name: hireName(h), icPassport: "", addressLine1: "", addressLine2: "" });
+        setJobTerms((t) => ({
+          ...t,
+          title: roleLabelOf(h.role) || t.title,
+          department: h.department || t.department,
+          commencementDate: h.startDate ? format(parseISO(h.startDate), "do MMMM yyyy") : t.commencementDate,
+          basicSalary: h.basicSalary !== "" && h.basicSalary != null ? Number(h.basicSalary).toFixed(2) : t.basicSalary,
+        }));
+      } catch (e) {
+        toast.error("Couldn't open the new hire", { description: e.message });
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [companyId, branchId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const saveForHire = async () => {
+    if (!hire) return;
+    const state = { templateType, logo, stamp, companyDetails, letterMeta, employeeDetails, jobTerms, allowances, signatory, clauses, signatorySignature, stylingOptions };
+    const letter = Object.fromEntries(LETTER_KEYS.map((k) => [k, state[k] ?? null]));
+    if (JSON.stringify(letter).length > 900000) return toast.error("The logo or stamp is too big to save", { description: "Use a smaller image (under about 300 KB)." });
+    setSavingForHire(true);
+    try {
+      await saveLetter(companyId, branchId, hire.id, letter);
+      toast.success(`Letter saved for ${hireName(hire)}`, { description: "They read and sign it on their join link." });
+      router.push(`/staff-management?hire=${hire.id}`);
+    } catch (e) {
+      toast.error("Couldn't save the letter", { description: hire.signed ? "They have signed it already — it can't change now." : e.message });
+    } finally {
+      setSavingForHire(false);
+    }
+  };
+
   // --- Draft Storage Logic ---
   const handleSaveDraft = () => {
     if (!draftName.trim()) {
@@ -462,6 +541,16 @@ export default function AppointmentLetterGenerator() {
           </div>
           <span className="text-[10px] bg-brand-soft text-brand px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">v2.0</span>
         </div>
+
+        {hire && (
+          <div className="flex items-center gap-3 border-b border-line bg-brand-soft/40 px-5 py-3">
+            <UserPlus className="size-4 shrink-0 text-brand" />
+            <p className="min-w-0 flex-1 text-xs text-fg">
+              Letter for new hire <b>{hireName(hire)}</b> — they add their IC and address and sign it on their link.
+            </p>
+            <Button size="sm" loading={savingForHire} onClick={saveForHire}>Save for {hire.firstName || "them"}</Button>
+          </div>
+        )}
 
         {/* Tab Navigation */}
         <div className="flex border-b border-line bg-surface-2/60/10 text-xs font-semibold overflow-x-auto select-none styled-scrollbar shrink-0">

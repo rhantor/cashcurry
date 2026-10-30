@@ -28,7 +28,7 @@ const drawImageContained = (pdf, dataUrl, format, x, y, boxW, boxH) => {
 };
 
 /** Draws the letter. Returns the jsPDF document and the file name to save it as. */
-export function buildLetterPdf({ stylingOptions, companyDetails, letterMeta, employeeDetails, jobTerms, allowances, signatory, clauses, signatorySignature, employeeSignature, logo, stamp, templateType, formatCurrency }) {
+export function buildLetterPdf({ stylingOptions, companyDetails, letterMeta, employeeDetails, jobTerms, allowances, signatory, clauses, signatorySignature, employeeSignature, employeeSignedOn, logo, stamp, templateType, formatCurrency }) {
   const pdf = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -790,6 +790,13 @@ export function buildLetterPdf({ stylingOptions, companyDetails, letterMeta, emp
     pdf.setLineWidth(0.3);
     pdf.line(115, empLineY, 115 + 45, empLineY); // signature line
     pdf.line(170, empLineY, 210 - margin, empLineY); // date line
+    // signed on a join link (30 Oct): the day they signed, on the date line
+    if (employeeSignedOn) {
+      pdf.setFont('helvetica', 'normal');
+      pdf.setFontSize(9);
+      pdf.setTextColor(15, 23, 42);
+      pdf.text(employeeSignedOn, 170, empLineY - 1.5);
+    }
     
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(7.5);

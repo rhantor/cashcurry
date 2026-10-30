@@ -116,12 +116,13 @@ export default function StaffModal ({
     }
 
     if (mode === 'add') {
-      // what was typed last time and not saved, if anything
-      const draft = readDraft()
-      setForm(draft ? { ...EMPTY_FORM, ...draft } : EMPTY_FORM)
+      // filled in from a new hire's join form (30 Oct), else what was typed
+      // last time and not saved, if anything
+      const draft = initialData ? null : readDraft()
+      setForm(initialData ? { ...EMPTY_FORM, ...initialData } : draft ? { ...EMPTY_FORM, ...draft } : EMPTY_FORM)
       setRestored(!!draft)
       startRef.current = EMPTY_FORM
-      setPhotoPreview(null)
+      setPhotoPreview(initialData?.photoUrl || null)
       setPhotoFile(null)
       setPhotoCleared(false)
       setErrorMessage('')
@@ -290,8 +291,8 @@ export default function StaffModal ({
 
   // keep the new staff member's details as they are typed (not the photo)
   useEffect(() => {
-    if (mode === 'add') writeDraft(form)
-  }, [mode, form])
+    if (mode === 'add' && !initialData) writeDraft(form)
+  }, [mode, form, initialData])
 
   const startOver = () => {
     dropDraft()
