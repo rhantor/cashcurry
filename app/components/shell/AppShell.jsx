@@ -53,6 +53,8 @@ export default function AppShell({ onSignOut, children }) {
   const issueBranchIds = useMemo(() => (isCompany ? branches.map((b) => b.id) : [branchId]), [isCompany, branches, branchId]);
   const issuesWaiting = useIssuesWaiting(user, issueBranchIds);
   const badges = useMemo(() => ({ "/requested-panel": pending.total, "/issues": issuesWaiting }), [pending.total, issuesWaiting]);
+  // the phone's bar has Ops where Requests or Issues may have been: it carries both counts
+  const phoneBadges = useMemo(() => ({ ...badges, "/ops": pending.total + issuesWaiting }), [badges, pending.total, issuesWaiting]);
   const { data: company } = useGetCompanyDetailsQuery(companyId ?? skipToken);
 
   // Owners/GMs with no branch chosen yet start in their default branch (or the first).
@@ -145,7 +147,7 @@ export default function AppShell({ onSignOut, children }) {
         items={bottom}
         sections={sections}
         activePath={page?.path}
-        badges={badges}
+        badges={phoneBadges}
         user={user}
         isCompany={isCompany}
         branches={branches}

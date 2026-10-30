@@ -10,6 +10,8 @@ export const sidebarItems = [
   { label: "Company Dashboard", section: "Overview", icon: "MdOutlineSpaceDashboard", path: "/company/dashboard" },
   { label: "Dashboard", companyLabel: "Branch Dashboard", section: "Overview", icon: "MdOutlineSpaceDashboard", path: "/dashboard" },
   { label: "Daily Cash Tracker", section: "Overview", icon: "MdOutlineAccountBalanceWallet", path: "/cash-tracker" },
+  // Today at the branch — what needs you, who is in, who does what, the till (30 Oct)
+  { label: "Operations", section: "Overview", icon: "ops", path: "/ops" },
 
   {
     label: "Entries",
@@ -178,8 +180,10 @@ export function currentPage(pathname, role) {
   return best;
 }
 
-// The phone's bottom bar: Home plus the first three of these the role can open.
+// The phone's bottom bar: Home plus the first three of these the role can open
+// (Operations first: it is what the phone is for).
 const BOTTOM = [
+  ["/ops", "Ops"],
   ["/company/dashboard", "Company"],
   ["/dashboard", "Dashboard"],
   ["/entry-data/sales-entry", "Sales"],

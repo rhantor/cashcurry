@@ -5,7 +5,7 @@
 // written when the app used react-icons) into lucide icons, so the config
 // didn't have to change. Unknown names fall back to a neutral dot.
 import {
-  ArrowDownToLine, Banknote, CalendarDays, CalendarRange, ChartColumn, Circle, HandCoins, Headset, House, Inbox,
+  ArrowDownToLine, Banknote, CalendarDays, CalendarRange, ChartColumn, Circle, ClipboardCheck, HandCoins, Headset, House, Inbox,
   LayoutDashboard, ListChecks, MessagesSquare, TriangleAlert, Newspaper, NotebookPen, Receipt, Repeat, ScrollText, Settings, ShoppingCart,
   TrendingUp, Users, Wallet, Wrench,
 } from "lucide-react";
@@ -14,6 +14,7 @@ export const MENU_ICONS = {
   home: House,
   payouts: HandCoins, // pay-outs and their bills (4.10)
   tasks: ListChecks, // tasks, checklists, notes and performance (4.11)
+  ops: ClipboardCheck, // today at the branch, on the phone (30 Oct)
   MdOutlineSpaceDashboard: LayoutDashboard, // dashboards
   MdShoppingCart: ShoppingCart, // purchases
   GrTransaction: NotebookPen, // entries

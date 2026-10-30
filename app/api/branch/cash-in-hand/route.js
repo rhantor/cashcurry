@@ -3,7 +3,7 @@ import { adminAuth, adminDb } from "@/lib/server/firebaseAdmin";
 import { cashInHand } from "@/lib/server/cashInHand";
 import { can, isCompanyRole } from "@/lib/authz/permissions";
 
-// The till's cash for the Requested panel (30 Oct), for whoever may see it
+// The till's cash for the Requested panel and Ops (30 Oct), for whoever may see it
 // there (cashInHand.view) — the cashier among them, whose rules keep the
 // costs, banking and salaries it is made from out of reach. Only the figure
 // is sent back.
