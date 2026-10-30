@@ -6,6 +6,12 @@
 // `npm run dev:phone` (--lan) also lets phones on the same Wi-Fi open it: the
 // emulators listen on the network too, and the address to open is printed.
 // Only on a network you trust — anyone on it could read the local data.
+//
+// `npm run test:phone` (--lan --fast) is for testing, not changing code: the
+// app is built once first (2–3 minutes) and then served as production serves
+// it, so every page opens at once and nothing compiles while you click (31 Oct:
+// `next dev` took 10–20 s a page and ran out of memory). A code change needs
+// it run again; `--no-build` reuses the last build.
 import fs from "node:fs";
 import net from "node:net";
 import os from "node:os";
@@ -88,6 +94,20 @@ const portOpen = (port) =>
 
 // The Functions emulator loads the finance engine bundle; build it fresh.
 spawnSync("node", ["scripts/build-functions-engine.mjs"], { cwd: ROOT, stdio: "inherit" });
+
+// ── fast mode: build the app before anything else runs ──
+const fast = process.argv.includes("--fast");
+const NEXT_ENV = { ...NEXT_LOCAL_ENV, ...localLoginEnv(), ...(lanIp ? { CC_LAN_HOST: lanIp } : {}), ...(fast ? { NEXT_DIST_DIR: ".next-fast" } : {}) };
+if (fast && !process.argv.includes("--no-build")) {
+  console.log("
+  Building the app once — 2 to 3 minutes…
+");
+  const built = spawnSync("npx", ["next", "build"], { cwd: ROOT, stdio: "inherit", shell: true, env: { ...process.env, ...NEXT_ENV } });
+  if (built.status !== 0) {
+    console.error("The build failed — see above.");
+    process.exit(1);
+  }
+}
 
 // The Functions emulator gives the code 10 s to load by default — too short
 // while Next.js compiles at the same time on this machine.
@@ -176,4 +196,4 @@ if (lanIp) {
   console.log("     If it doesn't load: allow Node.js and Java through Windows Firewall (Private networks),");
   console.log("     and let your VPN allow local-network access (or pause it).\n");
 }
-run("npx", ["next", "dev"], { ...NEXT_LOCAL_ENV, ...localLoginEnv(), ...(lanIp ? { CC_LAN_HOST: lanIp } : {}) });
+run("npx", fast ? ["next", "start", "-p", "3000"] : ["next", "dev"], NEXT_ENV);

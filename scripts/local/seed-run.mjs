@@ -37,7 +37,7 @@ const result = spawnSync(
     "--only", "firestore,auth,storage",
     "--project", LOCAL_PROJECT_ID,
     "--export-on-exit", `"${EMULATOR_DATA_DIR}"`,
-    `"node scripts/local/seed.mjs && node scripts/link-staff-logins.mjs"`,
+    `"node scripts/local/seed.mjs && node scripts/link-staff-logins.mjs${useBackup ? "" : " && node scripts/local/demo/demoExtras.mjs"}"`,
   ],
   { cwd: ROOT, stdio: "inherit", shell: true, env: { ...process.env, CC_BACKUP_DIR: source } }
 );
