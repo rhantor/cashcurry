@@ -156,6 +156,26 @@ service cloud.firestore {
       return resource.data.get('createdBy', {}).get('uid', '') == request.auth.uid || isOwnStaffRecord();
     }
 
+    // …and one the signed-in person is writing for their own staff record.
+    function isMineAfter() {
+      let mine = userData().get('staffId', '');
+      return mine != '' && request.resource.data.get('staffId', '') == mine;
+    }
+
+    // An approver whose login is linked to a staff record (30 Oct) never decides
+    // their own: on it (before or after the change) no approving, no approval
+    // added, and not its amount or who it is for. Someone else approves it.
+    function selfDecides() {
+      return (isOwnStaffRecord() || isMineAfter()) && (
+        changedKeys().hasAny(['approvals', 'approvedBy', 'amount', 'staffId']) ||
+        (resource.data.get('status', '') == 'pending' && request.resource.data.get('status', '') == 'approved'));
+    }
+
+    // …nor removes their own once it is given.
+    function deletesOwnGiven() {
+      return isOwnStaffRecord() && resource.data.get('status', '') in ['approved', 'closed'];
+    }
+
     // A request as anyone may raise it: pending, nothing paid.
     function isNewRequest() {
       return request.resource.data.get('status', '') == 'pending' &&
@@ -335,6 +355,13 @@ service cloud.firestore {
       let u = get(/databases/$(database)/documents/users/$(uid)).data;
       return u.get('role', '') == 'staff' && u.get('branchId', '') == b && u.get('companyId', '') == c &&
         get(/databases/$(database)/documents/companies/$(c)/branches/$(b)/staff/$(u.get('staffId', 'none'))).data.get('supervisorUid', '') in [request.auth.uid, ''];
+    }
+    // a task changed by a supervisor falls to no one new but its (new) assignee: the
+    // rota's and covers' people are added only by the server, which checks them (31 Oct)
+    function noNewDoers() {
+      return request.resource.data.get('doers', []).toSet()
+        .difference(resource.data.get('doers', []).toSet())
+        .hasOnly([request.resource.data.assigneeUid]);
     }
     // who may see a task (and its thread): management, whoever has it, leads its team or gave it —
     // and whoever it can fall to on a rota or a cover (doers, 31 Oct)
@@ -850,13 +877,13 @@ service cloud.firestore {
           // only their own (isOwnRequest).
           allow read: if canAdvancesPayOut(companyId, branchId) || canReportsView(companyId, branchId) ||
             (isBranchMember(companyId, branchId) && isOwnRequest());
-          allow create: if canAdvancesApprove(companyId, branchId) ||
+          allow create: if (canAdvancesApprove(companyId, branchId) && (!isMineAfter() || isNewRequest())) ||
             (isBranchMember(companyId, branchId) && isNewRequest());
-          allow update: if canAdvancesApprove(companyId, branchId) ||
+          allow update: if (canAdvancesApprove(companyId, branchId) && !selfDecides()) ||
             (canAdvancesPayOut(companyId, branchId) && isPayOut()) ||
             (canSalariesEnter(companyId, branchId) && isBookkeeping()) ||
             (isBranchMember(companyId, branchId) && isOwnRequest() && isCancel());
-          allow delete: if canAdvancesApprove(companyId, branchId);
+          allow delete: if canAdvancesApprove(companyId, branchId) && !deletesOwnGiven();
         }
 
         // ── Issues (roadmap 4.5) ────────────────────────────────────────────
@@ -903,7 +930,10 @@ service cloud.firestore {
             (canTasksTeam(companyId, branchId) &&
               request.resource.data.creatorUid == request.auth.uid &&
               request.resource.data.teamLeadUid == request.auth.uid &&
-              inMyTeam(companyId, branchId, request.resource.data.assigneeUid));
+              inMyTeam(companyId, branchId, request.resource.data.assigneeUid) &&
+              // no rota or covers yet, and it falls to no one but its assignee
+              request.resource.data.get('rota', {}).size() == 0 && request.resource.data.get('covers', {}).size() == 0 &&
+              request.resource.data.get('doers', []).hasOnly([request.resource.data.assigneeUid]));
           allow update: if canTasksManage(companyId, branchId) ||
             // whoever has a one-off marks it done (or not)
             (isBranchMember(companyId, branchId) && resource.data.get('assigneeUid', '') == request.auth.uid &&
@@ -913,20 +943,19 @@ service cloud.firestore {
             (resource.data.get('issueId', '') != '' && isTaskWork() &&
               canSeeIssue(companyId, branchId, getAfter(/databases/$(database)/documents/companies/$(companyId)/branches/$(branchId)/issues/$(resource.data.issueId)).data) &&
               (request.resource.data.status == 'done') == (getAfter(/databases/$(database)/documents/companies/$(companyId)/branches/$(branchId)/issues/$(resource.data.issueId)).data.status == 'resolved')) ||
-            // a supervisor changes the tasks they lead, still within their team
+            // a supervisor changes the tasks they lead, still within their team — not
+            // who does it day by day (its rota and covers: the server, app/api/tasks/duty,
+            // checks the people), and it falls to no one new but its assignee
             (canTasksTeam(companyId, branchId) && resource.data.get('teamLeadUid', '') == request.auth.uid &&
               request.resource.data.teamLeadUid == request.auth.uid &&
-              !changedKeys().hasAny(['creatorUid', 'createdBy']) &&
+              !changedKeys().hasAny(['creatorUid', 'createdBy', 'rota', 'rotaSince', 'covers']) &&
+              noNewDoers() &&
               inMyTeam(companyId, branchId, request.resource.data.assigneeUid)) ||
-            // a supervisor sets who does a task given to them, day by day (31 Oct): its rota
-            // and one-day covers — leading it from then on (days off come to them)
-            (canTasksTeam(companyId, branchId) && resource.data.get('assigneeUid', '') == request.auth.uid &&
-              changedKeys().hasOnly(['rota', 'rotaSince', 'covers', 'doers', 'teamLeadUid', 'updatedAt']) &&
-              request.resource.data.teamLeadUid == request.auth.uid) ||
             // a supervisor hands a task given to them on to their team
             (canTasksTeam(companyId, branchId) && resource.data.get('assigneeUid', '') == request.auth.uid &&
               changedKeys().hasOnly(['assignee', 'assigneeUid', 'teamLeadUid', 'via', 'doers', 'updatedAt']) &&
               request.resource.data.teamLeadUid == request.auth.uid &&
+              noNewDoers() &&
               inMyTeam(companyId, branchId, request.resource.data.assigneeUid)) ||
             // a new question or answer: whoever can see it counts it up by one, as themselves
             (canSeeTask(companyId, branchId, resource.data) &&
@@ -993,11 +1022,11 @@ service cloud.firestore {
           allow read: if canAdvancesApprove(companyId, branchId) || canAttendanceView(companyId, branchId) ||
             canPayrollView(companyId, branchId) ||
             (isBranchMember(companyId, branchId) && isOwnRequest());
-          allow create: if canAdvancesApprove(companyId, branchId) ||
+          allow create: if (canAdvancesApprove(companyId, branchId) && (!isMineAfter() || isNewRequest())) ||
             (isBranchMember(companyId, branchId) && isNewRequest());
-          allow update: if canAdvancesApprove(companyId, branchId) ||
+          allow update: if (canAdvancesApprove(companyId, branchId) && !selfDecides()) ||
             (isBranchMember(companyId, branchId) && isOwnRequest() && isCancel());
-          allow delete: if canAdvancesApprove(companyId, branchId);
+          allow delete: if canAdvancesApprove(companyId, branchId) && !deletesOwnGiven();
         }
 
         // ── Staff Advances ───────────────────────────────────────────────────
@@ -1010,13 +1039,13 @@ service cloud.firestore {
           // only their own (isOwnRequest).
           allow read: if canAdvancesPayOut(companyId, branchId) || canReportsView(companyId, branchId) ||
             (isBranchMember(companyId, branchId) && isOwnRequest());
-          allow create: if canAdvancesApprove(companyId, branchId) ||
+          allow create: if (canAdvancesApprove(companyId, branchId) && (!isMineAfter() || isNewRequest())) ||
             (isBranchMember(companyId, branchId) && isNewRequest());
-          allow update: if canAdvancesApprove(companyId, branchId) ||
+          allow update: if (canAdvancesApprove(companyId, branchId) && !selfDecides()) ||
             (canAdvancesPayOut(companyId, branchId) && isPayOut()) ||
             (canSalariesEnter(companyId, branchId) && isBookkeeping()) ||
             (isBranchMember(companyId, branchId) && isOwnRequest() && isCancel());
-          allow delete: if canAdvancesApprove(companyId, branchId);
+          allow delete: if canAdvancesApprove(companyId, branchId) && !deletesOwnGiven();
         }
 
         // ── Old branch chat — read-only; chat moved to companies/{c}/chats (4.4,

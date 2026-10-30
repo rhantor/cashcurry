@@ -42,6 +42,16 @@ describe("new requests", () => {
     expect(newRequestFields(asked("advance", 3000), manager, now).status).toBe("approved");
     expect(newRequestFields(asked("leave", 0), owner, now)).not.toHaveProperty("paidOut");
   });
+  it("an approver entering one for themselves (their login linked to that staff record): it waits for someone else", () => {
+    const me = { ...manager, staffId: "st1" };
+    expect(newRequestFields(asked("advance", 300), me, now)).toEqual({ status: "pending", approvals: [], paidOut: null });
+    expect(newRequestFields(asked("staffLoan", 900), me, now).status).toBe("pending");
+    expect(newRequestFields(asked("leave", 0), me, now).status).toBe("pending");
+    expect(() => approvalPatch(asked("advance", 300), me, now)).toThrow(/for you/);
+    expect(actionsFor(asked("advance", 300), me)).toEqual(["cancel"]);
+    // someone else's: given at once, as before
+    expect(newRequestFields(asked("advance", 300, { staffId: "st2" }), me, now).status).toBe("approved");
+  });
 });
 
 describe("cancelling and stages", () => {

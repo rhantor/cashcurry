@@ -64,8 +64,18 @@ function Head ({ companyId, branchId, user, manager, tab, setTab }) {
   )
 }
 
+/** Picked themselves: it goes as a request, and someone else approves it. */
+function SelfNote () {
+  return (
+    <div className='mt-3 flex gap-3 rounded-2xl border border-warning/30 bg-warning-soft px-4 py-3 text-sm text-fg'>
+      <Clock3 className='mt-0.5 size-4 shrink-0 text-warning' />
+      <p>This is for you, so it goes as a request — another manager approves it. No money moves until then.</p>
+    </div>
+  )
+}
+
 // ─── Advance ──────────────────────────────────────────────────────────────────
-function AdvanceForm ({ head, staff, staffLoading, companyId, branchId, manager, money, currency }) {
+function AdvanceForm ({ head, staff, staffLoading, companyId, branchId, manager, money, currency, myStaffId }) {
   const today = useBusinessToday()
   const [staffId, setStaffId] = useState('')
   const [amount, setAmount] = useState('')
@@ -82,6 +92,7 @@ function AdvanceForm ({ head, staff, staffLoading, companyId, branchId, manager,
   const when = date || today
   const deductionMonth = month || ym(when)
   const person = staff.find(s => s.id === staffId)
+  const self = manager && !!myStaffId && staffId === myStaffId // the approver's own: only ever a request
 
   const save = async () => {
     const problems = {}
@@ -92,7 +103,8 @@ function AdvanceForm ({ head, staff, staffLoading, companyId, branchId, manager,
 
     const createdBy = getSessionUser() || {}
     // approvers give it now; anyone else's entry is a request
-    const flow = newRequestFields({ type: 'advance', amount: Number(amount) || 0 }, createdBy)
+    // approvers give it now — never to themselves (it then waits for someone else)
+    const flow = newRequestFields({ type: 'advance', staffId, amount: Number(amount) || 0 }, createdBy)
     const given = flow.status === 'approved'
     try {
       await addAdvanceEntry({
@@ -135,7 +147,7 @@ function AdvanceForm ({ head, staff, staffLoading, companyId, branchId, manager,
     }
   }
 
-  const label = manager ? 'Give advance' : 'Send request'
+  const label = manager && !self ? 'Give advance' : 'Send request'
   const button = (
     <Button size='lg' className='w-full' onClick={save} loading={isLoading} success={saved}>
       {label}
@@ -185,6 +197,7 @@ function AdvanceForm ({ head, staff, staffLoading, companyId, branchId, manager,
             />
           )}
         </Field>
+        {self && <SelfNote />}
         <div className='mt-4 grid gap-4 sm:grid-cols-2'>
           <Field label='Amount' error={errors.amount}>
             {({ id, invalid }) => (
@@ -239,7 +252,7 @@ function AdvanceForm ({ head, staff, staffLoading, companyId, branchId, manager,
 }
 
 // ─── Staff loan ───────────────────────────────────────────────────────────────
-function LoanForm ({ head, staff, staffLoading, companyId, branchId, manager, money, currency }) {
+function LoanForm ({ head, staff, staffLoading, companyId, branchId, manager, money, currency, myStaffId }) {
   const today = useBusinessToday()
   const [staffId, setStaffId] = useState('')
   const [amount, setAmount] = useState('')
@@ -259,6 +272,7 @@ function LoanForm ({ head, staff, staffLoading, companyId, branchId, manager, mo
   const when = date || today
   const firstMonth = startMonth || ym(when)
   const person = staff.find(s => s.id === staffId)
+  const self = manager && !!myStaffId && staffId === myStaffId // the approver's own: only ever a request
   const total = Number(amount) || 0
   const typed = Number(custom)
   const customOk = Number.isInteger(typed) && typed >= 1 && typed <= MAX_LOAN_MONTHS
@@ -287,7 +301,8 @@ function LoanForm ({ head, staff, staffLoading, companyId, branchId, manager, mo
     if (Object.keys(problems).length) return toast.error('Check the highlighted fields')
 
     const createdBy = getSessionUser() || {}
-    const flow = newRequestFields({ type: 'staffLoan', amount: total }, createdBy)
+    if (migration && self) return toast.error('Your own earlier loan', { description: 'Ask another manager to record it.' })
+    const flow = newRequestFields({ type: 'staffLoan', staffId, amount: total }, createdBy)
     const given = flow.status === 'approved'
     try {
       await addStaffLoan({
@@ -333,7 +348,7 @@ function LoanForm ({ head, staff, staffLoading, companyId, branchId, manager, mo
     }
   }
 
-  const label = migration ? 'Record earlier loan' : manager ? 'Give loan' : 'Send request'
+  const label = migration ? 'Record earlier loan' : manager && !self ? 'Give loan' : 'Send request'
   const button = (
     <Button size='lg' className='w-full' onClick={save} loading={isLoading} success={saved}>
       {label}
@@ -383,6 +398,7 @@ function LoanForm ({ head, staff, staffLoading, companyId, branchId, manager, mo
             />
           )}
         </Field>
+        {self && <SelfNote />}
         <div className='mt-4 grid gap-4 sm:grid-cols-2'>
           <Field label='Loan amount' error={errors.amount}>
             {({ id, invalid }) => (
@@ -561,7 +577,7 @@ export default function AdvanceLoanEntry () {
   const manager = can(role, 'advances.approve') // approvers record one handed over on the spot
 
   const head = <Head companyId={companyId} branchId={branchId} user={user} manager={manager} tab={tab} setTab={setTab} />
-  const props = { head, staff, staffLoading, companyId, branchId, manager, money, currency }
+  const props = { head, staff, staffLoading, companyId, branchId, manager, money, currency, myStaffId: user?.staffId || null }
   return tab === 'advance' ? <AdvanceForm key='advance' {...props} /> : <LoanForm key='loan' {...props} />
 }
 

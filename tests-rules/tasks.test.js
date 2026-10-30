@@ -212,14 +212,32 @@ describe("who does it each day — rota and covers (31 Oct)", () => {
       await ctx.firestore().doc(`${T}/rotaed`).set(task("rahim", { repeat: { every: "day" }, teamLeadUid: "rahim", rota, doers: ["rahim", "ali", "kumar"] }));
     });
   });
-  it("the supervisor given a task sets its rota and covers, leading it — nothing else, and no one else", async () => {
+  it("a supervisor can't write a rota or a cover themselves — the server does, checking the people (30 Oct)", async () => {
     const set = (extra = {}) => ({ rota, covers: {}, doers: ["rahim", "ali", "kumar"], teamLeadUid: "rahim", ...extra });
-    expect(await ok(db("rahim").doc(`${T}/opening`).update(set({ title: "Easier" })))).toBe(false);
-    expect(await ok(db("rahim").doc(`${T}/opening`).update(set({ teamLeadUid: null })))).toBe(false);
+    expect(await ok(db("rahim").doc(`${T}/opening`).update(set()))).toBe(false);
+    expect(await ok(db("rahim").doc(`${T}/rotaed`).update({ covers: { "2026-10-30": { uid: "kumar" } } }))).toBe(false);
     expect(await ok(db("nadia").doc(`${T}/opening`).update({ ...set(), teamLeadUid: "nadia" }))).toBe(false);
     expect(await ok(db("ali").doc(`${T}/opening`).update(set()))).toBe(false);
-    expect(await ok(db("rahim").doc(`${T}/opening`).update(set()))).toBe(true);
-    expect(await ok(db("rahim").doc(`${T}/rotaed`).update({ covers: { "2026-10-30": { uid: "kumar" } }, doers: ["rahim", "ali", "kumar"] }))).toBe(true);
+    expect(await ok(db("klManager").doc(`${T}/opening`).update(set()))).toBe(true); // management writes tasks as before
+  });
+  it("a supervisor never adds someone new to who a task falls to (doers) — only its new assignee", async () => {
+    // leading Ali's task (with Kumar on Saturdays): changing it keeps its people; adding Siti (Nadia's) is refused
+    await env.withSecurityRulesDisabled((ctx) =>
+      ctx.firestore().doc(`${T}/led`).set(task("ali", { repeat: { every: "day" }, teamLeadUid: "rahim", rota: { 6: { uid: "kumar" } }, doers: ["ali", "kumar"] }))
+    );
+    expect(await ok(db("rahim").doc(`${T}/led`).update({ title: "Opening check", doers: ["ali", "kumar"] }))).toBe(true);
+    expect(await ok(db("rahim").doc(`${T}/led`).update({ doers: ["ali", "kumar", "siti"] }))).toBe(false);
+    expect(await ok(db("rahim").doc(`${T}/led`).update({ rota: { 6: { uid: "siti" } } }))).toBe(false);
+    expect(await ok(db("rahim").doc(`${T}/led`).update({ doers: ["ali"] }))).toBe(true); // fewer is fine
+    // handing over: the new assignee joins, no one else
+    const hand = (doers) => ({ assignee: { uid: "ali" }, assigneeUid: "ali", teamLeadUid: "rahim", via: [{ uid: "rahim" }], doers });
+    expect(await ok(db("rahim").doc(`${T}/opening`).update(hand(["ali", "siti"])))).toBe(false);
+    expect(await ok(db("rahim").doc(`${T}/opening`).update(hand(["ali"])))).toBe(true);
+    // a new task: falls to its assignee only, with no rota or covers
+    const fresh = (extra) => task("ali", { creatorUid: "rahim", createdBy: { uid: "rahim" }, teamLeadUid: "rahim", repeat: { every: "day" }, doers: ["ali"], ...extra });
+    expect(await ok(db("rahim").doc(`${T}/new1`).set(fresh({ doers: ["ali", "siti"] })))).toBe(false);
+    expect(await ok(db("rahim").doc(`${T}/new2`).set(fresh({ rota: { 1: { uid: "siti" } } })))).toBe(false);
+    expect(await ok(db("rahim").doc(`${T}/new3`).set(fresh()))).toBe(true);
   });
   it("whoever is on the rota sees the task and ticks their own day as themselves", async () => {
     expect(await ok(db("kumar").collection(T).where("doers", "array-contains", "kumar").get())).toBe(true);
