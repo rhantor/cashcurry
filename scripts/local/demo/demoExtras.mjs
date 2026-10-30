@@ -30,11 +30,12 @@ const kl = db.doc(`companies/${CO}/branches/${KL}`);
 const BUCKET = `${LOCAL_PROJECT_ID}.appspot.com`;
 const password = fs.readFileSync(path.join(LOCAL_DIR, "dev-password.txt"), "utf8").trim();
 
-// ── days, on the KL branch's clock (Malaysia; its day ends at 05:00) ─────────
+// ── days, on the KL branch's clock (Malaysia) ────────────────────────────────
+// "Today" is the calendar day in KL: seeded late at night (before the
+// branch's 05:00 day end) it is still the day you will test on.
 const KL_OFFSET = 8 * 3600e3;
-const CUTOFF = 5 * 3600e3;
 const ymd = (ms) => new Date(ms).toISOString().slice(0, 10);
-const TODAY = ymd(Date.now() + KL_OFFSET - CUTOFF);
+const TODAY = ymd(Date.now() + KL_OFFSET);
 const addDays = (d, n) => ymd(Date.parse(`${d}T00:00:00Z`) + n * 864e5);
 const weekday = (d) => new Date(`${d}T00:00:00Z`).getUTCDay();
 const at = (d, hhmm) => Timestamp.fromMillis(Date.parse(`${d}T${hhmm}:00+08:00`));
