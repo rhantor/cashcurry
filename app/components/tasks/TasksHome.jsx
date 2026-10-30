@@ -13,12 +13,16 @@ import { useBusinessToday } from "@/app/hooks/useRegion";
 import { useChatPeople } from "@/app/components/chat/useChat";
 import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
 import { canManageTasks, canTeamTasks, leadOf, teamOf, unreadOn } from "@/lib/tasks/model";
-import { useTaskReads, useTasks } from "@/lib/tasks/client";
+import { useAway, useTaskReads, useTasks } from "@/lib/tasks/client";
+import { personName } from "@/lib/people";
 import MyTasksTab from "./MyTasksTab";
 import TeamTab from "./TeamTab";
 import PerformanceTab from "./PerformanceTab";
 import NotesTab from "./NotesTab";
 import TaskDetailSheet from "./TaskDetailSheet";
+
+const NONE = [];
+const union = (a, b) => [...a, ...b.filter((t) => !a.some((x) => x.id === t.id))];
 
 export default function TasksHome({ user, branchId }) {
   const companyId = user.companyId;
@@ -41,7 +45,11 @@ export default function TasksHome({ user, branchId }) {
   const given = useTasks(companyId, branchId, manage ? { all: true } : { lead: lead ? user.uid : undefined });
   const everyone = useChatPeople(gives ? companyId : null);
   // staff records say who leads whom (Staff management → Job → Supervisor)
-  const { data: staff = [] } = useGetStaffListQuery({ companyId, branchId }, { skip: !gives || !companyId || !branchId });
+  const { data: staffData } = useGetStaffListQuery({ companyId, branchId }, { skip: !gives || !companyId || !branchId });
+  const staff = staffData || NONE;
+  // who is off when (31 Oct): days off on the staff records, approved leave — everyone's
+  // for those who give tasks, else only one's own
+  const away = useAway(companyId, branchId, user, gives ? staff : null);
 
   // who tasks can be given to: management — the branch's people; a supervisor — their team
   const people = useMemo(() => {
@@ -53,7 +61,13 @@ export default function TasksHome({ user, branchId }) {
   }, [everyone, branchId, user.uid, manage, lead, staff]);
   // who leads a new task: the supervisor giving it, else the person's own supervisor
   const leadFor = useMemo(() => (lead ? () => user.uid : (uid) => leadOf(staff, uid)), [lead, user.uid, staff]);
-  const scope = manage ? { all: true } : { lead: user.uid };
+  const scope = manage ? { all: true } : { lead: user.uid, uid: user.uid };
+  // who can be put on a rota or given a day: the team (or the branch) and oneself
+  const dutyPeople = useMemo(() => (gives ? [{ uid: user.uid, name: personName(user) || user.username || "Me", role: user.role }, ...people] : []), [gives, user, people]);
+  // one's own list: what is given to one, and the days that fall to one as the
+  // supervisor (or whoever gave it) while someone is off
+  const myTasks = useMemo(() => (gives ? union(mine.list, given.list) : mine.list), [gives, mine.list, given.list]);
+  const teamTasks = useMemo(() => (lead ? union(given.list, mine.list) : given.list), [lead, given.list, mine.list]);
   // which tasks' messages are new to this person (the green badges)
   const reads = useTaskReads(companyId, user.uid);
   const newMine = mine.list.filter((t) => unreadOn(t, reads, user.uid)).length;
@@ -104,9 +118,11 @@ export default function TasksHome({ user, branchId }) {
         <Tabs tabs={tabs} value={current} onChange={setTab} className={phone ? "flex w-full [&>button]:flex-1 [&>button]:justify-center [&>button]:px-2" : undefined} />
       </div>
       {current === "team" && (
-        <TeamTab tasks={given.list} loading={given.loading} people={people} companyId={companyId} branchId={branchId} user={user} today={today} scope={scope} leadFor={leadFor} reads={reads} onOpenTask={openTask} />
+        <TeamTab tasks={teamTasks} loading={given.loading} people={people} companyId={companyId} branchId={branchId} user={user} today={today} scope={scope} leadFor={leadFor} reads={reads} onOpenTask={openTask} away={away} dutyPeople={dutyPeople} />
       )}
-      {current === "mine" && <MyTasksTab tasks={mine.list} loading={mine.loading} companyId={companyId} branchId={branchId} user={user} today={today} team={lead ? people : []} reads={reads} />}
+      {current === "mine" && (
+        <MyTasksTab tasks={myTasks} loading={mine.loading || (gives && given.loading)} companyId={companyId} branchId={branchId} user={user} today={today} team={lead ? people : []} reads={reads} away={away} dutyPeople={dutyPeople} />
+      )}
       {current === "performance" && (
         <PerformanceTab
           tasks={gives ? [...given.list, ...mine.list.filter((t) => !given.list.some((g) => g.id === t.id))] : mine.list}
@@ -117,9 +133,10 @@ export default function TasksHome({ user, branchId }) {
           branchId={branchId}
           user={user}
           today={today}
+          away={away}
         />
       )}
-      {linked && <TaskDetailSheet task={linked} onClose={closeLinked} companyId={companyId} branchId={branchId} user={user} team={lead ? people : []} />}
+      {linked && <TaskDetailSheet task={linked} onClose={closeLinked} companyId={companyId} branchId={branchId} user={user} team={lead ? people : []} dutyPeople={dutyPeople} away={away} today={today} />}
       {taskParam && !linked && !mine.loading && !given.loading && (
         <p className="rounded-xl bg-surface-2 px-4 py-3 text-sm text-muted">That task is no longer here — it was finished long ago, deleted, or is at another branch.</p>
       )}

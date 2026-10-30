@@ -231,11 +231,17 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
           const checks = Object.fromEntries(checkSnap.docs.map((d) => [d.id, d.data()]));
           all = all || (await people(company.id));
           const roleOf = (uid) => all.find((p) => p.uid === uid)?.role;
-          const byPerson = new Map();
-          for (const t of tasks) if (t.assigneeUid) byPerson.set(t.assigneeUid, [...(byPerson.get(t.assigneeUid) || []), t]);
-          for (const [uid, mine] of byPerson) {
+          // who is off when (31 Oct): a day off or leave moves the day to the supervisor
+          const [staffSnap, leaveSnap] = await Promise.all([branchRef.collection("staff").get(), branchRef.collection("leaves").where("status", "==", "approved").get()]);
+          const away = N.awayFrom({
+            staff: staffSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
+            leaves: leaveSnap.docs.map((d) => ({ ...d.data(), uid: d.data().staffId ? undefined : d.data().createdBy?.uid })),
+          });
+          // everyone a day can fall to: whoever has it, its rota and covers, who leads or gave it
+          const everyone = new Set(tasks.flatMap((t) => [t.assigneeUid, ...(t.doers || []), t.teamLeadUid, t.creatorUid]).filter(Boolean));
+          for (const uid of everyone) {
             if (!roleOf(uid)) continue; // no longer has a login
-            const message = N.reminderMessage(when, N.agenda(mine, checks, today), { branchName: b.name });
+            const message = N.reminderMessage(when, N.agenda(tasks, checks, today, { uid, away }), { branchName: b.name });
             if (!message) continue;
             await deliver({
               companyId: company.id,

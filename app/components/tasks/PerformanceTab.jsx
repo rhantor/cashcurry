@@ -140,7 +140,7 @@ function RateSheet({ person, month, current, onClose, companyId, branchId, user 
  * manage: everyone, and rating. lead (a supervisor): their team and themselves,
  * no rating (they see their own). Otherwise only the person's own.
  */
-export default function PerformanceTab({ tasks, loading, manage, lead = false, companyId, branchId, user, today }) {
+export default function PerformanceTab({ tasks, loading, manage, lead = false, companyId, branchId, user, today, away }) {
   const [month, setMonth] = useState(today.slice(0, 7));
   const [rating, setRating] = useState(null);
   const [details, setDetails] = useState(null); // { uid, show }
@@ -153,12 +153,14 @@ export default function PerformanceTab({ tasks, loading, manage, lead = false, c
   const { ratings } = useRatings(companyId, branchId, month, manage ? { all: true } : { uid: user.uid });
 
   const rows = useMemo(() => {
-    const people = many ? [...new Map(tasks.map((t) => [t.assigneeUid, t.assigneeUid === user.uid ? { ...t.assignee, name: "You" } : t.assignee])).values()].filter(Boolean) : [{ uid: user.uid, name: "You" }];
+    // everyone a task can fall to: whoever has it, and those on its rota or covering a day
+    const all = tasks.flatMap((t) => [{ ...t.assignee, uid: t.assigneeUid }, ...Object.values(t.rota || {}), ...Object.values(t.covers || {})]).filter((p) => p?.uid);
+    const people = many ? [...new Map(all.map((p) => [p.uid, p.uid === user.uid ? { ...p, name: "You" } : p])).values()] : [{ uid: user.uid, name: "You" }];
     return people
-      .map((p) => ({ person: p, p: performance(tasks, checks, p.uid, { from, to, today }), r: ratings[p.uid] }))
+      .map((p) => ({ person: p, p: performance(tasks, checks, p.uid, { from, to, today, away }), r: ratings[p.uid] }))
       .filter((x) => !many || x.p.given || x.r)
       .sort((a, b) => (b.p.score ?? -1) - (a.p.score ?? -1) || String(a.person.name).localeCompare(String(b.person.name)));
-  }, [tasks, checks, ratings, many, user.uid, from, to, today]);
+  }, [tasks, checks, ratings, many, user.uid, from, to, today, away]);
 
   const future = month > today.slice(0, 7);
   return (

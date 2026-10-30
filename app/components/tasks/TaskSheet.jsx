@@ -97,7 +97,8 @@ export default function TaskSheet({ open, onClose, task, defaultAssigneeUid, def
     const repeat = f.how === "once" ? null : f.how === "day" ? { every: "day" } : f.how === "week" ? { every: "week", days: [...f.days].sort() } : { every: "month", day: Number(f.monthDay) };
     // who leads it: kept while the person stays the same, else theirs (leadFor)
     const teamLeadUid = (task && task.assigneeUid === f.assigneeUid && task.teamLeadUid) || (leadFor ? leadFor(f.assigneeUid) : null);
-    const data = { teamLeadUid, title: f.title, details: f.details, assignee, repeat, dueDate: f.how === "once" ? f.dueDate || null : null, startDate: repeat ? f.startDate || today : null, needsPhoto: f.needsPhoto, priority: f.urgent ? "urgent" : "normal", items: cleanItems(f.items) };
+    // a changed task keeps who does it day by day (its rota and covers)
+    const data = { rota: task?.rota || null, covers: task?.covers || null, teamLeadUid, title: f.title, details: f.details, assignee, repeat, dueDate: f.how === "once" ? f.dueDate || null : null, startDate: repeat ? f.startDate || today : null, needsPhoto: f.needsPhoto, priority: f.urgent ? "urgent" : "normal", items: cleanItems(f.items) };
     const e = checkTask(data);
     setErrors(e);
     if (Object.keys(e).length) return;

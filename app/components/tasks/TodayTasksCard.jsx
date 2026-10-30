@@ -6,14 +6,16 @@ import Link from "next/link";
 import { ChevronRight, ListChecks } from "lucide-react";
 import { useBusinessToday } from "@/app/hooks/useRegion";
 import { dayList, unreadOn } from "@/lib/tasks/model";
-import { useChecks, useTaskReads, useTasks } from "@/lib/tasks/client";
+import { useAway, useChecks, useTaskReads, useTasks } from "@/lib/tasks/client";
 
 export default function TodayTasksCard({ user, href = "/my-tasks" }) {
   const today = useBusinessToday();
   const { list: tasks, loading } = useTasks(user.companyId, user.branchId, { uid: user.uid });
   const { checks } = useChecks(user.companyId, user.branchId, { from: today, to: today, uid: user.uid });
   const reads = useTaskReads(user.companyId, user.uid);
-  const items = useMemo(() => dayList(tasks, checks, today, today), [tasks, checks, today]);
+  const away = useAway(user.companyId, user.branchId, user);
+  // only what is theirs today: not a day off, nor a day given to someone else
+  const items = useMemo(() => dayList(tasks, checks, today, today, { uid: user.uid, away }), [tasks, checks, today, user.uid, away]);
   const fresh = tasks.filter((t) => unreadOn(t, reads, user.uid)).length;
   if (loading || (!items.length && !fresh)) return null;
   const left = items.filter((x) => !x.done);

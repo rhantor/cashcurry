@@ -5,15 +5,16 @@
 // someone in their team from here.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { Camera, Forward, Repeat, Send, X } from "lucide-react";
+import { Camera, Forward, Repeat, Send, Users, X } from "lucide-react";
 import { Avatar, Badge, Button, Select, Sheet, Textarea, cn, toast } from "@/app/components/ui";
 import { FileThumb } from "@/app/components/common/Files";
 import { timeOf } from "@/lib/chat/model";
 import Link from "next/link";
-import { canHandOver, chainText, issueHref, itemsOf, problemsIn, repeatText } from "@/lib/tasks/model";
+import { canHandOver, canSetDuty, chainText, hasRota, issueHref, itemsOf, problemsIn, repeatText, rotaText } from "@/lib/tasks/model";
 import { addTaskComment, handOver, markTaskRead, useTaskComments } from "@/lib/tasks/client";
 import useVoiceRecorder, { whyNoVoice } from "@/app/hooks/useVoiceRecorder";
 import { MicButton, RecordingBar, VoicePlayer } from "@/app/components/common/Voice";
+import { RotaSheet } from "./DutySheets";
 
 const dayText = (d) => format(parseISO(d), "EEE d MMM");
 const when = (t) => {
@@ -21,8 +22,12 @@ const when = (t) => {
   return ms ? format(new Date(ms), "d MMM, h:mm a") : "";
 };
 
-/** team: who a supervisor can hand it to [{ uid, name, role }]. */
-export default function TaskDetailSheet({ task, onClose, companyId, branchId, user, team = [] }) {
+/**
+ * team: who a supervisor can hand it to [{ uid, name, role }]. dutyPeople:
+ * who can be put on its rota (31 Oct); away: who is off when; today.
+ */
+export default function TaskDetailSheet({ task, onClose, companyId, branchId, user, team = [], dutyPeople = [], away, today }) {
+  const [rotaOpen, setRotaOpen] = useState(false);
   const { list: comments, loading } = useTaskComments(companyId, branchId, task?.id);
   const [text, setText] = useState("");
   const [files, setFiles] = useState([]);
@@ -87,7 +92,8 @@ export default function TaskDetailSheet({ task, onClose, companyId, branchId, us
       setBusy(false);
     }
   };
-  const handing = canHandOver(task, user) && team.length > 0;
+  const handing = canHandOver(task, user) && team.length > 0 && !hasRota(task);
+  const rotaEdit = canSetDuty(task, user) && dutyPeople.length > 0 && !!today;
 
   return (
     <Sheet open onClose={onClose} title={task.title} description={chainText(task)} size="lg">
@@ -132,6 +138,22 @@ export default function TaskDetailSheet({ task, onClose, companyId, branchId, us
             </div>
           )}
         </div>
+
+        {task.repeat && (hasRota(task) || rotaEdit) && (
+          <div className="flex items-center gap-3 rounded-2xl border border-line p-3">
+            <Users className="size-4 shrink-0 text-muted" />
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold text-fg">Who does it each day</p>
+              <p className="text-xs text-muted">{hasRota(task) ? rotaText(task) : "Just who it's given to — put your team on a rota, day by day."}</p>
+            </div>
+            {rotaEdit && (
+              <Button size="sm" variant="secondary" onClick={() => setRotaOpen(true)}>
+                {hasRota(task) ? "Change" : "Set a rota"}
+              </Button>
+            )}
+          </div>
+        )}
+        {rotaOpen && <RotaSheet task={task} onClose={() => setRotaOpen(false)} people={dutyPeople} companyId={companyId} branchId={branchId} user={user} today={today} away={away} />}
 
         {handing && (
           <div className="space-y-2 rounded-2xl border border-brand/30 bg-brand-soft/40 p-3">

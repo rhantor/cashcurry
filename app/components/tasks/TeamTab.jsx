@@ -2,17 +2,62 @@
 // The team, for those who give tasks (roadmap 4.11): today at a glance — how
 // much of the branch's work is done and each person's progress — and, for one
 // person, their to-do list and the tasks given to them (change, stop, delete).
+// "Who does what today": each repeating task's person for the day (31 Oct) —
+// someone off shows up here to be given to someone else.
 import { useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { ArrowLeft, ChevronRight, Flag, MoreHorizontal, Pause, Pencil, Play, Plus, Repeat, Trash2, Users } from "lucide-react";
+import { ArrowLeft, Check, ChevronRight, Flag, MoreHorizontal, Pause, Pencil, Play, Plus, Repeat, Trash2, UserRound, Users } from "lucide-react";
 import { Avatar, Badge, Button, EmptyState, Menu, Skeleton, Tabs, cn, toast } from "@/app/components/ui";
 import { confirmDialog } from "@/app/components/ui/notify";
 import Link from "next/link";
-import { CATCH_UP_DAYS, addDays, issueHref, itemsOf, repeatText, todayCount, unreadOn } from "@/lib/tasks/model";
+import { CATCH_UP_DAYS, addDays, canSetDuty, checkId, dutyOn, hasRota, issueHref, itemsOf, occursOn, repeatText, rotaText, todayCount, unreadOn } from "@/lib/tasks/model";
 import { deleteTask, setTaskActive, useChecks } from "@/lib/tasks/client";
 import TaskSheet from "./TaskSheet";
 import MyTasksTab from "./MyTasksTab";
 import MessageBadge from "./MessageBadge";
+import { CoverSheet, RotaSheet } from "./DutySheets";
+
+/** Each repeating task due today and who does it — anyone off shows, to be given to someone. */
+function TodaysDuty({ tasks, checks, today, away, user, nameOf, onGive, onOpen }) {
+  const rows = tasks
+    .filter((t) => t.repeat && occursOn(t, today))
+    .map((t) => ({ task: t, duty: dutyOn(t, today, away), done: !!checks[checkId(t.id, today)] }))
+    .sort((a, b) => Number(a.done) - Number(b.done) || Number(b.duty.via === "lead") - Number(a.duty.via === "lead") || String(a.task.title).localeCompare(String(b.task.title)));
+  if (!rows.length) return null;
+  const waiting = rows.filter((r) => r.duty.via === "lead" && !r.done).length;
+  return (
+    <section className="space-y-2">
+      <h3 className="flex items-baseline gap-2 px-1 text-sm font-semibold text-fg">
+        Who does what today
+        {waiting > 0 && <span className="text-xs font-medium text-warning">{waiting} need{waiting === 1 ? "s" : ""} someone</span>}
+      </h3>
+      <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
+        {rows.map(({ task: t, duty, done }) => {
+          const name = duty.uid === user.uid ? "You" : duty.name || nameOf(duty.uid);
+          const open = duty.via === "lead" && !done;
+          return (
+            <li key={t.id} className={cn("flex items-center gap-3 px-4 py-2.5", open && "bg-warning-soft/40")}>
+              <span className={cn("flex size-6 shrink-0 items-center justify-center rounded-full", done ? "bg-brand text-brand-fg" : open ? "bg-warning-soft text-warning" : "bg-surface-2 text-subtle")}>
+                {done ? <Check className="size-3.5" strokeWidth={3} /> : <UserRound className="size-3.5" />}
+              </span>
+              <span className="min-w-0 flex-1">
+                <button type="button" onClick={() => onOpen(t)} className="block truncate text-left text-sm font-medium text-fg hover:underline">{t.title}</button>
+                <span className={cn("block text-xs", open ? "font-medium text-warning" : "text-muted")}>
+                  {open ? `${duty.away.name || "Someone"} is away (${duty.away.reason.toLowerCase()}) — with ${name === "You" ? "you" : name} for now` : `${name}${duty.via === "cover" ? " · today only" : ""}`}
+                </span>
+              </span>
+              {!done && canSetDuty(t, user) && (
+                <Button size="sm" variant={open ? "primary" : "ghost"} onClick={() => onGive({ task: t, date: today })}>
+                  {open ? "Give" : "Change"}
+                </Button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
+  );
+}
 
 const label = (d) => format(parseISO(d), "d MMM");
 
@@ -26,7 +71,7 @@ function Progress({ done, total, className }) {
 }
 
 /** Every task given to one person, to change, stop or delete. */
-function GivenList({ tasks, onEdit, onOpen, companyId, branchId, today, reads, uid }) {
+function GivenList({ tasks, onEdit, onOpen, onRota, companyId, branchId, today, reads, uid }) {
   const remove = async (t) => {
     if (!(await confirmDialog({ title: "Delete this task?", message: `“${t.title}” goes. Days already ticked stay in the performance figures.`, confirmLabel: "Delete", danger: true }))) return;
     try {
@@ -64,6 +109,7 @@ function GivenList({ tasks, onEdit, onOpen, companyId, branchId, today, reads, u
               {itemsOf(t).length > 0 && <span>· {itemsOf(t).length} to check</span>}
               {t.issueId && <Badge tone="warning" className="px-2 py-px text-[10px]">From an issue</Badge>}
               {t.active === false && <Badge className="px-2 py-px text-[10px]">Stopped</Badge>}
+              {hasRota(t) && <span>· {rotaText(t)}</span>}
               {!t.repeat && t.status === "done" && <Badge tone="success" className="px-2 py-px text-[10px]">Done {t.done?.date ? label(t.done.date) : ""}</Badge>}
             </div>
           </div>
@@ -79,6 +125,7 @@ function GivenList({ tasks, onEdit, onOpen, companyId, branchId, today, reads, u
               trigger={(p) => <Button {...p} variant="ghost" size="sm" icon={MoreHorizontal} aria-label={`More for ${t.title}`} />}
               items={[
                 { label: "Change", icon: Pencil, onSelect: () => onEdit(t) },
+                ...(t.repeat && t.active !== false && onRota ? [{ label: "Who does it each day", icon: Users, onSelect: () => onRota(t) }] : []),
                 ...(t.repeat ? [{ label: t.active === false ? "Start again" : "Stop it", icon: t.active === false ? Play : Pause, onSelect: () => pause(t) }] : []),
                 "divider",
                 { label: "Delete", icon: Trash2, danger: true, onSelect: () => remove(t) },
@@ -96,8 +143,11 @@ function GivenList({ tasks, onEdit, onOpen, companyId, branchId, today, reads, u
  * supervisor. people: who can be given tasks (a supervisor: their team).
  * leadFor(uid): who leads a new task for that person.
  */
-export default function TeamTab({ tasks, loading, people, companyId, branchId, user, today, scope = { all: true }, leadFor, reads = {}, onOpenTask }) {
+export default function TeamTab({ tasks, loading, people, companyId, branchId, user, today, scope = { all: true }, leadFor, reads = {}, onOpenTask, away, dutyPeople = [] }) {
   const [editing, setEditing] = useState(null); // a task, or { new: true, assigneeUid }
+  const [giving, setGiving] = useState(null); // { task, date }: one day to someone else
+  const [rotaFor, setRotaFor] = useState(null);
+  const nameOf = (uid) => dutyPeople.find((p) => p.uid === uid)?.name || people.find((p) => p.uid === uid)?.name || "Someone";
   const [openUid, setOpenUid] = useState(null);
   const [view, setView] = useState("todo");
   const { checks } = useChecks(companyId, branchId, { from: addDays(today, -CATCH_UP_DAYS), to: today, ...scope });
@@ -108,11 +158,12 @@ export default function TeamTab({ tasks, loading, people, companyId, branchId, u
     for (const t of tasks) if (!byUid.has(t.assigneeUid)) byUid.set(t.assigneeUid, t.assignee || { uid: t.assigneeUid, name: "Someone" });
     return [...byUid.values()]
       .map((p) => {
-        const mine = tasks.filter((t) => t.assigneeUid === p.uid);
-        return { person: p, tasks: mine, unread: mine.filter((t) => unreadOn(t, reads, user.uid)).length, ...todayCount(mine, checks, today) };
+        // given to them — or theirs on a rota or a cover (their day counts by who is on duty)
+        const mine = tasks.filter((t) => t.assigneeUid === p.uid || (t.doers || []).includes(p.uid));
+        return { person: p, tasks: mine, given: mine.filter((t) => t.assigneeUid === p.uid), unread: mine.filter((t) => unreadOn(t, reads, user.uid)).length, ...todayCount(mine, checks, today, { uid: p.uid, away }) };
       })
       .sort((a, b) => Number(!a.tasks.length) - Number(!b.tasks.length) || b.late - a.late || String(a.person.name).localeCompare(String(b.person.name)));
-  }, [people, tasks, checks, today, reads, user.uid]);
+  }, [people, tasks, checks, today, reads, user.uid, away]);
   const total = rows.reduce((n, r) => n + r.total, 0);
   const done = rows.reduce((n, r) => n + r.done, 0);
   const late = rows.reduce((n, r) => n + r.late, 0);
@@ -131,6 +182,12 @@ export default function TeamTab({ tasks, loading, people, companyId, branchId, u
       user={user}
       today={today}
     />
+  );
+  const dutySheets = (
+    <>
+      <CoverSheet item={giving ? { task: tasks.find((t) => t.id === giving.task.id) || giving.task, date: giving.date } : null} onClose={() => setGiving(null)} people={dutyPeople} companyId={companyId} branchId={branchId} user={user} today={today} away={away} />
+      {rotaFor && <RotaSheet task={tasks.find((t) => t.id === rotaFor.id) || rotaFor} onClose={() => setRotaFor(null)} people={dutyPeople} companyId={companyId} branchId={branchId} user={user} today={today} away={away} />}
+    </>
   );
 
   if (loading) return <div className="space-y-2">{[0, 1, 2].map((i) => <Skeleton key={i} className="h-16" rounded="rounded-2xl" />)}</div>;
@@ -156,15 +213,16 @@ export default function TeamTab({ tasks, loading, people, companyId, branchId, u
           onChange={setView}
           tabs={[
             { value: "todo", label: "Their to-do" },
-            { value: "given", label: `All given (${open.tasks.length})` },
+            { value: "given", label: `All given (${open.given.length})` },
           ]}
         />
         {view === "todo" ? (
-          <MyTasksTab tasks={open.tasks} loading={false} companyId={companyId} branchId={branchId} user={user} today={today} person={open.person} readOnly scope={scope} reads={reads} />
+          <MyTasksTab tasks={open.tasks} loading={false} companyId={companyId} branchId={branchId} user={user} today={today} person={open.person} readOnly scope={scope} reads={reads} away={away} dutyPeople={dutyPeople} />
         ) : (
-          <GivenList tasks={open.tasks} onEdit={setEditing} onOpen={(t) => onOpenTask?.(t.id)} companyId={companyId} branchId={branchId} today={today} reads={reads} uid={user.uid} />
+          <GivenList tasks={open.given} onEdit={setEditing} onOpen={(t) => onOpenTask?.(t.id)} onRota={dutyPeople.length ? setRotaFor : null} companyId={companyId} branchId={branchId} today={today} reads={reads} uid={user.uid} />
         )}
         {sheet}
+        {dutySheets}
       </div>
     );
   }
@@ -182,6 +240,8 @@ export default function TeamTab({ tasks, loading, people, companyId, branchId, u
         <Progress done={done} total={total} />
         {late > 0 && <p className="text-xs font-medium text-danger">{late} late across the team (missed days and overdue tasks)</p>}
       </div>
+
+      <TodaysDuty tasks={tasks} checks={checks} today={today} away={away} user={user} nameOf={nameOf} onGive={setGiving} onOpen={(t) => onOpenTask?.(t.id)} />
 
       <div className="flex items-center justify-between gap-2">
         <h3 className="text-sm font-semibold text-fg">People</h3>
@@ -220,6 +280,7 @@ export default function TeamTab({ tasks, loading, people, companyId, branchId, u
         </ul>
       )}
       {sheet}
+      {dutySheets}
     </div>
   );
 }

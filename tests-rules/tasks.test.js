@@ -202,3 +202,34 @@ describe("a task's questions and answers", () => {
     expect(await ok(db("nadia").collection(`${T}/ledByRahim/comments`).get())).toBe(false);
   });
 });
+
+describe("who does it each day — rota and covers (31 Oct)", () => {
+  const rota = { 5: { uid: "ali" }, 6: { uid: "kumar" } };
+  beforeEach(async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      // the manager gave Rahim the opening check; Rahim puts Ali and Kumar on it
+      await ctx.firestore().doc(`${T}/opening`).set(task("rahim", { repeat: { every: "day" }, doers: ["rahim"] }));
+      await ctx.firestore().doc(`${T}/rotaed`).set(task("rahim", { repeat: { every: "day" }, teamLeadUid: "rahim", rota, doers: ["rahim", "ali", "kumar"] }));
+    });
+  });
+  it("the supervisor given a task sets its rota and covers, leading it — nothing else, and no one else", async () => {
+    const set = (extra = {}) => ({ rota, covers: {}, doers: ["rahim", "ali", "kumar"], teamLeadUid: "rahim", ...extra });
+    expect(await ok(db("rahim").doc(`${T}/opening`).update(set({ title: "Easier" })))).toBe(false);
+    expect(await ok(db("rahim").doc(`${T}/opening`).update(set({ teamLeadUid: null })))).toBe(false);
+    expect(await ok(db("nadia").doc(`${T}/opening`).update({ ...set(), teamLeadUid: "nadia" }))).toBe(false);
+    expect(await ok(db("ali").doc(`${T}/opening`).update(set()))).toBe(false);
+    expect(await ok(db("rahim").doc(`${T}/opening`).update(set()))).toBe(true);
+    expect(await ok(db("rahim").doc(`${T}/rotaed`).update({ covers: { "2026-10-30": { uid: "kumar" } }, doers: ["rahim", "ali", "kumar"] }))).toBe(true);
+  });
+  it("whoever is on the rota sees the task and ticks their own day as themselves", async () => {
+    expect(await ok(db("kumar").collection(T).where("doers", "array-contains", "kumar").get())).toBe(true);
+    expect(await ok(db("kumar").doc(`${T}/rotaed`).get())).toBe(true);
+    expect(await ok(db("siti").doc(`${T}/rotaed`).get())).toBe(false);
+    const t = (by, doer) => ({ taskId: "rotaed", date: "2026-10-31", assigneeUid: "rahim", teamLeadUid: "rahim", doerUid: doer, by: { uid: by }, doneOn: "2026-10-31" });
+    expect(await ok(db("siti").doc(`${C}/rotaed_2026-10-31`).set(t("siti", "siti")))).toBe(false); // not on it
+    expect(await ok(db("kumar").doc(`${C}/rotaed_2026-10-31`).set(t("kumar", "ali")))).toBe(false); // as someone else
+    expect(await ok(db("kumar").doc(`${C}/rotaed_2026-10-31`).set(t("kumar", "kumar")))).toBe(true);
+    expect(await ok(db("kumar").collection(C).where("doerUid", "==", "kumar").get())).toBe(true);
+    expect(await ok(db("kumar").doc(`${C}/rotaed_2026-10-31`).delete())).toBe(true); // their own tick
+  });
+});

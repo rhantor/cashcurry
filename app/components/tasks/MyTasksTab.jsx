@@ -3,17 +3,20 @@
 // later — and a week strip to look at a single day. Tick to finish; a task
 // that needs a photo asks for one. A missed day can still be ticked for a
 // week (counted late). `readOnly` shows someone else's list (management).
+// A repeating task's day is whoever is on duty then (31 Oct): its rota, a
+// cover, or — when that person is off — the supervisor, who gives it on.
 import { useEffect, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import Link from "next/link";
 import { CalendarClock, Camera, Check, Flag, ListChecks, Repeat, TriangleAlert, X } from "lucide-react";
 import { Badge, Button, EmptyState, Input, Sheet, Skeleton, Textarea, cn, toast } from "@/app/components/ui";
 import { FileThumb } from "@/app/components/common/Files";
-import { CATCH_UP_DAYS, addDays, agenda, answersFor, checklistState, dayList, issueHref, itemsOf, problemsIn, repeatText } from "@/lib/tasks/model";
+import { CATCH_UP_DAYS, addDays, agenda, answersFor, canSetDuty, checklistState, dayList, issueHref, itemsOf, problemsIn, repeatText } from "@/lib/tasks/model";
 import { completeOnce, reopenOnce, tickDay, untickDay, uploadProof, useChecks } from "@/lib/tasks/client";
 import { resolveIssue } from "@/lib/issues/client";
 import TaskDetailSheet from "./TaskDetailSheet";
 import MessageBadge from "./MessageBadge";
+import { CoverSheet, DutyNote } from "./DutySheets";
 import { unreadOn } from "@/lib/tasks/model";
 
 const dayText = (d) => format(parseISO(d), "EEE d MMM");
@@ -139,7 +142,7 @@ function DoneSheet({ item, onClose, onDone }) {
 }
 
 /** One task on the list. `showDate`: say which day it is for (late and coming-up items). */
-function Row({ item, onTick, onOpen, busy, canUndo, showDate, readOnly, unread, role }) {
+function Row({ item, onTick, onOpen, busy, canUndo, showDate, readOnly, unread, role, user, onGive }) {
   const { task, done } = item;
   const check = item.check;
   const proof = done ? (item.kind === "repeat" ? check?.photos : task.done?.photos) || [] : [];
@@ -196,7 +199,9 @@ function Row({ item, onTick, onOpen, busy, canUndo, showDate, readOnly, unread, 
             </Link>
           )}
           {done && item.check?.doneOn > item.date && <Badge tone="warning" className="px-2 py-px text-[10px]">Done late</Badge>}
+          {done && item.check?.by?.name && item.check.by.uid !== (item.check.doerUid || item.task.assigneeUid) && <span>· ticked by {item.check.by.name}</span>}
         </div>
+        {!done && <DutyNote duty={item.duty} user={user} onGive={onGive ? () => onGive(item) : null} />}
         {problems.length > 0 && (
           <ul className="space-y-0.5 rounded-lg bg-danger-soft/50 px-2.5 py-1.5 text-xs text-danger">
             {problems.map((x, i) => (
@@ -237,19 +242,21 @@ function Section({ title, hint, tone, items, children }) {
  * ({ all: true } management, { lead: uid } their supervisor). team: who a
  * supervisor can hand a task to.
  */
-export default function MyTasksTab({ tasks, loading, companyId, branchId, user, today, person, readOnly = false, scope, team = [], reads = {} }) {
+export default function MyTasksTab({ tasks, loading, companyId, branchId, user, today, person, readOnly = false, scope, team = [], reads = {}, away, dutyPeople = [] }) {
   const uid = person?.uid || user.uid;
   const [day, setDay] = useState(null); // null = the to-do list; a date = that day only
   const [asking, setAsking] = useState(null);
   const [busy, setBusy] = useState(null);
   const [openId, setOpenId] = useState(null);
+  const [giving, setGiving] = useState(null); // a day of a task, to give to someone
   const opened = openId && tasks.find((t) => t.id === openId);
   const monday = weekStart(today);
   const week = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(monday, i)), [monday]);
   const from = [addDays(today, -CATCH_UP_DAYS), monday].sort()[0];
   const { checks, loading: checksLoading } = useChecks(companyId, branchId, { from, to: today, ...(readOnly && scope ? scope : { uid }) });
-  const list = useMemo(() => agenda(tasks, checks, today), [tasks, checks, today]);
-  const single = useMemo(() => (day ? dayList(tasks, checks, day, today).map((x) => ({ ...x, date: day, canTick: x.kind === "once" || day <= today })) : []), [tasks, checks, day, today]);
+  const duty = useMemo(() => ({ uid, away }), [uid, away]);
+  const list = useMemo(() => agenda(tasks, checks, today, duty), [tasks, checks, today, duty]);
+  const single = useMemo(() => (day ? dayList(tasks, checks, day, today, duty).map((x) => ({ ...x, date: day, canTick: x.kind === "once" || day <= today })) : []), [tasks, checks, day, today, duty]);
 
   const finish = async (item, { files = [], note = "", items = [] } = {}) => {
     setBusy(`${item.task.id}-${item.date}`);
@@ -262,7 +269,7 @@ export default function MyTasksTab({ tasks, loading, companyId, branchId, user, 
         toast.success("Done — the issue is resolved");
         return;
       }
-      if (item.kind === "repeat") await tickDay(companyId, branchId, item.task, user, { date: item.date, doneOn: today, photos, note, items });
+      if (item.kind === "repeat") await tickDay(companyId, branchId, item.task, user, { date: item.date, doneOn: today, doerUid: item.duty?.uid, photos, note, items });
       else await completeOnce(companyId, branchId, item.task, user, { date: today, photos, note, items });
       const bad = items.filter((x) => !x.ok).length;
       toast.success(item.kind === "repeat" && item.date < today ? "Done — counted late" : "Done", bad ? { description: `${bad} problem${bad === 1 ? "" : "s"} noted — your manager sees them` } : undefined);
@@ -291,11 +298,24 @@ export default function MyTasksTab({ tasks, loading, companyId, branchId, user, 
   // your own tick, or a one-off you finished — today only (an issue's task opens again with the issue)
   const canUndo = (item) => !item.task.issueId && (item.kind === "repeat" ? item.check?.by?.uid === user.uid && item.check?.doneOn === today : item.task.done?.by?.uid === user.uid && item.task.done?.date === today);
   const row = (item, showDate) => (
-    <Row key={`${item.task.id}-${item.date}`} item={item} unread={unreadOn(item.task, reads, user.uid)} onTick={onTick} onOpen={(t) => setOpenId(t.id)} busy={busy === `${item.task.id}-${item.date}`} canUndo={canUndo(item)} showDate={showDate} readOnly={readOnly} role={user.role} />
+    <Row
+      key={`${item.task.id}-${item.date}`}
+      item={item}
+      unread={unreadOn(item.task, reads, user.uid)}
+      onTick={onTick}
+      onOpen={(t) => setOpenId(t.id)}
+      busy={busy === `${item.task.id}-${item.date}`}
+      canUndo={canUndo(item)}
+      showDate={showDate}
+      readOnly={readOnly}
+      role={user.role}
+      user={user}
+      onGive={item.kind === "repeat" && item.date >= today && dutyPeople.length && canSetDuty(item.task, user) ? setGiving : null}
+    />
   );
 
   // a dot under a day of the strip: something still to do that day
-  const openOn = (d) => d >= addDays(today, -CATCH_UP_DAYS) && dayList(tasks, checks, d, today).some((x) => !x.done && (d >= today || x.kind === "repeat"));
+  const openOn = (d) => d >= addDays(today, -CATCH_UP_DAYS) && dayList(tasks, checks, d, today, duty).some((x) => !x.done && (d >= today || x.kind === "repeat"));
   const left = list.today.filter((x) => !x.done).length;
 
   return (
@@ -365,7 +385,8 @@ export default function MyTasksTab({ tasks, loading, companyId, branchId, user, 
         </div>
       )}
       <DoneSheet key={asking ? `${asking.task.id}-${asking.date}` : "none"} item={asking} onClose={() => setAsking(null)} onDone={finish} />
-      {opened && <TaskDetailSheet task={opened} onClose={() => setOpenId(null)} companyId={companyId} branchId={branchId} user={user} team={team} />}
+      {opened && <TaskDetailSheet task={opened} onClose={() => setOpenId(null)} companyId={companyId} branchId={branchId} user={user} team={team} dutyPeople={dutyPeople} away={away} today={today} />}
+      <CoverSheet item={giving ? { task: tasks.find((t) => t.id === giving.task.id) || giving.task, date: giving.date } : null} onClose={() => setGiving(null)} people={dutyPeople} companyId={companyId} branchId={branchId} user={user} today={today} away={away} />
     </div>
   );
 }

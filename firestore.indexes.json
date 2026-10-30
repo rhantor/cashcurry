@@ -20,6 +20,15 @@
       ]
     },
     {
+      "_usedBy": "lib/tasks/client.js useChecks — the days someone was on duty for, by rota or cover (31 Oct)",
+      "collectionGroup": "taskChecks",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "doerUid", "order": "ASCENDING" },
+        { "fieldPath": "date", "order": "ASCENDING" }
+      ]
+    },
+    {
       "_usedBy": "lib/tasks/client.js useRatings — one person's rating for a month (4.11)",
       "collectionGroup": "ratings",
       "queryScope": "COLLECTION",
