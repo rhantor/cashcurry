@@ -451,6 +451,11 @@ service cloud.firestore {
       allow list, write: if false;
     }
 
+    // A new hire's join link (30 Oct): keyed by the token's hash, the server only.
+    match /joinLinks/{hash} {
+      allow read, write: if false;
+    }
+
     match /usernames/{username} {
       allow read: if true;          // Public: required for username-based login
       // Your own login, or a company admin adding someone to their company.
@@ -854,6 +859,26 @@ service cloud.firestore {
             allow read: if canPayrollView(companyId, branchId) ||
               (isBranchMember(companyId, branchId) && userData().get('staffId', '') == staffId);
             allow write: if canPayrollManage(companyId, branchId);
+          }
+        }
+
+        // New hires (30 Oct, lib/hires/model.js): whoever manages staff makes, checks
+        // and accepts them; those who see pay read them too (documents, the signed
+        // letter). What the person sends from their join link — their files, their
+        // signature — and the link itself are written by the server only.
+        match /newHires/{hireId} {
+          allow read: if canStaffPay(companyId, branchId);
+          allow create: if canStaffManage(companyId, branchId) &&
+            request.resource.data.status == 'draft' &&
+            !request.resource.data.keys().hasAny(['linkHash', 'link', 'files', 'signed', 'submittedAt']);
+          allow update: if canStaffManage(companyId, branchId) &&
+            !changedKeys().hasAny(['linkHash', 'link', 'files', 'signed', 'submittedAt']);
+          allow delete: if canStaffManage(companyId, branchId) && resource.data.get('status', '') in ['draft', 'cancelled'];
+          // their appointment letter — fixed once they have signed it
+          match /letter/{docId} {
+            allow read: if canStaffPay(companyId, branchId);
+            allow write: if canStaffManage(companyId, branchId) &&
+              get(/databases/$(database)/documents/companies/$(companyId)/branches/$(branchId)/newHires/$(hireId)).data.get('signed', null) == null;
           }
         }
 

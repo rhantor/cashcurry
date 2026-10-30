@@ -23,7 +23,8 @@ export default function ClientLayoutWrapper({ children }) {
   // that would be refused by the database rules.
   const isLoading = status === "loading";
 
-  const authPages = ["/login", "/signup", "/signup/verify", "/reset-password"];
+  // …and a new hire's join link (30 Oct): no sign-in, no menu
+  const authPages = ["/login", "/signup", "/signup/verify", "/reset-password", "/join/"];
   // No sidebar/top bar on these (the staff app, the kiosk, and the /ui design preview).
   // …and chat, which has its own full-screen workspace (/messages).
   const staffPages = ["/staff-portal", "/requests", "/kiosk", "/profile", "/ui", "/messages", "/my-issues", "/my-pay", "/my-attendance", "/my-tasks"];

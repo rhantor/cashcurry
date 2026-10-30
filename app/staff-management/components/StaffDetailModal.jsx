@@ -1,10 +1,15 @@
 'use client'
-import React from 'react'
+import React, { useState } from 'react'
+import { doc, getDoc } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
+import { fileUrl, getLetter } from '@/lib/hires/client'
+import { letterForHire } from '@/app/tools/appointment-letter/letterForHire'
+import FileViewer from '@/app/components/common/FileViewer'
 import { format, parseISO } from 'date-fns'
-import { Pencil, Phone, Trash2 } from 'lucide-react'
+import { FileSignature, FileText, Pencil, Phone, Trash2 } from 'lucide-react'
 import useCurrency from '@/app/hooks/useCurrency'
 import { formatMoney } from '@/lib/region/currency'
-import { Avatar, Badge, Button, Sheet, cn } from '@/app/components/ui'
+import { Avatar, Badge, Button, Sheet, cn, toast } from '@/app/components/ui'
 import { roleLabelOf } from '../lib/constants'
 import { WEEKDAYS } from '@/lib/tasks/model'
 
@@ -55,6 +60,47 @@ const Group = ({ title, children }) => {
     <section>
       <p className='mb-1 text-xs font-semibold uppercase tracking-[0.12em] text-subtle'>{title}</p>
       <div className='divide-y divide-line'>{children}</div>
+    </section>
+  )
+}
+
+/**
+ * What they gave when they joined (30 Oct, a new hire's join link): their
+ * documents and the appointment letter they signed — for those who see pay
+ * (the staff list carries the record's private half only for them).
+ */
+function JoinPapers ({ staff, currency }) {
+  const [viewer, setViewer] = useState(null)
+  const docs = staff.documents || []
+  if (!docs.length && !staff.joinedFrom) return null
+  const open = async index => {
+    try {
+      setViewer({ items: await Promise.all(docs.map(async d => ({ url: await fileUrl(d.path), label: d.label, pdf: d.contentType === 'application/pdf' }))), index })
+    } catch {
+      toast.error("Couldn't open the documents")
+    }
+  }
+  const letter = async () => {
+    try {
+      const hire = (await getDoc(doc(db, 'companies', staff.companyId, 'branches', staff.branchId, 'newHires', staff.joinedFrom))).data()
+      const saved = hire?.letterReady && (await getLetter(staff.companyId, staff.branchId, staff.joinedFrom))
+      if (!saved) return toast.error('No letter was signed when they joined')
+      const { blob } = letterForHire(saved, { details: hire.details, signed: hire.signed, currency })
+      setViewer({ items: [{ url: URL.createObjectURL(blob), label: 'Signed appointment letter', pdf: true }], index: 0 })
+    } catch (err) {
+      toast.error("Couldn't draw the letter", { description: err?.message })
+    }
+  }
+  return (
+    <section>
+      <p className='mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-subtle'>Papers from joining</p>
+      <div className='flex flex-wrap gap-2'>
+        {staff.joinedFrom && <Button size='sm' variant='secondary' icon={FileSignature} onClick={letter}>Signed letter</Button>}
+        {docs.map((d, i) => (
+          <Button key={d.path} size='sm' variant='secondary' icon={FileText} onClick={() => open(i)}>{d.label}</Button>
+        ))}
+      </div>
+      <FileViewer open={!!viewer} items={viewer?.items || []} index={viewer?.index || 0} onClose={() => setViewer(null)} />
     </section>
   )
 }
@@ -186,6 +232,8 @@ export default function StaffDetailModal ({ isOpen, onClose, staff, onEdit, onDe
               </Group>
             </div>
           </div>
+
+          <JoinPapers staff={s} currency={currency} />
 
           {s.notes && (
             <div className='rounded-xl bg-surface-2/60 p-3'>

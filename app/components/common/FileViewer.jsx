@@ -132,7 +132,8 @@ function Photo({ url, zoom, setZoom }) {
 }
 
 /**
- * The viewer. items: [{ url, label }]; `index` the one to open with. Pass
+ * The viewer. items: [{ url, label, pdf? }] (`pdf`: a PDF whose address doesn't
+ * say so, e.g. one drawn here); `index` the one to open with. Pass
  * `open={false}` (or no items) to close it.
  */
 export default function FileViewer({ open, items = [], index = 0, onClose }) {
@@ -170,7 +171,7 @@ export default function FileViewer({ open, items = [], index = 0, onClose }) {
   }, [open, go, onClose]);
 
   if (!open || !item || typeof document === "undefined") return null;
-  const pdf = isPdf(item.url);
+  const pdf = item.pdf ?? isPdf(item.url);
   const zoomBy = (f) => setZoom((z) => Math.min(MAX_ZOOM, Math.max(1, Math.round(z * f * 100) / 100)));
 
   return createPortal(

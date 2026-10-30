@@ -177,6 +177,16 @@ service firebase.storage {
       allow delete: if canDelete(companyId, branchId);
     }
 
+    // A new hire's documents (30 Oct): IC or passport, photo, bank card, health
+    // certificate — sent from their join link by the server; read by those who
+    // manage staff or see pay at the branch (as staffPrivate in firestore.rules).
+    match /newHires/{companyId}/{branchId}/{hireId}/{filename} {
+      allow read: if isAuth() && userData().companyId == companyId && (
+        isCompanyRole(userData()) ||
+        (userData().get('branchId', null) == branchId && (isBranchAdmin(userData()) || userData().role in ['manager', 'accountant'])));
+      allow write: if false;
+    }
+
     // A staff member's own photo, from the staff app's settings:
     // staffPhotos/{companyId}/{branchId}/self/{staffId}/{filename}
     match /staffPhotos/{companyId}/{branchId}/self/{staffId}/{filename} {

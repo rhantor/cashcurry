@@ -1,7 +1,12 @@
 'use client'
 
 import { moveTasksToLead } from '@/lib/tasks/client'
-import React, { useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import useSession from '@/app/hooks/useSession'
+import { useHires, acceptHire, fileUrl } from '@/lib/hires/client'
+import { staffFormFrom } from '@/lib/hires/model'
+import { regionOf } from '@/lib/region'
 import useResolvedCompanyBranch from '@/app/hooks/useResolvedCompanyBranch'
 import {
   useGetStaffListQuery,
@@ -16,7 +21,7 @@ import { useGetSingleBranchQuery } from '@/lib/redux/api/branchApiSlice'
 import { useGetBranchSettingsQuery } from '@/lib/redux/api/branchSettingsApiSlice'
 import { skipToken } from '@reduxjs/toolkit/query'
 import { shiftsEnabled } from '@/lib/attendance/shifts'
-import { Check, Copy, Eye, KeyRound, Link2, Link2Off, MoreHorizontal, Pencil, Plus, Search, Smartphone, Store, Trash2, Users, Wallet } from 'lucide-react'
+import { Check, Copy, Eye, KeyRound, Link2, Link2Off, MoreHorizontal, Pencil, Plus, Search, Smartphone, Store, Trash2, UserPlus, Users, Wallet } from 'lucide-react'
 import { Avatar, Badge, Button, DataTable, Input, Menu, Select, Sheet, Skeleton, cn } from '@/app/components/ui'
 import { toast, confirmDialog } from '@/app/components/ui/notify'
 import StatTiles from '@/app/components/purchases/StatTiles'
@@ -29,6 +34,7 @@ import { isCompanyRole, roleLabel as loginRoleLabel } from '@/lib/authz/permissi
 
 import StaffModal, { dropDraft } from './components/StaffModal'
 import StaffDetailModal from './components/StaffDetailModal'
+import NewHires, { HireSheet, NewHireSheet } from './components/NewHires'
 
 const fullName = s => `${s?.firstName || ''} ${s?.lastName || ''}`.trim() || s?.name || 'Unnamed'
 
@@ -59,6 +65,15 @@ function CopyLine ({ label, value }) {
 
 /** The branch's staff: who works here, what they're paid, and their app login. */
 export default function StaffManagementPage () {
+  // ?hire= (a notification) is read from the address: Next needs a Suspense boundary for that
+  return (
+    <React.Suspense fallback={<Skeleton className='m-6 h-64' rounded='rounded-2xl' />}>
+      <StaffManagement />
+    </React.Suspense>
+  )
+}
+
+function StaffManagement () {
   const { ready, companyId, branchId } = useResolvedCompanyBranch()
   const args = ready && companyId && branchId ? { companyId, branchId } : skipToken
   const currency = useCurrency()
@@ -114,6 +129,36 @@ export default function StaffManagementPage () {
   const [generatedCreds, setGeneratedCreds] = useState(null)
   const [generatingFor, setGeneratingFor] = useState(null)
 
+  // people joining (30 Oct): made here, filled in by them from a link, accepted into the list
+  const { user } = useSession()
+  const { list: hires } = useHires(companyId, branchId, ready)
+  const [hireForm, setHireForm] = useState(null) // { hire? }: the new hire sheet
+  const [hireId, setHireId] = useState(null) // the one open
+  const [accepting, setAccepting] = useState(null) // { hire, form }: the Add staff form, filled in from it
+  const params = useSearchParams()
+  const router = useRouter()
+  useEffect(() => {
+    const id = params.get('hire') // from the "filled in their joining form" notification
+    if (id) setHireId(id)
+  }, [params])
+  const openHire = hires.find(h => h.id === hireId) || null
+  const closeHire = () => {
+    setHireId(null)
+    if (params.get('hire')) router.replace('/staff-management', { scroll: false })
+  }
+  const startAccept = async hire => {
+    const form = staffFormFrom(hire)
+    try {
+      if (hire.files?.photo?.path) form.photoUrl = await fileUrl(hire.files.photo.path)
+    } catch {
+      /* no photo then — they can add one in the form */
+    }
+    setAccepting({ hire, form })
+    closeHire()
+    setEditTarget(null)
+    setModalMode('add')
+  }
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     return staffList.filter(s => {
@@ -139,7 +184,12 @@ export default function StaffManagementPage () {
 
   const handleSave = async ({ data, photoFile, oldPhotoUrl, id }) => {
     try {
-      if (modalMode === 'add') {
+      if (modalMode === 'add' && accepting) {
+        const added = await addStaff({ companyId, branchId, data, photoFile }).unwrap()
+        await acceptHire(companyId, branchId, accepting.hire, added.id, user)
+        toast.success(`${data.firstName} ${data.lastName} joined`, { description: 'Their documents and signed letter are on their record.' })
+        setAccepting(null)
+      } else if (modalMode === 'add') {
         await addStaff({ companyId, branchId, data, photoFile }).unwrap()
         dropDraft() // saved: the form's draft is done with
         toast.success(`${data.firstName} ${data.lastName} added`)
@@ -284,10 +334,17 @@ export default function StaffManagementPage () {
           <h1 className='text-2xl font-bold tracking-tight text-fg'>Staff</h1>
           <p className='text-sm text-muted'>Everyone working at {branchData?.name || 'this branch'}. Tap someone for their details.</p>
         </div>
-        <Button icon={Plus} onClick={openAdd}>
-          Add staff
-        </Button>
+        <div className='flex flex-wrap gap-2'>
+          <Button variant='secondary' icon={UserPlus} onClick={() => setHireForm({})}>
+            New hire
+          </Button>
+          <Button icon={Plus} onClick={openAdd}>
+            Add staff
+          </Button>
+        </div>
       </div>
+
+      <NewHires hires={hires} onNew={() => setHireForm({})} onOpen={h => setHireId(h.id)} />
 
       <StatTiles
         loading={isLoading}
@@ -351,16 +408,42 @@ export default function StaffManagementPage () {
       {modalMode && (
         <StaffModal
           mode={modalMode}
-          initialData={modalMode === 'edit' ? editTarget : null}
+          initialData={modalMode === 'edit' ? editTarget : accepting?.form || null}
           payrollConfig={payrollConfig}
           shiftsEnabled={shiftsOn}
           onSave={handleSave}
           onClose={() => {
             setModalMode(null)
             setEditTarget(null)
+            setAccepting(null)
           }}
         />
       )}
+
+      <NewHireSheet
+        open={!!hireForm}
+        onClose={() => setHireForm(null)}
+        hire={hireForm?.hire || null}
+        companyId={companyId}
+        branchId={branchId}
+        user={user}
+        currency={currency}
+        onSaved={id => {
+          setHireForm(null)
+          setHireId(id)
+        }}
+      />
+      <HireSheet
+        hire={openHire}
+        onClose={closeHire}
+        companyId={companyId}
+        branchId={branchId}
+        company={branchSettings?.basic?.companyName || branchData?.name || ''}
+        timeZone={regionOf(branchSettings).timeZone}
+        currency={currency}
+        onEdit={h => setHireForm({ hire: h })}
+        onAccept={startAccept}
+      />
 
       <StaffDetailModal
         isOpen={!!detailTarget}
