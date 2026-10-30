@@ -16,6 +16,7 @@
 # next.js
 /.next/
 /.next-check/
+/.next-fast/
 /out/
 
 # production
