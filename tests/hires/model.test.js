@@ -81,3 +81,32 @@ describe("accepting", () => {
     ]);
   });
 });
+
+describe("the signed letter", () => {
+  it("is drawn with what they filled in, their signature and the day", async () => {
+    const { letterForHire } = await import("@/app/tools/appointment-letter/letterForHire");
+    const { TEMPLATES } = await import("@/app/tools/appointment-letter/templates");
+    const t = TEMPLATES.fullTime;
+    const letter = {
+      templateType: "fullTime", logo: null, stamp: null,
+      companyDetails: { name: "DEMO SDN BHD", registrationNo: "1", addressLine1: "1 Jalan Demo", addressLine2: "KL", phoneEmail: "Tel" },
+      letterMeta: { refNo: "R1", date: "31 October 2026", watermarkText: "" },
+      employeeDetails: { name: "Faiz", icPassport: "", addressLine1: "", addressLine2: "" },
+      jobTerms: { ...t.jobTerms, title: "Cook" }, allowances: [], signatory: { name: "KL Manager", title: "Manager" },
+      clauses: t.clauses, signatorySignature: null,
+      stylingOptions: { fontFamily: "serif", fontSize: "13px", marginSize: "20mm", lineHeight: "1.6", showWatermark: false },
+    };
+    const sig = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==";
+    const { pdf, fileName } = letterForHire(letter, {
+      details: { firstName: "Muhammad Faiz", lastName: "Rahman", icNumber: "960812-14-5567", addressLine1: "No. 45 Jalan Setia", city: "Kuala Lumpur", postalCode: "50490" },
+      signed: { signature: sig, at: "2026-10-31T09:00:00Z" },
+      currency: "MYR",
+    });
+    const text = pdf.output();
+    expect(fileName).toMatch(/muhammad_faiz_rahman/);
+    expect(text).toContain("MUHAMMAD FAIZ RAHMAN");
+    expect(text).toContain("960812-14-5567");
+    expect(text).toContain("31 Oct 2026");
+    expect(text).toMatch(/\/Subtype \/Image/);
+  });
+});
