@@ -2,7 +2,9 @@
 // Cash in hand on the Requested panel: what the till holds now (the same cash
 // book as Home and the dashboard), what is approved but not handed over yet,
 // and so what is free to give — so whoever approves needn't count the till or
-// ask anyone. Only roles that see the cash tracker (reports.view) get it.
+// ask anyone. Roles that see the cash tracker (reports.view) work it out here
+// from the books; the cashier, who may not read them, gets just the figure
+// from the server (app/api/branch/cash-in-hand) — the same engine either way.
 import { useEffect, useMemo, useState } from "react";
 import { Wallet } from "lucide-react";
 import { useBusinessToday } from "@/app/hooks/useRegion";
@@ -14,10 +16,11 @@ import { useGetStaffLoansQuery } from "@/lib/redux/api/staffLoanApiSlice";
 import { isLeaveRequest } from "@/lib/finance/rules";
 import { formatMoney } from "@/lib/region/currency";
 import { can } from "@/lib/authz/permissions";
+import { auth } from "@/lib/firebase";
 import { Card, Skeleton, cn } from "@/app/components/ui";
 
 /** May this role see the branch's cash on the Requested panel? */
-export const seesCash = (role) => can(role, "reports.view");
+export const seesCash = (role) => can(role, "cashInHand.view");
 
 // approved, from the till, not handed over yet (as PayOutQueue lists them)
 const heldBack = (x) => x.status === "approved" && x.paidOut === null && !isLeaveRequest(x) && x.paidFromOffice !== "back";
@@ -26,13 +29,8 @@ const heldBack = (x) => x.status === "approved" && x.paidOut === null && !isLeav
  * The card. `onFree(n)` hands what is free to give up to the page, for each
  * request's "After this" line; null until the figures are in.
  */
-export default function CashInHand({ companyId, branchId, onFree }) {
-  const today = useBusinessToday();
-  const currency = useCurrency();
-  const money = (v) => formatMoney(v, currency);
-  const [filter] = useState(() => presetFilter("week", new Date(), today));
-  const { loading, estCashOnHand, totalSales } = useBranchData(filter);
-
+export default function CashInHand({ companyId, branchId, role, onFree }) {
+  const [till, setTill] = useState({ ready: false, cash: 0 });
   const args = { companyId, branchId, status: "approved", unpaid: true };
   const skip = { skip: !companyId || !branchId };
   const { data: advances = [] } = useGetAdvanceEntriesQuery(args, skip);
@@ -42,8 +40,63 @@ export default function CashInHand({ companyId, branchId, onFree }) {
     [advances, loans]
   );
 
+  return (
+    <>
+      {can(role, "reports.view") ? (
+        <FromTheBooks onTill={setTill} />
+      ) : (
+        <FromTheServer companyId={companyId} branchId={branchId} onTill={setTill} recount={held} />
+      )}
+      <TillCard till={till} held={held} onFree={onFree} />
+    </>
+  );
+}
+
+/** The till worked out here, from the books (as Home does). */
+function FromTheBooks({ onTill }) {
+  const today = useBusinessToday();
+  const [filter] = useState(() => presetFilter("week", new Date(), today));
+  const { loading, estCashOnHand, totalSales } = useBranchData(filter);
   const ready = !(loading && !totalSales);
   const cash = Number(estCashOnHand) || 0;
+  useEffect(() => onTill({ ready, cash }), [ready, cash, onTill]);
+  return null;
+}
+
+/** Just the figure, from the server, for those who may not read the books — counted again when what is held back changes (something handed over). */
+function FromTheServer({ companyId, branchId, onTill, recount }) {
+  const today = useBusinessToday();
+  useEffect(() => {
+    if (!companyId || !branchId || !today) return;
+    let live = true;
+    (async () => {
+      try {
+        const idToken = await auth.currentUser?.getIdToken();
+        const res = await fetch("/api/branch/cash-in-hand", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken || ""}` },
+          body: JSON.stringify({ companyId, branchId, today }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        if (live) onTill({ ready: true, cash: Number(data.cash) || 0 });
+      } catch (err) {
+        console.warn("[CashInHand]", err?.message);
+        if (live) onTill({ ready: false, cash: 0, failed: true });
+      }
+    })();
+    return () => {
+      live = false;
+    };
+  }, [companyId, branchId, today, onTill, recount]);
+  return null;
+}
+
+function TillCard({ till, held, onFree }) {
+  const currency = useCurrency();
+  const money = (v) => formatMoney(v, currency);
+
+  const { ready, cash } = till;
   const free = cash - held;
   useEffect(() => onFree?.(ready ? free : null), [ready, free, onFree]);
   useEffect(() => () => onFree?.(null), [onFree]);
@@ -57,7 +110,13 @@ export default function CashInHand({ companyId, branchId, onFree }) {
           </span>
           <div>
             <p className="text-[11px] font-semibold uppercase tracking-wider text-subtle">Cash in hand now</p>
-            {ready ? <p className="text-xl font-bold tabular-nums text-fg">{money(cash)}</p> : <Skeleton className="mt-1 h-6 w-28" />}
+            {ready ? (
+              <p className="text-xl font-bold tabular-nums text-fg">{money(cash)}</p>
+            ) : till.failed ? (
+              <p className="text-sm text-muted">Couldn&apos;t count it just now</p>
+            ) : (
+              <Skeleton className="mt-1 h-6 w-28" />
+            )}
           </div>
         </div>
         {ready && held > 0 && (

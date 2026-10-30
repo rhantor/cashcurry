@@ -29,6 +29,13 @@ describe("the owner's decisions", () => {
     }
   });
 
+  it("the cashier sees the till's cash on the Requested panel (only the figure); the supervisor doesn't", () => {
+    expect(can("cashier", "cashInHand.view")).toBe(true);
+    expect(can("supervisor", "cashInHand.view")).toBe(false);
+    // everyone who sees the books sees it too
+    for (const r of CAN["reports.view"]) expect(can(r, "cashInHand.view"), r).toBe(true);
+  });
+
   it("only owner, superAdmin and branchAdmin change money settings — not the GM", () => {
     expect(who("moneySettings.manage")).toEqual(["owner", "superAdmin", "branchAdmin"]);
   });
