@@ -241,7 +241,7 @@ export default function RequestedPanel() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-4 px-4 py-5 sm:px-6 sm:py-6">
-      {seesCash(user?.role) && <CashInHand companyId={companyId} branchId={branchId} onFree={setFree} />}
+      {seesCash(user?.role) && <CashInHand companyId={companyId} branchId={branchId} role={user?.role} onFree={setFree} />}
       <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
         <Tabs
           value={currentTab}
