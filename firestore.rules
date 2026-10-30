@@ -336,10 +336,12 @@ service cloud.firestore {
       return u.get('role', '') == 'staff' && u.get('branchId', '') == b && u.get('companyId', '') == c &&
         get(/databases/$(database)/documents/companies/$(c)/branches/$(b)/staff/$(u.get('staffId', 'none'))).data.get('supervisorUid', '') in [request.auth.uid, ''];
     }
-    // who may see a task (and its thread): management, whoever has it, leads its team or gave it
+    // who may see a task (and its thread): management, whoever has it, leads its team or gave it —
+    // and whoever it can fall to on a rota or a cover (doers, 31 Oct)
     function canSeeTask(c, b, d) {
       return canTasksManage(c, b) || (isBranchMember(c, b) && (
-        d.get('assigneeUid', '') == request.auth.uid || d.get('teamLeadUid', '') == request.auth.uid || d.get('creatorUid', '') == request.auth.uid));
+        d.get('assigneeUid', '') == request.auth.uid || d.get('teamLeadUid', '') == request.auth.uid || d.get('creatorUid', '') == request.auth.uid ||
+        request.auth.uid in d.get('doers', [])));
     }
     // a one-off task marked done (or undone) by whoever has it: nothing else moves
     function isTaskWork() {
@@ -916,9 +918,14 @@ service cloud.firestore {
               request.resource.data.teamLeadUid == request.auth.uid &&
               !changedKeys().hasAny(['creatorUid', 'createdBy']) &&
               inMyTeam(companyId, branchId, request.resource.data.assigneeUid)) ||
+            // a supervisor sets who does a task given to them, day by day (31 Oct): its rota
+            // and one-day covers — leading it from then on (days off come to them)
+            (canTasksTeam(companyId, branchId) && resource.data.get('assigneeUid', '') == request.auth.uid &&
+              changedKeys().hasOnly(['rota', 'rotaSince', 'covers', 'doers', 'teamLeadUid', 'updatedAt']) &&
+              request.resource.data.teamLeadUid == request.auth.uid) ||
             // a supervisor hands a task given to them on to their team
             (canTasksTeam(companyId, branchId) && resource.data.get('assigneeUid', '') == request.auth.uid &&
-              changedKeys().hasOnly(['assignee', 'assigneeUid', 'teamLeadUid', 'via', 'updatedAt']) &&
+              changedKeys().hasOnly(['assignee', 'assigneeUid', 'teamLeadUid', 'via', 'doers', 'updatedAt']) &&
               request.resource.data.teamLeadUid == request.auth.uid &&
               inMyTeam(companyId, branchId, request.resource.data.assigneeUid)) ||
             // a new question or answer: whoever can see it counts it up by one, as themselves
@@ -944,17 +951,21 @@ service cloud.firestore {
         match /taskChecks/{checkId} {
           allow read: if canTasksManage(companyId, branchId) ||
             (isBranchMember(companyId, branchId) && (
-              resource.data.get('assigneeUid', '') == request.auth.uid || resource.data.get('teamLeadUid', '') == request.auth.uid));
+              resource.data.get('assigneeUid', '') == request.auth.uid || resource.data.get('teamLeadUid', '') == request.auth.uid ||
+              resource.data.get('doerUid', '') == request.auth.uid));
           // ticked as yourself, under the id {taskId}_{date}, for a task that is yours —
           // or for someone, by management or the supervisor leading it; the tick
-          // carries the task's team lead
+          // carries the task's team lead. Someone on its rota or a cover ticks
+          // their own day (doerUid themselves, 31 Oct).
           allow create: if isBranchMember(companyId, branchId) &&
             request.resource.data.by.uid == request.auth.uid &&
             checkId == request.resource.data.taskId + '_' + request.resource.data.date &&
             get(/databases/$(database)/documents/companies/$(companyId)/branches/$(branchId)/tasks/$(request.resource.data.taskId)).data.get('assigneeUid', '') == request.resource.data.assigneeUid &&
             get(/databases/$(database)/documents/companies/$(companyId)/branches/$(branchId)/tasks/$(request.resource.data.taskId)).data.get('teamLeadUid', null) == request.resource.data.get('teamLeadUid', null) &&
             (request.resource.data.assigneeUid == request.auth.uid || canTasksManage(companyId, branchId) ||
-              (canTasksTeam(companyId, branchId) && request.resource.data.get('teamLeadUid', '') == request.auth.uid));
+              (canTasksTeam(companyId, branchId) && request.resource.data.get('teamLeadUid', '') == request.auth.uid) ||
+              (request.resource.data.get('doerUid', '') == request.auth.uid &&
+                request.auth.uid in get(/databases/$(database)/documents/companies/$(companyId)/branches/$(branchId)/tasks/$(request.resource.data.taskId)).data.get('doers', [])));
           // a new supervisor leads the task: management moves its ticks along
           allow update: if canTasksManage(companyId, branchId) && changedKeys().hasOnly(['teamLeadUid']);
           // untick: whoever ticked it, the team's supervisor, or management

@@ -7,6 +7,8 @@ import { useGetStaffListQuery } from '@/lib/redux/api/staffApiSlice';
 import useSession from '@/app/hooks/useSession';
 import { useChatPeople } from '@/app/components/chat/useChat';
 import { ROLES, ROLE_GROUPS } from '../../lib/constants';
+import { WEEKDAYS } from '@/lib/tasks/model';
+import { format } from 'date-fns';
 import { useStaffFormContext } from "../StaffFormContext";
 import { Label, Row, Section, TextField } from '../parts';
 
@@ -96,6 +98,30 @@ export default function JobTab() {
               {supervisors.map(s => <option key={s.uid} value={s.uid}>{s.name}</option>)}
               {form.supervisorUid && !supervisors.some(s => s.uid === form.supervisorUid) && <option value={form.supervisorUid}>{form.supervisorName || 'Someone no longer here'}</option>}
             </Select>
+          )}
+        </Field>
+        <Field label='Weekly day off' hint="Their daily tasks go to the supervisor on these days — never counted as missed.">
+          {() => (
+            <div className='flex flex-wrap gap-1.5' role='group' aria-label='Weekly day off'>
+              {[1, 2, 3, 4, 5, 6, 0].map(d => {
+                const on = (form.daysOff || []).map(Number).includes(d)
+                return (
+                  <button
+                    key={d}
+                    type='button'
+                    aria-pressed={on}
+                    onClick={() => {
+                      change({ target: { name: 'daysOff', value: on ? (form.daysOff || []).filter(x => Number(x) !== d) : [...(form.daysOff || []), d].sort() } })
+                      // from today on: past days already given stay as they were
+                      change({ target: { name: 'daysOffSince', value: format(new Date(), 'yyyy-MM-dd') } })
+                    }}
+                    className={`h-10 min-w-12 rounded-xl border px-3 text-sm font-semibold transition ${on ? 'border-brand bg-brand text-brand-fg' : 'border-line text-fg hover:bg-surface-2'}`}
+                  >
+                    {WEEKDAYS[d]}
+                  </button>
+                )
+              })}
+            </div>
           )}
         </Field>
         <datalist id='staff-departments'>

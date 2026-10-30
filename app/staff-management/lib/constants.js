@@ -80,6 +80,8 @@ export const EMPTY_FORM = {
   department: '',
   supervisorUid: '', // who leads their work (4.11): a supervisor's login at this branch
   supervisorName: '',
+  daysOff: [], // weekly days off (31 Oct), Sunday = 0: their daily tasks go to the supervisor those days
+  daysOffSince: '', // from when the days off count (set when they change): earlier days stay as they were
   startDate: '',
   notes: '',
   photoUrl: null,

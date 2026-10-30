@@ -6,6 +6,7 @@ import useCurrency from '@/app/hooks/useCurrency'
 import { formatMoney } from '@/lib/region/currency'
 import { Avatar, Badge, Button, Sheet, cn } from '@/app/components/ui'
 import { roleLabelOf } from '../lib/constants'
+import { WEEKDAYS } from '@/lib/tasks/model'
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 const fmtDate = val => {
@@ -170,6 +171,7 @@ export default function StaffDetailModal ({ isOpen, onClose, staff, onEdit, onDe
               <Group title='Work'>
                 <Line label='Department'>{s.department}</Line>
                 <Line label='Supervisor'>{s.supervisorName}</Line>
+                <Line label='Day off'>{[1, 2, 3, 4, 5, 6, 0].filter(d => (s.daysOff || []).map(Number).includes(d)).map(d => WEEKDAYS[d]).join(', ')}</Line>
                 <Line label='Basic an hour'>{money(s.basicPerHour)}</Line>
                 <Line label='Added on'>{fmtDate(s.createdAt)}</Line>
               </Group>

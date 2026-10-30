@@ -204,6 +204,12 @@ rehearsed on the local copy first.
       they get one the next time they are given to someone. Office logins see "My pay & attendance" only after Staff
       management → a person → **Link an office login** (needs the new API route app/api/auth/link-office-login, so the
       Vercel deploy and the rules go out together).
+      Cashier's cash in hand on the Requested panel comes from a new API route (app/api/branch/cash-in-hand) — Vercel deploy.
+- [ ] **Duty rota and days off (30 Oct):** dev's firestore.rules widen tasks (whoever is on a task's rota or covers a day —
+      `doers` — sees it and ticks their own day; the supervisor given a task sets its rota) and taskChecks (`doerUid`).
+      Deploy the new index (taskChecks doerUid + date, firestore.indexes.json) before the app, or "My tasks" fails to load
+      for those on a rota. Deploy the functions too (the task reminders follow the rota and days off). Nothing to migrate:
+      tasks without `doers` keep working through assigneeUid; days off start empty (Staff management → Job → Weekly day off).
 - [ ] **Production rules (25 Oct):** live rules = main's firestore.rules (deployed 25 Oct with reservationDeposits). Before deploying dev's rules, diff them against the live ones (managers' branch-settings write is in both, written differently). Nothing to migrate
 - [ ] **Purchase orders (22 Oct):** deploy the functions (the hourly `notifyDailySummary` now also sends Late deliveries). Then add each supplier's phone and "Delivers in (days)" in Purchases → Vendors so WhatsApp and the due day work. Nothing to migrate
 - [ ] **Pay-outs at suppliers (21 Oct):** deploy `firestore.rules` (till roles read vendor names and bills; approvers write a supplier bill's payment only as part of approving it; 22 Oct: till roles read purchase orders and mark one as waiting on their own bill). Nothing to migrate
