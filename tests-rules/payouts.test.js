@@ -104,6 +104,38 @@ describe("approving bills", () => {
   });
 });
 
+describe("who checks whose money (owner, 31 Oct)", () => {
+  const voucher = (uid) => ({ date: "2026-10-11", amount: 40, category: "Food", paidFromOffice: "front", createdBy: { uid }, voucher: { status: "pending", reason: "stall", by: { uid } } });
+  const seed = (path, data) => env.withSecurityRulesDisabled((ctx) => ctx.firestore().doc(path).set(data));
+  it("a manager's voucher: not in-charge — someone above, or a company role", async () => {
+    await seed(`${B}/costs/vm`, voucher("klManager"));
+    expect(await ok(db("klInCharge").doc(`${B}/costs/vm`).update({ "voucher.status": "approved" }))).toBe(false);
+    expect(await ok(db("owner").doc(`${B}/costs/vm`).update({ "voucher.status": "approved" }))).toBe(true);
+  });
+  it("in-charge's voucher: a manager approves; a cashier's: in-charge does", async () => {
+    await seed(`${B}/costs/vi`, voucher("klInCharge"));
+    expect(await ok(db("klManager").doc(`${B}/costs/vi`).update({ "voucher.status": "approved" }))).toBe(true);
+    await seed(`${B}/costs/vc`, voucher("klCashier"));
+    expect(await ok(db("klInCharge").doc(`${B}/costs/vc`).update({ "voucher.status": "rejected", "voucher.note": "ask for a receipt" }))).toBe(true);
+  });
+  it("a company role's own voucher is approved as it is saved; nobody else may save one approved", async () => {
+    const own = (uid) => ({ ...voucher(uid), voucher: { status: "approved", reason: "stall", by: { uid }, decidedBy: { uid }, auto: true } });
+    expect(await ok(db("owner").doc(`${B}/costs/vo`).set(own("owner")))).toBe(true);
+    expect(await ok(db("klManager").doc(`${B}/costs/vx`).set(own("klManager")))).toBe(false);
+  });
+  it("a bill: senior to whoever handed it out and brought it", async () => {
+    await seed(`${P}/bm`, settle("klCashier", { payoutBy: { uid: "klManager" } }));
+    expect(await ok(db("klInCharge").doc(`${P}/bm`).update({ status: "approved" }))).toBe(false);
+    expect(await ok(db("owner").doc(`${P}/bm`).update({ status: "approved" }))).toBe(true);
+    await seed(`${P}/bi`, settle("klInCharge"));
+    expect(await ok(db("klManager").doc(`${P}/bi`).update({ status: "approved" }))).toBe(true);
+  });
+  it("a company role's own bill needs no one: they approve it as they bring it", async () => {
+    await seed(`${P}/bo`, settle("owner"));
+    expect(await ok(db("owner").doc(`${P}/bo`).update({ status: "approved" }))).toBe(true);
+  });
+});
+
 describe("who sees them", () => {
   it("till roles, approvers and those who see reports; not staff or another branch", async () => {
     for (const u of ["klCashier", "klInCharge", "klAccountant", "owner"]) expect(await ok(db(u).doc(`${P}/p1`).get())).toBe(true);

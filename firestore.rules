@@ -301,6 +301,19 @@ service cloud.firestore {
     function voucherMaker() {
       return resource.data.get('voucher', {}).get('by', {}).get('uid', resource.data.get('createdBy', {}).get('uid', ''));
     }
+    // ── who checks whose money (owner, 31 Oct — lib/authz/permissions.js outranks) ──
+    // a voucher or pay-out bill is decided by someone senior to everyone who
+    // made it; company roles need no one and may decide any
+    function approvalRank(role) {
+      return {'owner': 4, 'superAdmin': 4, 'superadmin': 4, 'gm': 4, 'branchAdmin': 3, 'branchadmin': 3, 'manager': 2, 'inCharge': 1}.get(role, 0);
+    }
+    function isCompanyUser() { return userData().role in companyRoles(); }
+    // the signed-in user is senior to `uid` (no one there: nothing to outrank)
+    function outranksUid(uid) { return uid == '' || outranksUser(uid); }
+    function outranksUser(uid) {
+      let path = /databases/$(database)/documents/users/$(uid);
+      return approvalRank(userData().role) > (exists(path) ? approvalRank(get(path).data.get('role', '')) : 0);
+    }
     function canCashBank(c, b)        { return may(c, b, leadRoles().concat(['accountant'])); }
     function canSalariesEnter(c, b)   { return may(c, b, leadRoles().concat(['accountant'])); }
     function canAdvancesRequest(c, b) { return may(c, b, officeBranchRoles()); }
@@ -770,21 +783,25 @@ service cloud.firestore {
           allow create: if canCostsEnter(companyId, branchId) && (
             request.resource.data.get('voucher', {}).get('status', 'pending') == 'pending' ||
             // a pay-out's bill approved with no paper: its voucher was decided with it (4.10)
-            (request.resource.data.get('meta', {}).get('type', '') == 'payout' && canCostsApprove(companyId, branchId))
+            (request.resource.data.get('meta', {}).get('type', '') == 'payout' && canCostsApprove(companyId, branchId)) ||
+            // a company role's own: approved as it is saved, no one else needed
+            (isCompanyUser() && request.resource.data.voucher.get('auto', false) == true &&
+              request.resource.data.voucher.by.uid == request.auth.uid && request.resource.data.voucher.decidedBy.uid == request.auth.uid)
           );
-          // A voucher (a cost with no invoice, 4.9) is decided by branch admin,
-          // manager or in-charge (and the company roles) — never by whoever made it.
+          // A voucher (a cost with no invoice, 4.9) is decided by someone senior to
+          // whoever made it (company roles: any) — never by whoever made it.
           allow update: if canCostsEnter(companyId, branchId) && (
-            !voucherDecided() || (canCostsApprove(companyId, branchId) && voucherMaker() != request.auth.uid)
+            !voucherDecided() || (canCostsApprove(companyId, branchId) &&
+              (isCompanyUser() || (voucherMaker() != request.auth.uid && outranksUid(voucherMaker()))))
           );
           allow delete: if canRecordsDelete(companyId, branchId);
         }
 
         // ── Pay-outs and their bills (4.10, lib/payouts/model.js) ─────────────
         // kind "out": money handed out of the till; kind "settle": the bill
-        // back. Till roles hand out and bring bills back; branch admin,
-        // manager or in-charge (and the company roles) approve or send a bill
-        // back — never one they handed out or brought back. Approved bills
+        // back. Till roles hand out and bring bills back; someone senior to
+        // both approves or sends a bill back — never one they handed out or
+        // brought back (company roles: any, theirs approved as brought). Approved bills
         // become costs and are not changed here again.
         match /payouts/{docId} {
           allow read: if canPayoutsHandOut(companyId, branchId) || canCostsApprove(companyId, branchId) || canReportsView(companyId, branchId);
@@ -801,11 +818,15 @@ service cloud.firestore {
             (resource.data.kind == 'settle' && resource.data.status == 'rejected' && canPayoutsHandOut(companyId, branchId) &&
               request.resource.data.status == 'pending' && request.resource.data.by.uid == request.auth.uid &&
               !changedKeys().hasAny(['kind', 'payoutId', 'floatAmount', 'payoutBy'])) ||
-            // approved or sent back by someone in charge, not their own
+            // approved or sent back by someone senior to whoever handed it out and
+            // brought it, not their own (company roles: any, their own included)
             (resource.data.kind == 'settle' && resource.data.status == 'pending' && canCostsApprove(companyId, branchId) &&
               request.resource.data.status in ['approved', 'rejected'] &&
-              resource.data.by.uid != request.auth.uid &&
-              resource.data.get('payoutBy', {}).get('uid', '') != request.auth.uid &&
+              (isCompanyUser() || (
+                resource.data.by.uid != request.auth.uid &&
+                resource.data.get('payoutBy', {}).get('uid', '') != request.auth.uid &&
+                outranksUid(resource.data.by.uid) &&
+                outranksUid(resource.data.get('payoutBy', {}).get('uid', '')))) &&
               !changedKeys().hasAny(['kind', 'payoutId', 'floatAmount', 'by', 'payoutBy', 'date']))
           );
           // a pay-out made by mistake, before any bill: whoever made it; anything else: those who delete records
