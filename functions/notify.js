@@ -147,10 +147,12 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
   }
 
   // ── pay-out bills and vouchers (4.9, 4.10) ─────────────────────────────────
-  /** Those who approve at this branch, minus the people involved. */
-  async function approvers(companyId, branchId, b, without = []) {
+  /** Those who approve at this branch; with `makers`, only those senior to them (lib/notify/model.js seniorTo). */
+  async function approvers(companyId, branchId, b, makers = null) {
     const all = await people(companyId);
-    return N.recipientsFor("costs.approval", { config: b.config, people: N.branchPeople(all, branchId) }).filter((u) => !without.includes(u));
+    const office = N.branchPeople(all, branchId);
+    const uids = N.recipientsFor("costs.approval", { config: b.config, people: office });
+    return makers ? N.seniorTo(uids, makers, office) : uids;
   }
 
   /** A pay-out's bill: waiting → approvers; approved / sent back → whoever brought it. */
@@ -160,7 +162,8 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
     const money = (v) => N.formatMoney(v, b.currency);
     const what = `${after.to?.name || "Someone"} · ${after.category || after.purpose || "a bill"} · ${money(after.billAmount)} of ${money(after.floatAmount)}`;
     if (after.status === "pending" && before?.status !== "pending") {
-      const uids = await approvers(companyId, branchId, b, [after.by?.uid, after.payoutBy?.uid]);
+      if (N.isCompanyRole(after.by?.role)) return; // a company role's own bill is approved as it is brought back
+      const uids = await approvers(companyId, branchId, b, [after.by, after.payoutBy]);
       await deliver({ companyId, branchId, uids, type: "costs.approval", message: { title: `Bill to approve · ${b.name}`, body: what }, link: "/requested-panel?tab=bills", ref: `payouts/${id}`, tag: `payout_${id}` });
     } else if ((after.status === "approved" || after.status === "rejected") && before?.status === "pending" && after.by?.uid) {
       const by = after.review?.by?.name || "a manager";
@@ -183,7 +186,7 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
     const b = await branch(companyId, branchId);
     const what = `${after.category || "A cost"} · ${N.formatMoney(after.amount, b.currency)}${after.paidTo ? ` · ${after.paidTo}` : ""}`;
     if (v.status === "pending" && was !== "pending") {
-      const uids = await approvers(companyId, branchId, b, [v.by?.uid, after.createdBy?.uid]);
+      const uids = await approvers(companyId, branchId, b, [v.by || after.createdBy]);
       await deliver({ companyId, branchId, uids, type: "costs.approval", message: { title: `Voucher to approve · ${b.name}`, body: `${what} — no invoice: ${v.reason || "no reason given"}` }, link: "/requested-panel?tab=vouchers", ref: `costs/${id}`, tag: `voucher_${id}` });
     } else if ((v.status === "approved" || v.status === "rejected") && was === "pending" && v.by?.uid) {
       const by = v.decidedBy?.name || "a manager";

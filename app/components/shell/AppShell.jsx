@@ -43,7 +43,7 @@ export default function AppShell({ onSignOut, children }) {
   const branches = useMemo(() => branchList.map((b) => ({ id: b.id, name: b.name, address: b.address })), [branchList]);
 
   // ── counts on menu items: what waits for approval (company roles: every branch's requests) ──
-  const pending = usePendingRequests({ companyId, branchId, role, branchIds: isCompany ? branches.map((b) => b.id) : null });
+  const pending = usePendingRequests({ companyId, branchId, role, uid: user?.uid, branchIds: isCompany ? branches.map((b) => b.id) : null });
   const { data: myBranch } = useGetSingleBranchQuery(!isCompany && companyId && branchId ? { companyId, branchId } : skipToken);
 
   // …and chats with something new (4.4)

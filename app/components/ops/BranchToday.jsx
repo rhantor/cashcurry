@@ -54,7 +54,7 @@ export default function BranchToday({ user, companyId, branchId, today }) {
 
   // waiting for this person's decision, and issues waiting on them
   const approves = canAny(role, ["advances.approve", "costs.approve"]);
-  const pending = usePendingRequests({ companyId, branchId, role, branchIds: [branchId] });
+  const pending = usePendingRequests({ companyId, branchId, role, uid: user?.uid, branchIds: [branchId] });
   const issues = useIssuesWaiting(user, [branchId]);
 
   // the day's tasks: the team's (those who give tasks) and one's own
