@@ -34,6 +34,9 @@ import {
   uploadBillFiles,
 } from "@/lib/payouts/client";
 import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
+import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
+import { skipToken } from "@reduxjs/toolkit/query";
+import { voucherLimit } from "@/lib/authz/permissions";
 import { FileThumb } from "@/app/components/common/Files";
 import ScanToPdf from "@/app/components/common/ScanToPdf";
 import SupplierPicker from "./SupplierPicker";
@@ -422,6 +425,8 @@ export function BillSheet({
   const currency = useCurrency();
   const money = (v) => formatMoney(v, currency);
   const { groups } = useCostCategories(companyId);
+  const { data: branchSettings } = useGetBranchSettingsQuery(open && companyId && branchId ? { companyId, branchId } : skipToken);
+  const limit = voucherLimit(branchSettings);
   const [date, setDate] = useDefaultDate();
   const [amount, setAmount] = useState("");
   const [files, setFiles] = useState([]);
@@ -629,13 +634,13 @@ export function BillSheet({
       let settleId = retry?.id;
       if (retry) await resubmitBill(companyId, branchId, user, retry, data);
       else settleId = await bringBill(companyId, branchId, user, payout, data);
-      // a company role's bill needs no one: approved as it is brought back (owner, 31 Oct)
-      if (approvesOwnBill(user)) {
-        const fresh = await getBill(companyId, branchId, settleId);
-        if (fresh?.supplier) await approveSupplierNow(companyId, branchId, user, fresh);
-        else if (fresh) await approveBillNow(companyId, branchId, user, fresh);
-      }
-      toast.success(approvesOwnBill(user) ? "Bill saved and approved" : "Bill saved", {
+      // a company role's bill, or a manager's up to the branch's limit, needs no
+      // one: approved as it is brought back (owner, 31 Oct and 1 Nov)
+      const fresh = await getBill(companyId, branchId, settleId);
+      const selfOk = approvesOwnBill(user, fresh, limit);
+      if (selfOk && fresh?.supplier) await approveSupplierNow(companyId, branchId, user, fresh);
+      else if (selfOk && fresh) await approveBillNow(companyId, branchId, user, fresh);
+      toast.success(selfOk ? "Bill saved and approved" : "Bill saved", {
         description:
           change > 0
             ? `Put ${money(change)} back in the till`

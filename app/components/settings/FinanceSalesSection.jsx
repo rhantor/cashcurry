@@ -4,7 +4,7 @@ import SettingsSection from "./SettingsSection";
 import { FieldRow, NumberField, TextField } from "./fields";
 import TendersEditor from "./TendersEditor";
 import { formatMoney } from "@/lib/region";
-import { can } from "@/lib/authz/permissions";
+import { DEFAULT_VOUCHER_LIMIT, can } from "@/lib/authz/permissions";
 
 export default function FinanceSalesSection({ role, value, onChange }) {
   const v = value || {};
@@ -65,6 +65,25 @@ export default function FinanceSalesSection({ role, value, onChange }) {
                     onChange={(val) => patch({ openingBankBalance: val })}
                     disabled={!canEditBalance}
                     placeholder="0.00"
+                  />
+                </div>
+              </FieldRow>
+
+              <FieldRow
+                label={
+                  <span className="flex items-center gap-1.5">
+                    No-invoice limit for managers
+                    {!canEditBalance && <Lock size={12} className="text-amber-500" />}
+                  </span>
+                }
+                hint={`A manager's or branch admin's own cost or pay-out bill up to this needs no approval; above it, someone senior approves (default ${DEFAULT_VOUCHER_LIMIT})`}
+              >
+                <div className={!canEditBalance ? "opacity-60 cursor-not-allowed" : ""}>
+                  <NumberField
+                    value={v.voucherLimit ?? DEFAULT_VOUCHER_LIMIT}
+                    onChange={(val) => patch({ voucherLimit: val })}
+                    disabled={!canEditBalance}
+                    placeholder={String(DEFAULT_VOUCHER_LIMIT)}
                   />
                 </div>
               </FieldRow>

@@ -14,14 +14,9 @@ import useCurrency from '@/app/hooks/useCurrency'
 import { formatMoney } from '@/lib/region/currency'
 import { BACK_OFFICE_METHODS, DESCRIPTION_CHIPS } from '../logic/constants'
 import { findCategory, pickable } from '@/lib/costs/categories'
-import { NO_INVOICE_REASONS } from '@/lib/costs/vouchers'
-import { checkedBy, isCompanyRole } from '@/lib/authz/permissions'
+import { NO_INVOICE_REASONS, voucherHint } from '@/lib/costs/vouchers'
 import { getSessionUser } from '@/lib/session'
 import ImageCaptureEditor from './ImageCaptureEditor'
-
-// who checks a cost with no invoice (owner, 31 Oct): someone senior to whoever saves it
-const voucherHint = (role) =>
-  isCompanyRole(role) ? 'It is saved with your reason — no approval needed.' : `It is saved with a voucher; ${checkedBy([role])} approves it.`
 
 // Invoices and receipts: photos shrunk like the old uploader did.
 const SHRINK = { maxMB: 0.6, maxSide: 1600 }
@@ -148,7 +143,7 @@ function WhatFor ({ groups, vendors, form, errors }) {
   )
 }
 
-export default function CostEntryForm ({ form, groups = [], vendors = [], onSave, errors = {}, saved = false, recent }) {
+export default function CostEntryForm ({ form, voucherLimit, groups = [], vendors = [], onSave, errors = {}, saved = false, recent }) {
   const {
     date,
     setDate,
@@ -310,7 +305,7 @@ export default function CostEntryForm ({ form, groups = [], vendors = [], onSave
                 <FileWarning className='size-5 shrink-0 text-warning' />
                 <div className='min-w-0 flex-1'>
                   <p className='text-sm font-semibold text-fg'>No invoice for this</p>
-                  <p className='text-xs text-muted'>{voucherHint(role)}</p>
+                  <p className='text-xs text-muted'>{voucherHint(role, voucherLimit, money)}</p>
                 </div>
                 <Switch checked={noInvoice} onChange={setNoInvoice} />
               </div>
@@ -363,6 +358,7 @@ export default function CostEntryForm ({ form, groups = [], vendors = [], onSave
 
 CostEntryForm.propTypes = {
   form: PropTypes.object.isRequired,
+  voucherLimit: PropTypes.number,
   groups: PropTypes.array,
   vendors: PropTypes.array,
   onSave: PropTypes.func.isRequired,

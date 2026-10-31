@@ -162,7 +162,8 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
     const money = (v) => N.formatMoney(v, b.currency);
     const what = `${after.to?.name || "Someone"} · ${after.category || after.purpose || "a bill"} · ${money(after.billAmount)} of ${money(after.floatAmount)}`;
     if (after.status === "pending" && before?.status !== "pending") {
-      if (N.isCompanyRole(after.by?.role)) return; // a company role's own bill is approved as it is brought back
+      // a company role's own bill, or a manager's up to the branch's limit, is approved as it is brought back
+      if (N.approvesOwnBill(after.by, after, N.voucherLimit(b.settings))) return;
       const uids = await approvers(companyId, branchId, b, [after.by, after.payoutBy]);
       await deliver({ companyId, branchId, uids, type: "costs.approval", message: { title: `Bill to approve · ${b.name}`, body: what }, link: "/requested-panel?tab=bills", ref: `payouts/${id}`, tag: `payout_${id}` });
     } else if ((after.status === "approved" || after.status === "rejected") && before?.status === "pending" && after.by?.uid) {
