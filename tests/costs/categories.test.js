@@ -89,6 +89,7 @@ describe("vouchers (costs without an invoice)", () => {
     // an older voucher with no role: looked up
     const old = { amount: 40, voucher: { status: "pending", reason: "x", by: { uid: "m1" } } };
     expect(canDecideVoucher({ uid: "i1", role: "inCharge" }, old, (uid) => (uid === "m1" ? "manager" : ""))).toBe(false);
+    expect(canDecideVoucher({ uid: "i1", role: "inCharge" }, { ...old, createdBy: { uid: "m1", role: "manager" } })).toBe(false);
   });
   it("a company role's needs no one: approved as it is saved", () => {
     const v = newVoucher({ uid: "g1", role: "gm", firstName: "Gita" }, "stall");
