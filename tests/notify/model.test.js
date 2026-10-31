@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  branchPeople, dailyMessage, hourOf, localHour, recipientsFor, requestEvents, requestLink, requestMessage, requesterMessage, withoutMuted,
+  branchPeople, dailyMessage, hourOf, localHour, recipientsFor, requestEvents, requestLink, requestMessage, requesterMessage, seniorTo, withoutMuted,
 } from "@/lib/notify/model";
 
 const users = [
@@ -98,6 +98,16 @@ describe("bills & vouchers (4.9, 4.10)", () => {
     const t = NOTIFY_TYPES["costs.approval"];
     for (const r of ["gm", "superAdmin", "branchAdmin", "manager", "inCharge"]) expect(t.defaultFor(r)).toBe(true);
     for (const r of ["owner", "accountant", "cashier", "supervisor", "staff"]) expect(t.defaultFor(r)).toBe(false);
+  });  it("wait only for someone senior to whoever made them (31 Oct)", () => {
+    const told = recipientsFor("costs.approval", { config: null, people: kl }); // gm, kla, klm
+    // a cashier's: everyone who approves
+    expect(seniorTo(told, [{ uid: "klc" }], kl).sort()).toEqual(["gm", "kla", "klm"]);
+    // a manager's: not the manager — branch admin and the GM
+    expect(seniorTo(told, [{ uid: "klm" }], kl).sort()).toEqual(["gm", "kla"]);
+    // handed out by branch admin: only the company roles
+    expect(seniorTo(told, [{ uid: "klc" }, { uid: "kla" }], kl)).toEqual(["gm"]);
+    // nobody chosen is senior enough (only the manager chosen): the branch's seniors, owner too
+    expect(seniorTo(["klm"], [{ uid: "kla" }], kl).sort()).toEqual(["gm", "owner"]);
   });
 });
 

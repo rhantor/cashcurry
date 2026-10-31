@@ -234,6 +234,10 @@ rehearsed on the local copy first.
 - [ ] **Costs, pay-outs (4.9, 4.10):** deploy `firestore.rules`, `storage.rules` and `firestore.indexes.json` (`firebase deploy --only firestore:rules,firestore:indexes,storage`) with the functions (new triggers summaryPayouts, notifyPayouts, notifyCostVouchers). Then the owner looks at Settings → Cost categories once (save to keep the standard list, or change it) and each branch's Notifications → "Bills & vouchers"
 - [ ] **Staff Android app (4.6):** Firebase console → add Android app `com.cashcurry.staff` → `google-services.json` into `android/app/`; `CAP_SERVER_URL=https://<app domain> npm run android:sync`; icon; signing key; `./gradlew bundleRelease`; Play Console → new app, internal testing first (docs/STAFF_APP.md §5)
 - [ ] **Staff payslips (4.6):** deploy `storage.rules` with `firestore.rules`; then `npm run payslips:copy -- --project <id>` and `--write --confirm` (gives staff their payslips from runs already finalized or paid)
+- [ ] **Senior approves (31 Oct):** vouchers and pay-out bills are checked by someone senior to whoever made them;
+      company roles' own are approved as saved. Ships in `firestore.rules` and the functions (`notifyPayouts`,
+      `notifyCostVouchers` tell only those senior enough) — no new index, nothing to migrate. Vouchers already waiting
+      at release carry no role: the rules read the maker's role from `users/{uid}`, so they work as they are
 - [ ] **Staff logins (4.6):** after the rules and functions deploy, `npm run staff:logins -- --project <id>` then `--write --confirm` (lets staff who already have a login sign in with their phone or IC number; their password stays until a manager resets their PIN). Functions keep it up to date after that
 - [ ] **Audit log (20 Oct):** the audit triggers (auditSales, auditCosts, auditSalaries, auditLoans, auditVendorBills)
       now record the signed-in account, so their trigger type changes; if the deploy refuses, delete those five

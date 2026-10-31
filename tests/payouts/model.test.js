@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { approveBill, canReviewBill, changeOf, changeText, newPayout, newSettle, openByPerson, payoutCash, rejectBill } from "@/lib/payouts/model";
+import { approveBill, approvesOwnBill, billWaitsFor, canReviewBill, changeOf, changeText, newPayout, newSettle, openByPerson, payoutCash, rejectBill } from "@/lib/payouts/model";
 import { can } from "@/lib/authz/permissions";
 
 const cashier = { uid: "c1", role: "cashier", firstName: "Siti" };
@@ -27,6 +27,18 @@ describe("pay-outs", () => {
     expect(canReviewBill({ uid: "a", role: "accountant" }, s, can)).toBe(false);
     const ownHandOut = { ...s, by: { uid: "c2" }, payoutBy: { uid: "m1" } };
     expect(canReviewBill(manager, ownHandOut, can)).toBe(false);
+  });
+  it("only someone senior to whoever handed it out and brought it (owner, 31 Oct)", () => {
+    const inCharge = { uid: "i1", role: "inCharge" };
+    const s = { id: "s2", ...newSettle({ ...p, by: { uid: "m2", role: "manager" } }, { date: "2026-10-11", billAmount: 82.5 }, cashier) };
+    expect(canReviewBill(inCharge, s, can)).toBe(false);
+    expect(canReviewBill({ uid: "m1", role: "manager" }, s, can)).toBe(false);
+    expect(canReviewBill({ uid: "b1", role: "branchAdmin" }, s, can)).toBe(true);
+    expect(billWaitsFor(inCharge, s)).toBe("Waits for branch admin or above.");
+    const ownOwner = { ...s, by: { uid: "o1", role: "owner" }, payoutBy: { uid: "o1", role: "owner" } };
+    expect(canReviewBill({ uid: "o1", role: "owner" }, ownOwner, can)).toBe(true);
+    expect(approvesOwnBill({ role: "gm" })).toBe(true);
+    expect(approvesOwnBill({ role: "branchAdmin" })).toBe(false);
   });
   it("approving makes the cost; a correction keeps the original", () => {
     const s = { id: "s1", ...newSettle(p, { date: "2026-10-11", billAmount: 82.5, fields: { categoryId: "gas", category: "Cooking gas", costGroupId: "food", costGroup: "Food & stock", costKind: "expense" } }, cashier) };

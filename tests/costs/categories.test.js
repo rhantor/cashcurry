@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_GROUPS, LEGACY, categoryFields, checkGroups, classify, findCategory, groupsFrom, isNotCost, missingFor, newId, pickable,
 } from "@/lib/costs/categories";
-import { approveVoucherPatch, canDecideVoucher, newVoucher, rejectVoucherPatch, voucherText } from "@/lib/costs/vouchers";
+import { approveVoucherPatch, canDecideVoucher, newVoucher, rejectVoucherPatch, voucherText, voucherWaitsFor } from "@/lib/costs/vouchers";
 
 describe("cost categories", () => {
   it("defaults until the company saves its own; hidden ones stay for old records but can't be picked", () => {
@@ -75,6 +75,25 @@ describe("vouchers (costs without an invoice)", () => {
     expect(canDecideVoucher({ uid: "a1", role: "accountant" }, cost)).toBe(false);
     const own = { ...cost, createdBy: { uid: "m1" }, voucher: newVoucher({ uid: "m1" }, "x") };
     expect(canDecideVoucher({ uid: "m1", role: "manager" }, own)).toBe(false);
+  });
+  it("only someone senior to whoever made it (owner, 31 Oct)", () => {
+    const byManager = { amount: 40, voucher: newVoucher({ uid: "m1", role: "manager" }, "stall") };
+    expect(canDecideVoucher({ uid: "i1", role: "inCharge" }, byManager)).toBe(false);
+    expect(canDecideVoucher({ uid: "m2", role: "manager" }, byManager)).toBe(false);
+    expect(canDecideVoucher({ uid: "b1", role: "branchAdmin" }, byManager)).toBe(true);
+    expect(canDecideVoucher({ uid: "g1", role: "gm" }, byManager)).toBe(true);
+    expect(voucherWaitsFor({ uid: "i1", role: "inCharge" }, byManager)).toBe("Waits for branch admin or above.");
+    const byInCharge = { amount: 40, voucher: newVoucher({ uid: "i1", role: "inCharge" }, "stall") };
+    expect(canDecideVoucher({ uid: "m1", role: "manager" }, byInCharge)).toBe(true);
+    expect(canDecideVoucher({ uid: "i2", role: "inCharge" }, byInCharge)).toBe(false);
+    // an older voucher with no role: looked up
+    const old = { amount: 40, voucher: { status: "pending", reason: "x", by: { uid: "m1" } } };
+    expect(canDecideVoucher({ uid: "i1", role: "inCharge" }, old, (uid) => (uid === "m1" ? "manager" : ""))).toBe(false);
+  });
+  it("a company role's needs no one: approved as it is saved", () => {
+    const v = newVoucher({ uid: "g1", role: "gm", firstName: "Gita" }, "stall");
+    expect(v).toMatchObject({ status: "approved", auto: true, decidedBy: { uid: "g1" } });
+    expect(voucherText({ voucher: v })).toMatch(/no approval needed/);
   });
   it("only while it waits", () => {
     const done = { ...cost, voucher: { ...cost.voucher, status: "approved" } };
