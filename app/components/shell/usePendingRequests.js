@@ -6,6 +6,8 @@ import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlic
 import { skipToken } from "@reduxjs/toolkit/query";
 import { shiftsEnabled } from "@/lib/attendance/shifts";
 import { can } from "@/lib/authz/permissions";
+import { canDecideVoucher } from "@/lib/costs/vouchers";
+import { canReviewBill } from "@/lib/payouts/model";
 
 /**
  * How many things wait for this person's decision — the same lists the
@@ -15,12 +17,14 @@ import { can } from "@/lib/authz/permissions";
  *  - at the branch being viewed: loans asked of it by another branch,
  *    early OT (only when the branch runs shifts), pay-out bills and vouchers
  *    (4.9, 4.10).
+ * Bills and vouchers count only when this person may decide them (not their
+ * own; only someone senior to whoever made them — lib/authz/permissions.js).
  * Live: the badge changes the moment something arrives or is decided, and
  * only the waiting records are read.
  *
  * `branchIds`: every branch for a company role, else just the branch.
  */
-export default function usePendingRequests({ companyId, branchId, role, branchIds }) {
+export default function usePendingRequests({ companyId, branchId, role, uid, branchIds }) {
   // a company role may have no branch picked yet: its inbox still lists every branch
   const allBranches = (branchIds?.length ? branchIds : [branchId]).filter(Boolean);
   const key = allBranches.join(",");
@@ -69,13 +73,14 @@ export default function usePendingRequests({ companyId, branchId, role, branchId
     }
     if (costsOn) {
       const payouts = collection(db, ...base(branchId), "payouts");
+      const me = { uid, role };
       stops.push(
-        watch(query(payouts, where("kind", "==", "settle"), where("status", "==", "pending")), "bills"),
-        watch(query(collection(db, ...base(branchId), "costs"), where("voucher.status", "==", "pending")), "vouchers")
+        watch(query(payouts, where("kind", "==", "settle"), where("status", "==", "pending")), "bills", (b) => canReviewBill(me, b, can)),
+        watch(query(collection(db, ...base(branchId), "costs"), where("voucher.status", "==", "pending")), "vouchers", (c) => canDecideVoucher(me, c))
       );
     }
     return () => stops.forEach((stop) => stop());
-  }, [enabled, requestsOn, costsOn, here, companyId, branchId, ot, key]);
+  }, [enabled, requestsOn, costsOn, here, companyId, branchId, ot, key, uid, role]);
 
   return { ...counts, total: counts.requests + counts.loans + counts.ot + counts.bills + counts.vouchers };
 }

@@ -1,7 +1,7 @@
 "use client";
-// Vouchers waiting (roadmap 4.9): costs saved without an invoice, for branch
-// admin, manager or in-charge (and the company roles) to approve or send
-// back. Nobody decides their own. The money already left when the cost was
+// Vouchers waiting (roadmap 4.9): costs saved without an invoice, for someone
+// senior to whoever saved it to approve or send back (owner, 31 Oct). Nobody
+// decides their own. The money already left when the cost was
 // saved — this is the check that someone in charge saw it.
 import { useEffect, useState } from "react";
 import { collection, onSnapshot, query, where } from "firebase/firestore";
@@ -12,8 +12,8 @@ import { Badge, Button, EmptyState, Skeleton, toast } from "@/app/components/ui"
 import { promptDialog } from "@/app/components/ui/notify";
 import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/lib/region/currency";
-import { canDecideVoucher } from "@/lib/costs/vouchers";
-import { approveVoucher, rejectVoucher } from "@/lib/costs/client";
+import { canDecideVoucher, voucherWaitsFor } from "@/lib/costs/vouchers";
+import { approveVoucher, rejectVoucher, useRoleOf } from "@/lib/costs/client";
 
 /** Live: this branch's costs whose voucher waits. */
 export function useWaitingVouchers(companyId, branchId) {
@@ -34,6 +34,7 @@ export default function VoucherInbox({ companyId, branchId, user }) {
   const currency = useCurrency();
   const money = (v) => formatMoney(v, currency);
   const { vouchers, loading } = useWaitingVouchers(companyId, branchId);
+  const roleOf = useRoleOf(companyId); // older vouchers carry no role
   const [busy, setBusy] = useState(null);
 
   const act = async (cost, approve) => {
@@ -60,7 +61,7 @@ export default function VoucherInbox({ companyId, branchId, user }) {
   return (
     <ul className="space-y-2">
       {vouchers.map((c) => {
-        const mine = !canDecideVoucher(user, c);
+        const mine = !canDecideVoucher(user, c, roleOf);
         return (
           <li key={c.id} className="overflow-hidden rounded-2xl border border-line bg-surface">
             <div className="space-y-1.5 p-4">
@@ -78,7 +79,7 @@ export default function VoucherInbox({ companyId, branchId, user }) {
             </div>
             <div className="flex flex-wrap items-center gap-2 border-t border-line bg-surface-2/40 px-4 py-3">
               {mine ? (
-                <p className="text-xs text-subtle">Yours — someone else approves it.</p>
+                <p className="text-xs text-subtle">{voucherWaitsFor(user, c, roleOf)}</p>
               ) : (
                 <>
                   <Button size="sm" icon={Check} loading={busy === c.id} onClick={() => act(c, true)} className="min-w-28 flex-1 sm:flex-none">Approve</Button>

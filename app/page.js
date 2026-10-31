@@ -83,7 +83,7 @@ function WithMoney(props) {
 function Home({ user, role, companyId, branchId, pages, sections, figures = null, extra = [] }) {
   const { data: branch } = useGetSingleBranchQuery(companyId && branchId ? { companyId, branchId } : skipToken);
   const { data: company } = useGetCompanyDetailsQuery(companyId ?? skipToken);
-  const pending = usePendingRequests({ companyId, branchId, role });
+  const pending = usePendingRequests({ companyId, branchId, role, uid: user?.uid });
 
   const name = user?.name || user?.fullName || personName(user) || "";
   const attention = [

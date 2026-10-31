@@ -1,6 +1,6 @@
 "use client";
-// Bills waiting (roadmap 4.10): pay-out bills brought back, for branch admin,
-// manager or in-charge (and the company roles) to approve — as they are, or
+// Bills waiting (roadmap 4.10): pay-out bills brought back, for someone senior
+// to whoever handed the money out and brought the bill (owner, 31 Oct) to approve — as they are, or
 // corrected (the original amount and category are kept) — or send back with
 // a reason. Approving turns the bill into a cost.
 import { useState } from "react";
@@ -14,7 +14,7 @@ import { formatMoney } from "@/lib/region/currency";
 import { can } from "@/lib/authz/permissions";
 import { categoryFields, pickable } from "@/lib/costs/categories";
 import { useCostCategories } from "@/lib/costs/client";
-import { canReviewBill, changeText, deliveryOf, goodsOf } from "@/lib/payouts/model";
+import { billWaitsFor, canReviewBill, changeText, deliveryOf, goodsOf } from "@/lib/payouts/model";
 import { FileThumb, FilesSheet, viewerItems } from "@/app/components/common/Files";
 import { approveBillNow, approveSupplierNow, sendBillBack } from "@/lib/payouts/client";
 import { linesTotal, supplierText } from "@/lib/payouts/supplier";
@@ -191,7 +191,7 @@ export default function BillInbox({ companyId, branchId, user, bills, loading })
               </div>
               <div className="flex flex-wrap items-center gap-2 border-t border-line bg-surface-2/40 px-4 py-3">
                 {mine ? (
-                  <p className="text-xs text-subtle">You handed it out or brought it — someone else approves it.</p>
+                  <p className="text-xs text-subtle">{billWaitsFor(user, b)}</p>
                 ) : (
                   <>
                     <Button size="sm" icon={Check} loading={busy === b.id} onClick={() => approve(b)} className="min-w-28 flex-1 sm:flex-none">Approve</Button>

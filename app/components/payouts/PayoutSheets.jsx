@@ -23,9 +23,12 @@ import { formatMoney } from "@/lib/region/currency";
 import { categoryFields, findCategory, pickable } from "@/lib/costs/categories";
 import { useCostCategories } from "@/lib/costs/client";
 import { NO_INVOICE_REASONS } from "@/lib/costs/vouchers";
-import { changeOf, deliveryOf, goodsOf } from "@/lib/payouts/model";
+import { approvesOwnBill, changeOf, deliveryOf, goodsOf } from "@/lib/payouts/model";
 import {
+  approveBillNow,
+  approveSupplierNow,
   bringBill,
+  getBill,
   handOut,
   resubmitBill,
   uploadBillFiles,
@@ -623,9 +626,16 @@ export function BillSheet({
             }
           : null,
       };
+      let settleId = retry?.id;
       if (retry) await resubmitBill(companyId, branchId, user, retry, data);
-      else await bringBill(companyId, branchId, user, payout, data);
-      toast.success("Bill saved", {
+      else settleId = await bringBill(companyId, branchId, user, payout, data);
+      // a company role's bill needs no one: approved as it is brought back (owner, 31 Oct)
+      if (approvesOwnBill(user)) {
+        const fresh = await getBill(companyId, branchId, settleId);
+        if (fresh?.supplier) await approveSupplierNow(companyId, branchId, user, fresh);
+        else if (fresh) await approveBillNow(companyId, branchId, user, fresh);
+      }
+      toast.success(approvesOwnBill(user) ? "Bill saved and approved" : "Bill saved", {
         description:
           change > 0
             ? `Put ${money(change)} back in the till`

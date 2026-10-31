@@ -15,7 +15,13 @@ import { formatMoney } from '@/lib/region/currency'
 import { BACK_OFFICE_METHODS, DESCRIPTION_CHIPS } from '../logic/constants'
 import { findCategory, pickable } from '@/lib/costs/categories'
 import { NO_INVOICE_REASONS } from '@/lib/costs/vouchers'
+import { checkedBy, isCompanyRole } from '@/lib/authz/permissions'
+import { getSessionUser } from '@/lib/session'
 import ImageCaptureEditor from './ImageCaptureEditor'
+
+// who checks a cost with no invoice (owner, 31 Oct): someone senior to whoever saves it
+const voucherHint = (role) =>
+  isCompanyRole(role) ? 'It is saved with your reason — no approval needed.' : `It is saved with a voucher; ${checkedBy([role])} approves it.`
 
 // Invoices and receipts: photos shrunk like the old uploader did.
 const SHRINK = { maxMB: 0.6, maxSide: 1600 }
@@ -174,6 +180,8 @@ export default function CostEntryForm ({ form, groups = [], vendors = [], onSave
   const currency = useCurrency()
   const money = v => formatMoney(v, currency)
   const [scanning, setScanning] = useState(false)
+  const [role, setRole] = useState('') // read after mount: the session lives in the browser
+  useEffect(() => setRole(getSessionUser()?.role || ''), [])
   const [receiptPreview, setReceiptPreview] = useState(null)
   const amt = Number(amount) || 0
 
@@ -302,7 +310,7 @@ export default function CostEntryForm ({ form, groups = [], vendors = [], onSave
                 <FileWarning className='size-5 shrink-0 text-warning' />
                 <div className='min-w-0 flex-1'>
                   <p className='text-sm font-semibold text-fg'>No invoice for this</p>
-                  <p className='text-xs text-muted'>It is saved with a voucher; a manager or in-charge approves it.</p>
+                  <p className='text-xs text-muted'>{voucherHint(role)}</p>
                 </div>
                 <Switch checked={noInvoice} onChange={setNoInvoice} />
               </div>

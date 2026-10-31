@@ -35,7 +35,7 @@ function BranchPulse({ user, branch, today: activeToday, onOpen }) {
   const region = useMemo(() => (settings ? regionOf(settings) : null), [settings]);
   const today = region ? businessToday(new Date(), region) : activeToday;
   const currency = settings?.financeSales?.currency || "RM";
-  const pending = usePendingRequests({ companyId, branchId: id, role, branchIds: [id] });
+  const pending = usePendingRequests({ companyId, branchId: id, role, uid: user.uid, branchIds: [id] });
   const issues = useIssuesWaiting(user, [id]);
   const till = useServerCash(companyId, id, undefined, today);
   const shift = useOnShift(companyId, id, today);
@@ -85,7 +85,7 @@ function BranchPulse({ user, branch, today: activeToday, onOpen }) {
 export default function AllBranches({ user, branches, today, onOpen }) {
   const ids = useMemo(() => branches.map((b) => b.id), [branches]);
   // every branch's advances, loans and leave (the company inbox), as the menu counts them
-  const pending = usePendingRequests({ companyId: user.companyId, branchId: null, role: user.role, branchIds: ids });
+  const pending = usePendingRequests({ companyId: user.companyId, branchId: null, role: user.role, uid: user.uid, branchIds: ids });
 
   return (
     <div className="space-y-3">
