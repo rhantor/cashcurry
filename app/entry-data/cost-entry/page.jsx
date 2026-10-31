@@ -17,6 +17,9 @@ import { useCostCategories } from '@/lib/costs/client'
 import { newVoucher } from '@/lib/costs/vouchers'
 import { useGetVendorsQuery } from '@/lib/redux/api/vendorsApiSlice'
 import SentBackVouchers from '@/app/components/costs/SentBackVouchers'
+import { useGetBranchSettingsQuery } from '@/lib/redux/api/branchSettingsApiSlice'
+import { skipToken } from '@reduxjs/toolkit/query'
+import { voucherLimit } from '@/lib/authz/permissions'
 
 const storedUserNow = () => getSessionUser() || {}
 
@@ -28,6 +31,8 @@ export default function CostEntryPage () {
   const money = v => formatMoney(v, currency)
   const [errors, setErrors] = useState({})
   const [saved, setSaved] = useState(false)
+  const { data: branchSettings } = useGetBranchSettingsQuery(form.companyId && form.branchId ? { companyId: form.companyId, branchId: form.branchId } : skipToken)
+  const limit = voucherLimit(branchSettings) // a manager's own no-invoice cost up to it needs no approval
 
   const {
     companyId,
@@ -133,7 +138,7 @@ export default function CostEntryPage () {
         ...categoryFields(groups, category),
         ...(vendor ? { vendorId: vendor.id, paidTo: vendor.name || vendor.vendorName || '' } : paidTo.trim() ? { paidTo: paidTo.trim() } : {}),
         ...(billMonth ? { billMonth, billRef: billRef.trim() } : {}),
-        ...(!file && noInvoice ? { voucher: newVoucher(storedUserNow(), voucherReason) } : {}),
+        ...(!file && noInvoice ? { voucher: newVoucher(storedUserNow(), voucherReason, { amount: amt, limit }) } : {}),
         description: description?.trim() || '',
         fileURL: fileURL || null,
         receiptURL: receiptURL || null,
@@ -172,6 +177,7 @@ export default function CostEntryPage () {
     <SentBackVouchers companyId={companyId} branchId={branchId} user={storedUserNow()} />
     <CostEntryForm
       form={form}
+      voucherLimit={limit}
       groups={groups}
       vendors={vendors}
       onSave={handleSave}

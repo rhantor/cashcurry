@@ -216,6 +216,7 @@ service cloud.firestore {
         after.get('financeSales', {}).get('openingBankBalance', null) == before.get('financeSales', {}).get('openingBankBalance', null) &&
         after.get('financeSales', {}).get('currency', null) == before.get('financeSales', {}).get('currency', null) &&
         after.get('initialCash', null) == before.get('initialCash', null) &&
+        after.get('financeSales', {}).get('voucherLimit', null) == before.get('financeSales', {}).get('voucherLimit', null) &&
         after.get('basic', {}).get('timeZone', null) == before.get('basic', {}).get('timeZone', null) &&
         after.get('attendance', {}).get('dayCutoffTime', null) == before.get('attendance', {}).get('dayCutoffTime', null);
     }
@@ -310,6 +311,15 @@ service cloud.firestore {
     function isCompanyUser() { return userData().role in companyRoles(); }
     // the signed-in user is senior to `uid` (no one there: nothing to outrank)
     function outranksUid(uid) { return uid == '' || outranksUser(uid); }
+    // a manager's or branch admin's own up to the branch's limit needs no one
+    // (owner, 1 Nov — lib/authz/permissions.js selfApproves; default 100)
+    function voucherLimitAt(c, b) {
+      let path = /databases/$(database)/documents/companies/$(c)/branches/$(b)/settings/settings;
+      return exists(path) ? get(path).data.get('financeSales', {}).get('voucherLimit', 100) : 100;
+    }
+    function withinOwnLimit(c, b, amount) {
+      return userData().role in ['manager', 'branchAdmin', 'branchadmin'] && amount <= voucherLimitAt(c, b);
+    }
     function outranksUser(uid) {
       let path = /databases/$(database)/documents/users/$(uid);
       return approvalRank(userData().role) > (exists(path) ? approvalRank(get(path).data.get('role', '')) : 0);
@@ -784,8 +794,9 @@ service cloud.firestore {
             request.resource.data.get('voucher', {}).get('status', 'pending') == 'pending' ||
             // a pay-out's bill approved with no paper: its voucher was decided with it (4.10)
             (request.resource.data.get('meta', {}).get('type', '') == 'payout' && canCostsApprove(companyId, branchId)) ||
-            // a company role's own: approved as it is saved, no one else needed
-            (isCompanyUser() && request.resource.data.voucher.get('auto', false) == true &&
+            // a company role's own — or a manager's up to the limit: approved as it is saved
+            ((isCompanyUser() || withinOwnLimit(companyId, branchId, request.resource.data.amount)) &&
+              request.resource.data.voucher.get('auto', false) == true &&
               request.resource.data.voucher.by.uid == request.auth.uid && request.resource.data.voucher.decidedBy.uid == request.auth.uid)
           );
           // A voucher (a cost with no invoice, 4.9) is decided by someone senior to
@@ -793,6 +804,11 @@ service cloud.firestore {
           allow update: if canCostsEnter(companyId, branchId) && (
             !voucherDecided() || (canCostsApprove(companyId, branchId) &&
               (isCompanyUser() || (voucherMaker() != request.auth.uid && outranksUid(voucherMaker()))))
+          ) && (
+            // one approved as saved under the limit doesn't grow past it later
+            request.resource.data.get('voucher', {}).get('auto', false) != true ||
+            request.resource.data.get('amount', 0) == resource.data.get('amount', 0) ||
+            isCompanyUser() || request.resource.data.get('amount', 0) <= voucherLimitAt(companyId, branchId)
           );
           allow delete: if canRecordsDelete(companyId, branchId);
         }
@@ -826,7 +842,12 @@ service cloud.firestore {
                 resource.data.by.uid != request.auth.uid &&
                 resource.data.get('payoutBy', {}).get('uid', '') != request.auth.uid &&
                 outranksUid(resource.data.by.uid) &&
-                outranksUid(resource.data.get('payoutBy', {}).get('uid', '')))) &&
+                outranksUid(resource.data.get('payoutBy', {}).get('uid', ''))) ||
+                // a manager's own bill up to the limit, handed out by them or someone junior
+                (request.resource.data.status == 'approved' && resource.data.by.uid == request.auth.uid &&
+                  withinOwnLimit(companyId, branchId, request.resource.data.billAmount) &&
+                  (resource.data.get('payoutBy', {}).get('uid', '') == request.auth.uid ||
+                    outranksUid(resource.data.get('payoutBy', {}).get('uid', ''))))) &&
               !changedKeys().hasAny(['kind', 'payoutId', 'floatAmount', 'by', 'payoutBy', 'date']))
           );
           // a pay-out made by mistake, before any bill: whoever made it; anything else: those who delete records

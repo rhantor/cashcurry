@@ -38,7 +38,14 @@ describe("pay-outs", () => {
     const ownOwner = { ...s, by: { uid: "o1", role: "owner" }, payoutBy: { uid: "o1", role: "owner" } };
     expect(canReviewBill({ uid: "o1", role: "owner" }, ownOwner, can)).toBe(true);
     expect(approvesOwnBill({ role: "gm" })).toBe(true);
-    expect(approvesOwnBill({ role: "branchAdmin" })).toBe(false);
+    // a manager's own up to the branch's limit (1 Nov), handed out by them or someone junior
+    const mine = { billAmount: 80, by: { uid: "m2" }, payoutBy: { uid: "m2", role: "manager" } };
+    expect(approvesOwnBill({ uid: "m2", role: "manager" }, mine)).toBe(true);
+    expect(approvesOwnBill({ uid: "m2", role: "manager" }, { ...mine, billAmount: 120 })).toBe(false);
+    expect(approvesOwnBill({ uid: "m2", role: "manager" }, { ...mine, billAmount: 120 }, 150)).toBe(true);
+    expect(approvesOwnBill({ uid: "m2", role: "manager" }, { ...mine, payoutBy: { uid: "c1", role: "cashier" } })).toBe(true);
+    expect(approvesOwnBill({ uid: "m2", role: "manager" }, { ...mine, payoutBy: { uid: "b1", role: "branchAdmin" } })).toBe(false);
+    expect(approvesOwnBill({ uid: "i1", role: "inCharge" }, { ...mine, by: { uid: "i1" }, payoutBy: { uid: "i1", role: "inCharge" } })).toBe(false);
   });
   it("approving makes the cost; a correction keeps the original", () => {
     const s = { id: "s1", ...newSettle(p, { date: "2026-10-11", billAmount: 82.5, fields: { categoryId: "gas", category: "Cooking gas", costGroupId: "food", costGroup: "Food & stock", costKind: "expense" } }, cashier) };

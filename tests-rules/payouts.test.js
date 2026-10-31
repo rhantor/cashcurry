@@ -118,10 +118,10 @@ describe("who checks whose money (owner, 31 Oct)", () => {
     await seed(`${B}/costs/vc`, voucher("klCashier"));
     expect(await ok(db("klInCharge").doc(`${B}/costs/vc`).update({ "voucher.status": "rejected", "voucher.note": "ask for a receipt" }))).toBe(true);
   });
-  it("a company role's own voucher is approved as it is saved; nobody else may save one approved", async () => {
+  it("a company role's own voucher is approved as it is saved; in-charge may not save one approved", async () => {
     const own = (uid) => ({ ...voucher(uid), voucher: { status: "approved", reason: "stall", by: { uid }, decidedBy: { uid }, auto: true } });
     expect(await ok(db("owner").doc(`${B}/costs/vo`).set(own("owner")))).toBe(true);
-    expect(await ok(db("klManager").doc(`${B}/costs/vx`).set(own("klManager")))).toBe(false);
+    expect(await ok(db("klInCharge").doc(`${B}/costs/vx`).set(own("klInCharge")))).toBe(false);
   });
   it("a bill: senior to whoever handed it out and brought it", async () => {
     await seed(`${P}/bm`, settle("klCashier", { payoutBy: { uid: "klManager" } }));
@@ -133,6 +133,46 @@ describe("who checks whose money (owner, 31 Oct)", () => {
   it("a company role's own bill needs no one: they approve it as they bring it", async () => {
     await seed(`${P}/bo`, settle("owner"));
     expect(await ok(db("owner").doc(`${P}/bo`).update({ status: "approved" }))).toBe(true);
+  });
+});
+
+describe("a manager's own up to the branch's limit (owner, 1 Nov)", () => {
+  const SET = `${B}/settings/settings`;
+  const own = (uid, amount) => ({ date: "2026-11-01", amount, category: "Food", paidFromOffice: "front", createdBy: { uid }, voucher: { status: "approved", reason: "stall", by: { uid }, decidedBy: { uid }, auto: true } });
+  const seed = (path, data) => env.withSecurityRulesDisabled((ctx) => ctx.firestore().doc(path).set(data));
+  it("up to RM 100 when the branch set nothing; not above, and not for in-charge", async () => {
+    expect(await ok(db("klManager").doc(`${B}/costs/m80`).set(own("klManager", 80)))).toBe(true);
+    expect(await ok(db("klManager").doc(`${B}/costs/m150`).set(own("klManager", 150)))).toBe(false);
+    expect(await ok(db("klInCharge").doc(`${B}/costs/i20`).set(own("klInCharge", 20)))).toBe(false);
+  });
+  it("the branch's own limit counts", async () => {
+    await seed(SET, { financeSales: { voucherLimit: 200 } });
+    expect(await ok(db("klManager").doc(`${B}/costs/m150`).set(own("klManager", 150)))).toBe(true);
+    await seed(SET, { financeSales: { voucherLimit: 50 } });
+    expect(await ok(db("klManager").doc(`${B}/costs/m60`).set(own("klManager", 60)))).toBe(false);
+  });
+  it("one approved as saved can't grow past the limit afterwards", async () => {
+    await seed(`${B}/costs/grow`, own("klManager", 80));
+    expect(await ok(db("klManager").doc(`${B}/costs/grow`).update({ amount: 500 }))).toBe(false);
+    expect(await ok(db("klManager").doc(`${B}/costs/grow`).update({ amount: 90 }))).toBe(true);
+  });
+  it("the limit is a money setting: not the manager's to change", async () => {
+    await seed(SET, { financeSales: { voucherLimit: 100 }, other: { notes: "" } });
+    expect(await ok(db("klManager").doc(SET).set({ financeSales: { voucherLimit: 5000 }, other: { notes: "" } }))).toBe(false);
+    expect(await ok(db("klManager").doc(SET).update({ "other.notes": "hello" }))).toBe(true);
+    expect(await ok(db("owner").doc(SET).update({ "financeSales.voucherLimit": 150 }))).toBe(true);
+  });
+  it("a manager's own bill up to the limit, handed out by them or someone junior", async () => {
+    await seed(`${P}/mb`, settle("klManager"));
+    expect(await ok(db("klManager").doc(`${P}/mb`).update({ status: "approved" }))).toBe(true);
+    await seed(`${P}/mbBig`, settle("klManager", { billAmount: 150 }));
+    expect(await ok(db("klManager").doc(`${P}/mbBig`).update({ status: "approved" }))).toBe(false);
+    await seed(`${P}/mbJr`, settle("klManager", { payoutBy: { uid: "klInCharge" } }));
+    expect(await ok(db("klManager").doc(`${P}/mbJr`).update({ status: "approved" }))).toBe(true);
+    await seed(`${P}/mbUp`, settle("klManager", { payoutBy: { uid: "owner" } }));
+    expect(await ok(db("klManager").doc(`${P}/mbUp`).update({ status: "approved" }))).toBe(false);
+    await seed(`${P}/mbBack`, settle("klManager"));
+    expect(await ok(db("klManager").doc(`${P}/mbBack`).update({ status: "rejected" }))).toBe(false);
   });
 });
 
