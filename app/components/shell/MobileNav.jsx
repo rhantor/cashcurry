@@ -2,7 +2,7 @@
 import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronDown, ChevronRight, LayoutGrid, LogOut, Search, X } from "lucide-react";
+import { ChevronDown, ChevronRight, LayoutGrid, LogOut, PenLine, Search, X } from "lucide-react";
 import { Avatar, Sheet, cn, menuIcon } from "@/app/components/ui";
 import { spring } from "@/app/components/ui/motion";
 import BranchSwitcher from "./BranchSwitcher";
@@ -16,7 +16,7 @@ const roleName = (r) => ({ owner: "Owner", gm: "General manager", superAdmin: "S
  * a sheet with everything else: search, branch, then the menu as tidy
  * section cards whose groups (Purchases, Reports…) open on tap.
  */
-export default function MobileNav({ items, sections, activePath, badges = {}, user, isCompany, branches, activeBranchId, onSwitchBranch, onSignOut }) {
+export default function MobileNav({ items, sections, activePath, badges = {}, user, isCompany, branches, activeBranchId, onSwitchBranch, onSignature, onSignOut }) {
   const [more, setMore] = useState(false);
   const inBar = new Set(items.map((i) => i.path));
   const inMore = !inBar.has(activePath);
@@ -53,6 +53,7 @@ export default function MobileNav({ items, sections, activePath, badges = {}, us
             onSwitchBranch(b);
           }}
           onNavigate={close}
+          onSignature={onSignature}
           onSignOut={onSignOut}
         />
       </Sheet>
@@ -60,7 +61,7 @@ export default function MobileNav({ items, sections, activePath, badges = {}, us
   );
 }
 
-function MoreMenu({ sections, hidden, activePath, badges, user, isCompany, branches, activeBranchId, onSwitchBranch, onNavigate, onSignOut }) {
+function MoreMenu({ sections, hidden, activePath, badges, user, isCompany, branches, activeBranchId, onSwitchBranch, onNavigate, onSignature, onSignOut }) {
   const [q, setQ] = useState("");
   const searchBox = useRef(null);
   // While searching, bring the box to the top of the sheet so the results
@@ -147,6 +148,16 @@ function MoreMenu({ sections, hidden, activePath, badges, user, isCompany, branc
         ))
       )}
 
+      <button
+        type="button"
+        onClick={() => {
+          onNavigate?.();
+          onSignature?.();
+        }}
+        className="flex w-full items-center justify-center gap-2 rounded-xl border border-line bg-surface py-3 text-sm font-semibold text-fg transition active:scale-[0.98]"
+      >
+        <PenLine className="size-4" /> My signature
+      </button>
       <button
         type="button"
         onClick={onSignOut}
