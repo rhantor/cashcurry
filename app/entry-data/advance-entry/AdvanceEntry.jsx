@@ -21,6 +21,11 @@ import { EntryLayout, EntrySection, SummaryLine } from '@/app/components/entry/E
 import { can } from '@/lib/authz/permissions'
 import { newRequestFields } from '@/lib/requests/model'
 import { loanSplit } from '@/lib/payroll/loanSplit'
+import SignPad from '@/app/components/common/SignPad'
+import { skipToken } from '@reduxjs/toolkit/query'
+import { useGetSingleBranchQuery } from '@/lib/redux/api/branchApiSlice'
+import { receivedStamp } from '@/lib/requests/voucher'
+import { attachRequestVoucher, completeVoucher } from '@/lib/requests/voucherClient'
 
 const ADVANCE_TYPES = [
   { value: 'salary', label: 'Salary advance' },
@@ -39,6 +44,30 @@ const monthsFrom = (d, n = 4) => Array.from({ length: n }, (_, i) => format(addM
 const day = d => (d ? format(parseISO(d), 'EEE, d MMM') : '')
 
 /** The page's top: money approved but not handed over yet, who can do what, and the two tabs. */
+/**
+ * Given on the spot (1 Nov): the voucher takes its number and who signed for
+ * it, then its picture goes onto the record. Runs after the save; a failure
+ * here doesn't undo the money.
+ */
+function signGiven ({ companyId, branchId, type, id, name, sig, branch, currency }) {
+  const uid = getSessionUser()?.uid
+  completeVoucher({ companyId, branchId, type, id, received: sig ? receivedStamp(name, sig) : null })
+    .then(record => attachRequestVoucher({ companyId, branchId, type, record, branch, currency, money: v => formatMoney(v, currency), uid }))
+    .catch(e => toast.warning("The voucher wasn't completed", { description: e.message }))
+}
+
+/** "Received by": the staff member signs for the money given now (cash: required). */
+function ReceivedBy ({ name, office, sig, setSig, error }) {
+  return (
+    <div className='mt-4 rounded-2xl border border-line p-4'>
+      <p className='mb-2 text-sm font-semibold text-fg'>Received by {name || 'them'}</p>
+      <p className='mb-3 text-xs text-muted'>{office === 'back' ? 'Optional for a bank transfer.' : 'Hand them the phone to sign for the cash.'}</p>
+      <SignPad value={sig} onChange={setSig} />
+      {error && <p className='mt-2 text-xs font-medium text-danger'>{error}</p>}
+    </div>
+  )
+}
+
 function Head ({ companyId, branchId, user, manager, tab, setTab }) {
   return (
     <div className='space-y-4'>
@@ -85,9 +114,11 @@ function AdvanceForm ({ head, staff, staffLoading, companyId, branchId, manager,
   const [reason, setReason] = useState('')
   const [office, setOffice] = useState('front')
   const [notes, setNotes] = useState('')
+  const [sig, setSig] = useState(null) // "Received by", when given now
   const [errors, setErrors] = useState({})
   const [saved, setSaved] = useState(false)
   const [addAdvanceEntry, { isLoading }] = useAddAdvanceEntryMutation()
+  const { data: branch } = useGetSingleBranchQuery(companyId && branchId ? { companyId, branchId } : skipToken)
 
   const when = date || today
   const deductionMonth = month || ym(when)
@@ -98,6 +129,7 @@ function AdvanceForm ({ head, staff, staffLoading, companyId, branchId, manager,
     const problems = {}
     if (!staffId) problems.staff = 'Who is it for?'
     if (!(Number(amount) > 0)) problems.amount = 'Enter the amount'
+    if (manager && !self && office === 'front' && !sig) problems.sig = `${staffName(person) || 'They'} sign for the cash first`
     setErrors(problems)
     if (Object.keys(problems).length) return toast.error('Check the highlighted fields')
 
@@ -107,7 +139,7 @@ function AdvanceForm ({ head, staff, staffLoading, companyId, branchId, manager,
     const flow = newRequestFields({ type: 'advance', staffId, amount: Number(amount) || 0 }, createdBy)
     const given = flow.status === 'approved'
     try {
-      await addAdvanceEntry({
+      const res = await addAdvanceEntry({
         companyId,
         branchId,
         data: {
@@ -129,6 +161,7 @@ function AdvanceForm ({ head, staff, staffLoading, companyId, branchId, manager,
           createdBy
         }
       }).unwrap()
+      if (given) signGiven({ companyId, branchId, type: 'advance', id: res.id, name: staffName(person), sig, branch, currency })
       toast.success(given ? 'Advance given' : 'Request sent', {
         description: `${staffName(person)} · ${money(amount)}${given ? ` · from the ${office === 'back' ? 'bank' : 'till'}` : ' · waiting for approval'}`
       })
@@ -141,6 +174,7 @@ function AdvanceForm ({ head, staff, staffLoading, companyId, branchId, manager,
       setNotes('')
       setMonth(null)
       setOffice('front')
+      setSig(null)
     } catch (err) {
       console.error(err)
       toast.error("Couldn't save the advance", { description: err?.message || 'Check your connection and try again.' })
@@ -241,6 +275,7 @@ function AdvanceForm ({ head, staff, staffLoading, companyId, branchId, manager,
 
       <EntrySection title='Paid from'>
         <PaidFromChoice value={office} onChange={setOffice} tillNote='Cash in hand goes down' bankNote='The bank goes down' />
+        {manager && !self && <ReceivedBy name={staffName(person)} office={office} sig={sig} setSig={setSig} error={errors.sig} />}
         {manager && (
           <Field label='Internal note (optional)' className='mt-4'>
             {({ id }) => <Textarea id={id} rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder='Only managers see this' />}
@@ -265,9 +300,11 @@ function LoanForm ({ head, staff, staffLoading, companyId, branchId, manager, mo
   const [notes, setNotes] = useState('')
   const [migration, setMigration] = useState(false)
   const [alreadyPaidMonths, setAlreadyPaidMonths] = useState(0)
+  const [sig, setSig] = useState(null) // "Received by", when given now
   const [errors, setErrors] = useState({})
   const [saved, setSaved] = useState(false)
   const [addStaffLoan, { isLoading }] = useAddStaffLoanMutation()
+  const { data: branch } = useGetSingleBranchQuery(companyId && branchId ? { companyId, branchId } : skipToken)
 
   const when = date || today
   const firstMonth = startMonth || ym(when)
@@ -296,6 +333,7 @@ function LoanForm ({ head, staff, staffLoading, companyId, branchId, manager, mo
     if (!staffId) problems.staff = 'Who is it for?'
     if (!(total > 0)) problems.amount = 'Enter the amount'
     if (!reason.trim()) problems.reason = 'Say what the loan is for'
+    if (manager && !self && !migration && office === 'front' && !sig) problems.sig = `${staffName(person) || 'They'} sign for the cash first`
     if (!duration) problems.months = `Enter 1 to ${MAX_LOAN_MONTHS} months`
     setErrors(problems)
     if (Object.keys(problems).length) return toast.error('Check the highlighted fields')
@@ -305,7 +343,7 @@ function LoanForm ({ head, staff, staffLoading, companyId, branchId, manager, mo
     const flow = newRequestFields({ type: 'staffLoan', staffId, amount: total }, createdBy)
     const given = flow.status === 'approved'
     try {
-      await addStaffLoan({
+      const res = await addStaffLoan({
         companyId,
         branchId,
         data: {
@@ -327,6 +365,7 @@ function LoanForm ({ head, staff, staffLoading, companyId, branchId, manager, mo
           createdBy
         }
       }).unwrap()
+      if (given && !migration) signGiven({ companyId, branchId, type: 'staffLoan', id: res.id, name: staffName(person), sig, branch, currency })
       toast.success(migration ? 'Earlier loan recorded' : given ? 'Loan given' : 'Request sent', {
         description: `${staffName(person)} · ${money(total)} over ${duration} months${migration ? ' · no cash moved' : ''}`
       })
@@ -342,6 +381,7 @@ function LoanForm ({ head, staff, staffLoading, companyId, branchId, manager, mo
       setMigration(false)
       setAlreadyPaidMonths(0)
       setOffice('front')
+      setSig(null)
     } catch (err) {
       console.error(err)
       toast.error("Couldn't save the loan", { description: err?.message || 'Check your connection and try again.' })
@@ -553,6 +593,7 @@ function LoanForm ({ head, staff, staffLoading, companyId, branchId, manager, mo
           tillNote={migration ? 'Cash, back then' : 'Cash in hand goes down'}
           bankNote={migration ? 'Bank, back then' : 'The bank goes down'}
         />
+        {manager && !self && !migration && <ReceivedBy name={staffName(person)} office={office} sig={sig} setSig={setSig} error={errors.sig} />}
         {manager && (
           <Field label='Internal note (optional)' className='mt-4'>
             {({ id }) => <Textarea id={id} rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder='Only managers see this' />}

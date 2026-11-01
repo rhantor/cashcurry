@@ -4,7 +4,10 @@
 // branch at once (or one branch), so they needn't switch branch to act; one
 // approval is enough, from anyone who may approve. Approving money doesn't pay
 // it out: it then waits in PayOutQueue until someone hands it over.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { skipToken } from "@reduxjs/toolkit/query";
+import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
+import { signaturesOf } from "@/lib/signatures/client";
 import { useGetRequestsQuery } from "@/lib/redux/api/requestsApiSlice";
 import { REQUEST_TYPES, actionsFor } from "@/lib/requests/model";
 import { isCompanyRole } from "@/lib/authz/permissions";
@@ -36,6 +39,20 @@ export default function RequestInbox({ companyId, branchId, user, branches = [],
   const counts = useMemo(() => data.reduce((m, r) => ((m[r.type] = (m[r.type] || 0) + 1), m), {}), [data]);
   // who else is off then (leave) and what they already owe (money), at this branch
   const hintsFor = useRequestHints({ companyId, branchId, requests: data, currency });
+
+  // advances and staff loans show as their paper voucher (1 Nov): the branch, and who asked's signature
+  const { data: here } = useGetSingleBranchQuery(companyId && branchId ? { companyId, branchId } : skipToken);
+  const branchOf = (id) => (id === branchId && here) || branches.find((b) => b.id === id) || { name: nameOf[id] || "" };
+  const askers = useMemo(() => [...new Set(data.map((r) => r.createdBy?.uid).filter(Boolean))].sort().join(","), [data]);
+  const [sigs, setSigs] = useState({});
+  useEffect(() => {
+    if (!companyId || !askers) return;
+    let live = true;
+    signaturesOf(companyId, askers.split(",")).then((s) => live && setSigs(s)).catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [companyId, askers]);
 
   return (
     <div className="space-y-3">
@@ -69,7 +86,7 @@ export default function RequestInbox({ companyId, branchId, user, branches = [],
       </div>
       <RequestList loading={isLoading} error={isError && "Couldn't load the requests."} count={shown.length} empty="No advances, staff loans or leave waiting for a decision.">
         {shown.map(({ r, actions }) => (
-          <RequestItem key={`${r.branchId}-${r.type}-${r.id}`} req={r} actions={actions} onAction={run} busy={busyId === r.id} currency={currency} branchName={branchIds ? nameOf[r.branchId] : null} free={r.branchId === branchId ? free : null} hints={actions.includes("approve") ? hintsFor(r) : undefined} />
+          <RequestItem key={`${r.branchId}-${r.type}-${r.id}`} req={r} actions={actions} onAction={run} busy={busyId === r.id} currency={currency} branchName={branchIds ? nameOf[r.branchId] : null} free={r.branchId === branchId ? free : null} hints={actions.includes("approve") ? hintsFor(r) : undefined} paper={{ branch: branchOf(r.branchId), sigs }} />
         ))}
       </RequestList>
     </div>

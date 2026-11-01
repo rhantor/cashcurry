@@ -2,6 +2,8 @@
 // Approved advances and staff loans that have not been handed over yet.
 // "Mark paid" records when and from where the money left (paidOut); only then
 // does it count in cash in hand / the bank (lib/finance/rules.js paidOutOf).
+// The staff member signs for it there ("Received by" — required for cash),
+// the voucher takes its number, and its picture goes onto the record (1 Nov).
 import React, { useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { useGetAdvanceEntriesQuery, usePayOutAdvanceMutation } from "@/lib/redux/api/AdvanceApiSlice";
@@ -12,8 +14,13 @@ import { formatMoney } from "@/lib/region";
 import { isLeaveRequest } from "@/lib/finance/rules";
 import { AnimatePresence, motion } from "framer-motion";
 import { Clock3 } from "lucide-react";
-import { Avatar, Badge, Button, Card, DatePicker, Field } from "@/app/components/ui";
+import { Avatar, Badge, Button, Card, DatePicker, Field, toast } from "@/app/components/ui";
 import { Chip } from "@/app/components/entry/Choices";
+import SignPad from "@/app/components/common/SignPad";
+import { skipToken } from "@reduxjs/toolkit/query";
+import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
+import { receivedStamp } from "@/lib/requests/voucher";
+import { attachRequestVoucher } from "@/lib/requests/voucherClient";
 
 // Roles allowed to hand over money — the same list the database rules
 // enforce (firestore.rules: isPayer).
@@ -37,7 +44,8 @@ export default function PayOutQueue({ companyId, branchId, user, title = "Waitin
 
   const canPay = PAYER_ROLES.includes(user?.role);
   const [openId, setOpenId] = useState(null);
-  const [draft, setDraft] = useState({ date: "", from: "front" });
+  const [draft, setDraft] = useState({ date: "", from: "front", sig: null });
+  const { data: branch } = useGetSingleBranchQuery(companyId && branchId ? { companyId, branchId } : skipToken);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -55,17 +63,23 @@ export default function PayOutQueue({ companyId, branchId, user, title = "Waitin
   const open = (item) => {
     setError("");
     setOpenId(`${item.kind}-${item.id}`);
-    setDraft({ date: today, from: item.paidFromOffice === "back" ? "back" : "front" });
+    setDraft({ date: today, from: item.paidFromOffice === "back" ? "back" : "front", sig: null });
   };
 
   const confirm = async (item) => {
     if (!draft.date) return setError("Pick the date the money was handed over.");
+    if (draft.from === "front" && !draft.sig) return setError(`${item.staffName || "They"} sign${item.staffName ? "s" : ""} for the cash first.`);
     setBusy(true);
     setError("");
     try {
       const pay = item.kind === "advance" ? payAdvance : payLoan;
-      await pay({ companyId, branchId, id: item.id, date: draft.date, from: draft.from, user }).unwrap();
+      const received = draft.sig || draft.from === "back" ? receivedStamp(item.staffName, draft.sig) : null;
+      const { record } = await pay({ companyId, branchId, id: item.id, date: draft.date, from: draft.from, user, received }).unwrap();
       setOpenId(null);
+      // the signed voucher's picture, onto the record (the payment is already saved)
+      attachRequestVoucher({ companyId, branchId, type: item.kind, record, branch, currency, money: (v) => formatMoney(v, currency), uid: user?.uid }).catch((e) =>
+        toast.warning("The voucher's picture wasn't made", { description: e.message })
+      );
     } catch (e) {
       setError(e?.message || "Could not mark it paid. Please try again.");
     } finally {
@@ -137,6 +151,12 @@ export default function PayOutQueue({ companyId, branchId, user, title = "Waitin
                             </Chip>
                           </div>
                         </div>
+                      </div>
+                      <div className="rounded-xl bg-surface p-3">
+                        <p className="mb-2 text-xs font-semibold text-muted">
+                          Received by {item.staffName || "them"} {draft.from === "back" ? "(optional for a transfer)" : "— hand them the phone to sign"}
+                        </p>
+                        <SignPad value={draft.sig} onChange={(sig) => setDraft((x) => ({ ...x, sig }))} />
                       </div>
                       {error && <p className="text-xs font-medium text-danger">{error}</p>}
                       <div className="flex justify-end gap-2">
