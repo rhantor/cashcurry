@@ -143,10 +143,11 @@ Rules that go with it:
    **senior to everyone who made it** (31 Oct): in-charge's by a manager or
    above, a manager's by branch admin or a company role, branch admin's by a
    company role. GM, super admin and owner need no one — theirs are approved as
-   they save them. A manager's or branch admin's own up to the branch's
-   **no-invoice limit** (default RM 100, Branch Settings → Finance; a money
-   setting, so only owner, super admin and branch admin change it) is approved
-   as saved too (1 Nov). The push goes only to those senior enough
+   they save them. A manager's or branch admin's own is approved as saved too
+   within the branch's **no-invoice limits** (1 Nov): up to RM 100 each and
+   RM 300 a day for all of theirs together, so a big buy can't be split (Branch
+   Settings → Finance; money settings, so only owner, super admin and branch
+   admin change them). The day's total is kept in `selfApproved/{date}_{uid}`. The push goes only to those senior enough
    (`lib/authz/permissions.js` `outranks`, `firestore.rules` `approvalRank`).
 2. Company roles act in the branch they have picked; branch roles only in their own branch.
 3. Changes to money settings, deletes and approvals go to the audit log.

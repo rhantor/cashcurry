@@ -42,7 +42,8 @@ describe("pay-outs", () => {
     const mine = { billAmount: 80, by: { uid: "m2" }, payoutBy: { uid: "m2", role: "manager" } };
     expect(approvesOwnBill({ uid: "m2", role: "manager" }, mine)).toBe(true);
     expect(approvesOwnBill({ uid: "m2", role: "manager" }, { ...mine, billAmount: 120 })).toBe(false);
-    expect(approvesOwnBill({ uid: "m2", role: "manager" }, { ...mine, billAmount: 120 }, 150)).toBe(true);
+    expect(approvesOwnBill({ uid: "m2", role: "manager" }, { ...mine, billAmount: 120 }, { entry: 150, day: 300 })).toBe(true);
+    expect(approvesOwnBill({ uid: "m2", role: "manager" }, mine, { entry: 100, day: 300 }, 250)).toBe(false); // the day's limit
     expect(approvesOwnBill({ uid: "m2", role: "manager" }, { ...mine, payoutBy: { uid: "c1", role: "cashier" } })).toBe(true);
     expect(approvesOwnBill({ uid: "m2", role: "manager" }, { ...mine, payoutBy: { uid: "b1", role: "branchAdmin" } })).toBe(false);
     expect(approvesOwnBill({ uid: "i1", role: "inCharge" }, { ...mine, by: { uid: "i1" }, payoutBy: { uid: "i1", role: "inCharge" } })).toBe(false);

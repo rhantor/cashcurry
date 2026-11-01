@@ -21,7 +21,7 @@ import { useDefaultDate } from "@/app/hooks/useRegion";
 import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/lib/region/currency";
 import { categoryFields, findCategory, pickable } from "@/lib/costs/categories";
-import { useCostCategories } from "@/lib/costs/client";
+import { useCostCategories, useSelfUsed } from "@/lib/costs/client";
 import { NO_INVOICE_REASONS } from "@/lib/costs/vouchers";
 import { approvesOwnBill, changeOf, deliveryOf, goodsOf } from "@/lib/payouts/model";
 import {
@@ -36,7 +36,7 @@ import {
 import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
 import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
 import { skipToken } from "@reduxjs/toolkit/query";
-import { voucherLimit } from "@/lib/authz/permissions";
+import { isCompanyRole, voucherLimits } from "@/lib/authz/permissions";
 import { FileThumb } from "@/app/components/common/Files";
 import ScanToPdf from "@/app/components/common/ScanToPdf";
 import SupplierPicker from "./SupplierPicker";
@@ -426,8 +426,9 @@ export function BillSheet({
   const money = (v) => formatMoney(v, currency);
   const { groups } = useCostCategories(companyId);
   const { data: branchSettings } = useGetBranchSettingsQuery(open && companyId && branchId ? { companyId, branchId } : skipToken);
-  const limit = voucherLimit(branchSettings);
+  const limits = voucherLimits(branchSettings);
   const [date, setDate] = useDefaultDate();
+  const used = useSelfUsed(companyId, branchId, open ? user?.uid : null, date); // a manager's own approved as brought, that day
   const [amount, setAmount] = useState("");
   const [files, setFiles] = useState([]);
   const [kept, setKept] = useState([]);
@@ -631,15 +632,19 @@ export function BillSheet({
             }
           : null,
       };
+      // a company role's bill, or a manager's within the branch's limits, needs
+      // no one: approved as it is brought back (owner, 31 Oct and 1 Nov)
+      const expectSelf = approvesOwnBill(user, { billAmount: bill, payoutBy: retry ? retry.payoutBy : payout?.by }, limits, used);
       let settleId = retry?.id;
       if (retry) await resubmitBill(companyId, branchId, user, retry, data);
-      else settleId = await bringBill(companyId, branchId, user, payout, data);
-      // a company role's bill, or a manager's up to the branch's limit, needs no
-      // one: approved as it is brought back (owner, 31 Oct and 1 Nov)
-      const fresh = await getBill(companyId, branchId, settleId);
-      const selfOk = approvesOwnBill(user, fresh, limit);
-      if (selfOk && fresh?.supplier) await approveSupplierNow(companyId, branchId, user, fresh);
-      else if (selfOk && fresh) await approveBillNow(companyId, branchId, user, fresh);
+      else settleId = await bringBill(companyId, branchId, user, payout, data, expectSelf);
+      let selfOk = false;
+      if (expectSelf) {
+        const fresh = await getBill(companyId, branchId, settleId);
+        const self = isCompanyRole(user?.role) ? null : { limits }; // a manager's counts toward the day's limit
+        if (fresh?.supplier) selfOk = !!(await approveSupplierNow(companyId, branchId, user, fresh, self));
+        else if (fresh) selfOk = !!(await approveBillNow(companyId, branchId, user, fresh, {}, self));
+      }
       toast.success(selfOk ? "Bill saved and approved" : "Bill saved", {
         description:
           change > 0
