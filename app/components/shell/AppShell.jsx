@@ -15,6 +15,7 @@ import CommandPalette, { rememberPage } from "./CommandPalette";
 import usePendingRequests from "./usePendingRequests";
 import { useChats } from "@/app/components/chat/useChat";
 import { useIssuesWaiting } from "@/app/components/issues/useIssues";
+import MySignatureSheet from "@/app/components/account/MySignatureSheet";
 
 const COLLAPSE_KEY = "cc-nav-collapsed";
 
@@ -94,6 +95,7 @@ export default function AppShell({ onSignOut, children }) {
 
   // ── Ctrl+K ──
   const [searching, setSearching] = useState(false);
+  const [signing, setSigning] = useState(false); // My signature (vouchers, 1 Nov)
   useEffect(() => {
     const onKey = (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
@@ -132,6 +134,7 @@ export default function AppShell({ onSignOut, children }) {
           branchName={myBranch?.name}
           onSwitchBranch={switchBranch}
           onSearch={() => setSearching(true)}
+          onSignature={() => setSigning(true)}
           onSignOut={onSignOut}
           chatUnread={chat.unread}
         />
@@ -153,8 +156,11 @@ export default function AppShell({ onSignOut, children }) {
         branches={branches}
         activeBranchId={branchId}
         onSwitchBranch={switchBranch}
+        onSignature={() => setSigning(true)}
         onSignOut={onSignOut}
       />
+
+      <MySignatureSheet open={signing} onClose={() => setSigning(false)} user={user ? { ...user, companyId } : null} />
 
       <CommandPalette
         open={searching}

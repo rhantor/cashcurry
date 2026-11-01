@@ -334,6 +334,20 @@ service cloud.firestore {
       let after = getAfter(path).data.get('total', 0);
       return near(after, before + amount) && after <= voucherDayLimitAt(c, b) + 0.005;
     }
+    // A new cost's voucher takes the branch's next running number (DKL-V-0007,
+    // 1 Nov): counters/vouchers.last moves on by one in the same write and
+    // names it. A pay-out's bill made into a cost carries none.
+    function voucherCounterPath(c, b) {
+      return /databases/$(database)/documents/companies/$(c)/branches/$(b)/counters/vouchers;
+    }
+    function numbersVoucher(c, b) {
+      let v = request.resource.data.get('voucher', null);
+      let path = voucherCounterPath(c, b);
+      return v == null || request.resource.data.get('meta', {}).get('type', '') == 'payout' || (
+        v.get('no', 0) == (exists(path) ? get(path).data.get('last', 0) : 0) + 1 &&
+        getAfter(path).data.get('last', 0) == v.get('no', 0));
+    }
+
     // the cost or bill that this write adds to my day's total: approved as saved by me, that day, that amount
     function selfCounted(c, b, d, prev) {
       return d.total > prev && (
@@ -822,8 +836,8 @@ service cloud.firestore {
         // ── Costs / Expenses ────────────────────────────────────────────────
         match /costs/{docId} {
           allow read: if canCostsEnter(companyId, branchId);
-          // a new cost's voucher can only start out waiting
-          allow create: if canCostsEnter(companyId, branchId) && (
+          // a new cost's voucher can only start out waiting, and takes the next number
+          allow create: if canCostsEnter(companyId, branchId) && numbersVoucher(companyId, branchId) && (
             request.resource.data.get('voucher', {}).get('status', 'pending') == 'pending' ||
             // a pay-out's bill approved with no paper: its voucher was decided with it (4.10)
             (request.resource.data.get('meta', {}).get('type', '') == 'payout' && canCostsApprove(companyId, branchId)) ||
@@ -838,12 +852,26 @@ service cloud.firestore {
             !voucherDecided() || (canCostsApprove(companyId, branchId) &&
               (isCompanyUser() || (voucherMaker() != request.auth.uid && outranksUid(voucherMaker()))))
           ) && (
+            // a voucher keeps its number
+            request.resource.data.get('voucher', {}).get('no', null) == resource.data.get('voucher', {}).get('no', null)
+          ) && (
             // one approved as saved under the limits doesn't grow later, nor move to another day
             request.resource.data.get('voucher', {}).get('auto', false) != true || isCompanyUser() ||
             (request.resource.data.get('amount', 0) <= resource.data.get('amount', 0) &&
               request.resource.data.get('date', '') == resource.data.get('date', ''))
           );
           allow delete: if canRecordsDelete(companyId, branchId);
+        }
+
+        // ── Running numbers: counters/vouchers = { last, ref } (1 Nov) ─────────
+        // moves on by one, only with the cost whose voucher takes that number
+        match /counters/{name} {
+          allow read: if canCostsEnter(companyId, branchId);
+          allow create, update: if name == 'vouchers' && canCostsEnter(companyId, branchId) &&
+            request.resource.data.keys().hasOnly(['last', 'ref']) &&
+            request.resource.data.last == (resource == null ? 0 : resource.data.get('last', 0)) + 1 &&
+            getAfter(/databases/$(database)/documents/companies/$(companyId)/branches/$(branchId)/costs/$(request.resource.data.ref)).data.get('voucher', {}).get('no', 0) == request.resource.data.last;
+          allow delete: if false;
         }
 
         // ── A manager's own approved as saved, per day (owner, 1 Nov) ─────────
@@ -1230,10 +1258,11 @@ service cloud.firestore {
         // ── Document number counters (PO numbers, etc.) ───────────────────────
         // One document per series, holding one field per YYMM period. Anyone
         // allowed to raise the underlying document must be able to draw a
-        // number, so this mirrors the requisitions write rule.
+        // number, so this mirrors the requisitions write rule. Voucher numbers
+        // have their own, stricter rule above (counters/vouchers).
         match /counters/{seriesId} {
-          allow read, write: if canPurchasesOrder(companyId, branchId) ||
-            (seriesId == 'reservationDeposits' && canReservationReceipt(companyId, branchId));
+          allow read, write: if seriesId != 'vouchers' && (canPurchasesOrder(companyId, branchId) ||
+            (seriesId == 'reservationDeposits' && canReservationReceipt(companyId, branchId)));
         }
 
         // ── Reservation deposit receipts (Tools → Reservation Receipt) ─────────

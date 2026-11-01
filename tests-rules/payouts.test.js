@@ -3,6 +3,7 @@
 // bill back — never one they handed out or brought back; approved bills are
 // final here (they became costs).
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { saveNumbered } from "./voucherNo";
 import fs from "node:fs";
 import { initializeTestEnvironment } from "@firebase/rules-unit-testing";
 
@@ -120,7 +121,7 @@ describe("who checks whose money (owner, 31 Oct)", () => {
   });
   it("a company role's own voucher is approved as it is saved; in-charge may not save one approved", async () => {
     const own = (uid) => ({ ...voucher(uid), voucher: { status: "approved", reason: "stall", by: { uid }, decidedBy: { uid }, auto: true } });
-    expect(await ok(db("owner").doc(`${B}/costs/vo`).set(own("owner")))).toBe(true);
+    expect(await ok(saveNumbered(env, db("owner"), B, "vo", own("owner")))).toBe(true);
     expect(await ok(db("klInCharge").doc(`${B}/costs/vx`).set(own("klInCharge")))).toBe(false);
   });
   it("a bill: senior to whoever handed it out and brought it", async () => {
@@ -144,10 +145,9 @@ describe("a manager's own within the branch's limits (owner, 1 Nov)", () => {
   // the cost and the day's total, in one write (as lib/costs/client.js addCost does)
   const saveOwn = (uid, id, amount, { date = "2026-11-01", total, ref } = {}) => {
     const f = db(uid);
-    const b = f.batch();
-    b.set(f.doc(`${B}/costs/${id}`), own(uid, amount, date));
-    if (total !== null) b.set(f.doc(DAY(date, uid)), { uid, date, total: total ?? amount, ref: ref || { kind: "cost", id } });
-    return b.commit();
+    return saveNumbered(env, f, B, id, own(uid, amount, date), (b) => {
+      if (total !== null) b.set(f.doc(DAY(date, uid)), { uid, date, total: total ?? amount, ref: ref || { kind: "cost", id } });
+    });
   };
   it("up to RM 100 each when the branch set nothing; not above, and not for in-charge", async () => {
     expect(await ok(saveOwn("klManager", "m80", 80))).toBe(true);
@@ -217,6 +217,32 @@ describe("a manager's own within the branch's limits (owner, 1 Nov)", () => {
     await seed(`${P}/o1`, out("klCashier"));
     expect(await ok(db("klCashier").doc(`${P}/nb1`).set(settle("klCashier", { selfApprove: true })))).toBe(false);
     expect(await ok(db("klManager").doc(`${P}/nb2`).set(settle("klManager", { selfApprove: true })))).toBe(true);
+  });
+});
+
+describe("running voucher numbers (1 Nov)", () => {
+  const V = (uid) => ({ date: "2026-11-01", amount: 20, category: "Food", paidFromOffice: "front", createdBy: { uid }, voucher: { status: "pending", reason: "stall", by: { uid } } });
+  const CNT = `${B}/counters/vouchers`;
+  it("each new voucher takes the next number, with the counter in the same write", async () => {
+    expect(await ok(saveNumbered(env, db("klInCharge"), B, "n1", V("klInCharge")))).toBe(true);
+    expect(await ok(saveNumbered(env, db("klInCharge"), B, "n2", V("klInCharge")))).toBe(true);
+    expect(await ok(db("klInCharge").doc(`${B}/costs/n3`).set(V("klInCharge")))).toBe(false); // no number
+    const f = db("klInCharge");
+    const skip = f.batch();
+    skip.set(f.doc(`${B}/costs/n4`), { ...V("klInCharge"), voucher: { ...V("klInCharge").voucher, no: 9 } });
+    skip.set(f.doc(CNT), { last: 9, ref: "n4" });
+    expect(await ok(skip.commit())).toBe(false); // can't jump ahead
+  });
+  it("the counter only moves with its cost; it never goes back, and a voucher keeps its number", async () => {
+    await saveNumbered(env, db("klInCharge"), B, "k1", V("klInCharge"));
+    expect(await ok(db("klInCharge").doc(CNT).set({ last: 2, ref: "k1" }))).toBe(false);
+    expect(await ok(db("klInCharge").doc(CNT).set({ last: 0, ref: "k1" }))).toBe(false);
+    expect(await ok(db("klInCharge").doc(CNT).delete())).toBe(false);
+    expect(await ok(db("klInCharge").doc(`${B}/costs/k1`).update({ "voucher.no": 5 }))).toBe(false);
+    expect(await ok(db("klInCharge").doc(`${B}/costs/k1`).update({ description: "fine" }))).toBe(true);
+  });
+  it("a plain cost needs no number", async () => {
+    expect(await ok(db("klInCharge").doc(`${B}/costs/p1`).set({ date: "2026-11-01", amount: 5, category: "Office" }))).toBe(true);
   });
 });
 

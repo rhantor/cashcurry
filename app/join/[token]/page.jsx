@@ -4,10 +4,10 @@
 // they like), their documents (IC or passport, photo; bank card and health
 // certificate if they have them), then their appointment letter — read and
 // signed — and send. What they type stays on this phone until it is sent.
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { format, parseISO } from "date-fns";
-import { ArrowLeft, ArrowRight, Camera, Check, CircleAlert, FileText, Loader2, RotateCcw, Trash2 } from "lucide-react";
+import { ArrowLeft, ArrowRight, Camera, Check, CircleAlert, FileText, Loader2, Trash2 } from "lucide-react";
 import { Button, Field, Input, LogoMark, Select, cn } from "@/app/components/ui";
 import FileViewer from "@/app/components/common/FileViewer";
 import { COUNTRIES } from "@/app/staff-management/lib/countries";
@@ -16,6 +16,7 @@ import { RULES } from "@/app/staff-management/lib/validation";
 import { LINK_DAYS, MAX_HEALTH_FILES, detailProblems, docKinds, fileProblem, missingDocs } from "@/lib/hires/model";
 import { shrinkPhoto } from "@/lib/chat/client";
 import { letterForHire } from "@/app/tools/appointment-letter/letterForHire";
+import SignPad from "@/app/components/common/SignPad";
 
 const GENDERS = [
   { value: "male", label: "Male" },
@@ -441,78 +442,3 @@ function LetterStep({ letter, details, currency, agreed, setAgreed, signature, s
 }
 
 /** Sign with a finger: a PNG of the strokes. */
-function SignPad({ value, onChange }) {
-  const canvas = useRef(null);
-  const drawing = useRef(false);
-  const drawn = useRef(false);
-  const setup = useCallback(() => {
-    const c = canvas.current;
-    if (!c) return;
-    const ratio = window.devicePixelRatio || 1;
-    c.width = c.clientWidth * ratio;
-    c.height = c.clientHeight * ratio;
-    const ctx = c.getContext("2d");
-    ctx.scale(ratio, ratio);
-    ctx.lineWidth = 2.2;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
-    ctx.strokeStyle = "#1d3a8a";
-    drawn.current = false;
-  }, []);
-  // drawn again when coming back to this step; cleared when Clear is pressed
-  useEffect(() => {
-    setup();
-    if (value) {
-      const img = new Image();
-      img.onload = () => canvas.current?.getContext("2d").drawImage(img, 0, 0, canvas.current.clientWidth, canvas.current.clientHeight);
-      img.src = value;
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (!value) setup();
-  }, [value, setup]);
-  const point = (e) => {
-    const r = canvas.current.getBoundingClientRect();
-    return [e.clientX - r.left, e.clientY - r.top];
-  };
-  const down = (e) => {
-    e.preventDefault();
-    canvas.current.setPointerCapture?.(e.pointerId);
-    drawing.current = true;
-    const ctx = canvas.current.getContext("2d");
-    ctx.beginPath();
-    ctx.moveTo(...point(e));
-  };
-  const move = (e) => {
-    if (!drawing.current) return;
-    const ctx = canvas.current.getContext("2d");
-    ctx.lineTo(...point(e));
-    ctx.stroke();
-    drawn.current = true;
-  };
-  const up = () => {
-    if (!drawing.current) return;
-    drawing.current = false;
-    if (drawn.current) onChange(canvas.current.toDataURL("image/png"));
-  };
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between">
-        <p className="text-sm font-semibold text-fg">Sign here</p>
-        <button type="button" onClick={() => onChange(null)} className="inline-flex items-center gap-1 text-xs font-semibold text-brand hover:underline">
-          <RotateCcw className="size-3.5" /> Clear
-        </button>
-      </div>
-      <canvas
-        ref={canvas}
-        onPointerDown={down}
-        onPointerMove={move}
-        onPointerUp={up}
-        onPointerCancel={up}
-        className={cn("h-40 w-full touch-none rounded-2xl border-2 border-dashed bg-white", value ? "border-brand/50" : "border-line")}
-        aria-label="Signature pad: draw your signature with your finger"
-      />
-      {!value && <p className="text-xs text-muted">Draw your signature with your finger.</p>}
-    </div>
-  );
-}

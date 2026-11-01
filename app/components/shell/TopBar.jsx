@@ -1,7 +1,7 @@
 "use client";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Building2, LogOut, MessagesSquare, Search } from "lucide-react";
+import { Building2, LogOut, MessagesSquare, PenLine, Search } from "lucide-react";
 import { Avatar, LogoMark, Menu, cn } from "@/app/components/ui";
 import BranchSwitcher from "./BranchSwitcher";
 
@@ -11,7 +11,7 @@ import NotificationBell from "@/app/components/notifications/NotificationBell";
  * The bar above every page: where you are, search (Ctrl+K), the branch, and you.
  * On phones it keeps to the essentials; the rest lives in the bottom bar.
  */
-export default function TopBar({ page, user, isCompany, branches, activeBranchId, branchName, onSwitchBranch, onSearch, onSignOut, chatUnread = 0 }) {
+export default function TopBar({ page, user, isCompany, branches, activeBranchId, branchName, onSwitchBranch, onSearch, onSignature, onSignOut, chatUnread = 0 }) {
   const crumb = page?.parent || page?.section;
   // Phones have no room for the branch box, so the branch sits under the
   // title — except on company-wide pages, which show every branch.
@@ -108,6 +108,7 @@ export default function TopBar({ page, user, isCompany, branches, activeBranchId
             { label: personName(user) || "Account", hint: user?.role, disabled: true },
             "divider",
             { label: "Search", icon: Search, hint: "Ctrl K", onSelect: onSearch },
+            { label: "My signature", icon: PenLine, onSelect: onSignature },
             { label: "Sign out", icon: LogOut, danger: true, onSelect: onSignOut },
           ]}
         />

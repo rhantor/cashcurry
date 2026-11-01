@@ -3,6 +3,7 @@
 // The database rules are the real security boundary: screens and middleware
 // only hide buttons; anyone can talk to Firestore directly from a browser.
 import { describe, it, expect, beforeAll, afterAll, beforeEach } from "vitest";
+import { saveNumbered } from "./voucherNo";
 import fs from "node:fs";
 import { initializeTestEnvironment, assertSucceeds, assertFails } from "@firebase/rules-unit-testing";
 
@@ -409,7 +410,7 @@ describe("everyday work keeps working", () => {
 describe("costs: categories and vouchers (4.9)", () => {
   const V = (extra = {}) => ({ date: "2026-10-10", amount: 20, category: "Food & ingredients", createdBy: { uid: "klCashier" }, voucher: { status: "pending", reason: "Market stall", by: { uid: "klManager" } }, ...extra });
   it("a new cost's voucher starts out waiting — nobody saves one already approved", async () => {
-    await assertSucceeds(as("klManager").doc(`${B()}/costs/new1`).set(V()));
+    await assertSucceeds(saveNumbered(env, as("klManager"), B(), "new1", V()));
     await assertFails(as("klManager").doc(`${B()}/costs/new2`).set(V({ voucher: { status: "approved", by: { uid: "klManager" } } })));
     await assertSucceeds(as("klAccountant").doc(`${B()}/costs/plain`).set({ date: "2026-10-10", amount: 5, category: "Office supplies" }));
   });
