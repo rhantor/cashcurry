@@ -13,13 +13,17 @@ import { useGetCostEntriesQuery } from '@/lib/redux/api/costApiSlice'
 import useCurrency from '@/app/hooks/useCurrency'
 import { formatMoney } from '@/lib/region/currency'
 import { categoryFields, findCategory, missingFor } from '@/lib/costs/categories'
-import { addCost, useCostCategories, useSelfUsed } from '@/lib/costs/client'
+import { addCost, attachVoucherImage, useCostCategories, useSelfUsed } from '@/lib/costs/client'
 import { newVoucher } from '@/lib/costs/vouchers'
 import { useGetVendorsQuery } from '@/lib/redux/api/vendorsApiSlice'
 import SentBackVouchers from '@/app/components/costs/SentBackVouchers'
 import { useGetBranchSettingsQuery } from '@/lib/redux/api/branchSettingsApiSlice'
 import { skipToken } from '@reduxjs/toolkit/query'
-import { voucherLimits } from '@/lib/authz/permissions'
+import { isCompanyRole, voucherLimits } from '@/lib/authz/permissions'
+import { useGetSingleBranchQuery } from '@/lib/redux/api/branchApiSlice'
+import { makeVoucherImage } from '@/lib/costs/voucherImage'
+import { selfStamp } from '@/lib/costs/voucherPaper'
+import { personName } from '@/lib/people'
 
 const storedUserNow = () => getSessionUser() || {}
 
@@ -33,6 +37,7 @@ export default function CostEntryPage () {
   const [saved, setSaved] = useState(false)
   const { data: branchSettings } = useGetBranchSettingsQuery(form.companyId && form.branchId ? { companyId: form.companyId, branchId: form.branchId } : skipToken)
   const limits = voucherLimits(branchSettings) // a manager's own no-invoice costs within them need no approval
+  const { data: branch } = useGetSingleBranchQuery(form.companyId && form.branchId ? { companyId: form.companyId, branchId: form.branchId } : skipToken)
 
   const {
     companyId,
@@ -158,7 +163,16 @@ export default function CostEntryPage () {
         createdAt: serverTimestamp() // ✅ only one createdAt
       }
 
-      const { waiting } = await addCost(companyId, branchId, data, storedUserNow(), limits)
+      const me = storedUserNow()
+      const { id, waiting, voucher } = await addCost(companyId, branchId, data, me, limits)
+      // needed no one: its voucher picture, stamped, goes onto the cost now (1 Nov)
+      if (voucher && !waiting) {
+        const cost = { ...data, id, voucher }
+        const by = { uid: me.uid, name: personName(me) || me.username || me.email || '' }
+        makeVoucherImage({ companyId, branchId, branch, cost, currency, money, approval: { stamp: selfStamp(isCompanyRole(me.role)), by, at: new Date() } })
+          .then(url => attachVoucherImage(companyId, branchId, cost, url))
+          .catch(e => toast.warning("The voucher's picture wasn't made", { description: e.message }))
+      }
 
       resetForm()
       setSaved(true)

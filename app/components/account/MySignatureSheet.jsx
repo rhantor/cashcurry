@@ -78,7 +78,6 @@ export default function MySignatureSheet({ open, onClose, user }) {
         {saved === undefined ? null : !drawing ? (
           <div className="space-y-3">
             <div className="flex h-32 items-center justify-center rounded-2xl border border-line bg-white p-3">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={saved} alt="Your saved signature" className="max-h-full max-w-full object-contain" />
             </div>
             <div className="flex flex-wrap gap-2">
