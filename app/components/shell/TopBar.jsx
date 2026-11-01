@@ -1,7 +1,8 @@
 "use client";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Building2, LogOut, MessagesSquare, PenLine, Search } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { Building2, LogOut, MessagesSquare, PenLine, Search, UserRound } from "lucide-react";
 import { Avatar, LogoMark, Menu, cn } from "@/app/components/ui";
 import BranchSwitcher from "./BranchSwitcher";
 
@@ -12,6 +13,7 @@ import NotificationBell from "@/app/components/notifications/NotificationBell";
  * On phones it keeps to the essentials; the rest lives in the bottom bar.
  */
 export default function TopBar({ page, user, isCompany, branches, activeBranchId, branchName, onSwitchBranch, onSearch, onSignature, onSignOut, chatUnread = 0 }) {
+  const router = useRouter();
   const crumb = page?.parent || page?.section;
   // Phones have no room for the branch box, so the branch sits under the
   // title — except on company-wide pages, which show every branch.
@@ -101,12 +103,13 @@ export default function TopBar({ page, user, isCompany, branches, activeBranchId
           width={230}
           trigger={(p) => (
             <button {...p} type="button" aria-label="Account" className={cn("rounded-full transition hover:ring-4 hover:ring-brand-soft")}>
-              <Avatar name={personName(user)} size="md" />
+              <Avatar name={personName(user)} src={user?.photo || undefined} size="md" />
             </button>
           )}
           items={[
             { label: personName(user) || "Account", hint: user?.role, disabled: true },
             "divider",
+            { label: "My profile", icon: UserRound, onSelect: () => router.push("/account") },
             { label: "Search", icon: Search, hint: "Ctrl K", onSelect: onSearch },
             { label: "My signature", icon: PenLine, onSelect: onSignature },
             { label: "Sign out", icon: LogOut, danger: true, onSelect: onSignOut },
