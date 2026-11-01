@@ -18,7 +18,7 @@ import { canDecideVoucher, voucherWaitsFor } from "@/lib/costs/vouchers";
 import { approveVoucherWithImage, rejectVoucher, useRoleOf } from "@/lib/costs/client";
 import { voucherSheet } from "@/lib/costs/voucherPaper";
 import { makeVoucherImage } from "@/lib/costs/voucherImage";
-import { nameSignature, signaturesOf } from "@/lib/signatures/client";
+import { signaturesOf } from "@/lib/signatures/client";
 import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
 import { personName } from "@/lib/people";
 import VoucherPaper from "./VoucherPaper";
@@ -87,11 +87,10 @@ export default function VoucherInbox({ companyId, branchId, user }) {
     <ul className="space-y-4">
       {vouchers.map((c) => {
         const mine = !canDecideVoucher(user, c, roleOf);
-        const maker = c.voucher?.by || {};
         return (
           <li key={c.id} className="space-y-2">
             {c.costKind === "notCost" && <Badge tone="neutral">Not a cost</Badge>}
-            <VoucherPaper sheet={voucherSheet(c, { branch, currency, money })} preparedSig={sigs[maker.uid] || (maker.name ? nameSignature(maker.name) : null)} />
+            <VoucherPaper sheet={voucherSheet(c, { branch, currency, money })} sigs={sigs} />
             <div className="flex flex-wrap items-center gap-2">
               {mine ? (
                 <p className="text-xs text-subtle">{voucherWaitsFor(user, c, roleOf)}</p>
