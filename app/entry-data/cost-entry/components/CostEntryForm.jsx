@@ -62,9 +62,17 @@ function WhatFor ({ groups, vendors, form, errors }) {
   const list = pickable(groups)
   const picked = findCategory(groups, category)
   const [groupId, setGroupId] = useState(picked?.group.id || list[0]?.id || '')
+  // follow the category only when it changes (a reset, a scan) — not when
+  // another group is opened, or that group could never be opened
+  const pickedGroupId = picked?.group.id
   useEffect(() => {
-    if (picked && picked.group.id !== groupId) setGroupId(picked.group.id)
-  }, [picked, groupId])
+    if (pickedGroupId) setGroupId(pickedGroupId)
+  }, [pickedGroupId])
+  // another group: the category picked in the old one no longer applies
+  const openGroup = id => {
+    setGroupId(id)
+    if (picked && picked.group.id !== id) setCategory('')
+  }
   const group = list.find(g => g.id === groupId) || list[0]
   const needs = picked?.category.needs || []
 
@@ -75,7 +83,7 @@ function WhatFor ({ groups, vendors, form, errors }) {
           <button
             key={g.id}
             type='button'
-            onClick={() => setGroupId(g.id)}
+            onClick={() => openGroup(g.id)}
             className={cn(
               'shrink-0 rounded-xl px-3 py-2 text-sm font-semibold transition',
               g.id === group?.id ? (g.kind === 'notCost' ? 'bg-warning-soft text-warning' : 'bg-brand text-brand-fg') : 'bg-surface-2 text-muted hover:text-fg'
