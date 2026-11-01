@@ -126,6 +126,7 @@ export const sidebarItems = [
     ],
   },
   { label: "Support", section: "More", icon: "MdOutlineSupportAgent", path: "/support" },
+  { label: "My profile", section: "More", icon: "profile", path: "/account" },
 ];
 
 // ── helpers ──────────────────────────────────────────────────────────────────

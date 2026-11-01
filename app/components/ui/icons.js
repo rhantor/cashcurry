@@ -7,7 +7,7 @@
 import {
   ArrowDownToLine, Banknote, CalendarDays, CalendarRange, ChartColumn, Circle, ClipboardCheck, HandCoins, Headset, House, Inbox,
   LayoutDashboard, ListChecks, MessagesSquare, TriangleAlert, Newspaper, NotebookPen, Receipt, Repeat, ScrollText, Settings, ShoppingCart,
-  TrendingUp, Users, Wallet, Wrench,
+  TrendingUp, UserRound, Users, Wallet, Wrench,
 } from "lucide-react";
 
 export const MENU_ICONS = {
@@ -15,6 +15,7 @@ export const MENU_ICONS = {
   payouts: HandCoins, // pay-outs and their bills (4.10)
   tasks: ListChecks, // tasks, checklists, notes and performance (4.11)
   ops: ClipboardCheck, // today at the branch, on the phone (30 Oct)
+  profile: UserRound, // your own name, photo, password, signature, notifications (1 Nov)
   MdOutlineSpaceDashboard: LayoutDashboard, // dashboards
   MdShoppingCart: ShoppingCart, // purchases
   GrTransaction: NotebookPen, // entries
