@@ -27,6 +27,7 @@ import { approvesOwnBill, changeOf, deliveryOf, goodsOf } from "@/lib/payouts/mo
 import {
   approveBillNow,
   approveSupplierNow,
+  attachPayoutVoucher,
   bringBill,
   getBill,
   handOut,
@@ -37,6 +38,11 @@ import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
 import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { isCompanyRole, voucherLimits } from "@/lib/authz/permissions";
+import SignPad from "@/app/components/common/SignPad";
+import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
+import { selfStamp } from "@/lib/costs/voucherPaper";
+import { personName } from "@/lib/people";
+import { receivedStamp } from "@/lib/requests/voucher";
 import { FileThumb } from "@/app/components/common/Files";
 import ScanToPdf from "@/app/components/common/ScanToPdf";
 import SupplierPicker from "./SupplierPicker";
@@ -78,6 +84,7 @@ export function HandOutSheet({
   const [supplier, setSupplier] = useState(null);
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
+  const [sig, setSig] = useState(null); // whoever takes the money signs for it (1 Nov)
   const { data: staff = [] } = useGetStaffListQuery(
     { companyId, branchId },
     { skip: !open || !companyId || !branchId },
@@ -88,6 +95,7 @@ export function HandOutSheet({
     setStaffId("");
     setName("");
     setErrors({});
+    setSig(null);
     if (preset?.vendorId) {
       const pays = (preset.bills || []).map((b) => ({
         billId: b.id,
@@ -133,6 +141,7 @@ export function HandOutSheet({
     if (!(Number(amount) > 0)) e.amount = "How much?";
     if (!person && !name.trim()) e.to = "Who took it?";
     if (!purpose.trim()) e.purpose = "What is it for?";
+    if (!sig) e.sig = "They sign for the money first";
     if (kind === "supplier") {
       if (supplier?.mode === "po") {
         if (!supplier.vendorId) e.vendor = "Which supplier?";
@@ -171,6 +180,7 @@ export function HandOutSheet({
         to: person ? { name: fullName(person), staffId: person.id } : { name },
         purpose,
         ...forSupplier,
+        received: receivedStamp(person ? fullName(person) : name, sig),
       });
       toast.success("Handed out", {
         description: `${formatMoney(Number(amount), currency)} · the till goes down now`,
@@ -289,6 +299,11 @@ export function HandOutSheet({
             ))}
           </div>
         )}
+        <div className="rounded-2xl border border-line p-4">
+          <p className="mb-2 text-xs text-muted">Received by — hand them the phone to sign for the money.</p>
+          <SignPad value={sig} onChange={setSig} />
+          {errors.sig && <p className="mt-2 text-xs font-medium text-danger">{errors.sig}</p>}
+        </div>
       </div>
     </Sheet>
   );
@@ -427,6 +442,7 @@ export function BillSheet({
   const { groups } = useCostCategories(companyId);
   const { data: branchSettings } = useGetBranchSettingsQuery(open && companyId && branchId ? { companyId, branchId } : skipToken);
   const limits = voucherLimits(branchSettings);
+  const { data: branch } = useGetSingleBranchQuery(open && companyId && branchId ? { companyId, branchId } : skipToken);
   const [date, setDate] = useDefaultDate();
   const used = useSelfUsed(companyId, branchId, open ? user?.uid : null, date); // a manager's own approved as brought, that day
   const [amount, setAmount] = useState("");
@@ -643,7 +659,17 @@ export function BillSheet({
         const fresh = await getBill(companyId, branchId, settleId);
         const self = isCompanyRole(user?.role) ? null : { limits }; // a manager's counts toward the day's limit
         if (fresh?.supplier) selfOk = !!(await approveSupplierNow(companyId, branchId, user, fresh, self));
-        else if (fresh) selfOk = !!(await approveBillNow(companyId, branchId, user, fresh, {}, self));
+        else if (fresh) {
+          const costId = await approveBillNow(companyId, branchId, user, fresh, {}, self);
+          selfOk = !!costId;
+          // no bill paper: its voucher, stamped, onto the cost (1 Nov)
+          if (costId && fresh.voucherReason) {
+            const me = { uid: user?.uid, name: personName(user) || user?.username || "" };
+            attachPayoutVoucher({ companyId, branchId, branch, settle: fresh, costId, approval: { stamp: selfStamp(isCompanyRole(user?.role)), by: me, at: new Date() }, currency, money }).catch((e) =>
+              toast.warning("The voucher's picture wasn't made", { description: e.message })
+            );
+          }
+        }
       }
       toast.success(selfOk ? "Bill saved and approved" : "Bill saved", {
         description:
