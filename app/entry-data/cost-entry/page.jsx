@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { db, storage } from '@/lib/firebase'
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore'
+import { storage } from '@/lib/firebase'
+import { serverTimestamp } from 'firebase/firestore'
 import { useCostEntryForm } from './logic/useCostEntryForm'
 import { uploadCostFile } from './logic/storageUpload'
 import CostEntryForm from './components/CostEntryForm'
@@ -13,13 +13,13 @@ import { useGetCostEntriesQuery } from '@/lib/redux/api/costApiSlice'
 import useCurrency from '@/app/hooks/useCurrency'
 import { formatMoney } from '@/lib/region/currency'
 import { categoryFields, findCategory, missingFor } from '@/lib/costs/categories'
-import { useCostCategories } from '@/lib/costs/client'
+import { addCost, useCostCategories, useSelfUsed } from '@/lib/costs/client'
 import { newVoucher } from '@/lib/costs/vouchers'
 import { useGetVendorsQuery } from '@/lib/redux/api/vendorsApiSlice'
 import SentBackVouchers from '@/app/components/costs/SentBackVouchers'
 import { useGetBranchSettingsQuery } from '@/lib/redux/api/branchSettingsApiSlice'
 import { skipToken } from '@reduxjs/toolkit/query'
-import { voucherLimit } from '@/lib/authz/permissions'
+import { voucherLimits } from '@/lib/authz/permissions'
 
 const storedUserNow = () => getSessionUser() || {}
 
@@ -32,7 +32,7 @@ export default function CostEntryPage () {
   const [errors, setErrors] = useState({})
   const [saved, setSaved] = useState(false)
   const { data: branchSettings } = useGetBranchSettingsQuery(form.companyId && form.branchId ? { companyId: form.companyId, branchId: form.branchId } : skipToken)
-  const limit = voucherLimit(branchSettings) // a manager's own no-invoice cost up to it needs no approval
+  const limits = voucherLimits(branchSettings) // a manager's own no-invoice costs within them need no approval
 
   const {
     companyId,
@@ -56,6 +56,8 @@ export default function CostEntryPage () {
     setIsSaving,
     resetForm
   } = form
+  // what of this person's own no-invoice costs was approved as saved on this day
+  const used = useSelfUsed(companyId, branchId, storedUserNow().uid, date)
 
   // a highlighted field calms down as soon as it is filled in
   useEffect(() => setErrors(e => (e.amount && Number(amount) > 0 ? { ...e, amount: undefined } : e)), [amount])
@@ -138,7 +140,7 @@ export default function CostEntryPage () {
         ...categoryFields(groups, category),
         ...(vendor ? { vendorId: vendor.id, paidTo: vendor.name || vendor.vendorName || '' } : paidTo.trim() ? { paidTo: paidTo.trim() } : {}),
         ...(billMonth ? { billMonth, billRef: billRef.trim() } : {}),
-        ...(!file && noInvoice ? { voucher: newVoucher(storedUserNow(), voucherReason, { amount: amt, limit }) } : {}),
+        ...(!file && noInvoice ? { voucher: newVoucher(storedUserNow(), voucherReason, { amount: amt, limits, used }) } : {}),
         description: description?.trim() || '',
         fileURL: fileURL || null,
         receiptURL: receiptURL || null,
@@ -156,12 +158,12 @@ export default function CostEntryPage () {
         createdAt: serverTimestamp() // ✅ only one createdAt
       }
 
-      await addDoc(collection(db, 'companies', companyId, 'branches', branchId, 'costs'), data)
+      const { waiting } = await addCost(companyId, branchId, data, storedUserNow(), limits)
 
       resetForm()
       setSaved(true)
       setTimeout(() => setSaved(false), 1400)
-      toast.success('Cost saved', { description: `${resolvedCategory} · ${money(amt)}` })
+      toast.success('Cost saved', { description: `${resolvedCategory} · ${money(amt)}${data.voucher && waiting ? ' — voucher waiting for approval' : ''}` })
       refetch()
     } catch (err) {
       console.error('Save failed:', err)
@@ -177,7 +179,8 @@ export default function CostEntryPage () {
     <SentBackVouchers companyId={companyId} branchId={branchId} user={storedUserNow()} />
     <CostEntryForm
       form={form}
-      voucherLimit={limit}
+      voucherLimits={limits}
+      usedToday={used}
       groups={groups}
       vendors={vendors}
       onSave={handleSave}

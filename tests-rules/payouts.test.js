@@ -136,43 +136,87 @@ describe("who checks whose money (owner, 31 Oct)", () => {
   });
 });
 
-describe("a manager's own up to the branch's limit (owner, 1 Nov)", () => {
+describe("a manager's own within the branch's limits (owner, 1 Nov)", () => {
   const SET = `${B}/settings/settings`;
-  const own = (uid, amount) => ({ date: "2026-11-01", amount, category: "Food", paidFromOffice: "front", createdBy: { uid }, voucher: { status: "approved", reason: "stall", by: { uid }, decidedBy: { uid }, auto: true } });
+  const DAY = (date, uid) => `${B}/selfApproved/${date}_${uid}`;
+  const own = (uid, amount, date = "2026-11-01") => ({ date, amount, category: "Food", paidFromOffice: "front", createdBy: { uid }, voucher: { status: "approved", reason: "stall", by: { uid }, decidedBy: { uid }, auto: true } });
   const seed = (path, data) => env.withSecurityRulesDisabled((ctx) => ctx.firestore().doc(path).set(data));
-  it("up to RM 100 when the branch set nothing; not above, and not for in-charge", async () => {
-    expect(await ok(db("klManager").doc(`${B}/costs/m80`).set(own("klManager", 80)))).toBe(true);
-    expect(await ok(db("klManager").doc(`${B}/costs/m150`).set(own("klManager", 150)))).toBe(false);
-    expect(await ok(db("klInCharge").doc(`${B}/costs/i20`).set(own("klInCharge", 20)))).toBe(false);
+  // the cost and the day's total, in one write (as lib/costs/client.js addCost does)
+  const saveOwn = (uid, id, amount, { date = "2026-11-01", total, ref } = {}) => {
+    const f = db(uid);
+    const b = f.batch();
+    b.set(f.doc(`${B}/costs/${id}`), own(uid, amount, date));
+    if (total !== null) b.set(f.doc(DAY(date, uid)), { uid, date, total: total ?? amount, ref: ref || { kind: "cost", id } });
+    return b.commit();
+  };
+  it("up to RM 100 each when the branch set nothing; not above, and not for in-charge", async () => {
+    expect(await ok(saveOwn("klManager", "m80", 80))).toBe(true);
+    expect(await ok(saveOwn("klManager", "m150", 150, { date: "2026-11-05" }))).toBe(false);
+    expect(await ok(saveOwn("klInCharge", "i20", 20))).toBe(false);
   });
-  it("the branch's own limit counts", async () => {
-    await seed(SET, { financeSales: { voucherLimit: 200 } });
-    expect(await ok(db("klManager").doc(`${B}/costs/m150`).set(own("klManager", 150)))).toBe(true);
-    await seed(SET, { financeSales: { voucherLimit: 50 } });
-    expect(await ok(db("klManager").doc(`${B}/costs/m60`).set(own("klManager", 60)))).toBe(false);
+  it("up to RM 300 a day for all of one's own: a big buy can't be split", async () => {
+    const d = "2026-11-02";
+    expect(await ok(saveOwn("klManager", "d1", 90, { date: d, total: 90 }))).toBe(true);
+    expect(await ok(saveOwn("klManager", "d2", 90, { date: d, total: 180 }))).toBe(true);
+    expect(await ok(saveOwn("klManager", "d3", 90, { date: d, total: 270 }))).toBe(true);
+    expect(await ok(saveOwn("klManager", "d4", 40, { date: d, total: 310 }))).toBe(false);
+    expect(await ok(saveOwn("klManager", "d5", 30, { date: d, total: 300 }))).toBe(true);
   });
-  it("one approved as saved can't grow past the limit afterwards", async () => {
+  it("the day's total can't be dodged: it must grow by exactly this one, in the same write", async () => {
+    const d = "2026-11-03";
+    expect(await ok(saveOwn("klManager", "x1", 50, { date: d, total: null }))).toBe(false); // no total kept
+    expect(await ok(saveOwn("klManager", "x2", 50, { date: d, total: 10 }))).toBe(false); // claims less
+    expect(await ok(db("klManager").doc(DAY(d, "klManager")).set({ uid: "klManager", date: d, total: 5, ref: { kind: "cost", id: "none" } }))).toBe(false);
+    expect(await ok(saveOwn("klManager", "x3", 50, { date: d, total: 50 }))).toBe(true);
+    expect(await ok(db("klManager").doc(DAY(d, "klManager")).update({ total: 0 }))).toBe(false);
+    expect(await ok(db("klManager").doc(DAY(d, "klManager")).delete())).toBe(false);
+    expect(await ok(db("klManager").doc(DAY(d, "klManager")).get())).toBe(true);
+    expect(await ok(db("klCashier").doc(DAY(d, "klManager")).get())).toBe(false);
+  });
+  it("the branch's own limits count", async () => {
+    await seed(SET, { financeSales: { voucherLimit: 200, voucherDayLimit: 250 } });
+    const d = "2026-11-04";
+    expect(await ok(saveOwn("klManager", "b1", 150, { date: d }))).toBe(true);
+    expect(await ok(saveOwn("klManager", "b2", 150, { date: d, total: 300 }))).toBe(false);
+    expect(await ok(saveOwn("klManager", "b3", 100, { date: d, total: 250 }))).toBe(true);
+  });
+  it("one approved as saved can't grow or move to another day afterwards; it may shrink", async () => {
     await seed(`${B}/costs/grow`, own("klManager", 80));
-    expect(await ok(db("klManager").doc(`${B}/costs/grow`).update({ amount: 500 }))).toBe(false);
-    expect(await ok(db("klManager").doc(`${B}/costs/grow`).update({ amount: 90 }))).toBe(true);
+    expect(await ok(db("klManager").doc(`${B}/costs/grow`).update({ amount: 90 }))).toBe(false);
+    expect(await ok(db("klManager").doc(`${B}/costs/grow`).update({ date: "2026-11-09" }))).toBe(false);
+    expect(await ok(db("klManager").doc(`${B}/costs/grow`).update({ amount: 70 }))).toBe(true);
   });
-  it("the limit is a money setting: not the manager's to change", async () => {
-    await seed(SET, { financeSales: { voucherLimit: 100 }, other: { notes: "" } });
-    expect(await ok(db("klManager").doc(SET).set({ financeSales: { voucherLimit: 5000 }, other: { notes: "" } }))).toBe(false);
+  it("the limits are money settings: not the manager's to change", async () => {
+    await seed(SET, { financeSales: { voucherLimit: 100, voucherDayLimit: 300 }, other: { notes: "" } });
+    expect(await ok(db("klManager").doc(SET).update({ "financeSales.voucherLimit": 5000 }))).toBe(false);
+    expect(await ok(db("klManager").doc(SET).update({ "financeSales.voucherDayLimit": 5000 }))).toBe(false);
     expect(await ok(db("klManager").doc(SET).update({ "other.notes": "hello" }))).toBe(true);
-    expect(await ok(db("owner").doc(SET).update({ "financeSales.voucherLimit": 150 }))).toBe(true);
+    expect(await ok(db("owner").doc(SET).update({ "financeSales.voucherDayLimit": 400 }))).toBe(true);
   });
-  it("a manager's own bill up to the limit, handed out by them or someone junior", async () => {
+  it("a manager's own bill within the limits, handed out by them or someone junior — counted in the day", async () => {
+    const approveOwn = (id, total = 80, date = "2026-10-11") => {
+      const f = db("klManager");
+      const b = f.batch();
+      b.update(f.doc(`${P}/${id}`), { status: "approved" });
+      if (total !== null) b.set(f.doc(DAY(date, "klManager")), { uid: "klManager", date, total, ref: { kind: "bill", id } });
+      return b.commit();
+    };
     await seed(`${P}/mb`, settle("klManager"));
-    expect(await ok(db("klManager").doc(`${P}/mb`).update({ status: "approved" }))).toBe(true);
+    expect(await ok(approveOwn("mb", null))).toBe(false); // not counted
+    expect(await ok(approveOwn("mb"))).toBe(true);
     await seed(`${P}/mbBig`, settle("klManager", { billAmount: 150 }));
-    expect(await ok(db("klManager").doc(`${P}/mbBig`).update({ status: "approved" }))).toBe(false);
+    expect(await ok(approveOwn("mbBig", 230))).toBe(false);
     await seed(`${P}/mbJr`, settle("klManager", { payoutBy: { uid: "klInCharge" } }));
-    expect(await ok(db("klManager").doc(`${P}/mbJr`).update({ status: "approved" }))).toBe(true);
+    expect(await ok(approveOwn("mbJr", 160))).toBe(true);
     await seed(`${P}/mbUp`, settle("klManager", { payoutBy: { uid: "owner" } }));
-    expect(await ok(db("klManager").doc(`${P}/mbUp`).update({ status: "approved" }))).toBe(false);
+    expect(await ok(approveOwn("mbUp", 240))).toBe(false);
     await seed(`${P}/mbBack`, settle("klManager"));
     expect(await ok(db("klManager").doc(`${P}/mbBack`).update({ status: "rejected" }))).toBe(false);
+  });
+  it("only those who may approve their own mark a bill as approved straight after", async () => {
+    await seed(`${P}/o1`, out("klCashier"));
+    expect(await ok(db("klCashier").doc(`${P}/nb1`).set(settle("klCashier", { selfApprove: true })))).toBe(false);
+    expect(await ok(db("klManager").doc(`${P}/nb2`).set(settle("klManager", { selfApprove: true })))).toBe(true);
   });
 });
 

@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_GROUPS, LEGACY, categoryFields, checkGroups, classify, findCategory, groupsFrom, isNotCost, missingFor, newId, pickable,
 } from "@/lib/costs/categories";
-import { approveVoucherPatch, canDecideVoucher, newVoucher, rejectVoucherPatch, voucherHint, voucherText, voucherWaitsFor } from "@/lib/costs/vouchers";
-import { voucherLimit } from "@/lib/authz/permissions";
+import { approveVoucherPatch, canDecideVoucher, newVoucher, rejectVoucherPatch, selfDayCount, selfDayId, voucherHint, voucherText, voucherWaitsFor } from "@/lib/costs/vouchers";
+import { leftToday, voucherLimits } from "@/lib/authz/permissions";
 
 describe("cost categories", () => {
   it("defaults until the company saves its own; hidden ones stay for old records but can't be picked", () => {
@@ -77,18 +77,24 @@ describe("vouchers (costs without an invoice)", () => {
     const own = { ...cost, createdBy: { uid: "m1" }, voucher: newVoucher({ uid: "m1" }, "x") };
     expect(canDecideVoucher({ uid: "m1", role: "manager" }, own)).toBe(false);
   });
-  it("a manager's or branch admin's own up to the branch's limit needs no one (1 Nov)", () => {
+  it("a manager's or branch admin's own within the branch's limits needs no one (1 Nov)", () => {
     const m = { uid: "m1", role: "manager" };
     expect(newVoucher(m, "stall", { amount: 100 })).toMatchObject({ status: "approved", auto: true });
     expect(newVoucher(m, "stall", { amount: 100.5 }).status).toBe("pending");
-    expect(newVoucher(m, "stall", { amount: 150, limit: 200 }).status).toBe("approved");
+    expect(newVoucher(m, "stall", { amount: 150, limits: { entry: 200, day: 300 } }).status).toBe("approved");
     expect(newVoucher({ uid: "b1", role: "branchAdmin" }, "stall", { amount: 60 }).status).toBe("approved");
     expect(newVoucher({ uid: "i1", role: "inCharge" }, "stall", { amount: 5 }).status).toBe("pending");
-    expect(voucherLimit(null)).toBe(100);
-    expect(voucherLimit({ financeSales: { voucherLimit: 250 } })).toBe(250);
-    expect(voucherLimit({ financeSales: { voucherLimit: "" } })).toBe(100);
-    expect(voucherHint("manager", 100, (v) => `RM ${v}`)).toBe("Up to RM 100 it needs no approval; above that, branch admin or above approves it.");
+    // the day: RM 300 of one's own altogether — splitting a big buy doesn't get round it
+    expect(newVoucher(m, "stall", { amount: 90, used: 210 }).status).toBe("approved");
+    expect(newVoucher(m, "stall", { amount: 90, used: 220 }).status).toBe("pending");
+    expect(voucherLimits(null)).toEqual({ entry: 100, day: 300 });
+    expect(voucherLimits({ financeSales: { voucherLimit: 250, voucherDayLimit: 500 } })).toEqual({ entry: 250, day: 500 });
+    expect(voucherLimits({ financeSales: { voucherLimit: "" } })).toEqual({ entry: 100, day: 300 });
+    expect(leftToday({ entry: 100, day: 300 }, 220)).toBe(80);
+    expect(voucherHint("manager", { entry: 100, day: 300 }, (v) => `RM ${v}`, 220)).toBe("No approval needed up to RM 100 a cost and RM 300 a day (RM 80 left on this day); above that, branch admin or above approves it.");
     expect(voucherHint("inCharge")).toBe("It is saved with a voucher; a manager or above approves it.");
+    expect(selfDayId("2026-11-01", "m1")).toBe("2026-11-01_m1");
+    expect(selfDayCount({ total: 80.1 }, { uid: "m1", date: "2026-11-01", amount: 0.2, ref: { kind: "cost", id: "c1" } })).toEqual({ uid: "m1", date: "2026-11-01", total: 80.3, ref: { kind: "cost", id: "c1" } });
   });
   it("only someone senior to whoever made it (owner, 31 Oct)", () => {
     const byManager = { amount: 400, voucher: newVoucher({ uid: "m1", role: "manager" }, "stall", { amount: 400 }) };

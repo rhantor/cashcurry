@@ -217,6 +217,7 @@ service cloud.firestore {
         after.get('financeSales', {}).get('currency', null) == before.get('financeSales', {}).get('currency', null) &&
         after.get('initialCash', null) == before.get('initialCash', null) &&
         after.get('financeSales', {}).get('voucherLimit', null) == before.get('financeSales', {}).get('voucherLimit', null) &&
+        after.get('financeSales', {}).get('voucherDayLimit', null) == before.get('financeSales', {}).get('voucherDayLimit', null) &&
         after.get('basic', {}).get('timeZone', null) == before.get('basic', {}).get('timeZone', null) &&
         after.get('attendance', {}).get('dayCutoffTime', null) == before.get('attendance', {}).get('dayCutoffTime', null);
     }
@@ -311,14 +312,46 @@ service cloud.firestore {
     function isCompanyUser() { return userData().role in companyRoles(); }
     // the signed-in user is senior to `uid` (no one there: nothing to outrank)
     function outranksUid(uid) { return uid == '' || outranksUser(uid); }
-    // a manager's or branch admin's own up to the branch's limit needs no one
-    // (owner, 1 Nov — lib/authz/permissions.js selfApproves; default 100)
-    function voucherLimitAt(c, b) {
+    // A manager's or branch admin's own needs no one within the branch's limits
+    // (owner, 1 Nov — lib/authz/permissions.js selfApproves): up to
+    // voucherLimit (100) each, and voucherDayLimit (300) for all of theirs on
+    // one day — kept in selfApproved/{date}_{uid}, which must grow by exactly
+    // this amount in the same write.
+    function financeAt(c, b) {
       let path = /databases/$(database)/documents/companies/$(c)/branches/$(b)/settings/settings;
-      return exists(path) ? get(path).data.get('financeSales', {}).get('voucherLimit', 100) : 100;
+      return exists(path) ? get(path).data.get('financeSales', {}) : {};
     }
-    function withinOwnLimit(c, b, amount) {
-      return userData().role in ['manager', 'branchAdmin', 'branchadmin'] && amount <= voucherLimitAt(c, b);
+    function voucherLimitAt(c, b) { return financeAt(c, b).get('voucherLimit', 100); }
+    function voucherDayLimitAt(c, b) { return financeAt(c, b).get('voucherDayLimit', 300); }
+    function selfDayPath(c, b, date) {
+      return /databases/$(database)/documents/companies/$(c)/branches/$(b)/selfApproved/$(date + '_' + request.auth.uid);
+    }
+    function near(x, y) { return x - y < 0.005 && y - x < 0.005; }
+    // this write adds `amount` to my day's total, which stays within the day's limit
+    function countsToday(c, b, date, amount) {
+      let path = selfDayPath(c, b, date);
+      let before = exists(path) ? get(path).data.get('total', 0) : 0;
+      let after = getAfter(path).data.get('total', 0);
+      return near(after, before + amount) && after <= voucherDayLimitAt(c, b) + 0.005;
+    }
+    // the cost or bill that this write adds to my day's total: approved as saved by me, that day, that amount
+    function selfCounted(c, b, d, prev) {
+      return d.total > prev && (
+        (d.ref.kind == 'cost' && costCounted(c, b, d, d.total - prev)) ||
+        (d.ref.kind == 'bill' && billCounted(c, b, d, d.total - prev)));
+    }
+    function costCounted(c, b, d, delta) {
+      let x = getAfter(/databases/$(database)/documents/companies/$(c)/branches/$(b)/costs/$(d.ref.id)).data;
+      return x.get('voucher', {}).get('auto', false) == true && x.voucher.by.uid == request.auth.uid &&
+        x.date == d.date && near(x.amount, delta);
+    }
+    function billCounted(c, b, d, delta) {
+      let x = getAfter(/databases/$(database)/documents/companies/$(c)/branches/$(b)/payouts/$(d.ref.id)).data;
+      return x.get('status', '') == 'approved' && x.by.uid == request.auth.uid && x.date == d.date && near(x.billAmount, delta);
+    }
+    function withinOwnLimit(c, b, amount, date) {
+      return userData().role in ['manager', 'branchAdmin', 'branchadmin'] &&
+        amount <= voucherLimitAt(c, b) && countsToday(c, b, date, amount);
     }
     function outranksUser(uid) {
       let path = /databases/$(database)/documents/users/$(uid);
@@ -795,7 +828,7 @@ service cloud.firestore {
             // a pay-out's bill approved with no paper: its voucher was decided with it (4.10)
             (request.resource.data.get('meta', {}).get('type', '') == 'payout' && canCostsApprove(companyId, branchId)) ||
             // a company role's own — or a manager's up to the limit: approved as it is saved
-            ((isCompanyUser() || withinOwnLimit(companyId, branchId, request.resource.data.amount)) &&
+            ((isCompanyUser() || withinOwnLimit(companyId, branchId, request.resource.data.amount, request.resource.data.date)) &&
               request.resource.data.voucher.get('auto', false) == true &&
               request.resource.data.voucher.by.uid == request.auth.uid && request.resource.data.voucher.decidedBy.uid == request.auth.uid)
           );
@@ -805,12 +838,24 @@ service cloud.firestore {
             !voucherDecided() || (canCostsApprove(companyId, branchId) &&
               (isCompanyUser() || (voucherMaker() != request.auth.uid && outranksUid(voucherMaker()))))
           ) && (
-            // one approved as saved under the limit doesn't grow past it later
-            request.resource.data.get('voucher', {}).get('auto', false) != true ||
-            request.resource.data.get('amount', 0) == resource.data.get('amount', 0) ||
-            isCompanyUser() || request.resource.data.get('amount', 0) <= voucherLimitAt(companyId, branchId)
+            // one approved as saved under the limits doesn't grow later, nor move to another day
+            request.resource.data.get('voucher', {}).get('auto', false) != true || isCompanyUser() ||
+            (request.resource.data.get('amount', 0) <= resource.data.get('amount', 0) &&
+              request.resource.data.get('date', '') == resource.data.get('date', ''))
           );
           allow delete: if canRecordsDelete(companyId, branchId);
+        }
+
+        // ── A manager's own approved as saved, per day (owner, 1 Nov) ─────────
+        // { uid, date, total, ref: { kind: 'cost' | 'bill', id } }: only grows,
+        // and only by the cost or bill approved as saved in the same write.
+        match /selfApproved/{dayId} {
+          allow read: if (isAuth() && (resource == null || resource.data.uid == request.auth.uid)) || canReportsView(companyId, branchId);
+          allow create, update: if isAuth() && request.resource.data.uid == request.auth.uid &&
+            dayId == request.resource.data.date + '_' + request.auth.uid &&
+            request.resource.data.keys().hasOnly(['uid', 'date', 'total', 'ref']) &&
+            selfCounted(companyId, branchId, request.resource.data, resource == null ? 0 : resource.data.get('total', 0));
+          allow delete: if false;
         }
 
         // ── Pay-outs and their bills (4.10, lib/payouts/model.js) ─────────────
@@ -825,7 +870,10 @@ service cloud.firestore {
             request.resource.data.by.uid == request.auth.uid && (
               (request.resource.data.kind == 'out' && request.resource.data.status == 'open') ||
               (request.resource.data.kind == 'settle' && request.resource.data.status == 'pending')
-            );
+            ) &&
+            // "approved straight after, ask no one" — only from those who may approve their own
+            (request.resource.data.get('selfApprove', false) != true || isCompanyUser() ||
+              userData().role in ['manager', 'branchAdmin', 'branchadmin']);
           allow update: if resource.data.get('status', '') != 'approved' && (
             // an open pay-out gets its bill
             (resource.data.kind == 'out' && canPayoutsHandOut(companyId, branchId) &&
@@ -845,7 +893,7 @@ service cloud.firestore {
                 outranksUid(resource.data.get('payoutBy', {}).get('uid', ''))) ||
                 // a manager's own bill up to the limit, handed out by them or someone junior
                 (request.resource.data.status == 'approved' && resource.data.by.uid == request.auth.uid &&
-                  withinOwnLimit(companyId, branchId, request.resource.data.billAmount) &&
+                  withinOwnLimit(companyId, branchId, request.resource.data.billAmount, resource.data.date) &&
                   (resource.data.get('payoutBy', {}).get('uid', '') == request.auth.uid ||
                     outranksUid(resource.data.get('payoutBy', {}).get('uid', ''))))) &&
               !changedKeys().hasAny(['kind', 'payoutId', 'floatAmount', 'by', 'payoutBy', 'date']))

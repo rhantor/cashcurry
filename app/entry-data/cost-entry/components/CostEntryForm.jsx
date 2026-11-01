@@ -143,7 +143,7 @@ function WhatFor ({ groups, vendors, form, errors }) {
   )
 }
 
-export default function CostEntryForm ({ form, voucherLimit, groups = [], vendors = [], onSave, errors = {}, saved = false, recent }) {
+export default function CostEntryForm ({ form, voucherLimits, usedToday = 0, groups = [], vendors = [], onSave, errors = {}, saved = false, recent }) {
   const {
     date,
     setDate,
@@ -305,7 +305,7 @@ export default function CostEntryForm ({ form, voucherLimit, groups = [], vendor
                 <FileWarning className='size-5 shrink-0 text-warning' />
                 <div className='min-w-0 flex-1'>
                   <p className='text-sm font-semibold text-fg'>No invoice for this</p>
-                  <p className='text-xs text-muted'>{voucherHint(role, voucherLimit, money)}</p>
+                  <p className='text-xs text-muted'>{voucherHint(role, voucherLimits, money, usedToday)}</p>
                 </div>
                 <Switch checked={noInvoice} onChange={setNoInvoice} />
               </div>
@@ -358,7 +358,8 @@ export default function CostEntryForm ({ form, voucherLimit, groups = [], vendor
 
 CostEntryForm.propTypes = {
   form: PropTypes.object.isRequired,
-  voucherLimit: PropTypes.number,
+  voucherLimits: PropTypes.shape({ entry: PropTypes.number, day: PropTypes.number }),
+  usedToday: PropTypes.number,
   groups: PropTypes.array,
   vendors: PropTypes.array,
   onSave: PropTypes.func.isRequired,
