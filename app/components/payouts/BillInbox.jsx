@@ -2,8 +2,16 @@
 // Bills waiting (roadmap 4.10): pay-out bills brought back, for someone senior
 // to whoever handed the money out and brought the bill (owner, 31 Oct) to approve — as they are, or
 // corrected (the original amount and category are kept) — or send back with
-// a reason. Approving turns the bill into a cost.
-import { useState } from "react";
+// a reason. Approving turns the bill into a cost. One with no bill paper shows
+// as its paper voucher — who brought it, who took the money (their signature
+// from the hand-out), who approves — and approving puts its picture on the cost (1 Nov).
+import { useEffect, useMemo, useState } from "react";
+import { skipToken } from "@reduxjs/toolkit/query";
+import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
+import { signaturesOf } from "@/lib/signatures/client";
+import { personName } from "@/lib/people";
+import { payoutSheet } from "@/lib/payouts/voucher";
+import VoucherPaper from "@/app/components/costs/VoucherPaper";
 import { format, parseISO } from "date-fns";
 import { Check, PencilLine, ReceiptText, Undo2 } from "lucide-react";
 import { Badge, Button, EmptyState, Field, Select, Sheet, Skeleton, cn, toast } from "@/app/components/ui";
@@ -16,7 +24,7 @@ import { categoryFields, pickable } from "@/lib/costs/categories";
 import { useCostCategories } from "@/lib/costs/client";
 import { billWaitsFor, canReviewBill, changeText, deliveryOf, goodsOf } from "@/lib/payouts/model";
 import { FileThumb, FilesSheet, viewerItems } from "@/app/components/common/Files";
-import { approveBillNow, approveSupplierNow, sendBillBack } from "@/lib/payouts/client";
+import { approveBillNow, approveSupplierNow, attachPayoutVoucher, getBill, sendBillBack } from "@/lib/payouts/client";
 import { linesTotal, supplierText } from "@/lib/payouts/supplier";
 import { priceRise } from "@/lib/purchases/orders";
 
@@ -70,6 +78,30 @@ export default function BillInbox({ companyId, branchId, user, bills, loading })
   const [busy, setBusy] = useState(null);
   const [correcting, setCorrecting] = useState(null);
   const [viewing, setViewing] = useState(null);
+  const { data: branch } = useGetSingleBranchQuery(companyId && branchId ? { companyId, branchId } : skipToken);
+
+  // bills with no paper: their hand-out (who took the money signed for it) and who brought them
+  const paperless = useMemo(() => (bills || []).filter((b) => b.voucherReason && !b.supplier), [bills]);
+  const outIds = paperless.map((b) => b.payoutId).filter(Boolean).sort().join(",");
+  const makers = paperless.map((b) => b.by?.uid).filter(Boolean).sort().join(",");
+  const [outs, setOuts] = useState({});
+  const [sigs, setSigs] = useState({});
+  useEffect(() => {
+    if (!companyId || !branchId || !outIds) return;
+    let live = true;
+    Promise.all(outIds.split(",").map((id) => getBill(companyId, branchId, id).catch(() => null))).then((list) => live && setOuts(Object.fromEntries(list.filter(Boolean).map((o) => [o.id, o]))));
+    return () => {
+      live = false;
+    };
+  }, [companyId, branchId, outIds]);
+  useEffect(() => {
+    if (!companyId || !makers) return;
+    let live = true;
+    signaturesOf(companyId, makers.split(",")).then((s) => live && setSigs(s)).catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [companyId, makers]);
 
   const approve = async (bill, correction = {}) => {
     setBusy(bill.id);
@@ -79,8 +111,16 @@ export default function BillInbox({ companyId, branchId, user, bills, loading })
         const r = await approveSupplierNow(companyId, branchId, user, bill);
         toast.success("Approved — in Purchases now", { description: `${money(r.paid)} paid to ${bill.supplier.vendorName}` });
       } else {
-        await approveBillNow(companyId, branchId, user, bill, correction);
+        const costId = await approveBillNow(companyId, branchId, user, bill, correction);
         toast.success("Approved — it's a cost now");
+        // no bill paper: the signed voucher's picture onto the cost
+        if (bill.voucherReason && costId) {
+          const settled = { ...bill, ...(correction.billAmount != null ? { billAmount: Number(correction.billAmount) } : {}), ...(correction.fields || {}) };
+          const me = { uid: user?.uid, name: personName(user) || user?.username || "" };
+          attachPayoutVoucher({ companyId, branchId, branch, settle: settled, costId, approval: { by: me, at: new Date() }, currency, money }).catch((e) =>
+            toast.warning("The voucher's picture wasn't made", { description: e.message })
+          );
+        }
       }
     } catch (e) {
       toast.error("Couldn't approve", { description: e.message });
@@ -112,7 +152,12 @@ export default function BillInbox({ companyId, branchId, user, bills, loading })
           const mine = !canReviewBill(user, b, can);
           return (
             <li key={b.id} className="overflow-hidden rounded-2xl border border-line bg-surface">
-              <div className="flex gap-4 p-4">
+              {b.voucherReason && !b.supplier && (
+                <div className="space-y-2 p-4 pb-0">
+                  <VoucherPaper sheet={payoutSheet(b, { branch, out: outs[b.payoutId] || null, currency, money })} sigs={sigs} />
+                </div>
+              )}
+              <div className={cn("flex gap-4 p-4", b.voucherReason && !b.supplier && "hidden")}>
                 <div className="flex shrink-0 flex-col gap-2">
                   {/* the bill's first page, or the payment receipt when there's no bill paper */}
                   {(() => {

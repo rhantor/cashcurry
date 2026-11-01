@@ -192,18 +192,39 @@ service cloud.firestore {
 
     // Paying out: an approved, unpaid request gets paidOut — and nothing else
     // changes (not the amount, not who it is for).
-    function isPayOut() {
+    // …with its voucher (1 Nov): the next number of `series` for the branch,
+    // and who signed for the money (Received by)
+    function isPayOut(c, b, series) {
       return resource.data.get('status', '') == 'approved' &&
         resource.data.get('paidOut', null) == null &&
         request.resource.data.get('paidOut', null) != null &&
-        changedKeys().hasOnly(['paidOut', 'paidFromOffice', 'updatedAt']);
+        changedKeys().hasOnly(['paidOut', 'paidFromOffice', 'updatedAt', 'voucher']) &&
+        (!changedKeys().hasAny(['voucher']) || (
+          resource.data.get('voucher', null) == null &&
+          request.resource.data.voucher.keys().hasOnly(['no', 'received']) &&
+          takesNext(c, b, series, request.resource.data.voucher.no)));
+    }
+    // the voucher's picture, added once it is paid out — nothing else changes
+    function isVoucherImage() {
+      return resource.data.get('paidOut', null) != null &&
+        changedKeys().hasOnly(['voucher', 'updatedAt']) &&
+        request.resource.data.voucher.diff(resource.data.get('voucher', {})).affectedKeys().hasOnly(['image']);
+    }
+    // which records a voucher series numbers
+    function seriesCollection(name) {
+      return name == 'vouchers' ? 'costs' : (name == 'advanceVouchers' ? 'advances' : 'loans');
+    }
+    // `no` is the branch's next number in `series`, taken in this same write
+    function takesNext(c, b, series, no) {
+      let path = /databases/$(database)/documents/companies/$(c)/branches/$(b)/counters/$(series);
+      return no == (exists(path) ? get(path).data.get('last', 0) : 0) + 1 && getAfter(path).data.get('last', 0) == no;
     }
 
     // Accountant / supervisor keeping the books (installments, totals, notes):
     // never who approved it, whether it is paid, the amount, or the staff
     // member — though a fully repaid one may go from approved to closed.
     function isBookkeeping() {
-      return !changedKeys().hasAny(['approvedBy', 'paidOut', 'paidFromOffice', 'amount', 'staffId', 'createdBy']) &&
+      return !changedKeys().hasAny(['approvedBy', 'paidOut', 'paidFromOffice', 'amount', 'staffId', 'createdBy', 'voucher']) &&
         (!changedKeys().hasAny(['status']) ||
           (resource.data.get('status', '') == 'approved' && request.resource.data.get('status', '') == 'closed'));
     }
@@ -343,7 +364,7 @@ service cloud.firestore {
     function numbersVoucher(c, b) {
       let v = request.resource.data.get('voucher', null);
       let path = voucherCounterPath(c, b);
-      return v == null || request.resource.data.get('meta', {}).get('type', '') == 'payout' || (
+      return v == null || (request.resource.data.get('meta', {}).get('type', '') == 'payout' && v.get('no', null) == null) || (
         v.get('no', 0) == (exists(path) ? get(path).data.get('last', 0) : 0) + 1 &&
         getAfter(path).data.get('last', 0) == v.get('no', 0));
     }
@@ -865,12 +886,14 @@ service cloud.firestore {
 
         // ── Running numbers: counters/vouchers = { last, ref } (1 Nov) ─────────
         // moves on by one, only with the cost whose voucher takes that number
+        // costs and pay-outs (vouchers), advances (advanceVouchers), staff loans (loanVouchers)
         match /counters/{name} {
-          allow read: if canCostsEnter(companyId, branchId);
-          allow create, update: if name == 'vouchers' && canCostsEnter(companyId, branchId) &&
+          allow read: if canCostsEnter(companyId, branchId) || canAdvancesPayOut(companyId, branchId) || canAdvancesApprove(companyId, branchId);
+          allow create, update: if name in ['vouchers', 'advanceVouchers', 'loanVouchers'] &&
+            (name == 'vouchers' ? canCostsEnter(companyId, branchId) : (canAdvancesPayOut(companyId, branchId) || canAdvancesApprove(companyId, branchId))) &&
             request.resource.data.keys().hasOnly(['last', 'ref']) &&
             request.resource.data.last == (resource == null ? 0 : resource.data.get('last', 0)) + 1 &&
-            getAfter(/databases/$(database)/documents/companies/$(companyId)/branches/$(branchId)/costs/$(request.resource.data.ref)).data.get('voucher', {}).get('no', 0) == request.resource.data.last;
+            getAfter(/databases/$(database)/documents/companies/$(companyId)/branches/$(branchId)/$(seriesCollection(name))/$(request.resource.data.ref)).data.get('voucher', {}).get('no', 0) == request.resource.data.last;
           allow delete: if false;
         }
 
@@ -1023,7 +1046,8 @@ service cloud.firestore {
           allow create: if (canAdvancesApprove(companyId, branchId) && (!isMineAfter() || isNewRequest())) ||
             (isBranchMember(companyId, branchId) && isNewRequest());
           allow update: if (canAdvancesApprove(companyId, branchId) && !selfDecides()) ||
-            (canAdvancesPayOut(companyId, branchId) && isPayOut()) ||
+            (canAdvancesPayOut(companyId, branchId) && isPayOut(companyId, branchId, 'loanVouchers')) ||
+            (canAdvancesPayOut(companyId, branchId) && isVoucherImage()) ||
             (canSalariesEnter(companyId, branchId) && isBookkeeping()) ||
             (isBranchMember(companyId, branchId) && isOwnRequest() && isCancel());
           allow delete: if canAdvancesApprove(companyId, branchId) && !deletesOwnGiven();
@@ -1185,7 +1209,8 @@ service cloud.firestore {
           allow create: if (canAdvancesApprove(companyId, branchId) && (!isMineAfter() || isNewRequest())) ||
             (isBranchMember(companyId, branchId) && isNewRequest());
           allow update: if (canAdvancesApprove(companyId, branchId) && !selfDecides()) ||
-            (canAdvancesPayOut(companyId, branchId) && isPayOut()) ||
+            (canAdvancesPayOut(companyId, branchId) && isPayOut(companyId, branchId, 'advanceVouchers')) ||
+            (canAdvancesPayOut(companyId, branchId) && isVoucherImage()) ||
             (canSalariesEnter(companyId, branchId) && isBookkeeping()) ||
             (isBranchMember(companyId, branchId) && isOwnRequest() && isCancel());
           allow delete: if canAdvancesApprove(companyId, branchId) && !deletesOwnGiven();
@@ -1261,7 +1286,7 @@ service cloud.firestore {
         // number, so this mirrors the requisitions write rule. Voucher numbers
         // have their own, stricter rule above (counters/vouchers).
         match /counters/{seriesId} {
-          allow read, write: if seriesId != 'vouchers' && (canPurchasesOrder(companyId, branchId) ||
+          allow read, write: if !(seriesId in ['vouchers', 'advanceVouchers', 'loanVouchers']) && (canPurchasesOrder(companyId, branchId) ||
             (seriesId == 'reservationDeposits' && canReservationReceipt(companyId, branchId)));
         }
 

@@ -246,6 +246,57 @@ describe("running voucher numbers (1 Nov)", () => {
   });
 });
 
+describe("advance and staff loan vouchers: numbered and signed for when paid (1 Nov)", () => {
+  const ADV = (extra = {}) => ({ staffId: "st1", staffName: "Ali", amount: 200, date: "2026-11-01", status: "approved", paidOut: null, approvedBy: { id: "klManager", name: "KL Manager" }, ...extra });
+  const seed = (path, data) => env.withSecurityRulesDisabled((ctx) => ctx.firestore().doc(path).set(data));
+  const paidOut = { date: "2026-11-01", from: "front", by: { uid: "klCashier" } };
+  const received = { name: "Ali", sig: "data:image/png;base64,AAA", at: "2026-11-01T10:00:00Z" };
+  const payWith = (uid, coll, series, id, no, extra = {}) => {
+    const f = db(uid);
+    const b = f.batch();
+    b.update(f.doc(`${B}/${coll}/${id}`), { paidOut, paidFromOffice: "front", voucher: { no, received }, ...extra });
+    b.set(f.doc(`${B}/counters/${series}`), { last: no, ref: id });
+    return b.commit();
+  };
+  it("the cashier marks it paid with the next number and Ali's signature", async () => {
+    await seed(`${B}/advances/a1`, ADV());
+    await seed(`${B}/advances/a2`, ADV());
+    expect(await ok(payWith("klCashier", "advances", "advanceVouchers", "a1", 2))).toBe(false); // skips a number
+    expect(await ok(payWith("klCashier", "advances", "advanceVouchers", "a1", 1))).toBe(true);
+    expect(await ok(payWith("klCashier", "advances", "advanceVouchers", "a2", 2))).toBe(true);
+    await seed(`${B}/loans/l1`, ADV({ durationMonths: 6 }));
+    expect(await ok(payWith("klCashier", "loans", "loanVouchers", "l1", 1))).toBe(true); // its own series
+  });
+  it("paid without a voucher still works (older screens); the counter never moves alone", async () => {
+    await seed(`${B}/advances/a3`, ADV());
+    expect(await ok(db("klCashier").doc(`${B}/advances/a3`).update({ paidOut, paidFromOffice: "front" }))).toBe(true);
+    expect(await ok(db("klCashier").doc(`${B}/counters/advanceVouchers`).set({ last: 1, ref: "a3" }))).toBe(false);
+  });
+  it("then only the picture may be added; the signature and number stay", async () => {
+    await seed(`${B}/advances/p1`, ADV({ paidOut, voucher: { no: 4, received } }));
+    expect(await ok(db("klCashier").doc(`${B}/advances/p1`).update({ "voucher.image": "https://x/v.png" }))).toBe(true);
+    expect(await ok(db("klCashier").doc(`${B}/advances/p1`).update({ "voucher.received.name": "Someone else" }))).toBe(false);
+    expect(await ok(db("klCashier").doc(`${B}/advances/p1`).update({ "voucher.no": 9 }))).toBe(false);
+    expect(await ok(db("klAccountant").doc(`${B}/advances/p1`).update({ "voucher.image": "https://x/other.png", totalPaid: 0 }))).toBe(false);
+  });
+  it("a pay-out records who took the money and their signature", async () => {
+    expect(await ok(db("klCashier").doc(`${P}/o9`).set(out("klCashier", { received })))).toBe(true);
+  });
+  it("a pay-out's bill with no paper takes the next cost voucher number when approved", async () => {
+    await seed(`${P}/np`, settle("klCashier", { voucherReason: "Stall" }));
+    const f = db("klInCharge");
+    const b = f.batch();
+    b.update(f.doc(`${P}/np`), { status: "approved", costId: "c9" });
+    b.set(f.doc(`${B}/costs/c9`), { date: "2026-10-11", amount: 80, category: "Gas", paidFromOffice: "front", meta: { type: "payout", payoutId: "p1" }, voucher: { status: "approved", reason: "Stall", no: 1 } });
+    b.set(f.doc(`${B}/counters/vouchers`), { last: 1, ref: "c9" });
+    expect(await ok(b.commit())).toBe(true);
+    const g = db("klInCharge");
+    const bad = g.batch();
+    bad.set(g.doc(`${B}/costs/c10`), { date: "2026-10-11", amount: 80, category: "Gas", paidFromOffice: "front", meta: { type: "payout", payoutId: "p1" }, voucher: { status: "approved", reason: "Stall", no: 7 } });
+    expect(await ok(bad.commit())).toBe(false); // a number without the counter
+  });
+});
+
 describe("who sees them", () => {
   it("till roles, approvers and those who see reports; not staff or another branch", async () => {
     for (const u of ["klCashier", "klInCharge", "klAccountant", "owner"]) expect(await ok(db(u).doc(`${P}/p1`).get())).toBe(true);

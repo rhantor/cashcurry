@@ -20,7 +20,17 @@ describe("the voucher on paper (1 Nov)", () => {
     const at = new Date("2026-11-01T02:42:00Z");
     const cost = { date: "2026-11-01", amount: 150, paidTo: "Pasar Chow Kit", costGroup: "Food & stock", category: "Food & ingredients", paidFromOffice: "front", voucher: { no: 7, reason: "Market stall, no receipt", by: { name: "KL Manager" }, at } };
     const s = voucherSheet(cost, { branch: { name: "Demo Branch KL", code: "DKL" }, money: (v) => `RM ${v.toFixed(2)}` });
-    expect(s).toMatchObject({ branchName: "Demo Branch KL", no: "DKL-V-0007", paidTo: "Pasar Chow Kit", category: "Food & stock · Food & ingredients", paidFrom: "Till (cash)", amount: "RM 150.00", words: "One hundred fifty ringgit only", reason: "Market stall, no receipt", prepared: { name: "KL Manager", at }, approval: null });
-    expect(voucherSheet(cost, { approval: { by: "KL Admin", at } }).approval).toEqual({ by: "KL Admin", at });
+    expect(s).toMatchObject({ title: "PAYMENT VOUCHER", branchName: "Demo Branch KL", no: "DKL-V-0007", date: "2026-11-01" });
+    expect(s.rows).toEqual([
+      { label: "Paid to", value: "Pasar Chow Kit" },
+      { label: "For", value: "Food & stock · Food & ingredients" },
+      { label: "Paid from", value: "Till (cash)" },
+      { label: "Amount", value: "RM 150.00", words: "One hundred fifty ringgit only" },
+      { label: "Why no invoice", value: "Market stall, no receipt" },
+    ]);
+    expect(s.boxes[0]).toMatchObject({ label: "Prepared by", name: "KL Manager", at });
+    expect(s.boxes[1]).toEqual({ label: "Approved by", waiting: "Waiting for approval" });
+    expect(voucherSheet(cost, { approval: { by: { uid: "a1", name: "KL Admin" }, at } }).boxes[1]).toEqual({ label: "Approved by", uid: "a1", name: "KL Admin", at });
+    expect(voucherSheet(cost, { approval: { stamp: "No approval needed", by: { uid: "g1", name: "GM" }, at } }).boxes[1].stamp).toBe("No approval needed");
   });
 });

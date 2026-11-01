@@ -243,6 +243,10 @@ rehearsed on the local copy first.
 - [ ] **Paper vouchers (1 Nov):** `firestore.rules` (counters/vouchers — running voucher numbers; the old counters rule
       no longer covers them). Voucher pictures go to `costs/{c}/{b}/vouchers/` in Storage (already allowed). Signatures
       live on `companies/{c}/users/{uid}.signature`. Vouchers saved before show "No. —"; nothing to migrate
+- [ ] **Money vouchers (1 Nov):** advances (DKL-A-…), staff loans (DKL-L-…) and pay-out bills with no paper (DKL-V-…)
+      as paper vouchers; the staff member signs "Received by" when paid (and whoever takes a pay-out, at the hand-out).
+      `firestore.rules`: isPayOut takes the voucher number + signature, isVoucherImage, counters advanceVouchers /
+      loanVouchers. Pictures go to `payouts/{c}/{b}/{uid}/` (already allowed). Older records show "No. —"
 - [ ] **Staff logins (4.6):** after the rules and functions deploy, `npm run staff:logins -- --project <id>` then `--write --confirm` (lets staff who already have a login sign in with their phone or IC number; their password stays until a manager resets their PIN). Functions keep it up to date after that
 - [ ] **Audit log (20 Oct):** the audit triggers (auditSales, auditCosts, auditSalaries, auditLoans, auditVendorBills)
       now record the signed-in account, so their trigger type changes; if the deploy refuses, delete those five

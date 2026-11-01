@@ -3,11 +3,13 @@
 // many days, where it has got to (who approved it, and their role), and
 // the buttons this person may use on it now.
 import { format, formatDistanceToNowStrict, isValid, parseISO } from "date-fns";
-import { Ban, Check, Clock3, HandCoins, X } from "lucide-react";
+import { Ban, Check, Clock3, FileText, HandCoins, X } from "lucide-react";
 import { Avatar, Badge, Button, Card, cn } from "@/app/components/ui";
 import { formatMoney } from "@/lib/region/currency";
 import { roleLabel } from "@/lib/authz/permissions";
 import { REQUEST_TYPES, STAGES, leaveKindLabel, stageOf } from "@/lib/requests/model";
+import { requestSheet } from "@/lib/requests/voucher";
+import VoucherPaper from "@/app/components/costs/VoucherPaper";
 
 const TYPE_TONE = { advance: "brand", staffLoan: "info", leave: "warning" };
 
@@ -73,9 +75,10 @@ function Trail({ req }) {
  * req: a request from toRequest · actions: what may be done now (actionsFor)
  * · onAction(action, req) · busy · currency · branchName (when the list
  * spans branches) · showWho (lists of
- * everyone's requests show the person; My requests too, for requests made for someone).
+ * everyone's requests show the person; My requests too, for requests made for someone)
+ * · paper: { branch, sigs } — show an advance or staff loan as its paper voucher (1 Nov).
  */
-export default function RequestItem({ req, actions = [], onAction, busy, currency, branchName, showWho = true, free = null, hints = [] }) {
+export default function RequestItem({ req, actions = [], onAction, busy, currency, branchName, showWho = true, free = null, hints = [], paper = null }) {
   const type = REQUEST_TYPES[req.type];
   const stage = stageOf(req);
   const st = STAGES[stage] || STAGES.waiting;
@@ -87,9 +90,20 @@ export default function RequestItem({ req, actions = [], onAction, busy, currenc
     { label: "Asked by", value: req.createdBy?.name && req.createdBy.name !== req.staffName ? `${req.createdBy.name}${req.createdBy.role ? ` (${roleLabel(req.createdBy.role)})` : ""}` : "" },
   ].filter((f) => f?.value);
 
+  const asPaper = paper && type?.money;
   return (
     <Card className="p-4">
-      <div className="flex items-start gap-3">
+      {asPaper && (
+        <div className="space-y-2">
+          <p className="flex flex-wrap items-center gap-1.5">
+            <Badge tone={st.tone} className="px-2 py-px text-[10px]">{st.label}</Badge>
+            {branchName && <Badge tone="neutral" className="px-2 py-px text-[10px]">{branchName}</Badge>}
+            {stage === "waiting" && req.askedAt && <span className="text-xs text-muted">waiting {since(req.askedAt)}</span>}
+          </p>
+          <VoucherPaper sheet={requestSheet(req, { branch: paper.branch, currency, money: (v) => formatMoney(v, currency) })} sigs={paper.sigs || {}} />
+        </div>
+      )}
+      <div className={cn("flex items-start gap-3", asPaper && "hidden")}>
         {showWho && <Avatar name={req.staffName} />}
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-center gap-1.5">
@@ -127,7 +141,12 @@ export default function RequestItem({ req, actions = [], onAction, busy, currenc
       ))}
       {/* the till after giving it, for whoever approves (Requested panel, cash roles) */}
       {!isLeave && actions.includes("approve") && <AfterThis free={free} amount={req.amount} currency={currency} />}
-      <Trail req={req} />
+      {!asPaper && <Trail req={req} />}
+      {req.voucher?.image && (
+        <a href={req.voucher.image} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand hover:underline">
+          <FileText className="size-3.5" /> Signed voucher
+        </a>
+      )}
       {stage === "rejected" && req.rejectReason && <p className="mt-2 text-xs text-danger">Why: {req.rejectReason}</p>}
 
       {actions.length > 0 && (
