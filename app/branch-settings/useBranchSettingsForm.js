@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   useGetSingleBranchQuery,
   useUpdateBranchMutation,
@@ -47,6 +47,8 @@ export default function useBranchSettingsForm() {
   const [saveError, setSaveError] = useState("");
 
   // seed the form once both are loaded
+  const justSaved = useRef(false);
+
   useEffect(() => {
     if (!branch || !settings) return;
 
@@ -114,7 +116,9 @@ export default function useBranchSettingsForm() {
     };
 
     setForm(newForm);
-    if (!initialFormText) {
+    // first load, or the copy read back after a save: this is now "no changes"
+    if (!initialFormText || justSaved.current) {
+      justSaved.current = false;
       setInitialFormText(JSON.stringify(newForm));
     }
   }, [branch, settings]);
@@ -178,7 +182,8 @@ export default function useBranchSettingsForm() {
       return false;
     }
 
-    // Reset dirty state on successful save
+    // Reset dirty state on successful save (and again when it is read back)
+    justSaved.current = true;
     setInitialFormText(JSON.stringify({ ...form, basic: { ...form.basic, ...branchUpdates } }));
     return true;
   };
