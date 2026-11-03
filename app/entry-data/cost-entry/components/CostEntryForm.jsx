@@ -286,6 +286,8 @@ export default function CostEntryForm ({ form, voucherLimits, usedToday = 0, gro
           <ProofUpload
             label='Invoice'
             pdf
+            pageDrop={false}
+            paste
             shrink={SHRINK}
             file={file}
             preview={filePreview}

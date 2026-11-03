@@ -3,7 +3,7 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Camera, ExternalLink, FileText, ImageDown, ImageUp, Trash2 } from "lucide-react";
 import { cn, toast } from "@/app/components/ui";
-import { DropOverlay, hasFiles, isPdf, prepareFile, sizeOf, usePageDrop } from "./pageDrop";
+import { DropOverlay, hasFiles, isPdf, prepareFile, sizeOf, useFilesOverPage, usePageDrop, usePastedPhoto } from "./pageDrop";
 
 /**
  * A photo as proof (Z report, receipt…): tap to take or choose one, see it,
@@ -12,7 +12,9 @@ import { DropOverlay, hasFiles, isPdf, prepareFile, sizeOf, usePageDrop } from "
  * Big photos are shrunk before upload (`shrink` = { maxMB, maxSide }).
  * `pdf` also takes PDF files (shown as a file card; pass the picked `file`).
  * `progress` (0–100) shows the upload; `required` marks it as needed.
- * `pageDrop={false}` limits dropping to the box (use it when a page has two).
+ * `pageDrop={false}` limits dropping to the box (use it when a page has two):
+ * while a file is dragged, every box lights up, and it goes in the one it's
+ * dropped on. `paste` lets that box take Ctrl+V too (one box per page).
  * onPick(file, url) · onRemove()
  */
 export default function ProofUpload({
@@ -23,6 +25,7 @@ export default function ProofUpload({
   required = false,
   invalid = false,
   pageDrop = true,
+  paste = false,
   pdf = false,
   pdfOnly = false,
   shrink = { maxMB: 1.2, maxSide: 2200 },
@@ -50,6 +53,9 @@ export default function ProofUpload({
 
   // Drag a photo anywhere on the page; paste one with Ctrl+V.
   const { dragging, reset } = usePageDrop((files) => take(files[0]), pageDrop);
+  // or, with more than one box on the page: each shows it can take the file
+  const filesOverPage = useFilesOverPage(!pageDrop);
+  usePastedPhoto((files) => take(files[0]), !pageDrop && paste);
 
   const pick = (e) => {
     const picked = e.target.files?.[0];
@@ -59,6 +65,9 @@ export default function ProofUpload({
 
   // dropping onto the box itself (also when page-wide dropping is off)
   const boxDrop = {
+    onDragEnter: (e) => {
+      if (hasFiles(e)) e.preventDefault();
+    },
     onDragOver: (e) => {
       if (!hasFiles(e)) return;
       e.preventDefault();
@@ -75,7 +84,7 @@ export default function ProofUpload({
     },
   };
 
-  const target = overBox || dragging;
+  const target = overBox || dragging || filesOverPage;
 
   return (
     <div>
@@ -107,7 +116,7 @@ export default function ProofUpload({
               {busy ? "Preparing…" : target ? "Drop it here" : pdfOnly ? "Choose a PDF" : pdf ? "Take a photo or choose a file" : "Take or choose a photo"}
             </span>
             {/* computers: say it can be dragged or pasted too */}
-            {!busy && !target && <span className="hidden text-xs text-muted lg:block">or drag one here · Ctrl+V to paste</span>}
+            {!busy && !target && <span className="hidden text-xs text-muted lg:block">{pageDrop || paste ? "or drag one here · Ctrl+V to paste" : "or drag one here"}</span>}
             <input type="file" accept={pdfOnly ? "application/pdf" : pdf ? "image/*,application/pdf" : "image/*"} onChange={pick} className="sr-only" />
           </motion.label>
         ) : (pdf || pdfOnly) && isPdf(file) ? (

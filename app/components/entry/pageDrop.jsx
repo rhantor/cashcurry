@@ -70,6 +70,67 @@ export function usePageDrop(onFiles, enabled = true) {
   return { dragging, reset };
 }
 
+/**
+ * For a page with more than one box, where each takes only what is dropped on
+ * it: whether files are being dragged over the page, so every box can show
+ * it's a target. A file dropped between boxes is ignored, never opened by the
+ * browser in place of the app. Capture phase: a box's own drop stops the
+ * event before it would reach the window.
+ */
+export function useFilesOverPage(enabled = true) {
+  const [over, setOver] = useState(false);
+  const depth = useRef(0);
+  useEffect(() => {
+    if (!enabled) return;
+    const enter = (e) => {
+      if (!hasFiles(e)) return;
+      depth.current += 1;
+      setOver(true);
+    };
+    const hover = (e) => {
+      if (hasFiles(e)) e.preventDefault();
+    };
+    const leave = (e) => {
+      if (!hasFiles(e)) return;
+      depth.current = Math.max(0, depth.current - 1);
+      if (!depth.current) setOver(false);
+    };
+    const end = (e) => {
+      if (hasFiles(e)) e.preventDefault();
+      depth.current = 0;
+      setOver(false);
+    };
+    window.addEventListener("dragenter", enter, true);
+    window.addEventListener("dragover", hover, true);
+    window.addEventListener("dragleave", leave, true);
+    window.addEventListener("drop", end, true);
+    return () => {
+      window.removeEventListener("dragenter", enter, true);
+      window.removeEventListener("dragover", hover, true);
+      window.removeEventListener("dragleave", leave, true);
+      window.removeEventListener("drop", end, true);
+    };
+  }, [enabled]);
+  return over;
+}
+
+/** A photo pasted with Ctrl+V goes to `onFiles(files[])`. */
+export function usePastedPhoto(onFiles, enabled = true) {
+  const latest = useRef(onFiles);
+  latest.current = onFiles;
+  useEffect(() => {
+    if (!enabled) return;
+    const paste = (e) => {
+      const files = Array.from(e.clipboardData?.files || []).filter((f) => f.type?.startsWith("image/"));
+      if (!files.length) return;
+      e.preventDefault();
+      latest.current(files);
+    };
+    window.addEventListener("paste", paste);
+    return () => window.removeEventListener("paste", paste);
+  }, [enabled]);
+}
+
 /** The whole screen as the drop target while files are dragged over it. */
 export function DropOverlay({ show, title = "Drop the photo here", note }) {
   const [mounted, setMounted] = useState(false); // the portal is client-only
