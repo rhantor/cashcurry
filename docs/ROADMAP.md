@@ -53,7 +53,7 @@ Nothing here changes what users see. It lets us change things without fear.
   Also fixed: the cash books read only the newest 100 loan records; the company dashboard
   dated salaries by entry time. One figure changed on purpose — see "Open decisions"
   (banked sales follow the branch settings).
-- **1.3 How you check:** Branch Settings → General → "Region & business day" shows the branch's
+- **1.3 How you check:** Branch Settings → Money → "Currency and business day" shows the branch's
   clock, the date new entries default to, and how money is written; with "Day ends at 05:00",
   a sale form opened at 1:30am defaults to the previous day. Settings live in existing fields
   (`attendance.dayCutoffTime` is the same cut-off the POS uses); a branch with no cut-off

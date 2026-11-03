@@ -1,7 +1,7 @@
 "use client";
 import React, { useState, useEffect } from "react";
 import SettingsSection from "./SettingsSection";
-import { FieldRow, TextField, NumberField, Toggle, SectionCard } from "./fields";
+import { FieldRow, NumberField, Toggle, SectionCard } from "./fields";
 import ShiftRulesSection from "./ShiftRulesSection";
 import { useGetStaffListQuery, useUpdateStaffMutation } from "@/lib/redux/api/staffApiSlice";
 import { registerBiometric, isBiometricAvailable } from "@/lib/attendance/biometric";
@@ -95,14 +95,6 @@ export default function AttendanceSettingsSection({ role, companyId, branchId, v
 
               <SectionCard title="Punch Rules" subtitle="Logic for validating and processing punches.">
                 <div className="space-y-4 mt-4">
-                  <FieldRow label="Day Cutoff Time" hint="When the business day ends (e.g. 05:00) — also used for sales, costs and the POS">
-                    <TextField
-                      type="time"
-                      value={v.dayCutoffTime}
-                      onChange={(dayCutoffTime) => patch({ dayCutoffTime })}
-                      disabled={!can("dayCutoffTime")}
-                    />
-                  </FieldRow>
                   <FieldRow label="Duplicate Interval (Min)" hint="Ignore punches within X minutes">
                     <NumberField
                       value={v.duplicatePunchInterval}

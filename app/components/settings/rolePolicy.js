@@ -2,7 +2,8 @@ export function canEdit(role, section, field) {
   const isOwner = role === "owner" || role === "superAdmin" || role === "branchAdmin" || role === "admin";
   if (isOwner) return true;
 
-  if (role === "manager") {
+  // a GM runs branches too (branchSettings.manage in the roles matrix), not their money settings
+  if (role === "manager" || role === "gm") {
     const allow = {
       basic: ["phone", "whatsapp", "email", "address"],
       financeSales: ["tenders"], // label/enable/order only
