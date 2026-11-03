@@ -51,6 +51,7 @@ export default function BranchSection({ role, value, onChange }) {
         {text("Company name", "companyName", "e.g. Cash Curry Sdn. Bhd.")}
         {text("Registration no.", "companyRegistration", "e.g. 202401012345 (1234567-A)")}
       </Group>
+      {!can("name") && <p className="text-[13px] text-muted">The branch name, short code and company details can be changed only by the owner, super admin or branch admin.</p>}
     </>
   );
 }
