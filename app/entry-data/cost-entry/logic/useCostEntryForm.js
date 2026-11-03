@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import imageCompression from 'browser-image-compression'
 import { useDefaultDate } from '@/app/hooks/useRegion'
-import { getSessionUser } from '@/lib/session'
+import useSession from '@/app/hooks/useSession'
 import { toast } from "@/app/components/ui/notify";
 
 export function useCostEntryForm () {
@@ -28,21 +28,12 @@ export function useCostEntryForm () {
   const [receiptFile, setReceiptFile] = useState(null)
   const [receiptProgress, setReceiptProgress] = useState(0)
 
-  const [companyId, setCompanyId] = useState(null)
-  const [branchId, setBranchId] = useState(null)
+  // the branch being worked in: a company role's is the one picked at the top
+  const { companyId, branchId } = useSession()
   const [isSaving, setIsSaving] = useState(false)
 
   const [paidFromOffice, setPaidFromOffice] = useState('front')
   const [paidMethod, setPaidMethod] = useState('cash')
-
-  useEffect(() => {
-    const storedUser = getSessionUser()
-    if (storedUser) {
-      const parsed = storedUser
-      setCompanyId(parsed.companyId)
-      setBranchId(parsed.branchId)
-    }
-  }, [])
 
   // Sync payment method with office type
   useEffect(() => {
