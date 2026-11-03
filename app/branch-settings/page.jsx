@@ -1,14 +1,11 @@
 "use client";
 import React, { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Banknote, Bell, Building2, Clock, ReceiptText, Save, Settings2, TriangleAlert, Undo2, UserCog } from "lucide-react";
-import BasicInfoSection from "@/app/components/settings/BasicInfoSection";
-import RegionSection from "@/app/components/settings/RegionSection";
-import FinanceSalesSection from "@/app/components/settings/FinanceSalesSection";
-import StaffRolesSection from "@/app/components/settings/StaffRolesSection";
-import LoansFinanceSection from "@/app/components/settings/LoansFinanceSection";
-import PurchasesSection from "@/app/components/settings/PurchasesSection";
-import OtherSection from "@/app/components/settings/OtherSection";
+import { Banknote, Bell, Building2, Clock, CreditCard, ReceiptText, Save, ShieldCheck, TriangleAlert, Undo2 } from "lucide-react";
+import BranchSection from "@/app/components/settings/BranchSection";
+import MoneySection from "@/app/components/settings/MoneySection";
+import PaymentMethodsSection from "@/app/components/settings/PaymentMethodsSection";
+import ApprovalsSection from "@/app/components/settings/ApprovalsSection";
 import AttendanceSettingsSection from "@/app/components/settings/AttendanceSettingsSection";
 import PayrollSettingsSection from "@/app/components/settings/PayrollSettingsSection";
 import NotificationsSection from "@/app/components/settings/NotificationsSection";
@@ -19,13 +16,13 @@ import { Button, Card, Skeleton, cn, toast } from "@/app/components/ui";
 import useBranchSettingsForm from "./useBranchSettingsForm";
 
 const TABS = [
-  { id: "general", label: "General", note: "Name, contact, region, money", icon: Building2 },
-  { id: "finance", label: "Sales & money", note: "Ways of paying, sales rules", icon: Banknote },
-  { id: "operations", label: "Staff & spending", note: "Roles, loans, purchases", icon: UserCog },
+  { id: "branch", label: "Branch", note: "Name, contact, address", icon: Building2 },
+  { id: "money", label: "Money", note: "Balances, currency, day end", icon: Banknote },
+  { id: "payment", label: "Payment methods", note: "Cash, card, QR, delivery", icon: CreditCard },
+  { id: "approvals", label: "Approvals & limits", note: "What needs a check first", icon: ShieldCheck },
   { id: "attendance", label: "Attendance", note: "Kiosk, shifts, pay cycle", icon: Clock },
   { id: "payroll", label: "Payroll", note: "Pay mode, OT, deductions", icon: ReceiptText },
   { id: "notifications", label: "Notifications", note: "Who is told what", icon: Bell, only: canManageNotifications },
-  { id: "advanced", label: "Advanced", note: "Everything else", icon: Settings2 },
 ];
 
 // A section that doesn't bring its own card.
@@ -56,7 +53,7 @@ const Heading = ({ title, note }) => (
 export default function BranchSettingsPage() {
   const { role, form, setForm, save, discard, saving, saveError, loadError, isDirty } = useBranchSettingsForm();
   const { companyId, branchId } = useSession();
-  const [activeTab, setActiveTab] = useState("general");
+  const [activeTab, setActiveTab] = useState("branch");
   const tabs = TABS.filter((t) => !t.only || t.only(role));
   const set = (group) => (v) => setForm((prev) => ({ ...prev, [group]: v }));
 
@@ -81,8 +78,6 @@ export default function BranchSettingsPage() {
         <Skeleton className="h-[28rem]" rounded="rounded-2xl" />
       </div>
     );
-
-  const tab = tabs.find((t) => t.id === activeTab);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-5 pb-32 sm:px-6 sm:py-6">
@@ -124,33 +119,31 @@ export default function BranchSettingsPage() {
             </>
           )}
 
-          {activeTab === "general" && (
+          {activeTab === "branch" && (
             <>
-              <Heading title="General" note="The branch's name and contact details, its time zone, business day and money." />
-              <BasicInfoSection role={role} value={form.basic} onChange={set("basic")} />
-              <RegionSection role={role} form={form} setForm={setForm} />
+              <Heading title="Branch" note="The branch's name and how to reach it. These also show on invoices and purchase orders." />
+              <BranchSection role={role} value={form.basic} onChange={set("basic")} />
             </>
           )}
 
-          {activeTab === "finance" && (
+          {activeTab === "money" && (
             <>
-              <Heading title="Sales & money" note="How customers pay, which of those go to the bank, and the sales entry rules." />
-              <FinanceSalesSection role={role} value={form.financeSales} onChange={set("financeSales")} />
+              <Heading title="Money" note="Where this branch's cash and bank figures start, and how its days are counted." />
+              <MoneySection role={role} form={form} setForm={setForm} />
             </>
           )}
 
-          {activeTab === "operations" && (
+          {activeTab === "payment" && (
             <>
-              <Heading title="Staff & spending" note="Staff roles, advances and loans, and purchasing limits." />
-              <Panel title="Staff & roles">
-                <StaffRolesSection role={role} value={form.staffRoles} onChange={set("staffRoles")} />
-              </Panel>
-              <Panel title="Loans & advances">
-                <LoansFinanceSection role={role} value={form.loansFinance} onChange={set("loansFinance")} />
-              </Panel>
-              <Panel title="Purchasing">
-                <PurchasesSection role={role} value={form.purchases} onChange={set("purchases")} />
-              </Panel>
+              <Heading title="Payment methods" note="How customers pay, and what each one does on Sales Entry and in the books." />
+              <PaymentMethodsSection role={role} value={form.financeSales} onChange={set("financeSales")} />
+            </>
+          )}
+
+          {activeTab === "approvals" && (
+            <>
+              <Heading title="Approvals & limits" note="What can be spent or sent without someone checking it first." />
+              <ApprovalsSection role={role} form={form} setForm={setForm} />
             </>
           )}
 
@@ -172,15 +165,6 @@ export default function BranchSettingsPage() {
               <Heading title="Payroll" note="Pay mode, overtime rates and statutory deductions. They apply to every staff member unless set on the person." />
               <Panel>
                 <PayrollSettingsSection form={form} setForm={setForm} />
-              </Panel>
-            </>
-          )}
-
-          {activeTab === "advanced" && (
-            <>
-              <Heading title="Advanced" note={tab?.note} />
-              <Panel>
-                <OtherSection role={role} value={form.other} onChange={set("other")} />
               </Panel>
             </>
           )}

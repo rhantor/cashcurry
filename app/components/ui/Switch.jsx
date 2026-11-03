@@ -4,12 +4,13 @@ import { cn } from "./cn";
 import { spring } from "./motion";
 
 /** On/off toggle; the knob springs across. */
-export default function Switch({ checked, onChange, label, disabled, className }) {
+export default function Switch({ checked, onChange, label, disabled, className, "aria-label": ariaLabel }) {
   return (
     <label className={cn("inline-flex cursor-pointer select-none items-center gap-3", disabled && "cursor-not-allowed opacity-60", className)}>
       <button
         type="button"
         role="switch"
+        aria-label={ariaLabel}
         aria-checked={!!checked}
         disabled={disabled}
         onClick={() => onChange?.(!checked)}
