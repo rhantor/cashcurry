@@ -20,7 +20,7 @@ const RULES = [
   { field: "delivery", label: "Delivery app" },
   { field: "requireProof", label: "Photo needed" },
 ];
-const COLS = "sm:grid-cols-[2rem_minmax(0,1fr)_repeat(4,5.25rem)_4.75rem]";
+const COLS = "sm:grid-cols-[3rem_minmax(0,1fr)_repeat(4,5.25rem)_4.75rem]";
 
 export default function PaymentMethodsSection({ role, value, onChange }) {
   const fin = value || {};
