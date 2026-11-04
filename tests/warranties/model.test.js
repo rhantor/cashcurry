@@ -117,8 +117,9 @@ describe("the list", () => {
   it("renewing moves the old period into its history", () => {
     const old = w("2026-11-10", { startDate: "2025-11-10", paperURL: "old" });
     const p = renewalPatch(old, { endsOn: "2027-11-10", paperURL: "new", by: "Maya", now: new Date("2026-11-04T00:00:00Z") });
-    expect(p).toMatchObject({ endsOn: "2027-11-10", status: "active", paperURL: "new", startDate: "2026-11-11" });
-    expect(p.history).toEqual([{ startDate: "2025-11-10", endsOn: "2026-11-10", paperURL: "old", renewedAt: "2026-11-04T00:00:00.000Z", renewedBy: "Maya" }]);
+    expect(p).toEqual(expect.objectContaining({ endsOn: "2027-11-10", status: "active", paperURL: "new" }));
+    expect(p.startDate).toBeUndefined(); // the day it was bought stays
+    expect(p.history).toEqual([{ endsOn: "2026-11-10", paperURL: "old", renewedAt: "2026-11-04T00:00:00.000Z", renewedBy: "Maya" }]);
     expect(renewalPatch(old, { endsOn: "2027-11-10" }).paperURL).toBe("old");
   });
 });
