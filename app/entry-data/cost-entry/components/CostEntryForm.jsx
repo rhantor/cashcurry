@@ -16,6 +16,8 @@ import { BACK_OFFICE_METHODS, DESCRIPTION_CHIPS } from '../logic/constants'
 import { findCategory, pickable } from '@/lib/costs/categories'
 import { NO_INVOICE_REASONS, voucherHint } from '@/lib/costs/vouchers'
 import { getSessionUser } from '@/lib/session'
+import { offersWarranty } from '@/lib/warranties/model'
+import WarrantyBox from '@/app/components/warranties/WarrantyBox'
 import ImageCaptureEditor from './ImageCaptureEditor'
 
 // Invoices and receipts: photos shrunk like the old uploader did.
@@ -151,7 +153,7 @@ function WhatFor ({ groups, vendors, form, errors }) {
   )
 }
 
-export default function CostEntryForm ({ form, voucherLimits, usedToday = 0, groups = [], vendors = [], onSave, errors = {}, saved = false, recent }) {
+export default function CostEntryForm ({ form, voucherLimits, usedToday = 0, groups = [], vendors = [], onSave, errors = {}, saved = false, recent, warranty }) {
   const {
     date,
     setDate,
@@ -254,6 +256,12 @@ export default function CostEntryForm ({ form, voucherLimits, usedToday = 0, gro
 
         <EntrySection title='What for'>
           <WhatFor groups={groups} vendors={vendors} form={form} errors={errors} />
+
+          {warranty && offersWarranty(findCategory(groups, form.category)?.category) && (
+            <div className='mt-4'>
+              <WarrantyBox warranty={warranty} vendors={vendors} errors={errors.warranty} startDate={date} />
+            </div>
+          )}
 
           <Field label='Note' className='mt-5'>
             {({ id }) => (
@@ -375,6 +383,7 @@ CostEntryForm.propTypes = {
   onSave: PropTypes.func.isRequired,
   errors: PropTypes.object,
   saved: PropTypes.bool,
-  recent: PropTypes.node
+  recent: PropTypes.node,
+  warranty: PropTypes.object
 }
 

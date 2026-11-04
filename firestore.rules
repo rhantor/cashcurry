@@ -409,6 +409,7 @@ service cloud.firestore {
     function canPurchasesOrder(c, b)  { return may(c, b, leadRoles().concat(['inCharge', 'accountant', 'supervisor'])); }
     function canPurchasesApprove(c, b){ return may(c, b, leadRoles().concat(['inCharge'])); }
     function canPurchasesBills(c, b)  { return may(c, b, leadRoles().concat(['accountant'])); }
+    function canWarranties(c, b)      { return may(c, b, leadRoles().concat(['inCharge', 'accountant', 'supervisor'])); }
     function canBranchSettings(c, b)  { return may(c, b, leadRoles()); }
     // reservation deposit receipts (lib/reservations/receipt.js)
     function canReservationReceipt(c, b) { return may(c, b, officeBranchRoles()); }
@@ -1307,6 +1308,20 @@ service cloud.firestore {
                            request.resource.data.status in ['held', 'used', 'refunded', 'cancelled'] &&
                            changedKeys().hasOnly(['status', 'statusBy', 'statusAt', 'statusNote', 'updatedAt']);
           allow delete: if false;
+        }
+
+        // ── Warranties (lib/warranties/model.js) ─────────────────────────────
+        // Not money. Made in the maker's own name; `reminded` is the server's.
+        match /warranties/{docId} {
+          allow read: if canWarranties(companyId, branchId);
+          allow create: if canWarranties(companyId, branchId) &&
+                           request.resource.data.createdBy.uid == request.auth.uid &&
+                           request.resource.data.itemName is string &&
+                           request.resource.data.endsOn is string &&
+                           !request.resource.data.keys().hasAny(['reminded']);
+          allow update: if canWarranties(companyId, branchId) &&
+                           !changedKeys().hasAny(['createdBy', 'createdAt', 'reminded']);
+          allow delete: if canRecordsDelete(companyId, branchId);
         }
 
         // ── POS: Order Guides ────────────────────────────────────────────────
