@@ -223,6 +223,16 @@ await db.doc(`joinLinks/${hash}`).set({ companyId: CO, branchId: KL, hireId: H, 
 // 3. Arif — just added: prepare the letter, make the link
 await hires.doc("demo-hire-arif").set({ firstName: "Arif", lastName: "Hakim", phone: "012-999 1111", role: "kitchenHelper", department: "Kitchen", startDate: addDays(TODAY, 10), basicSalary: 1500, status: "draft", letterReady: false, ...created });
 
+// ── warranties: one of each state, relative to today ────────────────────────
+const warrantySamples = [
+  { id: "demo-warranty-chiller", itemName: "Walk-in chiller", soldBy: "Cold Tech Sdn Bhd", soldByEmail: "sales@coldtech.example", soldByPhone: "03-5555 0101", serial: "CT-88213", startDate: addDays(TODAY, -353), endsOn: addDays(TODAY, 12), status: "active" },
+  { id: "demo-warranty-oven", itemName: "Combi oven", soldBy: "Kitchen Pro Supplies", soldByEmail: "service@kitchenpro.example", startDate: addDays(TODAY, -724), endsOn: addDays(TODAY, 6), status: "active" },
+  { id: "demo-warranty-pos", itemName: "Receipt printer", soldBy: "Mega IT", startDate: addDays(TODAY, -368), endsOn: addDays(TODAY, -3), status: "active" },
+  { id: "demo-warranty-fryer", itemName: "Double fryer", soldBy: "Kitchen Pro Supplies", startDate: addDays(TODAY, -60), endsOn: addDays(TODAY, 305), status: "active" },
+  { id: "demo-warranty-mixer", itemName: "Stand mixer", soldBy: "Mega IT", startDate: addDays(TODAY, -700), endsOn: addDays(TODAY, 20), status: "notRenewing", stoppedBy: "Demo Manager" },
+];
+for (const { id, ...w } of warrantySamples) await kl.collection("warranties").doc(id).set({ ...w, vendorId: "", serial: w.serial || "", soldByEmail: w.soldByEmail || "", soldByPhone: w.soldByPhone || "", note: "", paperURL: null, history: [], createdBy: { uid: "demo", name: "Demo Manager" }, createdAt: Timestamp.now() });
+
 // ── the guide and the login buttons ─────────────────────────────────────────
 const accountsFile = path.join(LOCAL_DIR, "DEV_ACCOUNTS.md");
 fs.writeFileSync(accountsFile, fs.readFileSync(accountsFile, "utf8").trimEnd() + "\n" + NEW_LOGINS.map((p) => `| staff | ${p.username} | ${p.firstName} ${p.lastName} | Demo Branch KL |`).join("\n") + "\n");
@@ -237,6 +247,7 @@ fs.appendFileSync(guideFile, `
 - **To decide:** Ali's RM 200 advance (he already owes RM 100), Sam's leave on ${nextOff} (Ali is off that day), Kumar's RM 150 advance.
 - **New hires:** Faiz Rahman — filled in and signed (check, then Accept); Hana Lim — link sent; Arif Hakim — just added.
 - **Hana's join link:** \`/join/${token}\` — open \`http://<this computer's Wi-Fi address>:3000/join/${token}\` on a phone.
+- **Warranties** (Purchases → Warranties): chiller 12 days left, oven 6 days left, printer ended 3 days ago, fryer covered, mixer not renewing. \`npm run local:reminders\` sends the warnings to the bell (at the branch's summary hour; add \`-- --at <that time>\` for another hour).
 - New staff app logins: **sam**, **nora** (same password as the rest).
 `);
 fs.writeFileSync(path.join(LOCAL_DIR, "JOIN_LINK.txt"), `/join/${token}\n`);
