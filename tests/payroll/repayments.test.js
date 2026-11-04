@@ -143,6 +143,14 @@ describe("reverseRepayment", () => {
     expect(reverseRepayment({ amount: 100, installments: [due(1, "2026-07")] }, [{ index: 1, amount: 100, due: 100 }], before)).toBeNull();
   });
 
+  it("puts back one instalment when several share a month", () => {
+    const before = undoOf([paid(1, "2026-10"), due(2, "2026-10"), due(3, "2026-10")]);
+    const current = { amount: 300, installments: [paid(1, "2026-10"), paid(2, "2026-10"), due(3, "2026-10")] };
+    const r = reverseRepayment(current, [{ index: 2, amount: 100, due: 100 }], before);
+    expect(r.installments.map((i) => i.status)).toEqual(["paid", "pending", "pending"]);
+    expect(r.totalPaid).toBe(100);
+  });
+
   it("handles a run's slip saved before due was recorded", () => {
     const before = undoOf([due(1, "2026-07")]);
     const r = reverseRepayment({ amount: 100, installments: [paid(1, "2026-07")] }, [{ index: 1, amount: 100 }], before);

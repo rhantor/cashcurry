@@ -217,8 +217,14 @@ export default function PayrollBuilder () {
   }, [roster, searchTerm])
 
   // ── Advance/loan deductions per staff for this period ─────────────────────
+  // A finalized or paid month took its instalments already (they're no longer
+  // pending), so it shows what its slips took.
   const advanceByStaff = useMemo(() => {
     const map = {}
+    if (locked) {
+      for (const slip of savedSlips) map[slip.staffId] = slip.deductionMeta?.advances || []
+      return map
+    }
     for (const adv of advanceList) {
       // Deduct only what was actually handed over (approved AND paid out).
       if (!adv.staffId || adv.status !== 'approved' || !isPaidOut(adv)) continue
@@ -229,10 +235,14 @@ export default function PayrollBuilder () {
       })
     }
     return map
-  }, [advanceList, period])
+  }, [advanceList, period, locked, savedSlips])
 
   const loanByStaff = useMemo(() => {
     const map = {}
+    if (locked) {
+      for (const slip of savedSlips) map[slip.staffId] = slip.deductionMeta?.loans || []
+      return map
+    }
     for (const ln of loanList) {
       if (!ln.staffId || ln.status !== 'approved' || !isPaidOut(ln)) continue
       const inst = (ln.installments || []).find(i => i.month === period && i.status === 'pending')
@@ -242,7 +252,7 @@ export default function PayrollBuilder () {
       })
     }
     return map
-  }, [loanList, period])
+  }, [loanList, period, locked, savedSlips])
 
   // ── Totals for header ─────────────────────────────────────────────────────
   const totals = useMemo(() => {
