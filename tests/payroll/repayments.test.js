@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { calcPayroll } from "@/lib/payroll/calculations";
-import { allocateTaken, applyRepayment } from "@/lib/payroll/repayments";
+import { allocateTaken, applyRepayment, reverseRepayment } from "@/lib/payroll/repayments";
 
 const staff = { basicSalary: 1000, salaryMode: "days", workingDays: 26 };
 const fullMonth = { workedDays: 26 };
@@ -88,5 +88,64 @@ describe("applyRepayment", () => {
 
   it("does nothing to an instalment already paid", () => {
     expect(applyRepayment(loan, 1, 100, { amount: 300, now })).toBeNull();
+  });
+});
+
+describe("reverseRepayment", () => {
+  const now = "2026-10-31T00:00:00.000Z";
+  const paid = (index, month, amount = 100) => ({ index, month, amount, status: "paid", paidAt: now });
+  const due = (index, month, amount = 100) => ({ index, month, amount, status: "pending", paidAt: null });
+  const undoOf = (installments, extra = {}) => ({ installments, totalPaid: 0, remainingAmount: 300, status: "approved", ...extra });
+
+  it("puts back only this month when a later month has been repaid too", () => {
+    const before = undoOf([due(1, "2026-07"), due(2, "2026-08"), due(3, "2026-09")]);
+    const current = { amount: 300, installments: [paid(1, "2026-07"), paid(2, "2026-08"), due(3, "2026-09")] };
+    const r = reverseRepayment(current, [{ index: 1, amount: 100, due: 100 }], before);
+    expect(r.installments.map((i) => i.status)).toEqual(["pending", "paid", "pending"]);
+    expect(r.totalPaid).toBe(100);
+    expect(r.remainingAmount).toBe(200);
+    expect(r.installments[0].paidAt).toBeNull();
+  });
+
+  it("reopens a closed loan", () => {
+    const before = undoOf([paid(1, "2026-07"), due(2, "2026-08")], { totalPaid: 100, remainingAmount: 100 });
+    const current = { amount: 200, status: "closed", installments: [paid(1, "2026-07"), paid(2, "2026-08")] };
+    const r = reverseRepayment(current, [{ index: 2, amount: 100, due: 100 }], before);
+    expect(r.status).toBe("approved");
+    expect(r.remainingAmount).toBe(100);
+  });
+
+  it("undoes a carry-over from the snapshot when nothing was paid since", () => {
+    const list = [due(1, "2026-07"), due(2, "2026-08")];
+    const { installments } = applyRepayment(list, 1, 40, { amount: 200, now });
+    expect(installments).toHaveLength(3);
+    const r = reverseRepayment({ amount: 200, installments }, [{ index: 1, amount: 40, due: 100 }], undoOf(list, { remainingAmount: 200 }));
+    expect(r.installments).toEqual(list);
+    expect(r.remainingAmount).toBe(200);
+  });
+
+  it("refuses when this month changed the schedule and a later month was paid", () => {
+    const list = [due(1, "2026-07"), due(2, "2026-08")];
+    const first = applyRepayment(list, 1, 40, { amount: 200, now }).installments;
+    const later = applyRepayment(first, 2, 100, { amount: 200, now }).installments;
+    expect(reverseRepayment({ amount: 200, installments: later }, [{ index: 1, amount: 40, due: 100 }], undoOf(list))).toBeNull();
+  });
+
+  it("refuses an old snapshot once an earlier month was put back", () => {
+    // August's snapshot says July was paid; July has since been reopened
+    const before = undoOf([paid(1, "2026-07"), due(2, "2026-08"), due(3, "2026-09")]);
+    const after = applyRepayment([due(1, "2026-07"), due(2, "2026-08"), due(3, "2026-09")], 2, 50, { amount: 300, now }).installments;
+    expect(reverseRepayment({ amount: 300, installments: after }, [{ index: 2, amount: 50, due: 100 }], before)).toBeNull();
+  });
+
+  it("refuses when the instalment isn't paid any more", () => {
+    const before = undoOf([due(1, "2026-07")]);
+    expect(reverseRepayment({ amount: 100, installments: [due(1, "2026-07")] }, [{ index: 1, amount: 100, due: 100 }], before)).toBeNull();
+  });
+
+  it("handles a run's slip saved before due was recorded", () => {
+    const before = undoOf([due(1, "2026-07")]);
+    const r = reverseRepayment({ amount: 100, installments: [paid(1, "2026-07")] }, [{ index: 1, amount: 100 }], before);
+    expect(r.installments[0].status).toBe("pending");
   });
 });
