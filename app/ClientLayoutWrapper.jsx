@@ -9,7 +9,6 @@ import { Loader, UIProvider } from "./components/ui";
 import NotificationsProvider from "@/app/components/notifications/NotificationsProvider";
 import RegionSync from "@/app/components/region/RegionSync";
 import NativeBridge from "@/app/components/native/NativeBridge";
-import DeviceCopy from "@/app/components/device/DeviceCopy";
 
 export default function ClientLayoutWrapper({ children }) {
   const router = useRouter();
@@ -65,8 +64,6 @@ export default function ClientLayoutWrapper({ children }) {
         {isLoggedIn && !isAuthPage && <RegionSync />}
         {/* the staff Android app: fingerprint lock, push, back button (nothing in a browser) */}
         <NativeBridge />
-        {/* phones: the saved copy of the app, and a note when showing it */}
-        {isLoggedIn && !isAuthPage && <DeviceCopy uid={user.uid} />}
 
         {isAuthPage ? (
           <div className="min-h-screen bg-background">
