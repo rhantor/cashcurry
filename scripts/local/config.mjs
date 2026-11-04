@@ -1,6 +1,7 @@
 // Shared settings for the local (emulator) development setup.
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { findBackupDir } from "./backupDir.mjs";
 
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -12,9 +13,7 @@ export const LOCAL_PROJECT_ID = "demo-cashcurry";
 export const LOCAL_DIR = path.join(ROOT, ".local");
 export const EMULATOR_DATA_DIR = path.join(LOCAL_DIR, "emulator-data");
 
-export const BACKUP_DIR = process.env.CC_BACKUP_DIR
-  ? path.resolve(process.env.CC_BACKUP_DIR)
-  : path.resolve(ROOT, "../backup_saffron_empire");
+export const BACKUP_DIR = findBackupDir(ROOT);
 
 // What the web app needs to talk to the emulators. Real environment variables
 // win over .env.local in Next.js, so these override the production config.

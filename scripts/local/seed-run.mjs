@@ -3,7 +3,7 @@
 // `npm run dev:local`.
 //
 //   npm run local:seed          made-up demo company (default — no client data)
-//   npm run local:seed:backup   a real company backup (CC_BACKUP_DIR or ../backup_*)
+//   npm run local:seed:backup   a real company backup (CC_BACKUP_DIR or .local/backup-path.txt)
 import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";

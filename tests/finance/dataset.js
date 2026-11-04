@@ -9,20 +9,19 @@
 //   }
 import fs from "node:fs";
 import path from "node:path";
-
-export const DEFAULT_BACKUP_DIR = path.resolve(process.cwd(), "../backup_saffron_empire");
+import { findBackupDir } from "../../scripts/local/backupDir.mjs";
 
 export function backupDir() {
-  return process.env.CC_BACKUP_DIR ? path.resolve(process.env.CC_BACKUP_DIR) : DEFAULT_BACKUP_DIR;
+  return findBackupDir(process.cwd());
 }
 
 export function hasBackup(dir = backupDir()) {
-  return fs.existsSync(path.join(dir, "company", "company.json"));
+  return !!dir && fs.existsSync(path.join(dir, "company", "company.json"));
 }
 
 const readJson = (p) => JSON.parse(fs.readFileSync(p, "utf8"));
 
-/** Load a backup made by backup_saffron_empire/export-script.cjs. */
+/** Load a backup made by the export script that sits in the backup folder. */
 export function loadBackup(dir = backupDir()) {
   const company = readJson(path.join(dir, "company", "company.json"));
   const companyCols = {};

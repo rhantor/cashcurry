@@ -24,7 +24,7 @@ export default function BasicInfoSection({ role, value, onChange }) {
                   value={v.name}
                   onChange={(name) => patch({ name })}
                   disabled={!can("name")}
-                  placeholder="e.g., Lazeez KLCC"
+                  placeholder="e.g., Cash Curry KLCC"
                 />
               </FieldRow>
 

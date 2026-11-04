@@ -60,7 +60,8 @@ golden figures — recorded from the full download — also prove the fast path.
 Tests run in Malaysia time. `CC_TEST_TZ=UTC npm test` runs them as the Cloud
 Functions server would (two tests about the device's own day are skipped).
 
-The backup is read from `../backup_saffron_empire`, or `CC_BACKUP_DIR`. Without
+The backup is read from `CC_BACKUP_DIR`, or the path in the git-ignored
+`.local/backup-path.txt`. Without
 it, the backup tests are skipped and only the hand-made example runs.
 
 ### Real client data stays out of git

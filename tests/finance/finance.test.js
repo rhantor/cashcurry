@@ -6,8 +6,8 @@
 //
 // 1. "cash rules": a small hand-made branch whose every figure is worked out
 //    by hand below. Always runs.
-// 2. "golden": the full company backup (../backup_saffron_empire, or
-//    CC_BACKUP_DIR). Every branch × month must match the recorded figures in
+// 2. "golden": the full company backup (CC_BACKUP_DIR, or the path in
+//    .local/backup-path.txt). Every branch × month must match the recorded figures in
 //    __golden__/, the dashboards must agree with the summary report, and the
 //    company total must equal the sum of the branches. Skipped if the backup
 //    isn't on this machine.
