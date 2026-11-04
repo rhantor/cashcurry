@@ -8,7 +8,6 @@ import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 import { useAddDepositEntryMutation, useGetDepositEntryQuery } from "@/lib/redux/api/depositApiSlice";
 import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
-import { exportDepositToExcel, exportDepositToPDF, shareDeposit } from "@/app/export/exportDepositData";
 import useCurrency from "@/app/hooks/useCurrency";
 import useSession from "@/app/hooks/useSession";
 import { useDefaultDate } from "@/app/hooks/useRegion";
@@ -21,6 +20,9 @@ import RecordSheet from "@/app/components/entry/RecordSheet";
 import { EntryLayout, EntrySection, MoneyRoute, RecentEntries, SummaryLine } from "@/app/components/entry/EntryLayout";
 
 import { personName } from "@/lib/people";
+
+// Excel and PDF are heavy: they load when someone exports.
+const depositExports = () => import("@/app/export/exportDepositData");
 const day = (d) => (d ? format(parseISO(d), "EEE, d MMM") : "");
 
 /**
@@ -241,9 +243,9 @@ export default function DepositEntryPage() {
           files={viewing.fileURL ? [viewing.fileURL] : []}
           by={personName(viewing.createdBy)}
           at={viewing.createdAt}
-          share={() => shareDeposit(viewing, branchData)}
-          pdf={() => exportDepositToPDF(viewing, branchData)}
-          excel={() => exportDepositToExcel(viewing, branchData)}
+          share={() => depositExports().then((x) => x.shareDeposit(viewing, branchData))}
+          pdf={() => depositExports().then((x) => x.exportDepositToPDF(viewing, branchData))}
+          excel={() => depositExports().then((x) => x.exportDepositToExcel(viewing, branchData))}
         />
       )}
     </>

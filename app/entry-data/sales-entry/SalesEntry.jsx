@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { format, parseISO } from "date-fns";
 import { AnimatePresence, motion } from "framer-motion";
 import { CalendarCheck2, Landmark, NotebookPen, Pencil, Wallet, X } from "lucide-react";
@@ -21,13 +22,15 @@ import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
 import { formatMoney } from "@/lib/region/currency";
 import { getSessionUser } from "@/lib/session";
 import useCrudActions from "@/app/components/common/useCrudActions";
-import ItemsReportModal from "@/app/reports/sales-report/SalesReportModal";
 import { Badge, Button, CountUp, DatePicker, Field, Input, Skeleton, cn, confirmDialog, toast } from "@/app/components/ui";
 import MoneyInput from "@/app/components/entry/MoneyInput";
 import ProofUpload from "@/app/components/entry/ProofUpload";
 import { EntryLayout, EntrySection, RecentEntries, SummaryLine } from "@/app/components/entry/EntryLayout";
 
 import { personName } from "@/lib/people";
+
+// With its Excel and PDF, the heaviest part of this page: it loads when a day is opened.
+const ItemsReportModal = dynamic(() => import("@/app/reports/sales-report/SalesReportModal"), { ssr: false });
 const day = (d) => (d ? format(parseISO(d), "EEE, d MMM") : "");
 const blank = (tenders) => Object.fromEntries(tenders.map((t) => [t.key, ""]));
 
