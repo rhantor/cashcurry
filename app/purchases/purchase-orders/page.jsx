@@ -24,6 +24,7 @@ import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlic
 import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
 import { useGetCompanyDetailsQuery } from "@/lib/redux/api/authApiSlice";
 import ConfirmSheet from "@/app/components/purchases/ConfirmSheet";
+import { OrdersDue } from "@/app/components/purchases/OrderReminders";
 import { filterItems } from "@/app/components/purchases/ItemFilterBar";
 import useToast from "@/app/components/purchases/useToast";
 import { uploadInvoiceFile } from "@/lib/storage/uploadInvoice";
@@ -587,6 +588,8 @@ export default function PurchaseOrdersPage() {
           <Plus className="w-5 h-5" /> New Order
         </button>
       </div>
+
+      <OrdersDue companyId={ready ? companyId : null} branchId={ready ? branchId : null} user={user} onPlace={(guide) => router.push(`/purchases/order-guides?order=${guide.id}`)} />
 
       {/* Filters — two big tabs plus search, rather than three dropdowns. */}
       <div className="space-y-3">

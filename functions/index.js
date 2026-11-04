@@ -154,6 +154,8 @@ exports.notifyDailySummary = onSchedule({ schedule: "0 * * * *", timeZone: "UTC"
   await notify.lateOrders(now);
   // and warranties about to end (4 Nov)
   await notify.warrantyReminders(now);
+  // and order guides whose day is coming (4 Nov)
+  await notify.orderReminders(now);
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
