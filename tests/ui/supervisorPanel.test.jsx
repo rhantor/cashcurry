@@ -15,6 +15,7 @@ const requests = [
 ];
 const decide = vi.fn(() => ({ unwrap: () => Promise.resolve({}) }));
 
+vi.mock("@/lib/firebase", () => ({ db: {}, auth: {}, storage: {} }));
 vi.mock("@/app/hooks/useSession", () => ({ default: () => ({ user: me, companyId: "c1", branchId: "b1", role: "supervisor" }) }));
 vi.mock("@/app/hooks/useCurrency", () => ({ default: () => "MYR" }));
 vi.mock("@/lib/redux/api/requestsApiSlice", () => ({
