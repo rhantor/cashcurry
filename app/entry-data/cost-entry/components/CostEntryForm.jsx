@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import PropTypes from 'prop-types'
 import { format, parseISO } from 'date-fns'
 import { AnimatePresence, motion } from 'framer-motion'
-import { FileWarning, ReceiptText, ScanLine, Store } from 'lucide-react'
+import { FileWarning, ReceiptText, ScanLine, ShieldCheck, Store } from 'lucide-react'
 import { Button, CountUp, DatePicker, Field, Input, Select, Sheet, Switch, Textarea, cn } from '@/app/components/ui'
 import MoneyInput from '@/app/components/entry/MoneyInput'
 import ProofUpload from '@/app/components/entry/ProofUpload'
@@ -16,6 +16,8 @@ import { BACK_OFFICE_METHODS, DESCRIPTION_CHIPS } from '../logic/constants'
 import { findCategory, pickable } from '@/lib/costs/categories'
 import { NO_INVOICE_REASONS, voucherHint } from '@/lib/costs/vouchers'
 import { getSessionUser } from '@/lib/session'
+import { offersWarranty } from '@/lib/warranties/model'
+import WarrantyFields from '@/app/components/warranties/WarrantyFields'
 import ImageCaptureEditor from './ImageCaptureEditor'
 
 // Invoices and receipts: photos shrunk like the old uploader did.
@@ -151,7 +153,7 @@ function WhatFor ({ groups, vendors, form, errors }) {
   )
 }
 
-export default function CostEntryForm ({ form, voucherLimits, usedToday = 0, groups = [], vendors = [], onSave, errors = {}, saved = false, recent }) {
+export default function CostEntryForm ({ form, voucherLimits, usedToday = 0, groups = [], vendors = [], onSave, errors = {}, saved = false, recent, warranty }) {
   const {
     date,
     setDate,
@@ -254,6 +256,24 @@ export default function CostEntryForm ({ form, voucherLimits, usedToday = 0, gro
 
         <EntrySection title='What for'>
           <WhatFor groups={groups} vendors={vendors} form={form} errors={errors} />
+
+          {warranty && offersWarranty(findCategory(groups, form.category)?.category) && (
+            <div className='mt-4 rounded-2xl border border-line p-4'>
+              <div className='flex items-center gap-3'>
+                <ShieldCheck className='size-5 shrink-0 text-muted' />
+                <div className='min-w-0 flex-1'>
+                  <p className='text-sm font-semibold text-fg'>Has warranty</p>
+                  <p className='text-xs text-muted'>You&apos;ll be told 15 and 7 days before it ends.</p>
+                </div>
+                <Switch checked={warranty.on} onChange={warranty.setOn} />
+              </div>
+              {warranty.on && (
+                <div className='mt-4'>
+                  <WarrantyFields value={{ ...warranty.value, startDate: warranty.value.startDate || date }} onChange={warranty.onChange} vendors={vendors} errors={errors.warranty || {}} paper={warranty.paper} onPaper={warranty.onPaper} />
+                </div>
+              )}
+            </div>
+          )}
 
           <Field label='Note' className='mt-5'>
             {({ id }) => (
@@ -375,6 +395,7 @@ CostEntryForm.propTypes = {
   onSave: PropTypes.func.isRequired,
   errors: PropTypes.object,
   saved: PropTypes.bool,
-  recent: PropTypes.node
+  recent: PropTypes.node,
+  warranty: PropTypes.object
 }
 

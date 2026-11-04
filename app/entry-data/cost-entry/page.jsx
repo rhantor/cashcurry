@@ -24,6 +24,8 @@ import { useGetSingleBranchQuery } from '@/lib/redux/api/branchApiSlice'
 import { makeVoucherImage } from '@/lib/costs/voucherImage'
 import { selfStamp } from '@/lib/costs/voucherPaper'
 import { personName } from '@/lib/people'
+import { addWarranty, uploadPaper } from '@/lib/warranties/client'
+import { emptyWarranty, offersWarranty, warrantyFields, warrantyProblems } from '@/lib/warranties/model'
 
 const storedUserNow = () => getSessionUser() || {}
 
@@ -74,6 +76,30 @@ export default function CostEntryPage () {
 
   const picked = findCategory(groups, category)
   const resolvedCategory = picked?.category.name || ''
+
+  // a new purchase with a warranty (4 Nov): it gets its own record, after the cost
+  const [hasWarranty, setHasWarranty] = useState(false)
+  const [warranty, setWarranty] = useState(() => emptyWarranty())
+  const [warrantyPaper, setWarrantyPaper] = useState(null)
+  const warrantyOn = hasWarranty && offersWarranty(picked?.category)
+  const changeWarranty = w => {
+    setWarranty(w)
+    setErrors(e => (e.warranty ? { ...e, warranty: undefined } : e))
+  }
+  const saveWarranty = async (costId, amt) => {
+    const me = storedUserNow()
+    try {
+      const paperURL = await uploadPaper(companyId, branchId, me, warrantyPaper?.file)
+      const form = { ...warranty, startDate: warranty.startDate || date }
+      await addWarranty(companyId, branchId, { ...warrantyFields(form, vendors.find(v => v.id === warranty.vendorId)), paperURL }, me, { costId, amount: amt })
+    } catch (e) {
+      console.error('Warranty failed:', e)
+      toast.warning("The cost is saved, but its warranty isn't", { description: 'Add it in Purchases → Warranties.' })
+    }
+    setHasWarranty(false)
+    setWarranty(emptyWarranty())
+    setWarrantyPaper(null)
+  }
   useEffect(() => setErrors(e => (e.method && paidMethod ? { ...e, method: undefined } : e)), [paidMethod])
 
   // this month's costs, for the list under the form
@@ -103,6 +129,10 @@ export default function CostEntryPage () {
     if (!file && !noInvoice) problems.invoice = 'Attach the invoice, or say there is none'
     if (!file && noInvoice && !voucherReason.trim()) problems.voucher = 'Say why there is no invoice'
     if (paidFromOffice === 'back' && !paidMethod) problems.method = 'Pick how it was paid'
+    if (warrantyOn) {
+      const bad = warrantyProblems({ ...warranty, startDate: warranty.startDate || date })
+      if (Object.keys(bad).length) problems.warranty = bad
+    }
     setErrors(problems)
     if (Object.keys(problems).length) return toast.error('Check the highlighted fields')
 
@@ -165,6 +195,7 @@ export default function CostEntryPage () {
 
       const me = storedUserNow()
       const { id, waiting, voucher } = await addCost(companyId, branchId, data, me, limits)
+      if (warrantyOn) await saveWarranty(id, amt)
       // needed no one: its voucher picture, stamped, goes onto the cost now (1 Nov)
       if (voucher && !waiting) {
         const cost = { ...data, id, voucher }
@@ -200,6 +231,7 @@ export default function CostEntryPage () {
       onSave={handleSave}
       errors={errors}
       saved={saved}
+      warranty={{ on: hasWarranty, setOn: setHasWarranty, value: warranty, onChange: changeWarranty, paper: warrantyPaper, onPaper: setWarrantyPaper }}
       recent={
         <RecentEntries
           title='Latest costs this month'

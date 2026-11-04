@@ -101,6 +101,7 @@ Branch settings**, though the database lets the owner change staff and settings.
 | Purchases: order guides, POs, receive goods | E | E | E | E | E | E | E | E | — | — |
 | Purchases: approve POs | A | A | A | A | A | A | — | — | — | — |
 | Purchases: bills, pay bills, payments | A | A | A | A | A | — | A | — | — | — |
+| Warranties | E | E | E | E | E | E | E | E | — | — |
 | Vendors & items catalog | M | M | M | M | M | V | M | V | — | — |
 | Staff records | M | M | M | M | M | V (names only) | — | — | — | own profile |
 | Staff pay & bank details | V | V | V | V | V | — | V | — | — | own |

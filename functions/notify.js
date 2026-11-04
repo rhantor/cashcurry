@@ -529,5 +529,36 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
     });
   }
 
-  return { deliver, onRequest, onPurchaseOrder, lateOrders, onPayout, onCostVoucher, dailySummaries, onChatMessage, onUser, onIssue, onIssueComment, onTask, onTaskComment, taskReminders, onStaffLogin };
+  // ── warranties ending (4 Nov 2026) ──────────────────────────────────────────
+  /**
+   * Once an hour: at a branch's summary time, one message about the warranties
+   * reaching 15 or 7 days left, to those chosen for "Warranties". Each warranty
+   * remembers the warning it has had, so each goes once.
+   */
+  async function warrantyReminders(now = new Date()) {
+    for (const company of await db.collection("companies").listDocuments()) {
+      let all = null;
+      for (const branchRef of await company.collection("branches").listDocuments()) {
+        try {
+          const b = await branch(company.id, branchRef.id);
+          if (N.localHour(now, b.timeZone) !== N.hourOf(b.config.dailyAt)) continue;
+          const today = N.businessDateFor(now, b.cutoff, b.timeZone);
+          const active = (await branchRef.collection("warranties").where("status", "==", "active").get()).docs;
+          const due = active.map((d) => ({ doc: d, w: d.data() })).filter(({ w }) => N.reminderDue(w, today));
+          if (!due.length) continue;
+          const batch = db.batch();
+          for (const { doc, w } of due) batch.update(doc.ref, { reminded: { endsOn: w.endsOn, step: N.reminderDue(w, today) } });
+          await batch.commit();
+          all = all || (await people(company.id));
+          const uids = N.recipientsFor("warranties.ending", { config: b.config, people: N.branchPeople(all, branchRef.id) });
+          const message = N.warrantyMessage(due.map(({ w }) => w), { today, branchName: b.name });
+          await deliver({ companyId: company.id, branchId: branchRef.id, uids, type: "warranties.ending", message, link: "/purchases/warranties", ref: `warranties/${today}`, tag: "warranties_ending" });
+        } catch (err) {
+          console.error("[notify warranties]", company.id, branchRef.id, err);
+        }
+      }
+    }
+  }
+
+  return { deliver, onRequest, onPurchaseOrder, lateOrders, warrantyReminders, onPayout, onCostVoucher, dailySummaries, onChatMessage, onUser, onIssue, onIssueComment, onTask, onTaskComment, taskReminders, onStaffLogin };
 };

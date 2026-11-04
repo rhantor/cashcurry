@@ -56,6 +56,7 @@ export const sidebarItems = [
       { label: "Payments", path: "/purchases/payments" },
       { label: "Vendors", path: "/purchases/vendors" },
       { label: "Items Catalog", path: "/purchases/items" },
+      { label: "Warranties", path: "/purchases/warranties" },
       { label: "Purchase Report", path: "/purchases/reports" },
     ],
   },

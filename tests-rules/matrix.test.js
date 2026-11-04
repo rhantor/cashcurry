@@ -50,6 +50,7 @@ const PROBES = {
   "purchases.order": (u) => as(u).doc(`${B}/requisitions/po-${u}`).set({ status: "Pending", vendorId: "v1" }),
   "purchases.approve": (u) => as(u).doc(`${B}/requisitions/pending-${u}`).update({ status: "Approved", approvedBy: u }),
   "purchases.bills": (u) => as(u).doc(`${B}/vendorPayments/vp-${u}`).set({ vendorId: "v1", total: 1 }),
+  "warranties.manage": (u) => as(u).doc(`${B}/warranties/w-${u}`).set({ itemName: "Chiller", endsOn: "2027-01-01", status: "active", createdBy: { uid: u } }),
   // the item catalog (vendor names are also open to pay-outs, to pick a supplier — 4.10)
   "catalog.view": (u) => as(u).doc(`companies/${CO}/items/i1`).get(),
   "catalog.manage": (u) => as(u).doc(`companies/${CO}/vendors/v-${u}`).set({ name: "V" }),
