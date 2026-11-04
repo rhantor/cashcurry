@@ -1,10 +1,11 @@
 // `npm run local:reminders` — run the hourly reminders once against the running
 // emulators, because the emulators don't fire scheduled functions by themselves.
-// They land in the bell; there is no push locally. Emulators only.
+// They land in the bell; there is no push locally. Emulators only. It uses the
+// functions/notify.cjs built when the app started: rebuilding it here would make
+// the running functions emulator reload, which has crashed the suite before.
 //
 //   npm run local:reminders                                  as of now
 //   npm run local:reminders -- --at 2026-11-08T18:00+08:00   as if it were then
-import { spawnSync } from "node:child_process";
 import { createRequire } from "node:module";
 import path from "node:path";
 import { initializeApp } from "firebase-admin/app";
@@ -20,8 +21,6 @@ if (Number.isNaN(now.getTime())) {
   console.error("--at wants a date and time, like 2026-11-08T18:00+08:00");
   process.exit(1);
 }
-
-spawnSync("node", ["scripts/build-functions-engine.mjs"], { cwd: ROOT, stdio: "inherit" });
 
 initializeApp({ projectId: LOCAL_PROJECT_ID });
 const require = createRequire(import.meta.url);
