@@ -21,6 +21,9 @@ import { useDefaultDate } from "@/app/hooks/useRegion";
 import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/lib/region/currency";
 import { categoryFields, findCategory, pickable } from "@/lib/costs/categories";
+import WarrantyBox from "@/app/components/warranties/WarrantyBox";
+import { uploadPaper } from "@/lib/warranties/client";
+import { emptyWarranty, offersWarranty, warrantyFields, warrantyProblems } from "@/lib/warranties/model";
 import { useCostCategories, useSelfUsed } from "@/lib/costs/client";
 import { NO_INVOICE_REASONS } from "@/lib/costs/vouchers";
 import { approvesOwnBill, changeOf, deliveryOf, goodsOf } from "@/lib/payouts/model";
@@ -33,6 +36,7 @@ import {
   handOut,
   resubmitBill,
   uploadBillFiles,
+  useSuppliers,
 } from "@/lib/payouts/client";
 import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
 import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
@@ -458,6 +462,11 @@ export function BillSheet({
   const [busy, setBusy] = useState(false);
   const [where, setWhere] = useState("shop"); // "shop" | "supplier"
   const [supplier, setSupplier] = useState(null);
+  // equipment bought with the money: its warranty waits on the bill (4 Nov)
+  const suppliers = useSuppliers(open ? companyId : null);
+  const [hasWarranty, setHasWarranty] = useState(false);
+  const [warranty, setWarranty] = useState(() => emptyWarranty());
+  const [warrantyPaper, setWarrantyPaper] = useState(null);
   // a delivery / transport charge paid on top: its own cost, category and receipt
   const [deliveryOn, setDeliveryOn] = useState(false);
   const [deliveryAmt, setDeliveryAmt] = useState("");
@@ -542,6 +551,9 @@ export function BillSheet({
     setCategoryId(retry?.categoryId || "");
     setNote(retry?.note || "");
     setErrors({});
+    setHasWarranty(!!retry?.warranty);
+    setWarranty({ ...emptyWarranty(), ...(retry?.warranty || {}) });
+    setWarrantyPaper(null);
     // keyed on the pay-out's id, not the object: a live update must not wipe what is being typed
   }, [open, retry, payout?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -551,9 +563,22 @@ export function BillSheet({
   const bill = (atSupplier ? supplierPaid(supplier) : Number(amount) || 0) + delivery;
   const deliveryCatId = deliveryCat || deliveryDefault;
   const change = changeOf(float, bill);
+  const offerWarranty = atSupplier ? supplier?.mode === "newBill" || supplier?.mode === "po" : offersWarranty(findCategory(groups, categoryId)?.category);
+  const warrantyOn = hasWarranty && offerWarranty;
+  const warrantyForm = { ...warranty, startDate: warranty.startDate || date };
+  // at a supplier, it starts as theirs; it can still be changed
+  const switchWarranty = (on) => {
+    setHasWarranty(on);
+    const s = on && atSupplier && !warranty.vendorId && !warranty.soldBy ? suppliers.find((v) => v.id === supplier?.vendorId) : null;
+    if (s) setWarranty({ ...warranty, vendorId: s.id, soldByEmail: s.email, soldByPhone: s.phone });
+  };
 
   const save = async () => {
     const e = {};
+    if (warrantyOn) {
+      const bad = warrantyProblems(warrantyForm);
+      if (Object.keys(bad).length) e.warranty = bad;
+    }
     if (atSupplier) {
       Object.assign(e, checkSupplier(supplier));
       if (
@@ -626,9 +651,13 @@ export function BillSheet({
                   }),
           }
         : null;
+      const warrantyPaperURL = warrantyOn ? await uploadPaper(companyId, branchId, user, warrantyPaper?.file) : null;
       const data = {
         date,
         billAmount: bill,
+        warranty: warrantyOn
+          ? { ...warrantyFields(warrantyForm, suppliers.find((v) => v.id === warrantyForm.vendorId)), paperURL: warrantyPaperURL || retry?.warranty?.paperURL || null }
+          : null,
         fields: atSupplier
           ? categoryFields(groups, null)
           : categoryFields(groups, categoryId),
@@ -879,6 +908,14 @@ export function BillSheet({
               </Select>
             )}
           </Field>
+        )}
+        {offerWarranty && (
+          <WarrantyBox
+            warranty={{ on: hasWarranty, setOn: switchWarranty, value: warrantyForm, onChange: setWarranty, paper: warrantyPaper, onPaper: setWarrantyPaper }}
+            vendors={suppliers}
+            errors={errors.warranty}
+            startDate={date}
+          />
         )}
         <div>
           <p className="mb-2 text-xs font-semibold text-muted">

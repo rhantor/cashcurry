@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { addMonths, daysLeft, leftText, offersWarranty, reminderDue, renewalPatch, sortWarranties, stateOf, warrantyCounts, warrantyFields, warrantyMessage, warrantyProblems } from "@/lib/warranties/model";
+import { addMonths, daysLeft, leftText, warrantyFromBill, offersWarranty, reminderDue, renewalPatch, sortWarranties, stateOf, warrantyCounts, warrantyFields, warrantyMessage, warrantyProblems } from "@/lib/warranties/model";
 
 const w = (endsOn, extra = {}) => ({ itemName: "Chiller", endsOn, status: "active", ...extra });
 const TODAY = "2026-11-04";
@@ -93,6 +93,18 @@ describe("the form", () => {
     expect(offersWarranty({ id: "assets" })).toBe(true);
     expect(offersWarranty({ id: "rent" })).toBe(false);
     expect(offersWarranty(null)).toBe(false);
+  });
+});
+
+describe("with a pay-out's bill", () => {
+  it("takes the bill's day when it has none of its own", () => {
+    const f = warrantyFromBill({ date: "2026-11-04", warranty: { itemName: "Oven", endsOn: "2027-11-04" } });
+    expect(f).toEqual({ itemName: "Oven", endsOn: "2027-11-04", startDate: "2026-11-04", paperURL: null });
+  });
+  it("nothing for a bill with no warranty", () => {
+    expect(warrantyFromBill({ date: "2026-11-04" })).toBeNull();
+    expect(warrantyFromBill({ warranty: { itemName: "Oven" } })).toBeNull();
+    expect(warrantyFromBill(null)).toBeNull();
   });
 });
 

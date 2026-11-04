@@ -231,6 +231,11 @@ export default function BillInbox({ companyId, branchId, user, bills, loading })
                     </p>
                   )}
                   {b.receipts?.length > 0 && <p className="text-xs text-muted">With a payment receipt</p>}
+                  {b.warranty && (
+                    <p className="text-xs text-muted">
+                      Warranty: <span className="font-semibold text-fg">{b.warranty.itemName}</span> until {b.warranty.endsOn}. Added to Warranties when approved.
+                    </p>
+                  )}
                   {b.note && <p className="text-xs text-muted">{b.note}</p>}
                 </div>
               </div>
