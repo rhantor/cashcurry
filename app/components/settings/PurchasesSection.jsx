@@ -1,7 +1,6 @@
 import React from "react";
 import SettingsSection from "./SettingsSection";
 import { FieldRow, Toggle } from "./fields";
-import { OrderReminderList } from "@/app/components/purchases/OrderReminders";
 
 export default function PurchasesSection({ role, value, onChange }) {
   const v = value || {};
@@ -28,8 +27,6 @@ export default function PurchasesSection({ role, value, onChange }) {
               ? "Orders are raised as Pending and must be approved before they can be sent to the vendor. Editing an approved order sends it back for approval."
               : "Orders can be sent to the vendor as soon as they are raised. Turn this on to add an Approve / Reject step in between."}
           </p>
-
-          <OrderReminderList />
         </div>
       )}
     </SettingsSection>

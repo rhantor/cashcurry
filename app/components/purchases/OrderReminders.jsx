@@ -8,7 +8,6 @@ import { Bell, BellRing, ShoppingCart } from "lucide-react";
 import { Chip } from "@/app/components/entry/Choices";
 import Sheet from "@/app/components/purchases/Sheet";
 import { Field, Select, Switch, cn, toast } from "@/app/components/ui";
-import useResolvedCompanyBranch from "@/app/hooks/useResolvedCompanyBranch";
 import { localHour } from "@/lib/notify/model";
 import { personName } from "@/lib/people";
 import { BEFORE_CHOICES, SNOOZES, WEEKDAYS, dayLabel, hourLabel, localDay, newReminder, ordersForReminders, reminderStatus, reminderText, savedReminder, skipPatch, snoozePatch, unskipPatch } from "@/lib/purchases/reminders";
@@ -240,15 +239,12 @@ export function ReminderSheet({ guide, onClose, companyId, branchId }) {
 }
 
 /** Branch settings → Purchases: every guide and its reminder. */
-export function OrderReminderList() {
-  const { ready, companyId, branchId } = useResolvedCompanyBranch();
-  const { data: guides = [], isLoading } = useGetOrderGuidesQuery(ready && companyId && branchId ? { companyId, branchId } : skipToken);
+export function OrderReminderList({ companyId, branchId }) {
+  const { data: guides = [], isLoading } = useGetOrderGuidesQuery(companyId && branchId ? { companyId, branchId } : skipToken);
   const [editing, setEditing] = useState(null);
 
   return (
-    <div className="border-t border-line pt-4">
-      <p className="text-sm font-semibold text-fg">Order reminders</p>
-      <p className="mb-3 max-w-prose text-sm text-muted">For what you order on set days, like vegetables every Monday. Who gets them: Notifications → Order reminders.</p>
+    <div>
       {!isLoading && guides.length === 0 && <p className="text-sm text-muted">Make an order guide first, in Purchases → Order Guides.</p>}
       <div className="space-y-2">
         {guides.map((g) => (

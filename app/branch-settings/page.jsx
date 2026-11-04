@@ -1,7 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Banknote, Bell, Building2, Clock, CreditCard, ReceiptText, Save, ShieldCheck, TriangleAlert, Undo2 } from "lucide-react";
+import { Banknote, Bell, Building2, Clock, CreditCard, ReceiptText, Save, ShieldCheck, ShoppingCart, TriangleAlert, Undo2 } from "lucide-react";
 import BranchSection from "@/app/components/settings/BranchSection";
 import MoneySection from "@/app/components/settings/MoneySection";
 import PaymentMethodsSection from "@/app/components/settings/PaymentMethodsSection";
@@ -9,6 +9,7 @@ import ApprovalsSection from "@/app/components/settings/ApprovalsSection";
 import AttendanceSettingsSection from "@/app/components/settings/AttendanceSettingsSection";
 import PayrollSettingsSection from "@/app/components/settings/PayrollSettingsSection";
 import NotificationsSection from "@/app/components/settings/NotificationsSection";
+import { OrderReminderList } from "@/app/components/purchases/OrderReminders";
 import useSession from "@/app/hooks/useSession";
 import { canManageNotifications } from "@/lib/notify/model";
 import StatusScreen from "@/app/components/common/StatusScreen";
@@ -22,6 +23,7 @@ const TABS = [
   { id: "approvals", label: "Approvals & limits", note: "What needs a check first", icon: ShieldCheck },
   { id: "attendance", label: "Attendance", note: "Kiosk, shifts, pay cycle", icon: Clock },
   { id: "payroll", label: "Payroll", note: "Pay mode, OT, deductions", icon: ReceiptText },
+  { id: "purchases", label: "Purchases", note: "Order reminders", icon: ShoppingCart },
   { id: "notifications", label: "Notifications", note: "Who is told what", icon: Bell, only: canManageNotifications },
 ];
 
@@ -116,6 +118,15 @@ export default function BranchSettingsPage() {
             <>
               <Heading title="Notifications" note="Who at this branch is told about each kind of thing. Requests are told at once; sales and costs once a day. Anyone can still turn off what they get, from the bell." />
               <NotificationsSection companyId={companyId} branchId={branchId} />
+            </>
+          )}
+
+          {activeTab === "purchases" && (
+            <>
+              <Heading title="Order reminders" note="For what you order on set days, like vegetables every Monday. Who gets them: Notifications → Order reminders." />
+              <Panel>
+                <OrderReminderList companyId={companyId} branchId={branchId} />
+              </Panel>
             </>
           )}
 
