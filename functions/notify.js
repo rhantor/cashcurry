@@ -560,5 +560,47 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
     }
   }
 
-  return { deliver, onRequest, onPurchaseOrder, lateOrders, warrantyReminders, onPayout, onCostVoucher, dailySummaries, onChatMessage, onUser, onIssue, onIssueComment, onTask, onTaskComment, taskReminders, onStaffLogin };
+  // ── order reminders (4 Nov 2026) ────────────────────────────────────────────
+  /**
+   * Once an hour: an order guide whose day is coming and nothing is ordered
+   * tells those chosen for "Order reminders" (lib/purchases/reminders.js).
+   * A marker for each reminder means each goes once.
+   */
+  async function orderReminders(now = new Date()) {
+    for (const company of await db.collection("companies").listDocuments()) {
+      let all = null;
+      for (const branchRef of await company.collection("branches").listDocuments()) {
+        try {
+          const guides = (await branchRef.collection("orderGuides").where("reminder.enabled", "==", true).get()).docs.map((d) => ({ id: d.id, ...d.data() }));
+          if (!guides.length) continue;
+          const b = await branch(company.id, branchRef.id);
+          const clock = { today: N.localDay(now, b.timeZone), hour: N.localHour(now, b.timeZone), nowMs: now.getTime(), morningHour: N.hourOf(b.config.dailyAt) };
+          const recent = await branchRef.collection("requisitions").where("createdAt", ">=", new Date(now.getTime() - 21 * 864e5)).get();
+          const orders = N.ordersForReminders(recent.docs.map((d) => ({ id: d.id, ...d.data() })), b.timeZone);
+          for (const guide of guides) {
+            const slots = N.reminderSlots(guide, orders, clock);
+            if (!slots.length) continue;
+            const st = N.reminderStatus(guide, orders, clock);
+            let fresh = 0;
+            for (const slot of slots) {
+              try {
+                await branchRef.collection("notifyLog").doc(`order-reminder-${guide.id}-${st.orderDay}-${slot}`).create({ at: FieldValue.serverTimestamp() });
+                fresh += 1;
+              } catch {
+                // already sent
+              }
+            }
+            if (!fresh) continue;
+            all = all || (await people(company.id));
+            const uids = N.recipientsFor("purchases.reminder", { config: b.config, people: N.branchPeople(all, branchRef.id) });
+            await deliver({ companyId: company.id, branchId: branchRef.id, uids, type: "purchases.reminder", message: N.orderReminderMessage(guide, st, { branchName: b.name }), link: `/purchases/order-guides?due=${guide.id}`, ref: `orderGuides/${guide.id}`, tag: `order_reminder_${guide.id}` });
+          }
+        } catch (err) {
+          console.error("[notify order reminders]", company.id, branchRef.id, err);
+        }
+      }
+    }
+  }
+
+  return { deliver, onRequest, onPurchaseOrder, lateOrders, warrantyReminders, orderReminders, onPayout, onCostVoucher, dailySummaries, onChatMessage, onUser, onIssue, onIssueComment, onTask, onTaskComment, taskReminders, onStaffLogin };
 };

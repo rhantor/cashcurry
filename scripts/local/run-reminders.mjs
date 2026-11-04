@@ -29,4 +29,5 @@ const notify = require(path.join(ROOT, "functions", "notify.js"))({ db: getFires
 
 console.log(`Running the reminders as of ${now.toISOString()}`);
 await notify.warrantyReminders(now);
+await notify.orderReminders(now);
 console.log("Done. Check the bell in the app.");

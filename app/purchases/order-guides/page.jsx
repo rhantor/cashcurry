@@ -2,7 +2,7 @@
 import { personName } from "@/lib/people";
 import { Select } from "@/app/components/ui";
 import { formatMoney } from "@/lib/region/currency";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { choosable } from "@/lib/purchases/vendors";
 import { skipToken } from "@reduxjs/toolkit/query";
 import useResolvedCompanyBranch from "@/app/hooks/useResolvedCompanyBranch";
@@ -21,6 +21,7 @@ import ConfirmSheet from "@/app/components/purchases/ConfirmSheet";
 import ItemFilterBar, { filterItems } from "@/app/components/purchases/ItemFilterBar";
 import useToast from "@/app/components/purchases/useToast";
 import useCurrency from "@/app/hooks/useCurrency";
+import { GuideReminder, OrdersDue, ReminderSheet, useGuideReminders } from "@/app/components/purchases/OrderReminders";
 import {
   Plus,
   Pencil,
@@ -68,6 +69,14 @@ export default function OrderGuidesPage() {
     guidesLoading || vLoading || iLoading || addingGuide || updatingGuide || deletingGuide || creatingOrder;
 
   const itemsById = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
+
+  // order reminders (4 Nov): which guide a notification came about; the one being set
+  const { statusOf } = useGuideReminders(ready ? companyId : null, ready ? branchId : null);
+  const [reminderFor, setReminderFor] = useState(null);
+  const [dueGuide, setDueGuide] = useState("");
+  useEffect(() => {
+    setDueGuide(new URLSearchParams(window.location.search).get("due") || "");
+  }, []);
 
   /* -------------------------------- builder -------------------------------- */
   const [openGuideBuilder, setOpenGuideBuilder] = useState(false);
@@ -224,6 +233,16 @@ export default function OrderGuidesPage() {
     setOpenOrderSheet(true);
   };
 
+  // from Purchase orders (?order=…): straight to that guide's order
+  const orderDone = useRef(false);
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("order");
+    const guide = id && guides.find((g) => g.id === id);
+    if (!guide || !items.length || orderDone.current) return;
+    orderDone.current = true;
+    handleOpenOrder(guide);
+  }, [guides, items]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const updateOrderRow = (itemId, val) => {
     setOrderItems((prev) => prev.map((row) => (row.itemId === itemId ? { ...row, requestedQty: val } : row)));
   };
@@ -296,6 +315,8 @@ export default function OrderGuidesPage() {
         </button>
       </div>
 
+      <OrdersDue companyId={ready ? companyId : null} branchId={ready ? branchId : null} user={user} onPlace={handleOpenOrder} highlight={dueGuide} />
+
       {onlyVendor && (
         <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl bg-brand-soft px-4 py-3 text-sm">
           <span className="font-medium text-fg">
@@ -364,6 +385,8 @@ export default function OrderGuidesPage() {
                   </span>
                 </div>
               )}
+
+              <GuideReminder guide={guide} status={statusOf(guide)} onEdit={() => setReminderFor(guide)} companyId={companyId} branchId={branchId} />
 
               <button
                 onClick={() => handleOpenOrder(guide)}
@@ -625,6 +648,8 @@ export default function OrderGuidesPage() {
           </div>
         </div>
       </Sheet>
+
+      <ReminderSheet guide={reminderFor} onClose={() => setReminderFor(null)} companyId={companyId} branchId={branchId} />
 
       <ConfirmSheet
         open={!!guideToDelete}
