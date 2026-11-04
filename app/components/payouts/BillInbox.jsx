@@ -25,6 +25,7 @@ import { useCostCategories } from "@/lib/costs/client";
 import { billWaitsFor, canReviewBill, changeText, deliveryOf, goodsOf } from "@/lib/payouts/model";
 import { FileThumb, FilesSheet, viewerItems } from "@/app/components/common/Files";
 import { approveBillNow, approveSupplierNow, attachPayoutVoucher, getBill, sendBillBack } from "@/lib/payouts/client";
+import keepBillWarranty from "@/app/components/warranties/keepBillWarranty";
 import { linesTotal, supplierText } from "@/lib/payouts/supplier";
 import { priceRise } from "@/lib/purchases/orders";
 
@@ -109,9 +110,11 @@ export default function BillInbox({ companyId, branchId, user, bills, loading })
       if (bill.supplier) {
         // spent at a supplier: into Purchases — their bills, a payment, what they're owed
         const r = await approveSupplierNow(companyId, branchId, user, bill);
+        await keepBillWarranty(companyId, branchId, bill, r.costId, user);
         toast.success("Approved — in Purchases now", { description: `${money(r.paid)} paid to ${bill.supplier.vendorName}` });
       } else {
         const costId = await approveBillNow(companyId, branchId, user, bill, correction);
+        await keepBillWarranty(companyId, branchId, bill, costId, user);
         toast.success("Approved — it's a cost now");
         // no bill paper: the signed voucher's picture onto the cost
         if (bill.voucherReason && costId) {

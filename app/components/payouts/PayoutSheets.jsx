@@ -22,6 +22,7 @@ import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/lib/region/currency";
 import { categoryFields, findCategory, pickable } from "@/lib/costs/categories";
 import WarrantyBox from "@/app/components/warranties/WarrantyBox";
+import keepBillWarranty from "@/app/components/warranties/keepBillWarranty";
 import { uploadPaper } from "@/lib/warranties/client";
 import { emptyWarranty, offersWarranty, warrantyFields, warrantyProblems } from "@/lib/warranties/model";
 import { useCostCategories, useSelfUsed } from "@/lib/costs/client";
@@ -687,10 +688,15 @@ export function BillSheet({
       if (expectSelf) {
         const fresh = await getBill(companyId, branchId, settleId);
         const self = isCompanyRole(user?.role) ? null : { limits }; // a manager's counts toward the day's limit
-        if (fresh?.supplier) selfOk = !!(await approveSupplierNow(companyId, branchId, user, fresh, self));
+        if (fresh?.supplier) {
+          const r = await approveSupplierNow(companyId, branchId, user, fresh, self);
+          selfOk = !!r;
+          if (r) await keepBillWarranty(companyId, branchId, fresh, r.costId, user);
+        }
         else if (fresh) {
           const costId = await approveBillNow(companyId, branchId, user, fresh, {}, self);
           selfOk = !!costId;
+          if (costId) await keepBillWarranty(companyId, branchId, fresh, costId, user);
           // no bill paper: its voucher, stamped, onto the cost (1 Nov)
           if (costId && fresh.voucherReason) {
             const me = { uid: user?.uid, name: personName(user) || user?.username || "" };
