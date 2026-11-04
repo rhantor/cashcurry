@@ -103,6 +103,6 @@ export function middleware(request) {
 // Ensure middleware never runs on static assets / PWA files
 export const config = {
   matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico|images/|fonts/|icons/|manifest\\.webmanifest|manifest\\.json|robots\\.txt|sitemap\\.xml|apple-touch-icon\\.png|site\\.webmanifest|sw\\.js|workbox-).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|images/|fonts/|icons/|manifest\\.webmanifest|manifest\\.json|robots\\.txt|sitemap\\.xml|apple-touch-icon\\.png|site\\.webmanifest|sw\\.js|workbox-|firebase-messaging-sw\\.js|logo/|stickers/).*)",
   ],
 };

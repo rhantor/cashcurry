@@ -7,8 +7,10 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { useRouter } from "next/navigation";
 import { collection, deleteDoc, doc, limit, onSnapshot, orderBy, query, serverTimestamp, writeBatch, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { enablePush, pushState, refreshPush } from "@/lib/notify/push";
 import { toast } from "@/app/components/ui";
+
+// Firebase messaging is heavy and this wraps every page, so it comes after the page is up.
+const loadPush = () => import("@/lib/notify/push");
 
 const Ctx = createContext(null);
 const EMPTY = { items: [], unread: 0, ready: false, push: "unavailable" };
@@ -29,8 +31,10 @@ export default function NotificationsProvider({ user, children }) {
   // push on this device: where it stands, and a quiet token refresh if allowed
   useEffect(() => {
     if (!companyId || !uid) return;
-    pushState().then(setPush);
-    refreshPush({ companyId, uid });
+    loadPush().then(({ pushState, refreshPush }) => {
+      pushState().then(setPush);
+      refreshPush({ companyId, uid });
+    }).catch(() => {});
   }, [companyId, uid]);
 
   const open = useCallback(
@@ -85,7 +89,7 @@ export default function NotificationsProvider({ user, children }) {
         await Promise.all(items.map((n) => deleteDoc(ref(n.id)).catch(() => {})));
       },
       turnOnPush: async () => {
-        const s = await enablePush({ companyId, uid }).catch(() => "off");
+        const s = await loadPush().then(({ enablePush }) => enablePush({ companyId, uid })).catch(() => "off");
         setPush(s);
         return s;
       },

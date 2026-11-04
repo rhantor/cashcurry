@@ -7,7 +7,6 @@
 // phone; nothing is uploaded until the bill is saved.
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
-import { jsPDF } from "jspdf";
 import { ArrowLeft, ArrowRight, Camera, FileText, ImagePlus, RotateCw, Trash2 } from "lucide-react";
 import { Button, Sheet, cn, toast } from "@/app/components/ui";
 import { Chip } from "@/app/components/entry/Choices";
@@ -72,6 +71,7 @@ async function renderPage(page, { px, q }, tone) {
 /** The pages as one PDF File: each page as big as A4 allows, in order. */
 export async function pagesToPdf(pages, quality = "medium", tone = "color", onProgress) {
   const settings = QUALITIES[quality] || QUALITIES.medium;
+  const { jsPDF } = await import("jspdf"); // heavy: only when a PDF is really made
   const pdf = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4", compress: true });
   for (let i = 0; i < pages.length; i++) {
     const { data, w, h } = await renderPage(pages[i], settings, tone);

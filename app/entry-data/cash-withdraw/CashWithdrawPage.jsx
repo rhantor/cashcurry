@@ -5,7 +5,6 @@ import { ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { storage } from "@/lib/firebase";
 import { useAddWithdrawEntryMutation, useGetWithdrawEntriesQuery } from "@/lib/redux/api/cashWithdrawApiSlice";
 import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
-import { exportWithdrawalToExcel, exportWithdrawalToPDF, shareWithdrawal } from "@/app/export/exportWithdrawData";
 import useCurrency from "@/app/hooks/useCurrency";
 import useSession from "@/app/hooks/useSession";
 import { useDefaultDate } from "@/app/hooks/useRegion";
@@ -19,6 +18,9 @@ import RecordSheet from "@/app/components/entry/RecordSheet";
 import { EntryLayout, EntrySection, MoneyRoute, RecentEntries, SummaryLine } from "@/app/components/entry/EntryLayout";
 
 import { personName } from "@/lib/people";
+
+// Excel and PDF are heavy: they load when someone exports.
+const withdrawalExports = () => import("@/app/export/exportWithdrawData");
 // What the cash was taken out for (kept as stored before).
 const CATEGORIES = ["Supplier Payment", "Staff Advance", "Staff Salary", "Utility Bills", "Rent/Deposit", "Maintenance", "Transport/Delivery", "Petty Cash", "Other"];
 const METHODS = ["ATM Withdraw", "Online Transfer", "Other"];
@@ -266,9 +268,9 @@ export default function CashWithdrawPage() {
           files={viewing.receiptUrls?.length ? viewing.receiptUrls : viewing.receiptUrl ? [viewing.receiptUrl] : []}
           by={personName(viewing.createdBy)}
           at={viewing.createdAt}
-          share={() => shareWithdrawal(viewing, branchData)}
-          pdf={() => exportWithdrawalToPDF(viewing, branchData)}
-          excel={() => exportWithdrawalToExcel(viewing, branchData)}
+          share={() => withdrawalExports().then((x) => x.shareWithdrawal(viewing, branchData))}
+          pdf={() => withdrawalExports().then((x) => x.exportWithdrawalToPDF(viewing, branchData))}
+          excel={() => withdrawalExports().then((x) => x.exportWithdrawalToExcel(viewing, branchData))}
         />
       )}
     </>

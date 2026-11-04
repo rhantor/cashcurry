@@ -1,7 +1,7 @@
 "use client";
 
 import { looksLikeStaffId } from "@/lib/staff/login";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useAnimationControls } from "framer-motion";
@@ -106,10 +106,6 @@ export default function LoginPage() {
     shake.start({ x: [0, -10, 10, -6, 6, -2, 0], transition: { duration: 0.45 } });
   };
 
-  useEffect(() => {
-    router.prefetch?.("/");
-  }, [router]);
-
   const signIn = async (user, pass) => {
     setError("");
     try {
@@ -120,7 +116,9 @@ export default function LoginPage() {
       // The session caches the profile and sets the routing cookies.
       signedIn(res.data.user);
       setDone(true);
-      setTimeout(() => router.replace("/"), 650);
+      // A full load, so the server sees the new sign-in. The router may remember "/" from
+      // before it, when that still meant "go to sign-in", and stay here for good.
+      setTimeout(() => window.location.replace("/"), 650);
     } catch (err) {
       fail(friendly(err.message, looksLikeStaffId(user)));
     }
