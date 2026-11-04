@@ -3,7 +3,6 @@
 import React, { useState, useRef, useEffect } from 'react'
 import PropTypes from 'prop-types'
 import imageCompression from 'browser-image-compression'
-import { jsPDF } from 'jspdf'
 import { Camera, ImageIcon, Trash2, Pencil, CropIcon, FileText, Check } from "lucide-react";
 import { toast } from "@/app/components/ui/notify";
 
@@ -296,6 +295,7 @@ export default function ImageCaptureEditor ({ onFilesReady }) {
     }
 
     try {
+      const { jsPDF } = await import('jspdf') // heavy: only when a PDF is really made
       const pdf = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
