@@ -14,9 +14,8 @@ the local copy. No badge = production data.
 - Node 20+
 - Firebase CLI: `npm install -g firebase-tools`
 - Java 11+ (the Firestore emulator needs it)
-- Only for `local:seed:backup`: a backup folder. Default:
-  `../backup_saffron_empire` next to this repo; use another one with
-  `CC_BACKUP_DIR=path/to/backup`.
+- Only for `local:seed:backup`: a backup folder. Put its path in the
+  git-ignored `.local/backup-path.txt`, or use `CC_BACKUP_DIR=path/to/backup`.
 
 The demo company is built by `scripts/local/demo/demoCompany.mjs`. Its
 walkthrough figures are computed from the same list of entries, and

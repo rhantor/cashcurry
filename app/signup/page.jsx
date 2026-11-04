@@ -78,7 +78,7 @@ export default function SignupPage() {
           {({ id, invalid }) => <Input id={id} size="lg" value={inviteCode} invalid={invalid} autoCapitalize="none" onChange={(e) => (setInviteCode(e.target.value), clear("code"))} />}
         </Field>
         <Field label="Company name" error={errors.company}>
-          {({ id, invalid }) => <Input id={id} size="lg" value={companyName} invalid={invalid} onChange={(e) => (setCompanyName(e.target.value), clear("company"))} placeholder="e.g. Saffron Empire Sdn Bhd" />}
+          {({ id, invalid }) => <Input id={id} size="lg" value={companyName} invalid={invalid} onChange={(e) => (setCompanyName(e.target.value), clear("company"))} placeholder="e.g. Cash Curry Sdn Bhd" />}
         </Field>
         <Field label="Your name" error={errors.name}>
           {({ id, invalid }) => <Input id={id} size="lg" value={name} invalid={invalid} autoComplete="name" onChange={(e) => (setName(e.target.value), clear("name"))} placeholder="Shown on everything you enter" />}

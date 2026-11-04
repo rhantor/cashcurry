@@ -4,7 +4,7 @@ import { amountInWords, branchTag, checkReceipt, numberWords, receiptMessage, re
 describe("reservation deposit receipts", () => {
   it("numbers per branch and month", () => {
     expect(receiptNo("KLBB", "2610", 7)).toBe("RSV-KLBB-2610-0007");
-    expect(branchTag({ name: "Lazeez Arabic" })).toBe("LAZE");
+    expect(branchTag({ name: "Curry House" })).toBe("CURR");
     expect(branchTag({ code: "lz-bb" })).toBe("LZBB");
   });
   it("the amount in words, in the branch's currency", () => {
@@ -21,7 +21,7 @@ describe("reservation deposit receipts", () => {
     expect(checkReceipt({ customerName: "A", customerPhone: "012", reservationDate: "2026-11-01", amount: 100, method: "cash", pax: "" })).toEqual({});
   });
   it("the WhatsApp message", () => {
-    const m = receiptMessage({ customerName: "Aisha", amount: 200, receiptNo: "RSV-X-2610-0001", reservationDate: "2026-11-01", reservationTime: "19:30", pax: 12 }, { business: "Lazeez", currency: "RM" });
+    const m = receiptMessage({ customerName: "Aisha", amount: 200, receiptNo: "RSV-X-2610-0001", reservationDate: "2026-11-01", reservationTime: "19:30", pax: 12 }, { business: "Curry House", currency: "RM" });
     expect(m).toContain("We have received your deposit of RM 200.00 (receipt RSV-X-2610-0001).");
     expect(m).toContain("7:30 PM · 12 pax");
   });

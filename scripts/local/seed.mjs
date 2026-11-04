@@ -5,7 +5,7 @@
 // host variables it sets are checked below, so this script can only ever
 // write to the emulators, never to production.
 //
-// Backup layout (made by backup_saffron_empire/export-script.cjs):
+// Backup layout (made by the export script in the backup folder):
 //   company/company.json                 -> companies/{companyId}
 //   company/<name>.json                  -> companies/{companyId}/<name>/*
 //   company/root_users.json              -> users/*
@@ -31,8 +31,8 @@ for (const v of ["FIRESTORE_EMULATOR_HOST", "FIREBASE_AUTH_EMULATOR_HOST"]) {
   }
 }
 
-if (!fs.existsSync(path.join(BACKUP_DIR, "company", "company.json"))) {
-  console.error(`No backup found at ${BACKUP_DIR}. Set CC_BACKUP_DIR to the backup folder.`);
+if (!BACKUP_DIR || !fs.existsSync(path.join(BACKUP_DIR, "company", "company.json"))) {
+  console.error(`No backup found at ${BACKUP_DIR || "(no path set)"}. Set CC_BACKUP_DIR, or put the folder in .local/backup-path.txt.`);
   process.exit(1);
 }
 

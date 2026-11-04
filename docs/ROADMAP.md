@@ -31,7 +31,7 @@ Nothing here changes what users see. It lets us change things without fear.
 | # | Task | Status |
 |---|------|--------|
 | 0.1 | Tidy git: commit the two pending access fixes (supervisor kiosk / attendance menu), start the local `dev` branch | ✅ |
-| 0.2 | Local Firebase emulator, seeded from the Saffron Empire backup, so development never touches live data — see [LOCAL_DEV.md](LOCAL_DEV.md) | ✅ |
+| 0.2 | Local Firebase emulator, seeded from a backup of the client company, so development never touches live data — see [LOCAL_DEV.md](LOCAL_DEV.md) | ✅ |
 | 0.3 | Test setup (Vitest) + **golden finance tests**: hand-in-cash per branch per month, company total, must equal today's verified numbers — see [TESTING.md](TESTING.md) | ✅ |
 
 - **0.2 How you check:** `npm run dev:local` opens the app with real-looking data; changes you make there do not appear in production.
@@ -47,7 +47,7 @@ Nothing here changes what users see. It lets us change things without fear.
 | 1.4 | **Money request lifecycle**: requested → approved / rejected → **paid** (who paid, when, from front cash or bank). Only *paid* moves cash; payroll deducts only paid. Manager entering directly = approve + pay in one step (today's workflow keeps working). Existing records count as paid on their date, so today's numbers stay the same | ✅ |
 | 1.5 | ~~Promotion in Total Sales~~ — **decided: keep as is.** Promotion is free food served after an order and the owners want it counted; each branch's "include in total" setting stays in control | ✅ |
 
-- **1.1 How you check:** branch dashboard, Lazeez BB, "Last 7 Days" shows the same cash as the summary report for the same dates.
+- **1.1 How you check:** branch dashboard, a busy branch, "Last 7 Days" shows the same cash as the summary report for the same dates.
 - **1.2 How you check:** summary report, branch dashboard and company dashboard show the
   same cash and bank for the same dates; `npm test` proves it for every branch × month.
   Also fixed: the cash books read only the newest 100 loan records; the company dashboard
@@ -73,7 +73,7 @@ Needed before staff phones get direct access to the database (Phase 4).
 | 2.1 | **Real access control** — the database and storage rules are the security boundary (screens and middleware only hide buttons). One shared rules file for v2 + POS; closed: anyone could make themselves owner of any company, staff could read all finances and colleagues' personal data, anyone could approve/pay their own advance, anyone could claim usernames, open create-staff and image-proxy endpoints. 46 rules tests (`npm run test:rules`). Login-token claims deferred: not needed for security now that rules are tight | ✅ |
 | 2.2 | One shared "current user / company / branch" source (`lib/session`, `useSession`), replacing 44 separate browser-storage reads in 37 files and three helpers. Profile comes from the database (a changed role/branch applies on next load); one active branch for every screen; signing out anywhere returns to login | ✅ |
 | 2.3 | **Fast dashboards.** The server keeps each branch's monthly totals with the app's own finance engine (bundled into the Cloud Functions), recomputing the whole month on every change, with retry and a nightly pass. The old rollups (which broke the money rules and drifted) are gone. The branch and company dashboards and the summary report check those totals against server-side record counts and, when they cover everything earlier, load only the period's months; anything missing or stale → the full download, as before. Proven equal to the full download for every branch, month and filter on the real data; **1,744 → 230 document reads (−87%)** for the Sep 2026 dashboards. Loans between branches are now dated on the branch's clock (Malaysia by default), not the device's, so the server and every screen agree | ✅ |
-| 2.4 | **Screens ask for what they show.** The list reports already loaded by date range; the rest of the app did not. The requests panel re-downloaded every advance, staff loan, branch loan and OT request every 5 seconds — now only pending ones (Lazeez BB: ~1,920 → 48 reads a minute while open). Pay-out queue: only approved-unpaid. Payroll/salary sheet: only approved. Supervisor panel: only their own. Deposit entry: the latest five (it was showing the five *oldest*). **Staff pages fixed:** since 2.1 staff may read only their own records, but their pages asked for the whole branch, so they would have shown nothing. Each staff login now records which staff record it is (`users.staffId`, set by create-staff, locked like role); staff read their own advances, loans, punches and OT requests — asked by them or entered for them. Demo company has a staff login (`ali`) | ✅ |
+| 2.4 | **Screens ask for what they show.** The list reports already loaded by date range; the rest of the app did not. The requests panel re-downloaded every advance, staff loan, branch loan and OT request every 5 seconds — now only pending ones (busiest branch: ~1,920 → 48 reads a minute while open). Pay-out queue: only approved-unpaid. Payroll/salary sheet: only approved. Supervisor panel: only their own. Deposit entry: the latest five (it was showing the five *oldest*). **Staff pages fixed:** since 2.1 staff may read only their own records, but their pages asked for the whole branch, so they would have shown nothing. Each staff login now records which staff record it is (`users.staffId`, set by create-staff, locked like role); staff read their own advances, loans, punches and OT requests — asked by them or entered for them. Demo company has a staff login (`ali`) | ✅ |
 | 2.5 | **Dead and unsafe code removed.** `onShiftClosed` (watched an old POS path; if anything wrote there it added a UTC-dated sale with no payment breakdown). 22 files nothing used — incl. a 709-line second copy of the summary math. Three unreachable pages: `/cost-report` (duplicate), `/offline`, and the old salary sheet `/entry-data/salary-sheet` (replaced by Payroll; it deducted approved-but-unpaid advances). `functions/node_modules` no longer in git (5,481 files). Dashboard charts group by the same day as the money figures (wrong days west of UTC and for late-night timestamps before). Lint: 70 unused variables/imports and 127 stale disable-comments gone; both lint configs agree | ✅ |
 | 2.6 | **Face recognition removed** (owner has another plan for attendance): the kiosk face scanner, face enrolment and the duplicate-face banner in Staff Management, the settings toggle, `@vladmandic/face-api` and its 6.8 MB of model files. The kiosk keeps the staff grid with fingerprint and PIN. Face data already stored on staff records stays until `npm run face:remove-data` is run | ✅ |
 
@@ -176,7 +176,7 @@ rehearsed on the local copy first.
 - [ ] Optional data fix: write `paidOut` on existing approved/closed advances and staff loans (the engine
       already treats them as paid on their date, so figures don't change either way)
 - [ ] Branch settings: set each branch's time zone (Asia/Kuala_Lumpur) and confirm its
-      "day ends at" — Lazeez BB and Lazeez Bistro have 05:00; the two Eggcellence branches have
+      "day ends at" — two branches have 05:00; the other two have
       none (midnight). Note: until now every form defaulted to the UTC date, which in Malaysia
       behaved like an 08:00 cut-off.
 - [ ] Rules: v2 and the POS share one Firebase project, and both repos had their own firestore.rules —
@@ -266,9 +266,9 @@ Decided 19 Oct 2026: equipment and assets are **costs** (no asset register is ke
 | Decision | Needed before |
 |---|---|
 | Were any past advances actually paid by bank transfer? The form asked, but the answer was never saved, so all 136 counted as cash. If some were by bank, they can be corrected | release |
-| Do the Eggcellence branches trade past midnight? (sets their "day ends at") | release |
+| Do the two branches with no "day ends at" trade past midnight? (sets their "day ends at") | release |
 | A company with branches in two countries: one company per country, or company dashboard per currency? (today it warns) | 5.x |
-| Banked sales: follow the branch settings (now, as the summary report always did) or the flag saved on each sale? Only Eggcellence BB Jan 2026 differs (RM 70) | any time — one line in `lib/finance` |
+| Banked sales: follow the branch settings (now, as the summary report always did) or the flag saved on each sale? Only one branch-month differs (RM 70) | any time — one line in `lib/finance` |
 | Attendance: confirm the kiosk plan (4.8) after a one-branch pilot; liveness check on or off; which tablets | 4.8 |
 | Accountant to check the standard cost groups once (Settings → Cost categories) | release |
 | Pay-outs: should the bookkeeper (accountant) also hand out money? (A push reminder for an overdue bill is not built — only the list and the count.) | release |
