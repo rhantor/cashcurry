@@ -46,7 +46,7 @@ const Line = ({ label, value, tone, strong }) => (
  * tap to open the hours, extras and deductions, with the slip worked out
  * below. The sums are calcPayroll's — this only lays them out.
  */
-export default function SlipCard ({ staff, name, inputs, setInputs, payrollConfig, advanceDed, loanDed, locked, onPrint, money }) {
+export default function SlipCard ({ staff, name, inputs, setInputs, payrollConfig, advanceDed, loanDed, locked, onPrint, onRemove, money }) {
   const [open, setOpen] = useState(false)
   const mode = staff.salaryMode || payrollConfig?.defaultPayMode || 'hours'
   const stdHours = parseFloat(staff.standardHours) || parseFloat(payrollConfig?.standardHoursPerMonth) || 208
@@ -107,6 +107,8 @@ export default function SlipCard ({ staff, name, inputs, setInputs, payrollConfi
           </span>
           <span className='min-w-0 flex-1'>
             <span className='block truncate text-sm font-semibold text-fg'>{name}</span>
+            {staff.notOnStaffList && <span className='mb-0.5 inline-block rounded bg-surface-2 px-1.5 py-0.5 text-[10px] font-semibold text-muted'>Not on staff list now</span>}
+            {staff.addedToSheet && <span className='mb-0.5 inline-block rounded bg-info-soft px-1.5 py-0.5 text-[10px] font-semibold text-info'>Added to this sheet</span>}
             <span className='block truncate text-[11px] text-muted'>
               <span className='capitalize'>{staff.role || 'staff'}</span> · paid {payBy} · basic {money(staffConfig.basicSalary)}
             </span>
@@ -175,6 +177,12 @@ export default function SlipCard ({ staff, name, inputs, setInputs, payrollConfi
                 <Group title='Note on the payslip'>
                   <Input value={inputs.extraNote || ''} onChange={e => set('extraNote', e.target.value)} placeholder='Optional' className='text-sm' />
                 </Group>
+
+                {onRemove && (
+                  <button type='button' onClick={onRemove} className='text-xs font-semibold text-danger hover:underline'>
+                    Remove from this sheet
+                  </button>
+                )}
               </div>
             )}
 

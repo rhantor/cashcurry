@@ -35,7 +35,7 @@ export default function BranchSection({ role, value, onChange }) {
   return (
     <>
       <Group title="Name and contact">
-        {text("Branch name", "name", "e.g. Lazeez KLCC")}
+        {text("Branch name", "name", "e.g. Cash Curry KLCC")}
         {text("Short code", "code", "e.g. KLCC")}
         {text("Phone", "phone", "+60 12-345 6789", "tel")}
         {text("WhatsApp", "whatsapp", "+60 12-345 6789", "tel")}
