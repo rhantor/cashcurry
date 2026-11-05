@@ -35,13 +35,16 @@ describe("allocateTaken", () => {
     { docId: "a", index: 1, amount: 100 },
     { docId: "b", index: 2, amount: 150 },
   ];
-  it("fills in order and drops what gets nothing", () => {
+  it("fills in order, and keeps what gets nothing at 0 so it moves later (6 Nov)", () => {
     expect(allocateTaken(items, 120)).toEqual([
       { docId: "a", index: 1, amount: 100, due: 100 },
       { docId: "b", index: 2, amount: 20, due: 150 },
     ]);
-    expect(allocateTaken(items, 80)).toEqual([{ docId: "a", index: 1, amount: 80, due: 100 }]);
-    expect(allocateTaken(items, 0)).toEqual([]);
+    expect(allocateTaken(items, 80)).toEqual([
+      { docId: "a", index: 1, amount: 80, due: 100 },
+      { docId: "b", index: 2, amount: 0, due: 150 },
+    ]);
+    expect(allocateTaken(items, 0).map((i) => i.amount)).toEqual([0, 0]);
   });
   it("puts an extra amount on the last one", () => {
     expect(allocateTaken(items, 300).map((i) => i.amount)).toEqual([100, 200]);
@@ -155,5 +158,25 @@ describe("reverseRepayment", () => {
     const before = undoOf([due(1, "2026-07")]);
     const r = reverseRepayment({ amount: 100, installments: [paid(1, "2026-07")] }, [{ index: 1, amount: 100 }], before);
     expect(r.installments[0].status).toBe("pending");
+  });
+});
+
+describe("a loan not taken this month (6 Nov)", () => {
+  const list = [
+    { index: 1, month: "2026-03", amount: 500, status: "paid", paidAt: "migration" },
+    { index: 2, month: "2026-10", amount: 500, status: "pending", paidAt: null },
+  ];
+  it("moves after the last instalment, still due, nothing marked repaid", () => {
+    const r = applyRepayment(list, 2, 0, { amount: 1000 });
+    expect(r.installments).toEqual([
+      { index: 1, month: "2026-03", amount: 500, status: "paid", paidAt: "migration" },
+      { index: 2, month: "2026-11", amount: 500, status: "pending", paidAt: null, note: "Moved from 2026-10 (not taken that month)" },
+    ]);
+    expect(r).toMatchObject({ totalPaid: 500, remainingAmount: 500, allPaid: false });
+  });
+  it("undoing the run puts it back where it was", () => {
+    const moved = applyRepayment(list, 2, 0, { amount: 1000 });
+    const back = reverseRepayment({ amount: 1000, ...moved }, [{ docId: "l", index: 2, amount: 0, due: 500 }], { installments: list, totalPaid: 500, remainingAmount: 500, status: "approved" });
+    expect(back.installments).toEqual(list);
   });
 });
