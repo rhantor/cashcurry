@@ -208,9 +208,9 @@ export default function ChatApp({ user, branches = [], allBranches, className })
   ].filter(Boolean);
 
   return (
-    <div className={cn("grid min-h-0 overflow-hidden bg-surface md:grid-cols-[22rem_1fr]", className)}>
+    <div className={cn("grid min-h-0 grid-cols-[minmax(0,1fr)] overflow-hidden bg-surface md:grid-cols-[22rem_minmax(0,1fr)]", className)}>
       {/* the chats */}
-      <aside className={cn("flex min-h-0 flex-col border-line md:border-r", active && "hidden md:flex")}>
+      <aside className={cn("flex min-h-0 min-w-0 flex-col border-line md:border-r", active && "hidden md:flex")}>
         <div className="flex items-center gap-2 px-4 pb-2 pt-4">
           <h2 className="flex-1 text-xl font-bold tracking-tight text-fg">Chats</h2>
           <Menu
@@ -266,7 +266,7 @@ export default function ChatApp({ user, branches = [], allBranches, className })
       </aside>
 
       {/* the open chat */}
-      <section className={cn("min-h-0", !active && "hidden md:block")}>
+      <section className={cn("min-h-0 min-w-0", !active && "hidden md:block")}>
         {active ? (
           <Conversation
             key={active.id}
