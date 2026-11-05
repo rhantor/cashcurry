@@ -171,6 +171,21 @@ export default function SlipCard ({ staff, name, inputs, setInputs, payrollConfi
                   </div>
                   {parseFloat(inputs.penalty) > 0 && <NoteField placeholder='Why the penalty…' value={inputs.penaltyNote} onChange={v => set('penaltyNote', v)} />}
                   {parseFloat(inputs.otherDeductions) > 0 && <NoteField placeholder='What the other deduction is…' value={inputs.otherDeductionsNote} onChange={v => set('otherDeductionsNote', v)} />}
+                  {/* skip the loan this month (6 Nov): nothing taken, the instalment moves to a later month on finalize */}
+                  {loanDed > 0 && (
+                    <div className='mt-2 flex flex-wrap items-center gap-2'>
+                      {inputs.loanOverride === '0' ? (
+                        <>
+                          <span className='text-xs font-semibold text-warning'>Loan not taken this month · {money(loanDed)} moves to a later month</span>
+                          <button type='button' className='text-xs font-semibold text-brand hover:underline' onClick={() => { set('loanOverride', ''); set('loanNote', '') }}>Take it after all</button>
+                        </>
+                      ) : (
+                        <button type='button' className='rounded-full bg-surface-2 px-3 py-1 text-xs font-semibold text-muted hover:text-fg' onClick={() => { set('loanOverride', '0'); set('loanNote', 'Not this month') }}>
+                          Not this month
+                        </button>
+                      )}
+                    </div>
+                  )}
                   {inputs.loanOverride !== '' && <NoteField placeholder='Why the loan amount changed…' value={inputs.loanNote} onChange={v => set('loanNote', v)} />}
                 </Group>
 

@@ -26,6 +26,7 @@ import {
 import { shiftsEnabled } from '@/lib/attendance/shifts'
 import { calcPayroll, fmtAmt, toPeriodKey, periodLabel } from '@/lib/payroll/calculations'
 import { allocateTaken } from '@/lib/payroll/repayments'
+import { byId, deductionLines } from '@/lib/payroll/deductionDetails'
 import { changeSheet, inputsFromSlip, rosterOf, sheetChoicesOf, staffAsPaid } from '@/lib/payroll/sheet'
 import { exportPayrollToPDF, exportPayrollToExcel } from '@/app/export/exportPayroll'
 import { computeAttendance } from '@/lib/attendance/computeHours'
@@ -117,6 +118,9 @@ export default function PayrollBuilder () {
   // Only approved ones can have an instalment to deduct (repaid ones are closed).
   const { data: advanceList = [], refetch: refetchAdvances } = useGetAdvanceEntriesQuery({ companyId, branchId, status: 'approved' }, { skip })
   const { data: loanList = [], refetch: refetchLoans }       = useGetStaffLoansQuery({ companyId, branchId, status: 'approved' }, { skip })
+  // every advance and loan, closed ones too: what a printed slip lists against its deductions
+  const { data: allAdvances = [] } = useGetAdvanceEntriesQuery({ companyId, branchId }, { skip })
+  const { data: allLoans = [] }    = useGetStaffLoansQuery({ companyId, branchId }, { skip })
   const { data: runs = [] }         = useGetPayrollRunsQuery(skip ? skipToken : { companyId, branchId, period })
 
   // Existing run for this period (if any) — defined early so slips query can use runId
@@ -376,6 +380,15 @@ export default function PayrollBuilder () {
     })
   }
 
+  // the advances and loans a slip takes from, for the printed slip (6 Nov)
+  function deductionDetailsOf (meta = {}) {
+    const branch = { code: branchSettings?.basic?.code, name: branchName }
+    return {
+      advances: deductionLines({ items: meta.advances, docs: byId(allAdvances, advanceList), kind: 'advance', period, branch }),
+      loans:    deductionLines({ items: meta.loans,    docs: byId(allLoans, loanList),       kind: 'loan',    period, branch }),
+    }
+  }
+
   // Build a single slip object for print (from current live inputs)
   function buildSingleSlipForPrint (staff) {
     const slipData = buildSlips().find(s => s.staffId === staff.id)
@@ -393,6 +406,7 @@ export default function PayrollBuilder () {
       otherDeductionsNote: slipData.inputs?.otherDeductionsNote || '',
       loanNote:            slipData.inputs?.loanNote            || '',
       extraNote:           slipData.inputs?.extraNote           || '',
+      deductionDetails:    deductionDetailsOf(slipData.deductionMeta),
     }
   }
 
@@ -411,6 +425,7 @@ export default function PayrollBuilder () {
       otherDeductionsNote: s.inputs?.otherDeductionsNote || '',
       loanNote:            s.inputs?.loanNote            || '',
       extraNote:           s.inputs?.extraNote           || '',
+      deductionDetails:    deductionDetailsOf(s.deductionMeta),
     }))
   }
 

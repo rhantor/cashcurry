@@ -13,6 +13,9 @@ import { useGetBranchSettingsQuery } from '@/lib/redux/api/branchSettingsApiSlic
 import { useGetCompanyDetailsQuery } from '@/lib/redux/api/authApiSlice'
 import { useGetSingleBranchQuery } from '@/lib/redux/api/branchApiSlice'
 import { useGetStaffListQuery } from '@/lib/redux/api/staffApiSlice'
+import { useGetAdvanceEntriesQuery } from '@/lib/redux/api/AdvanceApiSlice'
+import { useGetStaffLoansQuery } from '@/lib/redux/api/staffLoanApiSlice'
+import { byId, deductionLines } from '@/lib/payroll/deductionDetails'
 import PayrollPrintView from '../components/PayrollPrintView'
 import useResolvedCompanyBranch from '@/app/hooks/useResolvedCompanyBranch'
 import { can } from '@/lib/authz/permissions'
@@ -50,6 +53,17 @@ function SlipsDrawer ({ companyId, branchId, runId, run, setPrintTarget, money }
     companyId && branchId ? { companyId, branchId } : skipToken
   )
 
+  // the advances and loans each slip took from, for the printed slip (6 Nov)
+  const skipLists = !companyId || !branchId
+  const { data: advances = [] } = useGetAdvanceEntriesQuery({ companyId, branchId }, { skip: skipLists })
+  const { data: loans = [] }    = useGetStaffLoansQuery({ companyId, branchId }, { skip: skipLists })
+  const { data: settings }      = useGetBranchSettingsQuery(skipLists ? skipToken : { companyId, branchId })
+  const branch = { code: settings?.basic?.code, name: settings?.basic?.name }
+  const details = (meta = {}) => ({
+    advances: deductionLines({ items: meta.advances, docs: byId(advances), kind: 'advance', period: run?.period, branch }),
+    loans:    deductionLines({ items: meta.loans,    docs: byId(loans),    kind: 'loan',    period: run?.period, branch }),
+  })
+
   const staffMap = {}
   for (const s of staffList) {
     staffMap[s.id] = `${s.firstName || ''} ${s.lastName || ''}`.trim() || s.name || s.staffName || ''
@@ -57,7 +71,8 @@ function SlipsDrawer ({ companyId, branchId, runId, run, setPrintTarget, money }
 
   const enrichedSlips = slips.map(slip => ({
     ...slip,
-    staffName: slip.staffName || staffMap[slip.staffId] || 'Former staff'
+    staffName: slip.staffName || staffMap[slip.staffId] || 'Former staff',
+    deductionDetails: details(slip.deductionMeta),
   }))
 
   if (isLoading) return <div className='space-y-2 p-4'><Skeleton className='h-10' /><Skeleton className='h-10' /></div>

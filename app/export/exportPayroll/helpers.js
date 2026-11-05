@@ -10,6 +10,18 @@ import { fmtAmt, periodLabel } from '@/lib/payroll/calculations'
 
 export const RM = v => `RM ${fmtAmt(v || 0)}`
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const dayText = (d) => {
+  const m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})/)
+  return m ? `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]} ${m[1]}` : '—'
+}
+
+/** The slip's advances and loans (lib/payroll/deductionDetails.js), as printed (6 Nov). */
+const detailsOf = (slip) => [...(slip.deductionDetails?.advances || []), ...(slip.deductionDetails?.loans || [])]
+const thisMonth = (d, fmt) => d.moved
+  ? `Not this month (${fmt(d.due)} moved later)`
+  : `${fmt(d.taken)}${d.instalment ? ` · inst. ${d.instalment}` : ''}${d.due > d.taken ? ` (${fmt(d.due - d.taken)} carried)` : ''}`
+
 export const n2 = v => Number(v || 0).toLocaleString('en-MY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
 export const dash = v => (Number(v || 0) > 0 ? n2(v) : '-')
@@ -320,8 +332,35 @@ export function drawPayslipToPDF (doc, slip, branchName = '', period = '', compa
     doc.setFontSize(16); doc.setFont('helvetica', 'bold'); doc.setTextColor(30, 41, 59)
     doc.text(fmt(slip.netPay), 192, netY + 10, { align: 'right' })
 
-    // Extra Note
     let afterNet = netY + 22
+
+    // Advances and loans deducted: which, what for, what is left (6 Nov)
+    const details = detailsOf(slip)
+    if (details.length) {
+      autoTable(doc, {
+        startY: afterNet,
+        head: [
+          [{ content: 'ADVANCES & LOANS DEDUCTED', colSpan: 6, styles: { fillColor: [255, 247, 237], textColor: [154, 52, 18], fontStyle: 'bold', halign: 'left' } }],
+          ['Given', 'Voucher', 'For', 'Amount', 'This month', 'Left after'].map((h, i) => ({ content: h, styles: { fillColor: [248, 250, 252], textColor: [100, 116, 139], halign: i >= 3 ? 'right' : 'left' } })),
+        ],
+        body: details.map(d => [
+          `${d.kind === 'loan' ? 'Loan' : 'Advance'} · ${dayText(d.date)}`,
+          d.voucher || '—',
+          d.reason || '—',
+          d.amount ? fmt(d.amount) : '—',
+          thisMonth(d, fmt),
+          d.left == null ? '—' : fmt(d.left),
+        ]),
+        styles: { fontSize: 7.5, cellPadding: 2, lineColor: [241, 245, 249], lineWidth: 0.1, textColor: [55, 65, 81] },
+        headStyles: { lineColor: [226, 232, 240], lineWidth: 0.1 },
+        columnStyles: { 0: { cellWidth: 30 }, 1: { cellWidth: 24 }, 2: { cellWidth: 44 }, 3: { halign: 'right', cellWidth: 22 }, 4: { halign: 'right', cellWidth: 38, textColor: [153, 27, 27] }, 5: { halign: 'right', cellWidth: 24 } },
+        tableWidth: 182,
+        margin: { left: 14 },
+      })
+      afterNet = doc.lastAutoTable.finalY + 6
+    }
+
+    // Extra Note
     if (slip.extraNote) {
       doc.setFillColor(254, 252, 232) // yellow-50
       doc.setDrawColor(253, 230, 138) // yellow-200
@@ -335,7 +374,8 @@ export function drawPayslipToPDF (doc, slip, branchName = '', period = '', compa
     }
 
     // Signatures
-    const sigY = netY + 30
+    let sigY = afterNet + 8
+    if (sigY > 270) { doc.addPage(); sigY = 30 }
     ;['Employee Signature', 'Accountant / HR', 'Authorized Signatory'].forEach((label, i) => {
       const x = 14 + i * 63
       doc.setLineWidth(0.3); doc.setDrawColor(148, 163, 184)
@@ -508,6 +548,20 @@ export function drawCompactPayslipToPDF (doc, slip, branchName, period, companyN
 
   // ── Remarks (if any) ──
   let afterNet = netY + 14
+
+  // ── Advances and loans deducted, one short line each (6 Nov) ──
+  const details = detailsOf(slip)
+  if (details.length) {
+    doc.setFontSize(5.5); doc.setFont('helvetica', 'bold'); doc.setTextColor(154, 52, 18)
+    doc.text('ADVANCES & LOANS DEDUCTED', leftM, afterNet + 2)
+    doc.setFont('helvetica', 'normal'); doc.setTextColor(55, 65, 81)
+    details.forEach((d, i) => {
+      const line = `${d.kind === 'loan' ? 'Loan' : 'Advance'} ${dayText(d.date)}${d.voucher ? ` ${d.voucher}` : ''}${d.reason ? ` · ${d.reason}` : ''} · ${d.amount ? fmt(d.amount) : '—'} · this month ${thisMonth(d, fmt)} · left ${d.left == null ? '—' : fmt(d.left)}`
+      doc.text(doc.splitTextToSize(line, rightEdge - leftM)[0], leftM, afterNet + 5.5 + i * 3.2)
+    })
+    afterNet += 5 + details.length * 3.2
+  }
+
   if (slip.extraNote) {
     doc.setFillColor(254, 252, 232)
     doc.setDrawColor(253, 230, 138)

@@ -4,6 +4,13 @@ import { fmtAmt, periodLabel } from '@/lib/payroll/calculations'
 import useCurrency from '@/app/hooks/useCurrency'
 import { currencyInfo } from '@/lib/region/currency'
 
+const CELL = { padding: '5px 8px', fontSize: 8.5, color: '#374151', border: '1px solid #f1f5f9', verticalAlign: 'top' }
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const dayText = (d) => {
+  const m = String(d || '').match(/^(\d{4})-(\d{2})-(\d{2})/)
+  return m ? `${Number(m[3])} ${MONTHS[Number(m[2]) - 1]} ${m[1]}` : '—'
+}
+
 // ─── Individual Salary Voucher ────────────────────────────────────────────────
 
 export function Payslip ({ slip, branchName, companyName, period }) {
@@ -37,6 +44,8 @@ export function Payslip ({ slip, branchName, companyName, period }) {
     slip.penalty > 0         && { label: slip.penaltyNote ? `Penalty (${slip.penaltyNote})` : 'Penalty',                             amount: slip.penalty },
     slip.otherDeductions > 0 && { label: slip.otherDeductionsNote || 'Other Deductions',                                             amount: slip.otherDeductions },
   ].filter(Boolean)
+
+  const details = [...(slip.deductionDetails?.advances || []), ...(slip.deductionDetails?.loans || [])]
 
   return (
     <div id='payslip-print-root' className='print-root' style={{ fontFamily: 'Arial, sans-serif', maxWidth: 680, margin: '0 auto', background: '#ffffff', padding: '24px 32px' }}>
@@ -137,6 +146,41 @@ export function Payslip ({ slip, branchName, companyName, period }) {
           </tfoot>
         </table>
       </div>
+
+      {/* Advances and loans deducted (6 Nov): which ones, what for, and what is left — no separate sheet needed */}
+      {details.length > 0 && (
+        <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #e2e8f0', marginBottom: 12 }}>
+          <thead>
+            <tr>
+              <th colSpan={6} style={{ background: '#fff7ed', color: '#9a3412', padding: '6px 10px', textAlign: 'left', fontSize: 9.5, fontWeight: 700, letterSpacing: 0.5, borderBottom: '1px solid #fed7aa' }}>
+                ADVANCES &amp; LOANS DEDUCTED
+              </th>
+            </tr>
+            <tr style={{ background: '#f8fafc' }}>
+              {['Given', 'Voucher', 'For', 'Amount', 'This month', 'Left after'].map((h, i) => (
+                <th key={h} style={{ padding: '4px 8px', textAlign: i >= 3 ? 'right' : 'left', fontSize: 8, color: '#64748b', border: '1px solid #e2e8f0' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {details.map((d, i) => (
+              <tr key={`${d.kind}-${d.docId}-${i}`} style={{ background: i % 2 === 0 ? '#fff' : '#fafafa' }}>
+                <td style={CELL}>{d.kind === 'loan' ? 'Loan' : 'Advance'} · {dayText(d.date)}</td>
+                <td style={CELL}>{d.voucher || '—'}</td>
+                <td style={CELL}>{d.reason || '—'}</td>
+                <td style={{ ...CELL, textAlign: 'right' }}>{d.amount ? fmt(d.amount) : '—'}</td>
+                <td style={{ ...CELL, textAlign: 'right', color: '#991b1b', fontWeight: 600 }}>
+                  {d.moved ? 'Not this month' : fmt(d.taken)}
+                  {d.instalment && <div style={{ fontSize: 7.5, color: '#64748b', fontWeight: 400 }}>instalment {d.instalment}</div>}
+                  {!d.moved && d.due > d.taken && <div style={{ fontSize: 7.5, color: '#b45309', fontWeight: 400 }}>{fmt(d.due - d.taken)} carried to a later month</div>}
+                  {d.moved && <div style={{ fontSize: 7.5, color: '#b45309', fontWeight: 400 }}>{fmt(d.due)} moved to a later month</div>}
+                </td>
+                <td style={{ ...CELL, textAlign: 'right', fontWeight: 600 }}>{d.left == null ? '—' : fmt(d.left)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
 
       {/* Net Pay */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', border: '2px solid #1e293b', borderRadius: 6, padding: '10px 18px', marginBottom: 14 }}>
