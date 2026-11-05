@@ -67,7 +67,7 @@ export default function ReceiveSheet() {
             progress={uploadPct}
             onPick={(f, url) => {
               setInvoiceFile(f);
-              setInvoicePreview(f && !/pdf/i.test(f.type) ? url : null);
+              setInvoicePreview(f ? url : null); // a PDF shows as a file card, a photo as itself
             }}
             onRemove={() => {
               setInvoiceFile(null);
