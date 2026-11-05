@@ -26,6 +26,7 @@ import {
 import { shiftsEnabled } from '@/lib/attendance/shifts'
 import { calcPayroll, fmtAmt, toPeriodKey, periodLabel } from '@/lib/payroll/calculations'
 import { allocateTaken } from '@/lib/payroll/repayments'
+import { roleLabelOf } from '@/app/staff-management/lib/constants'
 import { byId, deductionLines } from '@/lib/payroll/deductionDetails'
 import { changeSheet, inputsFromSlip, rosterOf, sheetChoicesOf, staffAsPaid } from '@/lib/payroll/sheet'
 import { exportPayrollToPDF, exportPayrollToExcel } from '@/app/export/exportPayroll'
@@ -280,6 +281,7 @@ export default function PayrollBuilder () {
           basicSalary: parseFloat(staff.basicSalary) || 0,
           allowance:   effectiveAllowanceAmt,
           salaryMode: mode, standardHours: stdH, workingDays: wrkD,
+          fixedSalary: !!staff.fixedSalaryNoAttendance,
           OTPerHour:   parseFloat(staff.OTPerHour)   || null,
           otMultiplier: staff.otMultiplier ?? payrollConfig?.otMultiplier ?? 1.5,
           phMultiplier: staff.phMultiplier ?? payrollConfig?.phMultiplier ?? 2.0,
@@ -341,6 +343,7 @@ export default function PayrollBuilder () {
           basicSalary: parseFloat(staff.basicSalary) || 0,
           allowance:   effectiveSlipAllowance,
           salaryMode: mode, standardHours: stdH, workingDays: wrkD,
+          fixedSalary: !!staff.fixedSalaryNoAttendance,
           OTPerHour:   parseFloat(staff.OTPerHour)   || null,
           otMultiplier: staff.otMultiplier ?? payrollConfig?.otMultiplier ?? 1.5,
           phMultiplier: staff.phMultiplier ?? payrollConfig?.phMultiplier ?? 2.0,
@@ -365,7 +368,7 @@ export default function PayrollBuilder () {
       return {
         staffId:      staff.id,
         staffName:    getStaffName(staff),
-        designation:  staff.designation || staff.role || '',
+        designation:  staff.designation || roleLabelOf(staff.role) || '',
         department:   staff.department  || staff.group || staff.role || '',
         calc,
         inputs: { ...inputs },
@@ -397,7 +400,7 @@ export default function PayrollBuilder () {
       ...slipData.calc,
       staffId:      staff.id,
       staffName:    getStaffName(staff),
-      designation:  staff.designation || staff.role || '',
+      designation:  staff.designation || roleLabelOf(staff.role) || '',
       department:   staff.department  || staff.group || staff.role || '',
       status:       existingRun?.status || 'draft',
       bonusNote:           slipData.inputs?.bonusNote           || '',

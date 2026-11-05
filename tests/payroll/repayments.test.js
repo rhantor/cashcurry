@@ -180,3 +180,12 @@ describe("a loan not taken this month (6 Nov)", () => {
     expect(back.installments).toEqual(list);
   });
 });
+
+describe("a fixed monthly salary (6 Nov)", () => {
+  it("pays the whole basic whatever the hours, still taking advances off", () => {
+    const fixed = { basicSalary: 1300, salaryMode: "hours", standardHours: 260, fixedSalary: true };
+    expect(calcPayroll(fixed, { workedHours: 0 }).basePay).toBe(1300);
+    expect(calcPayroll(fixed, { workedHours: 0, advanceAmt: 100 }).netPay).toBe(1200);
+    expect(calcPayroll({ ...fixed, fixedSalary: false }, { workedHours: 0 }).basePay).toBe(0);
+  });
+});
