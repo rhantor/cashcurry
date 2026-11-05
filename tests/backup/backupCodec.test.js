@@ -55,7 +55,7 @@ describe("the older folder layout", () => {
 describe("a local copy", () => {
   it("leaves out push tokens", () => {
     expect(isDroppedLocally("companies/c/users/u/fcmTokens/t1")).toBe(true);
-    expect(isDroppedLocally("companies/c/fcmTokens")).toBe(false); // a document, not the collection
+    expect(isDroppedLocally("companies/fcmTokens")).toBe(false); // a document with that name, not the collection
     expect(isDroppedLocally("companies/c/branches/b/sales/s1")).toBe(false);
     expect(forLocalCopy({ fcmToken: "x", fcmTokens: ["y"], name: "A" })).toEqual({ name: "A" });
   });
