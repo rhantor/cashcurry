@@ -3,6 +3,7 @@ import React, { useMemo, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 import { ChevronDown, Printer } from 'lucide-react'
 import { calcPayroll } from '@/lib/payroll/calculations'
+import { roleLabelOf } from '@/app/staff-management/lib/constants'
 import { Input, cn } from '@/app/components/ui'
 
 /** A number box with a small label above it. */
@@ -60,6 +61,7 @@ export default function SlipCard ({ staff, name, inputs, setInputs, payrollConfi
     basicSalary:      parseFloat(staff.basicSalary)   || 0,
     allowance:        effectiveAllowance,
     salaryMode:       mode,
+    fixedSalary:      !!staff.fixedSalaryNoAttendance,
     standardHours:    stdHours,
     workingDays:      wrkDays,
     OTPerHour:        parseFloat(staff.OTPerHour)     || null,
@@ -96,7 +98,8 @@ export default function SlipCard ({ staff, name, inputs, setInputs, payrollConfi
 
   const set = (key, val) => setInputs(prev => ({ ...prev, [key]: val }))
   const deductions = calc.grossEarnings - calc.netPay
-  const payBy = mode === 'hours' ? 'by the hour' : mode === 'days' ? 'by the day' : mode
+  const fixed = !!staff.fixedSalaryNoAttendance
+  const payBy = fixed ? 'a fixed monthly salary' : mode === 'hours' ? 'by the hour' : mode === 'days' ? 'by the day' : mode
 
   return (
     <div className={cn('overflow-hidden rounded-2xl border bg-surface shadow-card transition-colors', open ? 'border-brand/40' : 'border-line')}>
@@ -110,7 +113,7 @@ export default function SlipCard ({ staff, name, inputs, setInputs, payrollConfi
             {staff.notOnStaffList && <span className='mb-0.5 inline-block rounded bg-surface-2 px-1.5 py-0.5 text-[10px] font-semibold text-muted'>Not on staff list now</span>}
             {staff.addedToSheet && <span className='mb-0.5 inline-block rounded bg-info-soft px-1.5 py-0.5 text-[10px] font-semibold text-info'>Added to this sheet</span>}
             <span className='block truncate text-[11px] text-muted'>
-              <span className='capitalize'>{staff.role || 'staff'}</span> · paid {payBy} · basic {money(staffConfig.basicSalary)}
+              <span>{roleLabelOf(staff.role) || 'Staff'}</span> · paid {payBy} · basic {money(staffConfig.basicSalary)}
             </span>
           </span>
           <span className='shrink-0 text-right'>
@@ -130,6 +133,7 @@ export default function SlipCard ({ staff, name, inputs, setInputs, payrollConfi
             {!locked && (
               <div className='space-y-4 border-t border-line p-3 sm:p-4'>
                 <Group title='Time worked'>
+                  {fixed && <p className='mb-2 text-xs font-semibold text-muted'>Fixed monthly salary: the basic {money(staffConfig.basicSalary)} is paid in full, whatever the hours.</p>}
                   <div className='grid grid-cols-3 gap-2'>
                     {mode === 'hours' ? (
                       <>
