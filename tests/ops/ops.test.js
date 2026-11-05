@@ -144,3 +144,15 @@ describe("who does it day by day, as the server writes it (30 Oct)", () => {
     expect(dutyNamed({ cover: { date: DATE, person: null } })).toEqual([]);
   });
 });
+
+describe("My pay counts only one's own (6 Nov)", () => {
+  it("advances a manager entered for other staff are not the manager's to pay back", () => {
+    const manager = { uid: "m1" };
+    const advances = [
+      { staffId: "rakib", status: "approved", advanceType: "salary", amount: 200, remainingAmount: 200, createdBy: manager },
+      { staffId: "ali", status: "approved", advanceType: "salary", amount: 3000, remainingAmount: 3000, createdBy: manager },
+      { staffId: "omar", status: "approved", advanceType: "personal", amount: 4000, remainingAmount: 3800, createdBy: manager },
+    ];
+    expect(owedBy("rakib", { advances }).advance).toBe(200);
+  });
+});
