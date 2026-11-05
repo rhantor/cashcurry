@@ -15,7 +15,7 @@ const appAlias = {
     b.onResolve({ filter: /^@\// }, async (args) => b.resolve(`./${args.path.slice(2)}`, { resolveDir: root, kind: args.kind }));
   },
 };
-const common = { bundle: true, platform: "node", format: "cjs", target: "node20", logLevel: "warning", plugins: [appAlias] };
+const common = { bundle: true, platform: "node", format: "cjs", target: "node22", logLevel: "warning", plugins: [appAlias] };
 await build({
   ...common,
   entryPoints: [path.join(root, "lib/finance/server.js")],
