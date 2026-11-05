@@ -14,7 +14,7 @@ import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlic
 import { computeAttendance, formatClock, getAttendanceDate, toLocalDateStr } from "@/lib/attendance/computeHours";
 import { shiftsEnabled } from "@/lib/attendance/shifts";
 import { byPeriodDesc } from "@/lib/payroll/payslipCopy";
-import { MONEY_ADVANCE_TYPES } from "@/lib/ops/model";
+import { owedBy } from "@/lib/ops/model";
 
 /**
  * { staff, priv, loading } — the person's staff record and its private half:
@@ -133,10 +133,8 @@ export function useMyWork(user, publicStaff, priv, offset = 0) {
   const stats = useMemo(() => {
     const base = { isFixed: false, basicHours: 0, otHours: 0, earnings: 0, loanDebt: 0, advanceDebt: 0, lateDays: 0, lateMinutes: 0, pendingOtDays: 0, daysWorked: 0, days: [] };
     if (!staff) return base;
-    const loanDebt = loans.filter((l) => l.staffId === staff.id && l.status !== "closed").reduce((s, l) => s + (l.remainingAmount || 0), 0);
-    const advanceDebt = advances
-      .filter((a) => (a.staffId === staff.id || a.createdBy?.uid === user?.uid) && a.status === "approved" && MONEY_ADVANCE_TYPES.includes(a.advanceType))
-      .reduce((s, a) => s + (a.remainingAmount ?? a.amount ?? 0), 0);
+    // only their own, handed over and not yet paid back — never one they entered for someone else (6 Nov)
+    const { advance: advanceDebt, loan: loanDebt } = owedBy(staff.id, { advances, loans });
     if (staff.fixedSalaryNoAttendance) return { ...base, isFixed: true, earnings: Number(staff.basicSalary) || 0, loanDebt, advanceDebt };
     if (!period) return { ...base, loanDebt, advanceDebt };
 
