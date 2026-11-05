@@ -11,7 +11,8 @@ export const LOCAL_PROJECT_ID = "demo-cashcurry";
 
 // Git-ignored folder for emulator data, the local password and account list.
 export const LOCAL_DIR = path.join(ROOT, ".local");
-export const EMULATOR_DATA_DIR = path.join(LOCAL_DIR, "emulator-data");
+// CC_EMULATOR_DATA runs the app on another saved copy (a release rehearsal).
+export const EMULATOR_DATA_DIR = process.env.CC_EMULATOR_DATA || path.join(LOCAL_DIR, "emulator-data");
 
 export const BACKUP_DIR = findBackupDir(ROOT);
 

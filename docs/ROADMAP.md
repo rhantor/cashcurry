@@ -162,6 +162,18 @@ system and permissions, and plan its own improvements.
 Things that must happen on production at release time, in order. Each one is
 rehearsed on the local copy first.
 
+**Rehearsed 5 Nov on a copy of production data** (`npm run backup:production`, `npm run backup:restore`): the restore read back identical;
+all data scripts ran and a second pass found nothing left to move; 1,298 money figures (every branch and month, summary and both dashboards) were
+compared between main's code and dev's, and did not move at all when the scripts ran. The differences between the two codes are all explained: salary
+entries with no `date` were counted in the current month on main's company dashboard and are now in their own month (closing cash the same), and the
+open decision on banked sales. Every office role signed in and opened every page. The emulators don't enforce indexes, so the new index queries were
+not exercised. Going back after `staff:private` needs a restore, because main reads pay from the staff record, so that script runs after the app is
+confirmed working. Today there are no staff logins, old leave records or old branch chat in production, so `staff:link`, `staff:logins`,
+`requests:leaves` and `chat:migrate` should report nothing: run the report anyway.
+
+- [ ] **Vercel (found 5 Nov):** the project has no `FIREBASE_SERVICE_ACCOUNT`. Every admin route needs it (create-staff, reset-staff-pin,
+      link-office-login, cash-in-hand, hires, join, tasks/duty). The owner adds it in Vercel, Production only, before the app goes out
+
 - [ ] **Roles matrix (4.1):** deploy the new `firestore.rules` and, right after, run
       `npm run staff:private -- --project <id>` (report), then with `--write --confirm`.
       Until it runs, existing staff records still carry pay / IC / bank on the record
@@ -172,13 +184,13 @@ rehearsed on the local copy first.
       `--write --confirm` — deletes the leave the old staff portal saved in advances (owner, 30 Oct: of no use; a copy
       goes to `.local/removed-old-leave/`). The new money engine already leaves them out, so no figure changes.
       The Sep 2026 backup had none
-- [ ] Fix the backup export script first: it writes `{ id: doc.id, ...data }`, so any
-      document with its own `id` field loses its real id (payroll salary entries —
-      42 of them collapsed in the Sep 2026 backup). Export the id separately.
-- [ ] Back up production with the fixed script, and test-restore it locally
+- [x] Backup script fixed (5 Nov): `scripts/backup-production.mjs` keeps each document's real path and value types, reads only, and refuses a folder
+      inside the repository
+- [ ] Right before the release, back up production again (`npm run backup:production -- --project <id> --out <new folder> --files <files folder>`)
+      and test-restore it into empty emulators (`npm run backup:restore -- <folder>`)
 - [ ] Optional data fix: write `paidOut` on existing approved/closed advances and staff loans (the engine
       already treats them as paid on their date, so figures don't change either way)
-- [ ] Branch settings: set each branch's time zone (Asia/Kuala_Lumpur) and confirm its
+- [ ] Branch settings (5 Nov: all four still have no time zone): set each branch's time zone (Asia/Kuala_Lumpur) and confirm its
       "day ends at" — two branches have 05:00; the other two have
       none (midnight). Note: until now every form defaulted to the UTC date, which in Malaysia
       behaved like an 08:00 cut-off.
@@ -186,7 +198,8 @@ rehearsed on the local copy first.
       deploying either one would lock the other app out. Deploy ONLY v2's firestore.rules and storage.rules
       (they include the POS sections); retire the POS repo's copy. First download the live rules and diff
       them against v2's, to catch anything deployed from elsewhere.
-- [ ] Deploy indexes (`firebase deploy --only firestore:indexes` — additive, safe; wait until they finish building)
+- [ ] Deploy indexes (`firebase deploy --only firestore:indexes` — additive, safe; wait until they finish building). Never add `--force`. The file now
+      also holds the four live POS indexes (5 Nov), so nothing is due for removal
 - [ ] Right after the rules: `npm run staff:link -- --project <id> --confirm` — records on each existing staff
       login which staff record it is. Until then those staff see only requests they raised themselves
 - [ ] Decide: delete the face data already on staff records (biometric personal data, no longer used)?
@@ -227,7 +240,7 @@ rehearsed on the local copy first.
       through the route). Nothing to migrate.
 - [ ] **New hires (31 Oct, 4.13):** deploy `firestore.rules` (newHires, joinLinks) and `storage.rules` (newHires/…) with the app
       (Vercel: the routes app/api/hires/link, app/api/join, app/api/join/upload, app/api/join/submit — they need
-      FIREBASE_SERVICE_ACCOUNT and NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET, already set). Uploads use the admin SDK on the real
+      FIREBASE_SERVICE_ACCOUNT, see the Vercel item above, and NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET). Uploads use the admin SDK on the real
       bucket (the local emulator path is a workaround). No functions, no index, nothing to migrate.
 - [ ] **Warranties and order reminders (4 Nov):** deploy `firestore.rules` (warranties), `storage.rules` (warranties/…) and the functions (the hourly `notifyDailySummary` now also warns about warranties and sends order reminders). Nothing to migrate
 - [ ] **Production rules (25 Oct):** live rules = main's firestore.rules (deployed 25 Oct with reservationDeposits). Before deploying dev's rules, diff them against the live ones (managers' branch-settings write is in both, written differently). Nothing to migrate
@@ -257,7 +270,7 @@ rehearsed on the local copy first.
       first (`firebase functions:delete auditSales auditCosts auditSalaries auditLoans auditVendorBills --region asia-southeast1`)
       and deploy again. Writes made between the delete and the deploy are not logged — do it at a quiet hour
 - [ ] Deploy Cloud Functions (`firebase deploy --only functions` builds the finance engine first). This
-      removes the old rollup functions — confirm the deletion when the CLI asks
+      removes the six old rollups, the four per-entry pushes and `onShiftClosed` (dead since 2.5) — confirm the deletion when the CLI asks
 - [ ] Right after: `npm run summaries:rebuild -- --project <id> --confirm` (engine v3 since 4.9 / 4.10 — every stored summary is rebuilt; needs
       `gcloud auth application-default login`). Until it runs, dashboards just use the full download
 - [ ] Merge `dev` into `main` and push (Vercel deploys the web app)
