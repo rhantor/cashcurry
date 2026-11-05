@@ -218,7 +218,7 @@ export default function PayBillsModal({ open, onClose, bills = [], onConfirm }) 
           preview={preview}
           onPick={(f, url) => {
             setFile(f);
-            setPreview(f && !/pdf/i.test(f.type) ? url : null);
+            setPreview(f ? url : null); // a PDF shows as a file card, a photo as itself
           }}
           onRemove={() => {
             setFile(null);
