@@ -58,7 +58,7 @@ export default function TopBar({ page, user, isCompany, branches, activeBranchId
         <button
           type="button"
           onClick={onSearch}
-          className="hidden h-10 w-56 items-center gap-2 rounded-xl border border-line bg-surface-2 px-3 text-sm text-subtle transition hover:border-brand/40 hover:text-muted md:flex"
+          className="hidden h-10 w-44 shrink-0 items-center gap-2 rounded-xl border border-line bg-surface-2 px-3 text-sm text-subtle transition hover:border-brand/40 hover:text-muted md:flex xl:w-56"
         >
           <Search className="size-4" />
           <span className="flex-1 text-left">Search…</span>
@@ -70,15 +70,16 @@ export default function TopBar({ page, user, isCompany, branches, activeBranchId
 
         {isCompany ? (
           branches.length > 0 && (
-            <div className="hidden max-w-56 sm:block">
+            <div className="hidden min-w-0 max-w-56 sm:block">
               <BranchSwitcher user={user} branches={branches} activeId={activeBranchId} onSwitch={onSwitchBranch} />
             </div>
           )
         ) : (
+          // a long branch name is cut short so it never runs into the icons; the full name on hover
           branchName && (
-            <span className="hidden items-center gap-1.5 rounded-xl bg-brand-soft px-3 py-2 text-xs font-semibold text-brand sm:inline-flex">
-              <Building2 className="size-3.5" />
-              {branchName}
+            <span title={branchName} className="hidden min-w-0 max-w-56 items-center gap-1.5 rounded-xl bg-brand-soft px-3 py-2 text-xs font-semibold text-brand sm:inline-flex">
+              <Building2 className="size-3.5 shrink-0" />
+              <span className="truncate">{branchName}</span>
             </span>
           )
         )}
@@ -87,7 +88,7 @@ export default function TopBar({ page, user, isCompany, branches, activeBranchId
         <Link
           href="/messages"
           aria-label={chatUnread ? `Chat, ${chatUnread} unread` : "Chat"}
-          className="relative inline-flex size-9 items-center justify-center rounded-xl text-muted transition-colors hover:bg-surface-2 hover:text-fg"
+          className="relative inline-flex size-9 shrink-0 items-center justify-center rounded-xl text-muted transition-colors hover:bg-surface-2 hover:text-fg"
         >
           <MessagesSquare className="size-[18px]" />
           {chatUnread > 0 && (
@@ -96,7 +97,7 @@ export default function TopBar({ page, user, isCompany, branches, activeBranchId
             </span>
           )}
         </Link>
-        <NotificationBell />
+        <NotificationBell className="shrink-0" />
 
         <Menu
           align="end"
