@@ -119,3 +119,11 @@ describe("collecting a purchase order", () => {
     expect(() => approveSupplier(s, [], manager, now, { paymentId: "vp", newBillId: "nb" }, { po: { ...po, vendorId: "oil" } })).toThrow(/another supplier/);
   });
 });
+
+describe("collecting an order starts from the last price paid (6 Nov)", () => {
+  const po = { items: [{ itemId: "a", name: "A", requestedQty: 2, estPrice: 5 }, { itemId: "b", name: "B", requestedQty: 1, estPrice: 0 }, { itemId: "c", name: "C", requestedQty: 1, estPrice: 7 }] };
+  it("the last price where there is one, else the planned price", () => {
+    expect(poLines(po, { a: 6, b: 9, c: 0 }).map((l) => l.finalPrice)).toEqual([6, 9, 7]);
+    expect(poLines(po).map((l) => l.finalPrice)).toEqual([5, 0, 7]);
+  });
+});

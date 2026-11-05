@@ -13,6 +13,7 @@ import { formatMoney } from "@/lib/region/currency";
 import {
   dueBillsOf,
   getOrder,
+  lastPricesFor,
   openOrdersOf,
   useSuppliers,
 } from "@/lib/payouts/client";
@@ -78,10 +79,10 @@ export default function SupplierPicker({
     };
   }, [companyId, branchId, v.vendorId, settleId, modes.join()]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // a purchase order: its lines, as ordered at the planned price, to change to what came
+  // a purchase order: its lines, as ordered at the last price paid here, to change to what came
   const pickOrder = async (id) => {
     const po = id ? await getOrder(companyId, branchId, id) : null;
-    const lines = poLines(po);
+    const lines = poLines(po, po ? await lastPricesFor(companyId, branchId, (po.items || []).map((i) => i.itemId)) : {});
     setPaidTouched(false);
     set({
       poId: po?.id || "",

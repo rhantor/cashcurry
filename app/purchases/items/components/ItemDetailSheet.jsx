@@ -102,10 +102,22 @@ export default function ItemDetailSheet({ item, stat, onClose }) {
                         <p className="truncate text-sm font-semibold text-fg">{l.vendorName || "Supplier"}</p>
                         <p className="truncate text-[11px] text-muted">
                           {day(l.date)}
-                          {l.invoiceNo ? ` · ${l.invoiceNo}` : ""} · {l.qty} {l.unit || unit} × {money(l.price)}
+                          {l.poNo ? ` · ${l.poNo}` : ""}
+                          {l.invoiceNo ? ` · Inv ${l.invoiceNo}` : ""} · {l.qty} {l.unit || unit} × {money(l.price)}
                         </p>
                       </div>
-                      <span className="shrink-0 text-sm font-bold tabular-nums text-fg">{money(l.amount)}</span>
+                      <div className="shrink-0 text-right">
+                        <p className="text-sm font-bold tabular-nums text-fg">{money(l.amount)}</p>
+                        {/* how the price moved since the purchase before, in the same unit */}
+                        {l.diff !== 0 && l.diff != null && (
+                          <p className={cn("inline-flex items-center gap-0.5 text-[11px] font-semibold tabular-nums", l.diff > 0 ? "text-warning" : "text-success")}>
+                            {l.diff > 0 ? <TrendingUp className="size-3" /> : <TrendingDown className="size-3" />}
+                            {l.diff > 0 ? "+" : "−"}
+                            {money(Math.abs(l.diff))} ({l.diff > 0 ? "+" : ""}
+                            {l.pct}%)
+                          </p>
+                        )}
+                      </div>
                     </li>
                   ))}
                 </ul>

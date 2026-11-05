@@ -62,3 +62,21 @@ describe("tidying the catalog", () => {
     expect(notBought(items, (i) => last[i.id], today).map((x) => x.item.id)).toEqual(["old", "stale"]);
   });
 });
+
+describe("each purchase against the one before (6 Nov)", () => {
+  const priced = [
+    { vendorName: "Best", invoiceNo: "B3", invoiceDate: "2026-11-20", notes: "Received from PO: PO-LZBB-2611-0009", items: [{ itemId: "lamb", unit: "Kg", receivedQty: 30, finalPrice: 41 }] },
+    { vendorName: "Best", invoiceNo: "B2", invoiceDate: "2026-11-10", items: [{ itemId: "lamb", unit: "Box", receivedQty: 1, finalPrice: 400 }] },
+    { vendorName: "Best", invoiceNo: "B1", invoiceDate: "2026-11-06", notes: "Received from PO: PO-LZBB-2611-0002 — note", items: [{ itemId: "lamb", unit: "Kg", receivedQty: 30, finalPrice: 38 }] },
+    { vendorName: "Best", invoiceNo: "B0", invoiceDate: "2026-11-01", items: [{ itemId: "lamb", unit: "Kg", receivedQty: 30, finalPrice: 38 }] },
+  ];
+  const h = itemStats(purchaseLines(priced), "2026-11-25").lamb.history;
+  it("says which purchase order a bill came from", () => {
+    expect(h.map((l) => l.poNo)).toEqual(["PO-LZBB-2611-0009", "", "PO-LZBB-2611-0002", ""]);
+  });
+  it("compares with the last purchase in the same unit, and shows no move when the price held", () => {
+    expect(h[0]).toMatchObject({ diff: 3, pct: 7.9 }); // 38 → 41 a Kg, the Box in between is skipped
+    expect(h[1]).toMatchObject({ diff: 0, pct: 0 }); // the first Box
+    expect(h[2]).toMatchObject({ diff: 0, pct: 0 }); // 38 again
+  });
+});

@@ -52,7 +52,7 @@ import { FileThumb } from "@/app/components/common/Files";
 import ScanToPdf from "@/app/components/common/ScanToPdf";
 import SupplierPicker from "./SupplierPicker";
 import { checkSupplier, poLines, supplierPaid } from "@/lib/payouts/supplier";
-import { getOrder } from "@/lib/payouts/client";
+import { getOrder, lastPricesFor } from "@/lib/payouts/client";
 
 const PURPOSES = [
   "Cooking gas",
@@ -518,8 +518,8 @@ export function BillSheet({
     // money sent to collect an order: its lines, as ordered, to change to what came
     if (!retry && po?.poId) {
       getOrder(companyId, branchId, po.poId)
-        .then((o) => {
-          const lines = poLines(o);
+        .then(async (o) => {
+          const lines = poLines(o, o ? await lastPricesFor(companyId, branchId, (o.items || []).map((i) => i.itemId)) : {});
           setSupplier((s) =>
             s?.poId === po.poId && !s.lines?.length
               ? {

@@ -165,6 +165,13 @@ export default function PurchaseOrdersPage() {
   const [receiveData, setReceiveData] = useState({ invoiceNo: "", invoiceDate: todayISO(), items: [] });
 
   const handleOpenReceive = (order) => {
+    // what this branch last paid for each item (6 Nov): never a blank or 0 when there is one
+    const byId = new Map(catalog.map((i) => [i.id, i]));
+    const startPrice = (i) => {
+      const last = byId.has(i.itemId) ? branchLastPrice(byId.get(i.itemId), branchId) : 0;
+      const p = last > 0 ? last : Number(i.estPrice) || 0;
+      return p > 0 ? String(p) : "";
+    };
     setSelectedOrder(order);
     setInvoiceFile(null);
     setInvoicePreview(null);
@@ -179,7 +186,7 @@ export default function PurchaseOrdersPage() {
         unit: i.unit,
         requestedQty: i.requestedQty,
         receivedQty: String(i.requestedQty ?? ""), // default to receiving exactly what was ordered
-        finalPrice: String(i.estPrice ?? ""), // default to est price
+        finalPrice: startPrice(i), // the last price paid here, else the estimate
         estPrice: Number(i.estPrice) || 0, // what was expected — a dearer price is flagged
       })),
     });
