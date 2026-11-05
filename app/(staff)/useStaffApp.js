@@ -170,7 +170,7 @@ export function useMyWork(user, publicStaff, priv, offset = 0) {
       pendingOtDays: inPeriod.filter((d) => d.otApproval === "pending").length,
       days: inPeriod,
     };
-  }, [staff, period, punches, attendanceSettings, otRequests, loans, advances, user?.uid]);
+  }, [staff, period, punches, attendanceSettings, otRequests, loans, advances]);
 
   return { period, stats, loading: !staff || (canAttendance && punchesLoading) };
 }
