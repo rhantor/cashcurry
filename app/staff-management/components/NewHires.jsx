@@ -22,7 +22,8 @@ const EMPTY = { firstName: '', lastName: '', phone: '', role: '', department: ''
 
 /** The list on the staff page: everyone joining who hasn't joined or been cancelled, and the last few who have. */
 export default function NewHires ({ hires, onNew, onOpen }) {
-  const open = hires.filter(h => !['accepted', 'cancelled'].includes(h.status))
+  // details asked for someone already on staff show on their record, not here (6 Nov)
+  const open = hires.filter(h => !h.forStaffId && !['accepted', 'cancelled'].includes(h.status))
   if (!open.length) return null
   return (
     <section className='space-y-2'>
@@ -195,7 +196,7 @@ export function HireSheet ({ hire, onClose, companyId, branchId, company, timeZo
       setBusy(false)
     }
   }
-  const text = link ? linkMessage({ name: hire.firstName, company, url: link.url, expiresAt: link.expiresAt }) : ''
+  const text = link ? linkMessage({ name: hire.firstName, company, url: link.url, expiresAt: link.expiresAt, forStaff: !!hire.forStaffId }) : ''
   const wa = waNumber(hire?.phone || '', timeZone)
   const showFiles = async index => {
     try {
@@ -293,7 +294,7 @@ export function HireSheet ({ hire, onClose, companyId, branchId, company, timeZo
                       ))}
                     </div>
                     {status === 'submitted' && (
-                      <Button className='w-full' icon={UserPlus} onClick={() => onAccept(hire)}>Accept as staff</Button>
+                      <Button className='w-full' icon={UserPlus} onClick={() => onAccept(hire)}>{hire.forStaffId ? 'Check and add to their record' : 'Accept as staff'}</Button>
                     )}
                     {status === 'accepted' && <p className='text-xs text-muted'>Joined — they are on the staff list. Their documents and signed letter are on their record.</p>}
                   </div>
