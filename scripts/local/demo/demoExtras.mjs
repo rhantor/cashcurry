@@ -14,7 +14,7 @@ import { LOCAL_DIR } from "../config.mjs";
 import { TEMPLATES } from "../../../app/tools/appointment-letter/templates.js";
 import { addPurchaseSamples } from "./purchaseSamples.mjs";
 // the emulators — or, with CC_TARGET=staging --confirm, the real project's staging database
-import { ACCOUNTS_FILE, GUIDE_FILE, LIVE, REAL, assertDemo, db, demoLogin, demoPassword, mirrorUser, putFile } from "../target.mjs";
+import { ACCOUNTS_FILE, GUIDE_FILE, LIVE, REAL, db, demoLogin, demoPassword, mirrorUser, putFile } from "../target.mjs";
 const CO = "demo-company";
 const KL = "demo-kl";
 const kl = db.doc(`companies/${CO}/branches/${KL}`);
