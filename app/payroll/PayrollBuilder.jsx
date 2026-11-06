@@ -28,6 +28,7 @@ import { calcPayroll, fmtAmt, toPeriodKey, periodLabel } from '@/lib/payroll/cal
 import { allocateTaken } from '@/lib/payroll/repayments'
 import { roleLabelOf } from '@/app/staff-management/lib/constants'
 import { byId, deductionLines } from '@/lib/payroll/deductionDetails'
+import { payFor } from '@/lib/payroll/payHistory'
 import { changeSheet, inputsFromSlip, rosterOf, sheetChoicesOf, staffAsPaid } from '@/lib/payroll/sheet'
 import { exportPayrollToPDF, exportPayrollToExcel } from '@/app/export/exportPayroll'
 import { computeAttendance } from '@/lib/attendance/computeHours'
@@ -165,7 +166,8 @@ export default function PayrollBuilder () {
       .map(e => staffAsPaid(e, byId.get(e.staffId), statutoryConfig || []))
       .sort((a, b) => getStaffName(a).localeCompare(getStaffName(b)))
   }, [pastPending, pastMonth, staffList, paidEntries, statutoryConfig])
-  const roster = useMemo(() => rosterOf(baseList, staffList, sheet), [baseList, staffList, sheet])
+  // each person at the pay in force for this month (a raise from a later month is not paid yet; 6 Nov)
+  const roster = useMemo(() => rosterOf(baseList, staffList, sheet).map(s => payFor(s, period)), [baseList, staffList, sheet, period])
   const sheetChoices = useMemo(() => sheetChoicesOf(baseList, staffList), [baseList, staffList])
   const [showSheetPicker, setShowSheetPicker] = useState(false)
   function setOnSheet (id, on) {

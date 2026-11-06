@@ -6,7 +6,7 @@ import { fileUrl, getLetter } from '@/lib/hires/client'
 import { letterForHire } from '@/app/tools/appointment-letter/letterForHire'
 import FileViewer from '@/app/components/common/FileViewer'
 import { format, parseISO } from 'date-fns'
-import { FileSignature, FileText, Pencil, Phone, Trash2 } from 'lucide-react'
+import { FileSignature, FileText, Pencil, Phone, Trash2, TrendingUp } from 'lucide-react'
 import useCurrency from '@/app/hooks/useCurrency'
 import { formatMoney } from '@/lib/region/currency'
 import { Avatar, Badge, Button, Sheet, cn, toast } from '@/app/components/ui'
@@ -106,7 +106,7 @@ function JoinPapers ({ staff, currency }) {
 }
 
 /** One staff member: pay at a glance, then contact, work, ID and bank. */
-export default function StaffDetailModal ({ isOpen, onClose, staff, onEdit, onDelete, onLinkOffice, onUnlinkOffice }) {
+export default function StaffDetailModal ({ isOpen, onClose, staff, onEdit, onDelete, onLinkOffice, onUnlinkOffice, onChangeSalary }) {
   const currency = useCurrency()
   const money = v => (v && Number(v) > 0 ? formatMoney(Number(v), currency) : null)
   const s = staff || {}
@@ -196,6 +196,39 @@ export default function StaffDetailModal ({ isOpen, onClose, staff, onEdit, onDe
               </div>
             ))}
           </div>
+
+          {/* every salary change, newest first, and a way to make one (6 Nov) */}
+          {(onChangeSalary || (s.payHistory || []).length > 0) && (
+            <section className='space-y-2'>
+              <div className='flex items-center justify-between gap-2'>
+                <h3 className='text-xs font-semibold uppercase tracking-[0.12em] text-subtle'>Salary history</h3>
+                {onChangeSalary && <Button size='sm' variant='secondary' icon={TrendingUp} onClick={() => onChangeSalary(staff)}>Change salary</Button>}
+              </div>
+              {(s.payHistory || []).length === 0 ? (
+                <p className='text-sm text-muted'>No change recorded yet.</p>
+              ) : (
+                <ul className='divide-y divide-line overflow-hidden rounded-2xl border border-line'>
+                  {[...s.payHistory].sort((a, b) => b.from.localeCompare(a.from) || String(b.at).localeCompare(String(a.at))).map((h, i) => {
+                    const rise = (h.now?.basicSalary || 0) - (h.was?.basicSalary || 0)
+                    return (
+                      <li key={`${h.from}-${h.at}-${i}`} className='flex items-start justify-between gap-3 p-3 text-sm'>
+                        <div className='min-w-0'>
+                          <p className='font-semibold text-fg'>From {fmtDate(`${h.from}-01`)?.replace(/^1 /, '')}</p>
+                          <p className='text-xs text-muted'>
+                            {money(h.was?.basicSalary) || '—'} → {money(h.now?.basicSalary) || '—'}
+                            {h.now?.basicPerHour ? ` · ${money(h.now.basicPerHour)} an hour` : ''}
+                            {h.note ? ` · ${h.note}` : ''}
+                          </p>
+                          <p className='text-[11px] text-subtle'>{[h.by?.name, fmtDate(h.at)].filter(Boolean).join(' · ')}</p>
+                        </div>
+                        {rise !== 0 && <Badge tone={rise > 0 ? 'success' : 'warning'}>{rise > 0 ? '+' : '−'}{money(Math.abs(rise))}</Badge>}
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </section>
+          )}
 
           <div className='grid gap-5 md:grid-cols-2'>
             <div className='space-y-5'>

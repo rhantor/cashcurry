@@ -30,10 +30,11 @@ import useCurrency from '@/app/hooks/useCurrency'
 import { formatMoney } from '@/lib/region/currency'
 import { ROLES, roleLabelOf } from './lib/constants'
 import { useChatPeople } from '@/app/components/chat/useChat'
-import { isCompanyRole, roleLabel as loginRoleLabel } from '@/lib/authz/permissions'
+import { can, isCompanyRole, roleLabel as loginRoleLabel } from '@/lib/authz/permissions'
 
 import StaffModal, { dropDraft } from './components/StaffModal'
 import StaffDetailModal from './components/StaffDetailModal'
+import SalaryChangeSheet from './components/SalaryChangeSheet'
 import NewHires, { HireSheet, NewHireSheet } from './components/NewHires'
 
 const fullName = s => `${s?.firstName || ''} ${s?.lastName || ''}`.trim() || s?.name || 'Unnamed'
@@ -126,6 +127,7 @@ function StaffManagement () {
   const [modalMode, setModalMode] = useState(null) // "add" | "edit" | null
   const [editTarget, setEditTarget] = useState(null)
   const [detailTarget, setDetailTarget] = useState(null)
+  const [salaryFor, setSalaryFor] = useState(null) // Change salary (6 Nov)
   const [generatedCreds, setGeneratedCreds] = useState(null)
   const [generatingFor, setGeneratingFor] = useState(null)
 
@@ -453,7 +455,9 @@ function StaffManagement () {
         onDelete={handleDelete}
         onLinkOffice={s => { setLinkUid(''); setLinkFor(s) }}
         onUnlinkOffice={unlinkOffice}
+        onChangeSalary={can(user?.role, 'staff.manage') ? s => { setDetailTarget(null); setSalaryFor(s) } : null}
       />
+      <SalaryChangeSheet open={!!salaryFor} onClose={() => setSalaryFor(null)} staff={salaryFor} />
 
       {/* an office login linked to this staff record: they see their own pay under Me */}
       <Sheet
