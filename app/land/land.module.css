@@ -762,3 +762,191 @@
     transform: none;
   }
 }
+
+/* ---------- light motion (7 Nov) ----------
+   The hero plays on load with CSS alone. Everything further down starts hidden
+   only once Motion.jsx has put .motion on the page, so without JavaScript, or
+   with "reduce motion" on, it all simply shows. */
+.hero {
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: "";
+  position: absolute;
+  width: 520px;
+  height: 520px;
+  right: -120px;
+  top: -160px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgb(117 214 184 / 0.22), transparent 65%);
+  animation: drift 18s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+.hero > .wrap {
+  position: relative;
+}
+.heroText > * {
+  animation: fadeUp 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.heroText > :nth-child(2) { animation-delay: 0.08s; }
+.heroText > :nth-child(3) { animation-delay: 0.18s; }
+.heroText > :nth-child(4) { animation-delay: 0.28s; }
+.heroText > :nth-child(5) { animation-delay: 0.38s; }
+.heroArt .dayend {
+  animation:
+    cardIn 0.9s 0.25s cubic-bezier(0.2, 0.7, 0.2, 1) both,
+    float 7s 1.4s ease-in-out infinite;
+}
+.heroArt .stack > span {
+  transform-origin: left center;
+  animation: grow 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+.heroArt .stack > :nth-child(1) { animation-delay: 0.6s; }
+.heroArt .stack > :nth-child(2) { animation-delay: 0.75s; }
+.heroArt .stack > :nth-child(3) { animation-delay: 0.9s; }
+.heroArt .stack > :nth-child(4) { animation-delay: 1.05s; }
+.heroArt .legend li {
+  animation: fadeUp 0.6s both;
+}
+.heroArt .legend li:nth-child(1) { animation-delay: 0.7s; }
+.heroArt .legend li:nth-child(2) { animation-delay: 0.8s; }
+.heroArt .legend li:nth-child(3) { animation-delay: 0.9s; }
+.heroArt .legend li:nth-child(4) { animation-delay: 1s; }
+.heroArt .short {
+  animation: flashRed 1.4s 1.5s both;
+  border-radius: 6px;
+}
+.toast {
+  animation:
+    toastIn 0.7s 1.3s cubic-bezier(0.2, 0.7, 0.2, 1) both,
+    float2 6s 2.2s ease-in-out infinite;
+}
+.chipWait {
+  animation: breathe 2.4s ease-in-out infinite;
+}
+.btnLight {
+  position: relative;
+  overflow: hidden;
+}
+.btnLight::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 30%, rgb(255 255 255 / 0.45) 50%, transparent 70%);
+  transform: translateX(-120%);
+  animation: shine 5s 2s ease-in-out infinite;
+}
+.featureArt > * {
+  transition: transform 0.35s ease, box-shadow 0.35s ease;
+}
+.featureArt > *:hover {
+  transform: translateY(-4px);
+}
+
+.motion .reveal {
+  opacity: 0;
+  transform: translateY(26px);
+  transition:
+    opacity 0.8s ease var(--d, 0ms),
+    transform 0.8s cubic-bezier(0.2, 0.7, 0.2, 1) var(--d, 0ms);
+}
+.motion .rise {
+  transform: translateY(44px) scale(0.97);
+}
+.motion .reveal.in {
+  opacity: 1;
+  transform: none;
+}
+.motion .reveal .points li {
+  opacity: 0;
+  transform: translateX(-10px);
+  transition:
+    opacity 0.5s ease var(--d, 0ms),
+    transform 0.5s ease var(--d, 0ms);
+}
+.motion .reveal.in .points li {
+  opacity: 1;
+  transform: none;
+}
+.motion .in .done .box {
+  animation: pop 0.45s cubic-bezier(0.3, 1.6, 0.5, 1) both;
+}
+.motion .in .tasks li:nth-child(1) .box { animation-delay: 0.6s; }
+.motion .in .tasks li:nth-child(2) .box { animation-delay: 0.95s; }
+.motion .in .changed {
+  animation: flashCurry 1.6s 0.8s both;
+}
+.motion .in .lines .total {
+  animation: fadeUp 0.6s 0.7s both;
+}
+
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(36px) rotate(-4deg); }
+  to { opacity: 1; transform: rotate(-1.2deg); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0) rotate(-1.2deg); }
+  50% { transform: translateY(-8px) rotate(-0.6deg); }
+}
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(24px) scale(0.94); }
+  to { opacity: 1; transform: rotate(1.5deg); }
+}
+@keyframes float2 {
+  0%, 100% { transform: translateY(0) rotate(1.5deg); }
+  50% { transform: translateY(-5px) rotate(0.8deg); }
+}
+@keyframes grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+@keyframes drift {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(-140px, 120px) scale(1.2); }
+}
+@keyframes breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.65; }
+}
+@keyframes shine {
+  0%, 70% { transform: translateX(-120%); }
+  100% { transform: translateX(120%); }
+}
+@keyframes pop {
+  from { transform: scale(0); }
+  to { transform: scale(1); }
+}
+@keyframes flashCurry {
+  0% { background: transparent; }
+  40% { background: #f7c98a; }
+  100% { background: var(--curry-soft); }
+}
+@keyframes flashRed {
+  0%, 100% { background: transparent; }
+  40% { background: #fde2d6; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page *,
+  .page *::before,
+  .page *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* the day's sales figure: hidden until CountUp starts counting from 0;
+   shown anyway after 2.2s if it never does */
+.countHold {
+  display: inline-block;
+  animation: fadeUp 0.4s 2.2s both;
+}
+.countLive {
+  display: inline-block;
+  animation: fadeUp 0.35s both;
+}

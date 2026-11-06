@@ -4,6 +4,7 @@
 // own site and domain later. The pictures are HTML, with made-up figures.
 import Link from "next/link";
 import { CONTACT, DEMO_TEXT, FEATURES, STEPS, TRUST } from "./content";
+import { CountUp, Reveal } from "./Motion";
 import s from "./land.module.css";
 
 export const metadata = {
@@ -56,7 +57,7 @@ function DayEnd() {
       </div>
       <p className={s.big}>
         <span className={s.cur}>RM</span>
-        {rm(SALES)}
+        <CountUp to={SALES} hold={s.countHold} live={s.countLive} />
       </p>
       <p className={s.small}>Sales today</p>
       <div className={s.stack} role="img" aria-label="Sales by channel">
@@ -267,6 +268,7 @@ const PICTURE = { finance: CashBook, payroll: Payslip, "staff-app": Phone, purch
 export default function LandingPage() {
   return (
     <div className={s.page}>
+      <Reveal root={s.page} motion={s.motion} reveal={s.reveal} shown={s.in} />
       <header className={s.nav}>
         <div className={s.wrap}>
           <a href="#top" className={s.brand}>
@@ -312,9 +314,9 @@ export default function LandingPage() {
 
         <section className={s.strip} aria-label="In short">
           <div className={`${s.wrap} ${s.stripGrid}`}>
-            <p><strong>One set of numbers.</strong> The day-end, the cash book and the reports all agree.</p>
-            <p><strong>Approved by someone senior.</strong> Nobody signs off their own pay-out.</p>
-            <p><strong>On any phone.</strong> Web for the office, an app for the team, a kiosk by the door.</p>
+            <p className={s.reveal}><strong>One set of numbers.</strong> The day-end, the cash book and the reports all agree.</p>
+            <p className={s.reveal} style={{ "--d": "90ms" }}><strong>Approved by someone senior.</strong> Nobody signs off their own pay-out.</p>
+            <p className={s.reveal} style={{ "--d": "180ms" }}><strong>On any phone.</strong> Web for the office, an app for the team, a kiosk by the door.</p>
           </div>
         </section>
 
@@ -323,7 +325,7 @@ export default function LandingPage() {
           return (
             <section key={f.id} id={f.id} className={`${s.feature} ${i % 2 ? s.alt : ""}`}>
               <div className={`${s.wrap} ${s.featureGrid} ${i % 2 ? s.flip : ""}`}>
-                <div className={s.featureText}>
+                <div className={`${s.featureText} ${s.reveal}`}>
                   <p className={s.kicker}>
                     <span className={s.kn}>0{i + 1}</span>
                     {f.kicker}
@@ -331,12 +333,12 @@ export default function LandingPage() {
                   <h2>{f.title}</h2>
                   <p className={s.body}>{f.body}</p>
                   <ul className={s.points}>
-                    {f.points.map((p) => (
-                      <li key={p}>{p}</li>
+                    {f.points.map((p, j) => (
+                      <li key={p} style={{ "--d": `${200 + j * 70}ms` }}>{p}</li>
                     ))}
                   </ul>
                 </div>
-                <div className={s.featureArt}>
+                <div className={`${s.featureArt} ${s.reveal} ${s.rise}`} style={{ "--d": "120ms" }}>
                   <Picture />
                 </div>
               </div>
@@ -348,8 +350,8 @@ export default function LandingPage() {
           <div className={s.wrap}>
             <h2 className={s.center}>Up and running in a week</h2>
             <ol className={s.stepGrid}>
-              {STEPS.map((st) => (
-                <li key={st.n}>
+              {STEPS.map((st, i) => (
+                <li key={st.n} className={s.reveal} style={{ "--d": `${i * 120}ms` }}>
                   <span className={s.stepN}>{st.n}</span>
                   <h3>{st.title}</h3>
                   <p>{st.body}</p>
@@ -363,8 +365,8 @@ export default function LandingPage() {
           <div className={s.wrap}>
             <h2 className={s.center}>Built for how a restaurant really runs</h2>
             <div className={s.trustGrid}>
-              {TRUST.map((t) => (
-                <div key={t.title}>
+              {TRUST.map((t, i) => (
+                <div key={t.title} className={s.reveal} style={{ "--d": `${i * 90}ms` }}>
                   <h3>{t.title}</h3>
                   <p>{t.body}</p>
                 </div>
@@ -374,7 +376,7 @@ export default function LandingPage() {
         </section>
 
         <section id="contact" className={s.final}>
-          <div className={`${s.wrap} ${s.finalInner}`}>
+          <div className={`${s.wrap} ${s.finalInner} ${s.reveal}`}>
             <h2>See it with your own restaurant&apos;s numbers.</h2>
             <p className={s.lead}>
               We&apos;ll walk you through a demo restaurant, then set up yours with you.
