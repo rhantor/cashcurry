@@ -30,6 +30,8 @@ const ALWAYS_PUBLIC_PREFIXES = [
   "/workbox-",
   // a new hire's join link (30 Oct): no sign-in — the link is the key
   "/join",
+  // the sales landing (7 Nov): open to everyone, signed in or not
+  "/land",
 ];
 
 const starts = (path, prefix) =>
