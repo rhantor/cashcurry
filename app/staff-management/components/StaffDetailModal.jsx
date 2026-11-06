@@ -6,7 +6,8 @@ import { fileUrl, getLetter } from '@/lib/hires/client'
 import { letterForHire } from '@/app/tools/appointment-letter/letterForHire'
 import FileViewer from '@/app/components/common/FileViewer'
 import { format, parseISO } from 'date-fns'
-import { FileSignature, FileText, Pencil, Phone, Trash2, TrendingUp } from 'lucide-react'
+import { AlertTriangle, FileSignature, FileText, Link2, Pencil, Phone, Trash2, TrendingUp } from 'lucide-react'
+import { STATUSES } from '@/lib/hires/model'
 import useCurrency from '@/app/hooks/useCurrency'
 import { formatMoney } from '@/lib/region/currency'
 import { Avatar, Badge, Button, Sheet, cn, toast } from '@/app/components/ui'
@@ -38,7 +39,10 @@ const tenure = start => {
   const d = typeof start === 'string' ? parseISO(start.slice(0, 10)) : start?.seconds ? new Date(start.seconds * 1000) : null
   if (!d || Number.isNaN(+d)) return null
   const months = (new Date().getFullYear() - d.getFullYear()) * 12 + (new Date().getMonth() - d.getMonth())
-  if (months < 1) return `${Math.max(1, Math.round((Date.now() - d) / 6048e5))} weeks`
+  if (months < 1) {
+    const w = Math.round((Date.now() - d) / 6048e5)
+    return w < 1 ? 'Just started' : `${w} week${w === 1 ? '' : 's'}`
+  }
   const y = Math.floor(months / 12)
   const m = months % 12
   return [y && `${y} yr${y === 1 ? '' : 's'}`, m && `${m} mth${m === 1 ? '' : 's'}`].filter(Boolean).join(' ')
@@ -106,7 +110,7 @@ function JoinPapers ({ staff, currency }) {
 }
 
 /** One staff member: pay at a glance, then contact, work, ID and bank. */
-export default function StaffDetailModal ({ isOpen, onClose, staff, onEdit, onDelete, onLinkOffice, onUnlinkOffice, onChangeSalary }) {
+export default function StaffDetailModal ({ isOpen, onClose, staff, onEdit, onDelete, onLinkOffice, onUnlinkOffice, onChangeSalary, missing = [], detailsRequest = null, onAskDetails, onOpenRequest }) {
   const currency = useCurrency()
   const money = v => (v && Number(v) > 0 ? formatMoney(Number(v), currency) : null)
   const s = staff || {}
@@ -196,6 +200,27 @@ export default function StaffDetailModal ({ isOpen, onClose, staff, onEdit, onDe
               </div>
             ))}
           </div>
+
+          {/* details still to get (6 Nov): send them a link, or fill them in by hand */}
+          {missing.length > 0 && (
+            <section className='space-y-2 rounded-2xl border border-warning/40 bg-warning-soft/50 p-3'>
+              <p className='flex items-center gap-1.5 text-sm font-semibold text-fg'>
+                <AlertTriangle className='size-4 text-warning' /> {missing.length} detail{missing.length === 1 ? '' : 's'} missing
+              </p>
+              <p className='text-xs text-muted'>{missing.map(m => m.label).join(' · ')}</p>
+              {detailsRequest ? (
+                <div className='flex flex-wrap items-center gap-2'>
+                  <Badge tone={STATUSES[detailsRequest.status]?.tone || 'info'}>{STATUSES[detailsRequest.status]?.label || detailsRequest.status}</Badge>
+                  {onOpenRequest && <Button size='sm' variant='secondary' icon={Link2} onClick={() => onOpenRequest(detailsRequest)}>{detailsRequest.status === 'submitted' ? 'Check what they sent' : 'Open the link'}</Button>}
+                </div>
+              ) : (
+                <div className='flex flex-wrap gap-2'>
+                  {onAskDetails && <Button size='sm' icon={Link2} onClick={() => onAskDetails(staff)}>Send a link</Button>}
+                  {onEdit && <Button size='sm' variant='secondary' icon={Pencil} onClick={() => { onClose(); onEdit(staff) }}>Fill in myself</Button>}
+                </div>
+              )}
+            </section>
+          )}
 
           {/* every salary change, newest first, and a way to make one (6 Nov) */}
           {(onChangeSalary || (s.payHistory || []).length > 0) && (

@@ -4,7 +4,8 @@ import { moveTasksToLead } from '@/lib/tasks/client'
 import React, { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import useSession from '@/app/hooks/useSession'
-import { useHires, acceptHire, fileUrl } from '@/lib/hires/client'
+import { useHires, acceptHire, fileUrl, createHire } from '@/lib/hires/client'
+import { detailsRequestFor, missingDetails } from '@/lib/staff/missing'
 import { staffFormFrom } from '@/lib/hires/model'
 import { regionOf } from '@/lib/region'
 import useResolvedCompanyBranch from '@/app/hooks/useResolvedCompanyBranch'
@@ -21,7 +22,7 @@ import { useGetSingleBranchQuery } from '@/lib/redux/api/branchApiSlice'
 import { useGetBranchSettingsQuery } from '@/lib/redux/api/branchSettingsApiSlice'
 import { skipToken } from '@reduxjs/toolkit/query'
 import { shiftsEnabled } from '@/lib/attendance/shifts'
-import { Check, Copy, Eye, KeyRound, Link2, Link2Off, MoreHorizontal, Pencil, Plus, Search, Smartphone, Store, Trash2, UserPlus, Users, Wallet } from 'lucide-react'
+import { Check, Copy, Eye, KeyRound, Link2, Link2Off, MoreHorizontal, Pencil, Plus, Search, Smartphone, Store, Trash2, UserPlus, Users, Wallet, Zap } from 'lucide-react'
 import { Avatar, Badge, Button, DataTable, Input, Menu, Select, Sheet, Skeleton, cn } from '@/app/components/ui'
 import { toast, confirmDialog } from '@/app/components/ui/notify'
 import StatTiles from '@/app/components/purchases/StatTiles'
@@ -35,6 +36,7 @@ import { can, isCompanyRole, roleLabel as loginRoleLabel } from '@/lib/authz/per
 import StaffModal, { dropDraft } from './components/StaffModal'
 import StaffDetailModal from './components/StaffDetailModal'
 import SalaryChangeSheet from './components/SalaryChangeSheet'
+import QuickAddSheet from './components/QuickAddSheet'
 import NewHires, { HireSheet, NewHireSheet } from './components/NewHires'
 
 const fullName = s => `${s?.firstName || ''} ${s?.lastName || ''}`.trim() || s?.name || 'Unnamed'
@@ -128,11 +130,13 @@ function StaffManagement () {
   const [editTarget, setEditTarget] = useState(null)
   const [detailTarget, setDetailTarget] = useState(null)
   const [salaryFor, setSalaryFor] = useState(null) // Change salary (6 Nov)
+  const [quickOpen, setQuickOpen] = useState(false) // Quick add (6 Nov)
   const [generatedCreds, setGeneratedCreds] = useState(null)
   const [generatingFor, setGeneratingFor] = useState(null)
 
   // people joining (30 Oct): made here, filled in by them from a link, accepted into the list
   const { user } = useSession()
+  const canSeePrivate = can(user?.role, 'staff.pay') // phone is public; IC, address, birth date are not
   const { list: hires } = useHires(companyId, branchId, ready)
   const [hireForm, setHireForm] = useState(null) // { hire? }: the new hire sheet
   const [hireId, setHireId] = useState(null) // the one open
@@ -148,7 +152,39 @@ function StaffManagement () {
     setHireId(null)
     if (params.get('hire')) router.replace('/staff-management', { scroll: false })
   }
+  // a details link for someone already on staff (6 Nov): one link at a time, opened to send it
+  const askDetails = async s => {
+    try {
+      const open = detailsRequestFor(s.id, hires)
+      const id = open?.id || await createHire(companyId, branchId, user, {
+        firstName: s.firstName || '', lastName: s.lastName || '', phone: s.phone || '', role: s.role || '',
+        department: s.department || '', startDate: s.startDate || '', basicSalary: s.basicSalary ?? '', forStaffId: s.id,
+      })
+      setDetailTarget(null)
+      setHireId(id)
+    } catch (err) {
+      toast.error(err?.message || "Couldn't make the link")
+    }
+  }
+
   const startAccept = async hire => {
+    // details for someone already on staff: their record, filled in with what they sent
+    if (hire.forStaffId) {
+      const existing = staffList.find(s => s.id === hire.forStaffId)
+      if (!existing) return toast.error('That staff member is no longer on the list')
+      const sent = Object.fromEntries(Object.entries(hire.details || {}).filter(([, v]) => String(v ?? '').trim() !== ''))
+      try {
+        if (hire.files?.photo?.path && !existing.photoUrl) sent.photoUrl = await fileUrl(hire.files.photo.path)
+      } catch {
+        /* no photo then */
+      }
+      // the form opens on their record with what they sent laid over it: check, then save
+      setAccepting({ hire, sent, staffId: existing.id })
+      closeHire()
+      setEditTarget(existing)
+      setModalMode('edit')
+      return
+    }
     const form = staffFormFrom(hire)
     try {
       if (hire.files?.photo?.path) form.photoUrl = await fileUrl(hire.files.photo.path)
@@ -197,6 +233,11 @@ function StaffManagement () {
         toast.success(`${data.firstName} ${data.lastName} added`)
       } else {
         await updateStaff({ companyId, branchId, id, staffId: id, data, photoFile, oldPhotoUrl }).unwrap()
+        if (accepting?.staffId === id) {
+          // the details they sent are in: their documents go on the record, the link is done
+          await acceptHire(companyId, branchId, accepting.hire, id, user)
+          setAccepting(null)
+        }
         toast.success(`${data.firstName} ${data.lastName} saved`)
         // a new supervisor leads their unfinished tasks from now on (4.11)
         if ((editTarget?.supervisorUid || '') !== (data.supervisorUid || '') && editTarget?.uid) {
@@ -275,7 +316,13 @@ function StaffManagement () {
         <div className='flex min-w-0 items-center gap-3'>
           <Avatar name={fullName(s)} src={s.photoUrl} size='md' />
           <div className='min-w-0'>
-            <p className='truncate font-semibold text-fg'>{fullName(s)}</p>
+            <p className='flex min-w-0 items-center gap-1.5'>
+              <span className='truncate font-semibold text-fg'>{fullName(s)}</span>
+              {/* details still to get (6 Nov): only those who see private details can tell */}
+              {canSeePrivate && missingDetails(s).length > 0 && (
+                <span className='shrink-0 rounded-full bg-warning-soft px-1.5 py-px text-[10px] font-semibold text-warning'>{missingDetails(s).length} missing</span>
+              )}
+            </p>
             <p className='truncate text-[11px] font-normal text-muted'>
               {roleLabel(s.role)}
               {s.department ? ` · ${s.department}` : ''}
@@ -339,6 +386,9 @@ function StaffManagement () {
         <div className='flex flex-wrap gap-2'>
           <Button variant='secondary' icon={UserPlus} onClick={() => setHireForm({})}>
             New hire
+          </Button>
+          <Button variant='secondary' icon={Zap} onClick={() => setQuickOpen(true)}>
+            Quick add
           </Button>
           <Button icon={Plus} onClick={openAdd}>
             Add staff
@@ -411,6 +461,7 @@ function StaffManagement () {
         <StaffModal
           mode={modalMode}
           initialData={modalMode === 'edit' ? editTarget : accepting?.form || null}
+          filledIn={modalMode === 'edit' && accepting?.staffId === editTarget?.id ? accepting.sent : null}
           payrollConfig={payrollConfig}
           shiftsEnabled={shiftsOn}
           onSave={handleSave}
@@ -456,7 +507,12 @@ function StaffManagement () {
         onLinkOffice={s => { setLinkUid(''); setLinkFor(s) }}
         onUnlinkOffice={unlinkOffice}
         onChangeSalary={can(user?.role, 'staff.manage') ? s => { setDetailTarget(null); setSalaryFor(s) } : null}
+        missing={detailTarget && canSeePrivate ? missingDetails(detailTarget) : []}
+        detailsRequest={detailTarget ? detailsRequestFor(detailTarget.id, hires) : null}
+        onAskDetails={can(user?.role, 'staff.manage') ? askDetails : null}
+        onOpenRequest={h => { setDetailTarget(null); setHireId(h.id) }}
       />
+      <QuickAddSheet open={quickOpen} onClose={() => setQuickOpen(false)} />
       <SalaryChangeSheet open={!!salaryFor} onClose={() => setSalaryFor(null)} staff={salaryFor} />
 
       {/* an office login linked to this staff record: they see their own pay under Me */}
