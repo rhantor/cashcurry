@@ -28,7 +28,10 @@ export default function ClientLayoutWrapper({ children }) {
   // No sidebar/top bar on these (the staff app, the kiosk, and the /ui design preview).
   // …and chat, which has its own full-screen workspace (/messages).
   const staffPages = ["/staff-portal", "/requests", "/kiosk", "/profile", "/ui", "/messages", "/my-issues", "/my-pay", "/my-attendance", "/my-tasks"];
-  const isAuthPage = authPages.some((path) => pathname.startsWith(path));
+  // The sales landing (7 Nov): a public page of its own, shown at once (no
+  // wait for the sign-in check), no menu, never sent to the login.
+  const isPublicSite = pathname === "/land" || pathname.startsWith("/land/");
+  const isAuthPage = isPublicSite || authPages.some((path) => pathname.startsWith(path));
   const isStaffPage = staffPages.some((path) => pathname.startsWith(path));
   const isLoggedIn = status === "signedIn" && !!user?.role;
 
@@ -38,7 +41,8 @@ export default function ClientLayoutWrapper({ children }) {
   }, [status, isAuthPage, router]);
 
 
-  // ---- early return AFTER hooks are declared
+  // ---- early returns AFTER hooks are declared
+  if (isPublicSite) return children;
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-bg">
