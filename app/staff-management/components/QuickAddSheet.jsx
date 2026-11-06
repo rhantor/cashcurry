@@ -9,8 +9,8 @@ import { skipToken } from '@reduxjs/toolkit/query'
 import { Button, Field, Input, Select, Sheet, toast } from '@/app/components/ui'
 import useSession from '@/app/hooks/useSession'
 import { useGetBranchSettingsQuery } from '@/lib/redux/api/branchSettingsApiSlice'
-import { useAddStaffMutation } from '@/lib/redux/api/staffApiSlice'
-import { quickStaff } from '@/lib/staff/missing'
+import { useAddStaffMutation, useGetStaffListQuery } from '@/lib/redux/api/staffApiSlice'
+import { freePin, quickStaff } from '@/lib/staff/missing'
 import { ROLE_GROUPS } from '../lib/constants'
 
 const PAY = [
@@ -25,15 +25,18 @@ export default function QuickAddSheet ({ open, onClose, onAdded }) {
   const { data: settings } = useGetBranchSettingsQuery(companyId && branchId ? { companyId, branchId } : skipToken)
   const hours = Number(settings?.payroll?.standardHoursPerMonth) || 312
   const [addStaff, { isLoading }] = useAddStaffMutation()
+  const { data: staffList = [] } = useGetStaffListQuery({ companyId, branchId }, { skip: !companyId || !branchId })
   const [form, setForm] = useState(EMPTY)
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
   const pay = PAY.find(p => p.value === form.pay)
 
   const save = async () => {
     try {
-      const data = quickStaff({ ...form, startDate: form.startDate || format(new Date(), 'yyyy-MM-dd'), hours })
+      // a kiosk PIN of their own, so the full form opens without stopping on it later (they can change it)
+      const pinCode = freePin(staffList.map(x => x.pinCode).filter(Boolean))
+      const data = quickStaff({ ...form, startDate: form.startDate || format(new Date(), 'yyyy-MM-dd'), hours, pinCode })
       const added = await addStaff({ companyId, branchId, data }).unwrap()
-      toast.success(`${data.firstName} added`, { description: 'On payroll and attendance now. Their details are still to come.' })
+      toast.success(`${data.firstName} ${data.lastName} added`, { description: `On payroll and attendance now. Kiosk PIN ${pinCode}. Their details are still to come.` })
       setForm(EMPTY)
       onClose()
       onAdded?.({ id: added?.id, ...data })
@@ -60,7 +63,7 @@ export default function QuickAddSheet ({ open, onClose, onAdded }) {
           <Field label='First name'>{({ id }) => <Input id={id} value={form.firstName} onChange={e => set('firstName', e.target.value)} autoFocus />}</Field>
           <Field label='Last name'>{({ id }) => <Input id={id} value={form.lastName} onChange={e => set('lastName', e.target.value)} />}</Field>
         </div>
-        <Field label='Job' hint='Optional'>
+        <Field label='Job' hint='Empty: Staff'>
           {({ id }) => (
             <Select id={id} value={form.role} onChange={e => set('role', e.target.value)}>
               <option value=''>— Later —</option>
