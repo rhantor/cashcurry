@@ -39,7 +39,10 @@ const tenure = start => {
   const d = typeof start === 'string' ? parseISO(start.slice(0, 10)) : start?.seconds ? new Date(start.seconds * 1000) : null
   if (!d || Number.isNaN(+d)) return null
   const months = (new Date().getFullYear() - d.getFullYear()) * 12 + (new Date().getMonth() - d.getMonth())
-  if (months < 1) return `${Math.max(1, Math.round((Date.now() - d) / 6048e5))} weeks`
+  if (months < 1) {
+    const w = Math.round((Date.now() - d) / 6048e5)
+    return w < 1 ? 'Just started' : `${w} week${w === 1 ? '' : 's'}`
+  }
   const y = Math.floor(months / 12)
   const m = months % 12
   return [y && `${y} yr${y === 1 ? '' : 's'}`, m && `${m} mth${m === 1 ? '' : 's'}`].filter(Boolean).join(' ')

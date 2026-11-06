@@ -173,6 +173,7 @@ export function HireSheet ({ hire, onClose, companyId, branchId, company, timeZo
   const open = !!hire
   useEffect(() => setLink(null), [hire?.id])
   const name = hire ? hireName(hire) : ''
+  const forStaff = !!hire?.forStaffId
   const status = hire?.status
   const submitted = ['submitted', 'accepted'].includes(status)
   const files = useMemo(() => {
@@ -225,16 +226,16 @@ export function HireSheet ({ hire, onClose, companyId, branchId, company, timeZo
 
   return (
     <>
-      <Sheet open={open} onClose={onClose} title={name} description={hire ? [roleLabelOf(hire.role), hire.startDate && `starts ${day(hire.startDate)}`].filter(Boolean).join(' · ') : ''} size='lg'>
+      <Sheet open={open} onClose={onClose} title={name} description={hire ? (forStaff ? 'Their details, asked for on a link' : [roleLabelOf(hire.role), hire.startDate && `starts ${day(hire.startDate)}`].filter(Boolean).join(' · ')) : ''} size='lg'>
         {hire && (
           <div className='space-y-5'>
             <div className='flex flex-wrap items-center gap-2'>
               <Badge tone={STATUSES[status]?.tone}>{STATUSES[status]?.label}</Badge>
-              {['draft', 'sent'].includes(status) && <Button size='sm' variant='ghost' onClick={() => onEdit(hire)}>Change</Button>}
+              {['draft', 'sent'].includes(status) && !forStaff && <Button size='sm' variant='ghost' onClick={() => onEdit(hire)}>Change</Button>}
             </div>
 
             <ol className='space-y-5'>
-              <Step n={1} done={hire.letterReady} title='Appointment letter'>
+              {!forStaff && <Step n={1} done={hire.letterReady} title='Appointment letter'>
                 <p className='text-xs text-muted'>{hire.letterReady ? (hire.signed ? `Signed ${day(hire.signed.at)}.` : 'Ready — they read and sign it on their link.') : 'Prepare it in the Appointment Letter tool; the job, pay and start day are filled in. They sign it on their link.'}</p>
                 <div className='flex flex-wrap gap-2'>
                   {!hire.signed && status !== 'accepted' && (
@@ -244,9 +245,9 @@ export function HireSheet ({ hire, onClose, companyId, branchId, company, timeZo
                   )}
                   {hire.letterReady && <Button size='sm' variant='secondary' icon={FileText} onClick={showLetter}>{hire.signed ? 'Signed letter' : 'See the letter'}</Button>}
                 </div>
-              </Step>
+              </Step>}
 
-              <Step n={2} done={submitted} title='Their join link'>
+              <Step n={forStaff ? 1 : 2} done={submitted} title={forStaff ? 'Their link' : 'Their join link'}>
                 <p className='text-xs text-muted'>
                   {submitted
                     ? `Filled in ${day(hire.submittedAt)}.`
@@ -272,9 +273,9 @@ export function HireSheet ({ hire, onClose, companyId, branchId, company, timeZo
                 )}
               </Step>
 
-              <Step n={3} done={status === 'accepted'} title='Check and accept'>
+              <Step n={forStaff ? 2 : 3} done={status === 'accepted'} title={forStaff ? 'Check and add' : 'Check and accept'}>
                 {!submitted ? (
-                  <p className='text-xs text-muted'>When they have filled it in, you are told; check it here, then accept them as staff.</p>
+                  <p className='text-xs text-muted'>{forStaff ? 'When they have filled it in, you are told; check it here, then add it to their record.' : 'When they have filled it in, you are told; check it here, then accept them as staff.'}</p>
                 ) : (
                   <div className='space-y-3'>
                     <dl className='divide-y divide-line overflow-hidden rounded-xl border border-line text-sm'>
@@ -303,7 +304,7 @@ export function HireSheet ({ hire, onClose, companyId, branchId, company, timeZo
             </ol>
 
             {!['accepted', 'cancelled'].includes(status) && (
-              <Button variant='ghost' size='sm' icon={X} className='text-danger' onClick={cancel}>Cancel this new hire</Button>
+              <Button variant='ghost' size='sm' icon={X} className='text-danger' onClick={cancel}>{forStaff ? 'Cancel this link' : 'Cancel this new hire'}</Button>
             )}
           </div>
         )}
