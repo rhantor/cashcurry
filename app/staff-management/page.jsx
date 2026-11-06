@@ -173,15 +173,15 @@ function StaffManagement () {
       const existing = staffList.find(s => s.id === hire.forStaffId)
       if (!existing) return toast.error('That staff member is no longer on the list')
       const sent = Object.fromEntries(Object.entries(hire.details || {}).filter(([, v]) => String(v ?? '').trim() !== ''))
-      const form = { ...existing, ...sent }
       try {
-        if (hire.files?.photo?.path && !existing.photoUrl) form.photoUrl = await fileUrl(hire.files.photo.path)
+        if (hire.files?.photo?.path && !existing.photoUrl) sent.photoUrl = await fileUrl(hire.files.photo.path)
       } catch {
         /* no photo then */
       }
-      setAccepting({ hire, form, staffId: existing.id })
+      // the form opens on their record with what they sent laid over it: check, then save
+      setAccepting({ hire, sent, staffId: existing.id })
       closeHire()
-      setEditTarget(form)
+      setEditTarget(existing)
       setModalMode('edit')
       return
     }
@@ -461,6 +461,7 @@ function StaffManagement () {
         <StaffModal
           mode={modalMode}
           initialData={modalMode === 'edit' ? editTarget : accepting?.form || null}
+          filledIn={modalMode === 'edit' && accepting?.staffId === editTarget?.id ? accepting.sent : null}
           payrollConfig={payrollConfig}
           shiftsEnabled={shiftsOn}
           onSave={handleSave}

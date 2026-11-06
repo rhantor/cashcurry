@@ -57,6 +57,7 @@ const TABS = [
 export default function StaffModal ({
   mode = 'add',
   initialData = null,
+  filledIn = null,        // edit: what they sent on a details link (6 Nov), laid over the record — to check, then save
   payrollConfig = null,   // branch payroll settings (for deduction overrides)
   shiftsEnabled = false,  // branch runs shift times (start/end per staff)
   onSave,
@@ -99,12 +100,13 @@ export default function StaffModal ({
       Object.keys(EMPTY_FORM).forEach(k => {
         seeded[k] = initialData?.[k] ?? EMPTY_FORM[k]
       })
-      setForm(seeded)
       startRef.current = seeded
+      const sent = filledIn ? Object.fromEntries(Object.entries(filledIn).filter(([k]) => k in EMPTY_FORM)) : {}
+      setForm({ ...seeded, ...sent })
 
       // show existing photo if any
-      if (initialData?.photoUrl) {
-        setPhotoPreview(initialData.photoUrl)
+      if (filledIn?.photoUrl || initialData?.photoUrl) {
+        setPhotoPreview(filledIn?.photoUrl || initialData.photoUrl)
       } else {
         setPhotoPreview(null)
       }
