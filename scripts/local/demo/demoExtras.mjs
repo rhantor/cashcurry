@@ -9,27 +9,16 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import zlib from "node:zlib";
-import { initializeApp } from "firebase-admin/app";
-import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { getAuth } from "firebase-admin/auth";
-import { LOCAL_PROJECT_ID, LOCAL_DIR } from "../config.mjs";
+import { Timestamp } from "firebase-admin/firestore";
+import { LOCAL_DIR } from "../config.mjs";
 import { TEMPLATES } from "../../../app/tools/appointment-letter/templates.js";
 import { addPurchaseSamples } from "./purchaseSamples.mjs";
-
-for (const v of ["FIRESTORE_EMULATOR_HOST", "FIREBASE_AUTH_EMULATOR_HOST", "FIREBASE_STORAGE_EMULATOR_HOST"]) {
-  if (!process.env[v]) {
-    console.error(`${v} is not set — refusing to run outside the emulators. Use \`npm run local:seed\`.`);
-    process.exit(1);
-  }
-}
-initializeApp({ projectId: LOCAL_PROJECT_ID });
-const db = getFirestore();
-const auth = getAuth();
+// the emulators — or, with CC_TARGET=staging --confirm, the real project's staging database
+import { ACCOUNTS_FILE, GUIDE_FILE, LIVE, REAL, db, demoLogin, demoPassword, mirrorUser, putFile } from "../target.mjs";
 const CO = "demo-company";
 const KL = "demo-kl";
 const kl = db.doc(`companies/${CO}/branches/${KL}`);
-const BUCKET = `${LOCAL_PROJECT_ID}.appspot.com`;
-const password = fs.readFileSync(path.join(LOCAL_DIR, "dev-password.txt"), "utf8").trim();
+const password = demoPassword();
 
 // ── days, on the KL branch's clock (Malaysia) ────────────────────────────────
 // "Today" is the calendar day in KL: seeded late at night (before the
@@ -59,8 +48,10 @@ const NORA = { uid: uid("nora"), name: "Nora Ismail", role: "staff" };
 for (const p of NEW_LOGINS) {
   const email = `${p.username}@demo.test`;
   const name = `${p.firstName} ${p.lastName}`;
-  await auth.createUser({ uid: uid(p.username), email, emailVerified: true, password, displayName: name });
-  await db.doc(`users/${uid(p.username)}`).set({ companyId: CO, role: "staff", userName: p.username, name, fullName: name, email, branchId: KL, staffId: p.id, createdAt: iso(WEEK_AGO) });
+  await demoLogin({ uid: uid(p.username), email, password, displayName: name });
+  const user = { companyId: CO, role: "staff", userName: p.username, name, fullName: name, email, branchId: KL, staffId: p.id, createdAt: iso(WEEK_AGO) };
+  await db.doc(`users/${uid(p.username)}`).set(user);
+  await mirrorUser(uid(p.username), user);
   await db.doc(`usernames/${p.username}`).set({ uid: uid(p.username), userName: p.username, email, companyId: CO, branchId: KL });
   await db.doc(`companies/${CO}/chatPeople/${uid(p.username)}`).set({ name, role: "staff", branchId: KL });
   await kl.collection("staff").doc(p.id).set({
@@ -148,8 +139,7 @@ await kl.collection("advances").doc("demo-adv-ali").set({
 const card = (label, color) => `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="400"><rect width="640" height="400" rx="24" fill="${color}"/><text x="40" y="80" font-family="Arial" font-size="34" fill="#fff" font-weight="bold">${label}</text><text x="40" y="140" font-family="Arial" font-size="24" fill="#fff">SAMPLE — NOT A REAL DOCUMENT</text><text x="40" y="340" font-family="Arial" font-size="28" fill="#fff">FAIZ RAHMAN · 960812-14-5567</text></svg>`;
 const face = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" fill="#e3f6ef"/><circle cx="200" cy="160" r="80" fill="#22a082"/><rect x="90" y="260" width="220" height="140" rx="110" fill="#22a082"/></svg>`;
 const put = async (p, body, type) => {
-  const res = await fetch(`http://${process.env.FIREBASE_STORAGE_EMULATOR_HOST}/v0/b/${BUCKET}/o?name=${encodeURIComponent(p)}`, { method: "POST", headers: { Authorization: "Bearer owner", "Content-Type": type }, body });
-  if (!res.ok) throw new Error(`storage ${res.status} for ${p}`);
+  await putFile(p, body, type);
   return { path: p, name: path.basename(p), contentType: type, size: Buffer.byteLength(body), at: iso(TODAY, "11:00") };
 };
 
@@ -228,9 +218,10 @@ await hires.doc("demo-hire-arif").set({ firstName: "Arif", lastName: "Hakim", ph
 await addPurchaseSamples(db, { companyId: CO, branchId: KL, today: TODAY });
 
 // ── the guide and the login buttons ─────────────────────────────────────────
-const accountsFile = path.join(LOCAL_DIR, "DEV_ACCOUNTS.md");
+const accountsFile = ACCOUNTS_FILE;
 fs.writeFileSync(accountsFile, fs.readFileSync(accountsFile, "utf8").trimEnd() + "\n" + NEW_LOGINS.map((p) => `| staff | ${p.username} | ${p.firstName} ${p.lastName} | Demo Branch KL |`).join("\n") + "\n");
-const guideFile = path.join(LOCAL_DIR, "DEMO_GUIDE.md");
+const guideFile = GUIDE_FILE;
+if (!fs.existsSync(guideFile)) fs.writeFileSync(guideFile, "# Demo company\n");
 fs.appendFileSync(guideFile, `
 ## Today at Demo Branch KL (${TODAY}) — Ops, tasks, new hires
 
@@ -245,5 +236,5 @@ fs.appendFileSync(guideFile, `
 - **Order reminders** (Purchases → Order Guides): Drinks is due today; Vegetables is ordered tomorrow, told today at 6 PM. \`npm run local:reminders\` sends what is due to the bell.
 - New staff app logins: **sam**, **nora** (same password as the rest).
 `);
-fs.writeFileSync(path.join(LOCAL_DIR, "JOIN_LINK.txt"), `/join/${token}\n`);
+fs.writeFileSync(path.join(LOCAL_DIR, LIVE ? "LIVE_DEMO_JOIN_LINK.txt" : REAL ? "STAGING_JOIN_LINK.txt" : "JOIN_LINK.txt"), `/join/${token}\n`);
 console.log(`Extras: 2 staff logins, shifts and days off, today's punches, 4 tasks, 3 issues, leave and an advance, 3 new hires — Hana's link: /join/${token}`);

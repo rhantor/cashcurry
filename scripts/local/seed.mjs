@@ -17,28 +17,17 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import crypto from "node:crypto";
 import { createRequire } from "node:module";
-import { initializeApp } from "firebase-admin/app";
-import { getFirestore, Timestamp } from "firebase-admin/firestore";
-import { getAuth } from "firebase-admin/auth";
-import { LOCAL_PROJECT_ID, LOCAL_DIR, BACKUP_DIR } from "./config.mjs";
-
-for (const v of ["FIRESTORE_EMULATOR_HOST", "FIREBASE_AUTH_EMULATOR_HOST"]) {
-  if (!process.env[v]) {
-    console.error(`${v} is not set — refusing to run outside the emulators. Use \`npm run local:seed\`.`);
-    process.exit(1);
-  }
-}
+import { Timestamp } from "firebase-admin/firestore";
+import { BACKUP_DIR } from "./config.mjs";
+// the emulators — or, with CC_TARGET=staging --confirm, the real project's staging database (target.mjs)
+import { ACCOUNTS_FILE, LIVE, REAL, assertDemo, db, demoLogin, demoPassword, mirrorUser } from "./target.mjs";
 
 if (!BACKUP_DIR || !fs.existsSync(path.join(BACKUP_DIR, "company", "company.json"))) {
   console.error(`No backup found at ${BACKUP_DIR || "(no path set)"}. Set CC_BACKUP_DIR, or put the folder in .local/backup-path.txt.`);
   process.exit(1);
 }
 
-initializeApp({ projectId: LOCAL_PROJECT_ID });
-const db = getFirestore();
-const auth = getAuth();
 
 const readJson = (p) => JSON.parse(fs.readFileSync(p, "utf8"));
 
@@ -91,6 +80,7 @@ function writeDoc(docPath, row, docId = row.id) {
   // Two rows mapping to one path means data would be silently lost.
   if (written.has(docPath)) throw new Error(`Duplicate document path in backup: ${docPath}`);
   written.add(docPath);
+  assertDemo({ path: docPath }); // the real project: the demo company and demo logins only
   writer.set(db.doc(docPath), toDocData(row, docId));
   docCount++;
   const col = docPath.split("/").at(-2);
@@ -112,6 +102,10 @@ function writeCollection(colPath, rows) {
 // ── company ──────────────────────────────────────────────────────────────────
 const companyDir = path.join(BACKUP_DIR, "company");
 const company = readJson(path.join(companyDir, "company.json"));
+if (REAL && company.id !== "demo-company") {
+  console.error("The real project takes the made-up demo company only — never a client backup.");
+  process.exit(1);
+}
 const companyPath = `companies/${company.id}`;
 writeDoc(companyPath, company);
 
@@ -155,10 +149,7 @@ console.log(`Summaries: ${Object.values(built).reduce((n, m) => n + m.length, 0)
 // Real passwords cannot be exported, so every account gets one shared local
 // password. It is generated once and kept in .local/ (git-ignored) so it stays
 // the same across re-seeds.
-fs.mkdirSync(LOCAL_DIR, { recursive: true });
-const pwFile = path.join(LOCAL_DIR, "dev-password.txt");
-if (!fs.existsSync(pwFile)) fs.writeFileSync(pwFile, `local-${crypto.randomBytes(6).toString("hex")}\n`);
-const password = fs.readFileSync(pwFile, "utf8").trim();
+const password = demoPassword();
 
 const users = readJson(path.join(companyDir, "root_users.json"));
 const usernames = readJson(path.join(companyDir, "root_usernames.json"));
@@ -168,13 +159,8 @@ for (const u of usernames) if (u.uid && !u.id.startsWith("@")) usernameByUid[u.u
 const accounts = [];
 for (const u of users) {
   if (!u.email) continue;
-  await auth.createUser({
-    uid: u.id,
-    email: u.email,
-    emailVerified: true,
-    password,
-    displayName: u.fullName || u.name || u.userName || undefined,
-  });
+  await demoLogin({ uid: u.id, email: u.email, password, displayName: u.fullName || u.name || u.userName || undefined });
+  await mirrorUser(u.id, u);
   accounts.push({
     role: u.role,
     login: usernameByUid[u.id] || u.email,
@@ -186,12 +172,14 @@ for (const u of users) {
 const roleOrder = ["owner", "superAdmin", "gm", "branchAdmin", "manager", "inCharge", "accountant", "supervisor", "cashier", "staff"];
 accounts.sort((a, b) => roleOrder.indexOf(a.role) - roleOrder.indexOf(b.role) || a.branch.localeCompare(b.branch));
 fs.writeFileSync(
-  path.join(LOCAL_DIR, "DEV_ACCOUNTS.md"),
+  ACCOUNTS_FILE,
   [
-    "# Local login accounts",
+    REAL ? `# ${LIVE ? "Live demo" : "Staging"} login accounts` : "# Local login accounts",
     "",
-    "These exist only in the local emulators (`npm run dev:local`).",
-    "Every account uses the password in `dev-password.txt` (same folder).",
+    REAL
+      ? `Demo logins on the real project (Auth uid demo-…, @demo.test), for the demo company in the ${LIVE ? "live app" : "staging database"} only.`
+      : "These exist only in the local emulators (`npm run dev:local`).",
+    `Every account uses the password in \`${LIVE ? "live-demo" : REAL ? "staging" : "dev"}-password.txt\` (same folder).`,
     "",
     "| Role | Log in with | Name | Branch |",
     "|---|---|---|---|",
@@ -199,4 +187,4 @@ fs.writeFileSync(
     "",
   ].join("\n")
 );
-console.log(`Auth: ${accounts.length} login accounts created — see .local/DEV_ACCOUNTS.md`);
+console.log(`Auth: ${accounts.length} login accounts — see ${ACCOUNTS_FILE}`);
