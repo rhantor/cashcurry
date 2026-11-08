@@ -122,10 +122,10 @@ export default function InventoryPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => setWasting({})} className="flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl bg-surface-2 px-4 font-semibold text-fg sm:flex-none">
-            <Trash2 className="size-4" /> Thrown away
+          <button onClick={() => setWasting({})} className="flex min-h-[48px] flex-1 items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-surface-2 px-3 font-semibold text-fg sm:flex-none sm:px-4">
+            <Trash2 className="size-4" /> Waste
           </button>
-          <button onClick={() => setCounting(true)} className="flex min-h-[48px] flex-1 items-center justify-center gap-2 rounded-2xl bg-brand px-5 font-semibold text-brand-fg active:brightness-95 sm:flex-none">
+          <button onClick={() => setCounting(true)} className="flex min-h-[48px] flex-[1.4] items-center justify-center gap-2 whitespace-nowrap rounded-2xl bg-brand px-3 font-semibold text-brand-fg active:brightness-95 sm:flex-none sm:px-5">
             <ClipboardCheck className="size-5" /> Count stock
           </button>
           {manages && (
@@ -206,7 +206,10 @@ export default function InventoryPage() {
         )}
       </Sheet>
 
-      <ItemSheet r={open} manages={manages} busy={busy} periods={(data.periods || []).filter((p) => p.key === openKey)} money={money} onClose={() => setOpenKey(null)} onWaste={() => setWasting({ key: openKey })} onMin={(q) => setMin(openKey, q)} />
+      <ItemSheet r={open} manages={manages} busy={busy} periods={(data.periods || []).filter((p) => p.key === openKey)} money={money} onClose={() => setOpenKey(null)} onWaste={() => {
+          setWasting({ key: openKey });
+          setOpenKey(null);
+        }} onMin={(q) => setMin(openKey, q)} />
 
       <SettingsSheet open={settingsOpen} data={data} busy={busy} onClose={() => setSettingsOpen(false)} onSave={(f) => run(() => saveStockSettings(companyId, branchId, f, user), "Saved.", "Could not save it.").then((ok) => ok && setSettingsOpen(false))} />
 
