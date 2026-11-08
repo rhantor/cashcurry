@@ -24,6 +24,8 @@ import { loanSplit } from '@/lib/payroll/loanSplit'
 import SignPad from '@/app/components/common/SignPad'
 import { skipToken } from '@reduxjs/toolkit/query'
 import { useGetSingleBranchQuery } from '@/lib/redux/api/branchApiSlice'
+import { useGetPayrollRunsQuery } from '@/lib/redux/api/payrollRunApiSlice'
+import { deductionMonths } from '@/lib/payroll/deductionMonths'
 import { receivedStamp } from '@/lib/requests/voucher'
 import { attachRequestVoucher, completeVoucher } from '@/lib/requests/voucherClient'
 
@@ -121,9 +123,13 @@ function AdvanceForm ({ head, staff, staffLoading, companyId, branchId, manager,
   const { data: branch } = useGetSingleBranchQuery(companyId && branchId ? { companyId, branchId } : skipToken)
 
   const when = date || today
-  const deductionMonth = month || ym(when)
   const person = staff.find(s => s.id === staffId)
   const self = manager && !!myStaffId && staffId === myStaffId // the approver's own: only ever a request
+  // last month's salary, if it is still open: only for one that takes effect now
+  const atOnce = manager && !self
+  const { data: runs = [] } = useGetPayrollRunsQuery(atOnce && companyId && branchId ? { companyId, branchId } : skipToken)
+  const months = deductionMonths(when, runs, { back: atOnce })
+  const deductionMonth = months.includes(month) ? month : ym(when) // a month no longer offered falls back
 
   const save = async () => {
     const problems = {}
@@ -264,13 +270,17 @@ function AdvanceForm ({ head, staff, staffLoading, companyId, branchId, manager,
 
       <EntrySection title='Taken back from which salary'>
         <div className='flex flex-wrap gap-2'>
-          {monthsFrom(when).map(m => (
+          {months.map(m => (
             <Chip key={m} on={deductionMonth === m} onClick={() => setMonth(m)}>
               {monthLabel(m)}
             </Chip>
           ))}
         </div>
-        <p className='mt-2 text-xs text-muted'>Payroll for that month takes it off the pay.</p>
+        <p className='mt-2 text-xs text-muted'>
+          {deductionMonth < ym(when)
+            ? `Given in ${monthLabel(ym(when))}, taken from the ${monthLabel(deductionMonth)} salary. That payroll isn't finalized yet.`
+            : 'Payroll for that month takes it off the pay.'}
+        </p>
       </EntrySection>
 
       <EntrySection title='Paid from'>
