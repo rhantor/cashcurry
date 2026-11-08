@@ -7,7 +7,7 @@ import Sheet from "@/app/components/purchases/Sheet";
 import QtyStepper from "@/app/components/purchases/QtyStepper";
 import MoneyInput from "@/app/components/purchases/MoneyInput";
 import DiscountField from "@/app/components/purchases/DiscountField";
-import { discountAmount } from "@/lib/purchases/discount";
+import { billTotals, discountAmount, signedMoney } from "@/lib/purchases/discount";
 import { lineTotal } from "../shared";
 import { priceRise } from "@/lib/purchases/orders";
 import { useOrdersContext } from "../OrdersContext";
@@ -29,6 +29,12 @@ export default function ReceiveSheet() {
               <div className="flex items-center justify-between gap-3 text-xs text-muted">
                 <span>Items {fmtMoney(receiveSubtotal)}</span>
                 <span className="font-semibold tabular-nums">− {fmtMoney(discountAmount(receiveData.discount))} {receiveData.discount.kind.toLowerCase()}</span>
+              </div>
+            )}
+            {billTotals(receiveSubtotal, receiveData.discount, receiveData.round).rounding !== 0 && (
+              <div className="flex items-center justify-between gap-3 text-xs text-muted">
+                <span>Rounding</span>
+                <span className="font-semibold tabular-nums">{signedMoney(billTotals(receiveSubtotal, receiveData.discount, receiveData.round).rounding, fmtMoney)}</span>
               </div>
             )}
             <div className="flex items-center justify-between gap-3">
@@ -154,7 +160,7 @@ export default function ReceiveSheet() {
             })}
           </div>
 
-          <DiscountField value={receiveData.discount} onChange={(discount) => setReceiveData((p) => ({ ...p, discount }))} before={receiveSubtotal} currency={currency} money={fmtMoney} />
+          <DiscountField value={receiveData.discount} onChange={(discount) => setReceiveData((p) => ({ ...p, discount }))} before={receiveSubtotal} currency={currency} money={fmtMoney} round={receiveData.round} onRound={(r) => setReceiveData((p) => ({ ...p, round: r }))} />
         </div>
       </Sheet>
     </>

@@ -1,5 +1,5 @@
 'use client'
-import { discountLabel } from '@/lib/purchases/discount'
+import { discountLabel, signedMoney } from '@/lib/purchases/discount'
 import { formatMoney } from '@/lib/region/currency'
 import { personName } from "@/lib/people";
 import React, { useState, useEffect } from 'react'
@@ -402,6 +402,9 @@ export default function ViewBillModal ({ isOpen, onClose, bill }) {
             )}
             {Number(bill.discount?.amount) > 0 && (
               <InfoRow icon={DollarSign} label={discountLabel(bill.discount)} value={`− ${fmtRM(bill.discount.amount)}`} />
+            )}
+            {Number(bill.rounding) !== 0 && bill.rounding != null && (
+              <InfoRow icon={DollarSign} label='Rounding' value={signedMoney(bill.rounding, fmtRM)} />
             )}
             <InfoRow
               icon={DollarSign}
