@@ -23,6 +23,15 @@ describe("stock now", () => {
     expect(s.meat.onHand).toBe(40);
     expect(s.meat.counted).toBeNull();
   });
+  it("an earlier start brings in the bills from then, for what is not counted yet", () => {
+    const early = bill("b0", "2026-11-02", "2026-11-02T10:00:00Z", [{ itemId: "meat", name: "Chicken", unit: "kg", receivedQty: 5 }]);
+    const later = [early, ...bills.slice(0, 1)];
+    expect(stockNow({ bills: later, items, startDate: "2026-11-06" }).meat.onHand).toBe(40);
+    expect(stockNow({ bills: later, items, startDate: "2026-11-01" }).meat.onHand).toBe(45);
+  });
+  it("moving the start doesn't touch what was counted", () => {
+    expect(stockNow({ bills, counts, items, startDate: "2026-11-01" }).meat.onHand).toBe(42);
+  });
   it("a count replaces the figure, and the next order adds on top", () => {
     const s = stockNow({ bills, counts, items, startDate: "2026-11-09" });
     expect(s.meat.onHand).toBe(42); // 12 counted + 30 on Sunday

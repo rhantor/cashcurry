@@ -4,7 +4,7 @@
 // Bill, a pay-out bill), someone counts each supplier's goods on the count
 // day, waste is written off, and what was used between two counts shows
 // week by week. The working-out: lib/inventory/model.js.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { AlertTriangle, Boxes, ClipboardCheck, Search, Settings2, Trash2 } from "lucide-react";
 import Sheet from "@/app/components/purchases/Sheet";
@@ -211,7 +211,7 @@ export default function InventoryPage() {
           setOpenKey(null);
         }} onMin={(q) => setMin(openKey, q)} />
 
-      <SettingsSheet open={settingsOpen} data={data} busy={busy} onClose={() => setSettingsOpen(false)} onSave={(f) => run(() => saveStockSettings(companyId, branchId, f, user), "Saved.", "Could not save it.").then((ok) => ok && setSettingsOpen(false))} />
+      <SettingsSheet open={settingsOpen} data={data} today={today} busy={busy} onClose={() => setSettingsOpen(false)} onSave={(f) => run(() => saveStockSettings(companyId, branchId, f, user), "Saved.", "Could not save it.").then((ok) => ok && setSettingsOpen(false))} />
 
       <ConfirmSheet
         open={!!toDelete}
@@ -486,8 +486,15 @@ function LogTab({ counts, waste, manages, onDelete }) {
   );
 }
 
-function SettingsSheet({ open, data, busy, onClose, onSave }) {
+function SettingsSheet({ open, data, today, busy, onClose, onSave }) {
   const [countDay, setCountDay] = useState(String(data?.countDay ?? 6));
+  const [startDate, setStartDate] = useState(data?.startDate || "");
+  // what is saved now, each time it opens
+  useEffect(() => {
+    if (!open) return;
+    setCountDay(String(data?.countDay ?? 6));
+    setStartDate(data?.startDate || "");
+  }, [open, data?.countDay, data?.startDate]);
   return (
     <Sheet
       open={open}
@@ -495,7 +502,7 @@ function SettingsSheet({ open, data, busy, onClose, onSave }) {
       onClose={onClose}
       maxWidth="max-w-md"
       footer={
-        <button onClick={() => onSave({ countDay: Number(countDay) })} disabled={busy} className="min-h-[52px] w-full rounded-2xl bg-brand text-base font-bold text-brand-fg disabled:opacity-40">
+        <button onClick={() => onSave({ countDay: Number(countDay), startDate })} disabled={busy || !startDate} className="min-h-[52px] w-full rounded-2xl bg-brand text-base font-bold text-brand-fg disabled:opacity-40">
           {busy ? "Saving…" : "Save"}
         </button>
       }
@@ -512,7 +519,9 @@ function SettingsSheet({ open, data, busy, onClose, onSave }) {
             </Select>
           )}
         </Field>
-        <p className="text-sm text-muted">Stock started {dayText(data?.startDate)}.</p>
+        <Field label="Stock started" hint="Bills from this day on count as goods in, for anything not counted yet. What has been counted stays as counted.">
+          {() => <DatePicker value={startDate} onChange={setStartDate} max={today} />}
+        </Field>
       </div>
     </Sheet>
   );
