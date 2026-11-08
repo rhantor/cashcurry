@@ -26,7 +26,8 @@ import { billWaitsFor, canReviewBill, changeText, deliveryOf, goodsOf } from "@/
 import { FileThumb, FilesSheet, viewerItems } from "@/app/components/common/Files";
 import { approveBillNow, approveSupplierNow, attachPayoutVoucher, getBill, sendBillBack } from "@/lib/payouts/client";
 import keepBillWarranty from "@/app/components/warranties/keepBillWarranty";
-import { linesTotal, supplierText } from "@/lib/payouts/supplier";
+import { supplierBillTotal, supplierText } from "@/lib/payouts/supplier";
+import { discountAmount, discountLabel } from "@/lib/purchases/discount";
 import { priceRise } from "@/lib/purchases/orders";
 
 const day = (d) => (d ? format(parseISO(d), "EEE d MMM") : "");
@@ -217,9 +218,15 @@ export default function BillInbox({ companyId, branchId, user, bills, loading })
                           </li>
                         );
                       })}
+                      {discountAmount(b.supplier.discount) > 0 && (
+                        <li className="flex justify-between gap-3 border-t border-line pt-1 text-muted">
+                          <span className="min-w-0 truncate">{discountLabel(b.supplier.discount)}</span>
+                          <span className="tabular-nums">− {money(discountAmount(b.supplier.discount))}</span>
+                        </li>
+                      )}
                       <li className="mt-1 flex justify-between gap-3 border-t border-line pt-1 font-semibold">
                         <span>Invoice {b.supplier.invoiceNo}</span>
-                        <span className="tabular-nums">{money(linesTotal(b.supplier.lines))}</span>
+                        <span className="tabular-nums">{money(supplierBillTotal(b.supplier))}</span>
                       </li>
                     </ul>
                   )}

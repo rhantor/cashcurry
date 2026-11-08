@@ -17,7 +17,8 @@ import {
   openOrdersOf,
   useSuppliers,
 } from "@/lib/payouts/client";
-import { linesTotal, poLines } from "@/lib/payouts/supplier";
+import { linesTotal, poLines, supplierBillTotal } from "@/lib/payouts/supplier";
+import DiscountField from "@/app/components/purchases/DiscountField";
 import { priceRise } from "@/lib/purchases/orders";
 import BillItems from "@/app/components/inventory/BillItems";
 
@@ -92,6 +93,7 @@ export default function SupplierPicker({
       lines,
       invoiceNo: v.invoiceNo || "",
       invoiceDate: v.invoiceDate || date,
+      discount: null,
       paid: linesTotal(lines),
     });
   };
@@ -100,8 +102,10 @@ export default function SupplierPicker({
       j === i ? { ...l, [key]: val } : l,
     );
     // what was paid follows the bill's total until someone types it
-    set({ lines, ...(paidTouched ? {} : { paid: linesTotal(lines) }) });
+    set({ lines, ...(paidTouched ? {} : { paid: supplierBillTotal({ ...v, lines }) }) });
   };
+  const setDiscount = (discount) =>
+    set({ discount, ...(paidTouched ? {} : { paid: supplierBillTotal({ ...v, discount }) }) });
 
   const paying = useMemo(
     () => Object.fromEntries((v.pays || []).map((p) => [p.billId, p])),
@@ -301,7 +305,7 @@ export default function SupplierPicker({
                         The invoice comes to
                       </td>
                       <td className="px-3 py-2 text-right font-semibold tabular-nums text-fg">
-                        {money(linesTotal(v.lines))}
+                        {money(supplierBillTotal(v))}
                       </td>
                     </tr>
                   </tfoot>
@@ -316,6 +320,14 @@ export default function SupplierPicker({
                 Less came than ordered? Put what came — the order closes with
                 that; order the rest again.
               </p>
+              <DiscountField
+                value={v.discount}
+                onChange={setDiscount}
+                before={linesTotal(v.lines)}
+                currency={currency}
+                money={money}
+                error={errors.discount}
+              />
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field
                   label="Invoice no. (on the bill)"

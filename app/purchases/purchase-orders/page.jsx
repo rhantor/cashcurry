@@ -1,4 +1,5 @@
 "use client";
+import { NO_DISCOUNT, afterDiscount, discountAmount, discountProblem } from "@/lib/purchases/discount";
 import { format } from "date-fns";
 import { personName } from "@/lib/people";
 import { formatMoney } from "@/lib/region/currency";
@@ -179,6 +180,7 @@ export default function PurchaseOrdersPage() {
     setReceiveData({
       invoiceNo: "",
       invoiceDate: todayISO(),
+      discount: NO_DISCOUNT,
       items: (order.items || []).map((i) => ({
         itemId: i.itemId,
         name: i.name,
@@ -200,13 +202,15 @@ export default function PurchaseOrdersPage() {
     }));
   };
 
-  const receiveTotal = sumLines(receiveData.items, "receivedQty", "finalPrice");
+  const receiveSubtotal = sumLines(receiveData.items, "receivedQty", "finalPrice");
+  const receiveTotal = afterDiscount(receiveSubtotal, receiveData.discount);
 
   const handleReceiveOrder = async () => {
     if (!receiveData.invoiceNo.trim()) return toastError("Enter the supplier's invoice number.");
     if (!invoiceFile) {
       return toastError("Take a photo of the invoice first — it's needed to check the prices later.");
     }
+    if (discountProblem(receiveSubtotal, receiveData.discount)) return toastError(discountProblem(receiveSubtotal, receiveData.discount));
     if (receiveTotal <= 0) return toastError("The invoice total must be more than zero.");
 
     const vendor = vendors.find((v) => v.id === selectedOrder.vendorId);
@@ -239,6 +243,7 @@ export default function PurchaseOrdersPage() {
         invoiceNo: receiveData.invoiceNo,
         invoiceDate: receiveData.invoiceDate,
         receivedItems: receiveData.items,
+        discount: receiveData.discount,
         vendorTermsDays,
         receivedBy: user || {},
         attachment,
@@ -580,7 +585,7 @@ export default function PurchaseOrdersPage() {
     "w-11 h-11 flex items-center justify-center rounded-xl text-muted bg-surface-2/60 active:bg-surface-2 transition-colors";
 
   return (
-    <OrdersContext.Provider value={{ receiving, ready, companyId, branchId, user, currency, fmtMoney, router, dispatch, toastOk, toastError, toastNode, args, companyArgs, orders, ordersLoading, vendors, catalog, branchSettings, branch, company, requireApproval, canApprove, invoiceFile, setInvoiceFile, invoicePreview, setInvoicePreview, uploadPct, setUploadPct, uploading, setUploading, busy, selectedOrder, setSelectedOrder, statusFilter, setStatusFilter, search, setSearch, visibleOrders, openReceiveSheet, setOpenReceiveSheet, receiveData, setReceiveData, handleOpenReceive, updateReceiveRow, receiveTotal, handleReceiveOrder, openEditSheet, setOpenEditSheet, editData, setEditData, showPicker, setShowPicker, pickSearch, setPickSearch, pickCategory, setPickCategory, confirmReapproval, setConfirmReapproval, canEdit, canCancel, handleOpenEdit, updateEditRow, removeEditRow, addableItems, pickableItems, handleAddEditRow, editTotal, saveEdit, handleSaveEdit, pendingAction, setPendingAction, runStatusChange, handleSend, sendingOrder, setSendingOrder, confirmPendingAction, actionCopy, printing, setPrinting, exportPDF }}>
+    <OrdersContext.Provider value={{ receiving, ready, companyId, branchId, user, currency, fmtMoney, router, dispatch, toastOk, toastError, toastNode, args, companyArgs, orders, ordersLoading, vendors, catalog, branchSettings, branch, company, requireApproval, canApprove, invoiceFile, setInvoiceFile, invoicePreview, setInvoicePreview, uploadPct, setUploadPct, uploading, setUploading, busy, selectedOrder, setSelectedOrder, statusFilter, setStatusFilter, search, setSearch, visibleOrders, openReceiveSheet, setOpenReceiveSheet, receiveData, setReceiveData, handleOpenReceive, updateReceiveRow, receiveSubtotal, receiveTotal, handleReceiveOrder, openEditSheet, setOpenEditSheet, editData, setEditData, showPicker, setShowPicker, pickSearch, setPickSearch, pickCategory, setPickCategory, confirmReapproval, setConfirmReapproval, canEdit, canCancel, handleOpenEdit, updateEditRow, removeEditRow, addableItems, pickableItems, handleAddEditRow, editTotal, saveEdit, handleSaveEdit, pendingAction, setPendingAction, runStatusChange, handleSend, sendingOrder, setSendingOrder, confirmPendingAction, actionCopy, printing, setPrinting, exportPDF }}>
     <div className="mx-auto max-w-7xl space-y-4 px-4 py-5 pb-24">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
@@ -679,7 +684,7 @@ export default function PurchaseOrdersPage() {
                   {fmtMoney(status === "Received" ? order.finalTotal : order.totalEst)}
                 </p>
                 <p className="text-xs text-subtle shrink-0">
-                  {status === "Received" ? "billed" : "estimated"}
+                  {status === "Received" ? (discountAmount(order.discount) > 0 ? `billed · ${fmtMoney(discountAmount(order.discount))} off` : "billed") : "estimated"}
                 </p>
               </div>
 
