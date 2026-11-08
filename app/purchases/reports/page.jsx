@@ -119,12 +119,15 @@ export default function PurchaseReportPage() {
     return sorted;
   }, [items, search, category, sortBy]);
 
+  // A discount is on a whole bill: it can only come off when every item is showing.
+  const narrowed = !!(search || category);
   const shownTotals = useMemo(
     () => ({
-      spend: visible.reduce((a, r) => a + r.spend, 0),
+      spend: narrowed ? visible.reduce((a, r) => a + r.spend, 0) : totals.spend,
+      discount: narrowed ? 0 : totals.discount,
       qty: visible.reduce((a, r) => a + r.qty, 0),
     }),
-    [visible]
+    [visible, narrowed, totals]
   );
 
   const meta = {
@@ -236,7 +239,7 @@ export default function PurchaseReportPage() {
         <StatTile
           label="Total spend"
           value={`${currencyInfo(currency).symbol} ${compact(shownTotals.spend)}`}
-          sub={`${fmtMoney(shownTotals.spend)}`}
+          sub={shownTotals.discount > 0 ? `${fmtMoney(shownTotals.spend)} · after ${fmtMoney(shownTotals.discount)} off` : `${fmtMoney(shownTotals.spend)}`}
           accent
         />
         <StatTile label="Products bought" value={compact(visible.length)} sub="distinct items" />

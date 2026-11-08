@@ -6,12 +6,14 @@ import ProofUpload from "@/app/components/entry/ProofUpload";
 import Sheet from "@/app/components/purchases/Sheet";
 import QtyStepper from "@/app/components/purchases/QtyStepper";
 import MoneyInput from "@/app/components/purchases/MoneyInput";
+import DiscountField from "@/app/components/purchases/DiscountField";
+import { discountAmount } from "@/lib/purchases/discount";
 import { lineTotal } from "../shared";
 import { priceRise } from "@/lib/purchases/orders";
 import { useOrdersContext } from "../OrdersContext";
 
 export default function ReceiveSheet() {
-  const { receiving, currency, fmtMoney, invoiceFile, setInvoiceFile, invoicePreview, setInvoicePreview, uploadPct, uploading, busy, selectedOrder, openReceiveSheet, setOpenReceiveSheet, receiveData, setReceiveData, updateReceiveRow, receiveTotal, handleReceiveOrder } = useOrdersContext();
+  const { receiving, currency, fmtMoney, invoiceFile, setInvoiceFile, invoicePreview, setInvoicePreview, uploadPct, uploading, busy, selectedOrder, openReceiveSheet, setOpenReceiveSheet, receiveData, setReceiveData, updateReceiveRow, receiveSubtotal, receiveTotal, handleReceiveOrder } = useOrdersContext();
   return (
     <>
       {/* ----------------------------- Receive sheet ---------------------------- */}
@@ -23,6 +25,12 @@ export default function ReceiveSheet() {
         maxWidth="max-w-2xl"
         footer={
           <div className="space-y-2">
+            {discountAmount(receiveData.discount) > 0 && (
+              <div className="flex items-center justify-between gap-3 text-xs text-muted">
+                <span>Items {fmtMoney(receiveSubtotal)}</span>
+                <span className="font-semibold tabular-nums">− {fmtMoney(discountAmount(receiveData.discount))} {receiveData.discount.kind.toLowerCase()}</span>
+              </div>
+            )}
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs font-semibold text-subtle uppercase tracking-wide">Invoice total</p>
               <p className="text-xl font-bold text-fg tabular-nums">
@@ -145,6 +153,8 @@ export default function ReceiveSheet() {
               );
             })}
           </div>
+
+          <DiscountField value={receiveData.discount} onChange={(discount) => setReceiveData((p) => ({ ...p, discount }))} before={receiveSubtotal} currency={currency} money={fmtMoney} />
         </div>
       </Sheet>
     </>

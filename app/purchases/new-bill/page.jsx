@@ -26,6 +26,8 @@ import ProofUpload from "@/app/components/entry/ProofUpload";
 import { EntryLayout, EntrySection, SummaryLine } from "@/app/components/entry/EntryLayout";
 import BillItems from "@/app/components/inventory/BillItems";
 import { billItemLines } from "@/lib/inventory/model";
+import DiscountField from "@/app/components/purchases/DiscountField";
+import { NO_DISCOUNT, afterDiscount, discountAmount, discountProblem, discountToSave } from "@/lib/purchases/discount";
 
 /* ----------------------- tiny helpers ----------------------- */
 const todayISO = () => {
@@ -87,6 +89,7 @@ export default function NewBillPage() {
   const [userEditedDueDate, setUserEditedDueDate] = useState(false);
   const [autoFilledHint, setAutoFilledHint] = useState("");
   const [total, setTotal] = useState("");
+  const [discount, setDiscount] = useState(NO_DISCOUNT); // a discount or voucher: off the total above
   const [note, setNote] = useState("");
   const [lines, setLines] = useState([]); // what came, for stock (8 Nov)
 
@@ -205,6 +208,7 @@ export default function NewBillPage() {
     if (invoiceDate && dueDate && dueDate < invoiceDate)
       return "Due date cannot be earlier than the invoice date.";
     if (!total || Number(total) <= 0) return `Enter bill total (${currency}).`;
+    if (discountProblem(total, discount)) return discountProblem(total, discount);
     if (!file) return "Attach invoice (PDF/Image).";
     const noQty = lines.find((l) => !(Number(l.qty) > 0));
     if (noQty) return `How much ${noQty.name} came? Or remove it.`;
@@ -220,6 +224,7 @@ export default function NewBillPage() {
     setUserEditedDueDate(false);
     setAutoFilledHint("");
     setTotal("");
+    setDiscount(NO_DISCOUNT);
     setNote("");
     setLines([]);
     setFile(null);
@@ -251,6 +256,7 @@ export default function NewBillPage() {
       invoiceDate,
       dueDate,
       total: normalizedTotal,
+      discount: discountAmount(discount),
     });
     if (lastSubmitHashRef.current === submitHash) return;
     lastSubmitHashRef.current = submitHash;
@@ -300,7 +306,8 @@ export default function NewBillPage() {
         invoiceNo: nonEmpty(invoiceNo),
         invoiceDate,
         dueDate,
-        total: Number(normalizedTotal),
+        total: afterDiscount(normalizedTotal, discount),
+        ...(discountToSave(discount) ? { subtotal: Number(normalizedTotal), discount: discountToSave(discount) } : {}),
         note: nonEmpty(note),
         attachments: [url],
         items: billItemLines(lines),
@@ -351,7 +358,7 @@ export default function NewBillPage() {
         <div className="space-y-4">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-subtle">Bill total</p>
-            <CountUp value={Number(total) || 0} format={money} className="mt-1 block text-3xl font-bold tracking-tight text-fg" />
+            <CountUp value={afterDiscount(total, discount)} format={money} className="mt-1 block text-3xl font-bold tracking-tight text-fg" />
             <p className="mt-0.5 text-xs text-muted">{selectedVendor?.name || "Pick the vendor"}</p>
           </div>
           <div className="space-y-2 border-t border-line pt-3">
@@ -375,7 +382,7 @@ export default function NewBillPage() {
         <div className="flex items-center gap-3">
           <div className="min-w-0 flex-1">
             <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-subtle">{selectedVendor?.name || "New bill"}</p>
-            <CountUp value={Number(total) || 0} format={money} className="block truncate text-lg font-bold tracking-tight text-fg" />
+            <CountUp value={afterDiscount(total, discount)} format={money} className="block truncate text-lg font-bold tracking-tight text-fg" />
           </div>
           <div className="w-40 shrink-0">{save}</div>
         </div>
@@ -472,6 +479,9 @@ export default function NewBillPage() {
             onPick={(f, url) => (setFile(f), setPreview(url))}
             onRemove={() => (setFile(null), setPreview(null), setUploadPct(0))}
           />
+        </div>
+        <div className="mt-4">
+          <DiscountField value={discount} onChange={setDiscount} before={total} currency={currency} money={money} />
         </div>
       </EntrySection>
 
