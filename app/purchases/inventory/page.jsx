@@ -4,7 +4,7 @@
 // Bill, a pay-out bill), someone counts each supplier's goods on the count
 // day, waste is written off, and what was used between two counts shows
 // week by week. The working-out: lib/inventory/model.js.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
 import { AlertTriangle, Boxes, ClipboardCheck, Search, Settings2, Trash2 } from "lucide-react";
 import Sheet from "@/app/components/purchases/Sheet";
