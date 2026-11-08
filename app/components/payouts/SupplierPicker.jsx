@@ -19,6 +19,7 @@ import {
 } from "@/lib/payouts/client";
 import { linesTotal, poLines } from "@/lib/payouts/supplier";
 import { priceRise } from "@/lib/purchases/orders";
+import BillItems from "@/app/components/inventory/BillItems";
 
 const MODE_LABEL = {
   pays: "Paid bills already in Purchases",
@@ -468,6 +469,19 @@ export default function SupplierPicker({
               />
             )}
           </Field>
+          {receiving && (
+            <Field label="What came (optional, goes into Inventory)" error={errors.items} className="sm:col-span-2">
+              {() => (
+                <BillItems
+                  companyId={companyId}
+                  branchId={branchId}
+                  vendorId={v.vendorId}
+                  rows={v.newBill?.items || []}
+                  onChange={(items) => set({ newBill: { ...v.newBill, items } })}
+                />
+              )}
+            </Field>
+          )}
         </div>
       )}
     </div>

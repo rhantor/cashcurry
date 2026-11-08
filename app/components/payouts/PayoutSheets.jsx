@@ -52,6 +52,7 @@ import { FileThumb } from "@/app/components/common/Files";
 import ScanToPdf from "@/app/components/common/ScanToPdf";
 import SupplierPicker from "./SupplierPicker";
 import { checkSupplier, poLines, supplierPaid } from "@/lib/payouts/supplier";
+import { billItemLines } from "@/lib/inventory/model";
 import { getOrder, lastPricesFor } from "@/lib/payouts/client";
 
 const PURPOSES = [
@@ -641,6 +642,7 @@ export function BillSheet({
                       invoiceDate: supplier.newBill?.invoiceDate || date,
                       total: Number(supplier.newBill?.total) || 0,
                       paid: Number(supplier.newBill?.paid) || 0,
+                      items: billItemLines(supplier.newBill?.items || []),
                     },
                   }
                 : {
