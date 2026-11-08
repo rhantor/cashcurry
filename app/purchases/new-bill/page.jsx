@@ -24,6 +24,8 @@ import { Button, CountUp, DatePicker, Field, Input, Select, Skeleton, Textarea }
 import MoneyInput from "@/app/components/entry/MoneyInput";
 import ProofUpload from "@/app/components/entry/ProofUpload";
 import { EntryLayout, EntrySection, SummaryLine } from "@/app/components/entry/EntryLayout";
+import BillItems from "@/app/components/inventory/BillItems";
+import { billItemLines } from "@/lib/inventory/model";
 
 /* ----------------------- tiny helpers ----------------------- */
 const todayISO = () => {
@@ -86,6 +88,7 @@ export default function NewBillPage() {
   const [autoFilledHint, setAutoFilledHint] = useState("");
   const [total, setTotal] = useState("");
   const [note, setNote] = useState("");
+  const [lines, setLines] = useState([]); // what came, for stock (8 Nov)
 
   const [file, setFile] = useState(null);
   const [uploadPct, setUploadPct] = useState(0);
@@ -203,6 +206,8 @@ export default function NewBillPage() {
       return "Due date cannot be earlier than the invoice date.";
     if (!total || Number(total) <= 0) return `Enter bill total (${currency}).`;
     if (!file) return "Attach invoice (PDF/Image).";
+    const noQty = lines.find((l) => !(Number(l.qty) > 0));
+    if (noQty) return `How much ${noQty.name} came? Or remove it.`;
     return null;
   };
 
@@ -216,6 +221,7 @@ export default function NewBillPage() {
     setAutoFilledHint("");
     setTotal("");
     setNote("");
+    setLines([]);
     setFile(null);
     setPreview(null);
     setUploadPct(0);
@@ -297,6 +303,7 @@ export default function NewBillPage() {
         total: Number(normalizedTotal),
         note: nonEmpty(note),
         attachments: [url],
+        items: billItemLines(lines),
         createdBy: stampOf(user || {}),
       };
 
@@ -466,6 +473,10 @@ export default function NewBillPage() {
             onRemove={() => (setFile(null), setPreview(null), setUploadPct(0))}
           />
         </div>
+      </EntrySection>
+
+      <EntrySection title="What came" action={<span className="text-xs text-muted">Optional · goes into Inventory</span>}>
+        <BillItems companyId={companyId} branchId={branchId} vendorId={vendorId} rows={lines} onChange={setLines} />
       </EntrySection>
 
       <p className="flex items-center gap-1.5 px-1 text-xs text-subtle">

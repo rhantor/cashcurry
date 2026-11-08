@@ -64,6 +64,12 @@ describe("approving a supplier bill", () => {
     expect(r.billWrites[0]).toMatchObject({ id: "nb1", create: true, data: { vendorId: "rice", total: 800, paid: 500, balance: 300, status: "partially_paid", payoutSettleId: "s1" } });
     expect(r.vendorDelta).toEqual({ billed: 800, paid: 500 });
   });
+  it("a new bill keeps what came, for stock (8 Nov)", () => {
+    const items = [{ itemId: "rice", name: "Rice", unit: "kg", qty: 25, receivedQty: 25 }];
+    const s = settle({ vendorId: "rice", vendorName: "Rice Co", mode: "newBill", newBill: { invoiceNo: "INV-78", invoiceDate: "2026-11-08", total: 100, paid: 100, items } });
+    expect(approveSupplier(s, [], manager, now, { paymentId: "vp1", newBillId: "nb1" }).billWrites[0].data.items).toEqual(items);
+    expect(checkSupplier({ vendorId: "rice", mode: "newBill", newBill: { total: 100, paid: 100, items: [{ name: "Rice", qty: "" }] } })).toEqual({ items: "How much Rice came? Or remove it." });
+  });
   it("the payment's file: the payment receipt, else the bill paper", () => {
     const sup = { vendorId: "rice", vendorName: "Rice Co", mode: "pays", pays: [{ billId: "b1", amount: 300 }] };
     const pay = (extra) => approveSupplier(settle(sup, extra), bills, manager, now, { paymentId: "vp1" }).payment;

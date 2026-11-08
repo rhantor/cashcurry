@@ -51,6 +51,8 @@ const PROBES = {
   "purchases.approve": (u) => as(u).doc(`${B}/requisitions/pending-${u}`).update({ status: "Approved", approvedBy: u }),
   "purchases.bills": (u) => as(u).doc(`${B}/vendorPayments/vp-${u}`).set({ vendorId: "v1", total: 1 }),
   "warranties.manage": (u) => as(u).doc(`${B}/warranties/w-${u}`).set({ itemName: "Chiller", endsOn: "2027-01-01", status: "active", createdBy: { uid: u } }),
+  "inventory.count": (u) => as(u).doc(`${B}/stockTakes/c-${u}`).set({ date: "2026-11-14", vendorId: "v1", lines: [{ itemId: "i1", qty: 3 }], by: { uid: u } }),
+  "inventory.manage": (u) => as(u).doc(`${B}/stockSettings/main`).set({ startDate: "2026-11-08", min: { i1: USERS.indexOf(u) } }),
   // the item catalog (vendor names are also open to pay-outs, to pick a supplier — 4.10)
   "catalog.view": (u) => as(u).doc(`companies/${CO}/items/i1`).get(),
   "catalog.manage": (u) => as(u).doc(`companies/${CO}/vendors/v-${u}`).set({ name: "V" }),

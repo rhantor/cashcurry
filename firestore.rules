@@ -1324,6 +1324,35 @@ service cloud.firestore {
           allow delete: if canRecordsDelete(companyId, branchId);
         }
 
+        // ── Inventory (lib/inventory/model.js, 8 Nov) ────────────────────────
+        // Not the POS's itemStock / inventoryMovements / stockCounts: the
+        // till's own stock model lives under those names.
+        // Stock is worked out from the supplier bills, the counts and the
+        // waste. Those who order count the stock and write off waste, in their
+        // own name; a recount replaces a wrong count, so only those who approve
+        // orders change or remove one, and set when stock starts, the
+        // minimums and the count day (stockSettings/main).
+        match /stockTakes/{docId} {
+          allow read: if canPurchasesOrder(companyId, branchId);
+          allow create: if canPurchasesOrder(companyId, branchId) &&
+                           request.resource.data.by.uid == request.auth.uid &&
+                           request.resource.data.date is string &&
+                           request.resource.data.lines is list;
+          allow update, delete: if canPurchasesApprove(companyId, branchId);
+        }
+        match /stockWaste/{docId} {
+          allow read: if canPurchasesOrder(companyId, branchId);
+          allow create: if canPurchasesOrder(companyId, branchId) &&
+                           request.resource.data.by.uid == request.auth.uid &&
+                           request.resource.data.date is string &&
+                           request.resource.data.qty is number && request.resource.data.qty > 0;
+          allow update, delete: if canPurchasesApprove(companyId, branchId);
+        }
+        match /stockSettings/{docId} {
+          allow read: if canPurchasesOrder(companyId, branchId);
+          allow write: if canPurchasesApprove(companyId, branchId);
+        }
+
         // ── POS: Order Guides ────────────────────────────────────────────────
         match /orderGuides/{docId} {
           allow read, write: if canPurchasesOrder(companyId, branchId);

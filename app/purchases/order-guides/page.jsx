@@ -17,6 +17,9 @@ import { useGetItemsQuery, branchLastPrice } from "@/lib/redux/api/itemsApiSlice
 import { useAddRequisitionMutation } from "@/lib/redux/api/requisitionsApiSlice";
 import Sheet from "@/app/components/purchases/Sheet";
 import QtyStepper from "@/app/components/purchases/QtyStepper";
+import { useBusinessToday } from "@/app/hooks/useRegion";
+import { useInventory } from "@/lib/inventory/client";
+import { qtyText } from "@/lib/inventory/model";
 import ConfirmSheet from "@/app/components/purchases/ConfirmSheet";
 import ItemFilterBar, { filterItems } from "@/app/components/purchases/ItemFilterBar";
 import useToast from "@/app/components/purchases/useToast";
@@ -47,6 +50,10 @@ const guideRows = (guide) => {
 
 export default function OrderGuidesPage() {
   const { ready, companyId, branchId, user } = useResolvedCompanyBranch();
+  // what is in stock, beside each line while ordering (Inventory, 8 Nov)
+  const today = useBusinessToday();
+  const { data: inventory } = useInventory(ready ? companyId : null, ready ? branchId : null, today);
+  const stockOf = (itemId) => (inventory?.started ? inventory.stock?.[itemId] : null);
   const currency = useCurrency();
   const fmtMoney = (n) => formatMoney(n, currency);
   const router = useRouter();
@@ -495,6 +502,12 @@ export default function OrderGuidesPage() {
                           {item.category ? `${item.category} · ` : ""}
                           {fmtMoney(item.estPrice)} / {item.unit}
                         </p>
+                        {stockOf(item.itemId) && (
+                          <p className={`text-xs mt-0.5 font-semibold ${stockOf(item.itemId).low ? "text-danger" : "text-muted"}`}>
+                            In stock {qtyText(Math.max(0, stockOf(item.itemId).onHand), item.unit)}
+                            {stockOf(item.itemId).min > 0 && ` · keep ${qtyText(stockOf(item.itemId).min, "")}`}
+                          </p>
+                        )}
                       </div>
                       {picked && (
                         <p className="text-base font-bold text-fg tabular-nums shrink-0">

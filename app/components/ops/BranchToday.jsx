@@ -6,7 +6,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CalendarClock, ChevronRight, HandCoins, ListChecks, MessageCircle, NotebookPen, TriangleAlert } from "lucide-react";
+import { Boxes, CalendarClock, ChevronRight, HandCoins, ListChecks, MessageCircle, NotebookPen, TriangleAlert } from "lucide-react";
 import { cn } from "@/app/components/ui";
 import { can, canAny, canOpen } from "@/lib/authz/permissions";
 import usePendingRequests from "@/app/components/shell/usePendingRequests";
@@ -18,6 +18,7 @@ import { CoverSheet } from "@/app/components/tasks/DutySheets";
 import { useChecks } from "@/lib/tasks/client";
 import { dutyGaps, dutyRows, todayCount } from "@/lib/tasks/model";
 import ShiftCard from "./ShiftCard";
+import StockCard from "./StockCard";
 
 /** A count that opens where it is dealt with. */
 function Tile({ n, label, href, tone }) {
@@ -44,6 +45,7 @@ const SHORTCUTS = [
   { href: "/entry-data/sales-entry", label: "Sales entry", icon: NotebookPen },
   { href: "/attendance-log", label: "Attendance", icon: CalendarClock },
   { href: "/tasks", label: "Tasks", icon: ListChecks },
+  { href: "/purchases/inventory", label: "Stock", icon: Boxes },
   { href: "/issues", label: "Issues", icon: TriangleAlert },
   { href: "/messages", label: "Chat", icon: MessageCircle },
 ];
@@ -84,6 +86,8 @@ export default function BranchToday({ user, companyId, branchId, today }) {
 
       {can(role, "cashInHand.view") && <CashInHand companyId={companyId} branchId={branchId} role={role} />}
 
+      {can(role, "inventory.count") && <StockCard companyId={companyId} branchId={branchId} today={today} />}
+
       {can(role, "attendance.view") && <ShiftCard companyId={companyId} branchId={branchId} today={today} />}
 
       {team.gives &&
@@ -100,7 +104,7 @@ export default function BranchToday({ user, companyId, branchId, today }) {
       {shortcuts.length > 0 && (
         <section className="space-y-2">
           <h2 className="px-1 text-sm font-semibold text-fg">Go to</h2>
-          <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+          <div className="grid grid-cols-3 gap-2 sm:grid-cols-7">
             {shortcuts.map(({ href, label, icon: Icon }) => (
               <Link key={href} href={href} className="group flex flex-col items-center gap-1.5 rounded-2xl p-2 hover:bg-surface-2">
                 <span className="inline-flex size-12 items-center justify-center rounded-2xl bg-brand-soft text-brand transition group-active:scale-95">

@@ -51,6 +51,7 @@ export const sidebarItems = [
     children: [
       { label: "Order Guides", path: "/purchases/order-guides" },
       { label: "Purchase Orders", path: "/purchases/purchase-orders" },
+      { label: "Inventory", path: "/purchases/inventory" },
       { label: "New Vendor Bill", path: "/purchases/new-bill" },
       { label: "Due Bills", path: "/purchases/due-bills" },
       { label: "Payments", path: "/purchases/payments" },
