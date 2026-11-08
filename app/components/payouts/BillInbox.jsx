@@ -26,8 +26,8 @@ import { billWaitsFor, canReviewBill, changeText, deliveryOf, goodsOf } from "@/
 import { FileThumb, FilesSheet, viewerItems } from "@/app/components/common/Files";
 import { approveBillNow, approveSupplierNow, attachPayoutVoucher, getBill, sendBillBack } from "@/lib/payouts/client";
 import keepBillWarranty from "@/app/components/warranties/keepBillWarranty";
-import { supplierBillTotal, supplierText } from "@/lib/payouts/supplier";
-import { discountAmount, discountLabel } from "@/lib/purchases/discount";
+import { linesTotal as linesOfBill, supplierBillTotal, supplierText } from "@/lib/payouts/supplier";
+import { billTotals, discountAmount, discountLabel, signedMoney } from "@/lib/purchases/discount";
 import { priceRise } from "@/lib/purchases/orders";
 
 const day = (d) => (d ? format(parseISO(d), "EEE d MMM") : "");
@@ -222,6 +222,12 @@ export default function BillInbox({ companyId, branchId, user, bills, loading })
                         <li className="flex justify-between gap-3 border-t border-line pt-1 text-muted">
                           <span className="min-w-0 truncate">{discountLabel(b.supplier.discount)}</span>
                           <span className="tabular-nums">− {money(discountAmount(b.supplier.discount))}</span>
+                        </li>
+                      )}
+                      {b.supplier.round === true && billTotals(linesOfBill(b.supplier.lines), b.supplier.discount).rounding !== 0 && (
+                        <li className="flex justify-between gap-3 text-muted">
+                          <span>Rounding</span>
+                          <span className="tabular-nums">{signedMoney(billTotals(linesOfBill(b.supplier.lines), b.supplier.discount).rounding, money)}</span>
                         </li>
                       )}
                       <li className="mt-1 flex justify-between gap-3 border-t border-line pt-1 font-semibold">

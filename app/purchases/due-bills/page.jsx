@@ -298,7 +298,7 @@ const handleSaveEdit = async (billId, formData) => {
         invoiceDate: formData.invoiceDate,
         dueDate:     formData.dueDate,
         total:       formData.total,
-        ...('discount' in formData ? { subtotal: formData.subtotal, discount: formData.discount } : {}),
+        ...('subtotal' in formData ? { subtotal: formData.subtotal, discount: formData.discount, rounding: formData.rounding, roundingOff: formData.roundingOff } : {}),
         notes:       formData.notes,
         attachments: finalAttachments,
       }

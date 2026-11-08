@@ -51,7 +51,8 @@ import { receivedStamp } from "@/lib/requests/voucher";
 import { FileThumb } from "@/app/components/common/Files";
 import ScanToPdf from "@/app/components/common/ScanToPdf";
 import SupplierPicker from "./SupplierPicker";
-import { checkSupplier, poLines, supplierPaid } from "@/lib/payouts/supplier";
+import { checkSupplier, poLines, supplierBillTotal, supplierPaid } from "@/lib/payouts/supplier";
+import { discountToSave } from "@/lib/purchases/discount";
 import { billItemLines } from "@/lib/inventory/model";
 import { getOrder, lastPricesFor } from "@/lib/payouts/client";
 
@@ -502,6 +503,7 @@ export function BillSheet({
             invoiceNo: "",
             invoiceDate: payout.date,
             paid: 0,
+            round: true,
           }
         : sent
           ? {
@@ -528,7 +530,7 @@ export function BillSheet({
                   lines,
                   paid: Math.min(
                     Number(payout.amount) || 0,
-                    lines.reduce((n, l) => n + l.receivedQty * l.finalPrice, 0),
+                    supplierBillTotal({ lines, round: true }),
                   ),
                 }
               : s,
@@ -634,6 +636,8 @@ export function BillSheet({
                   invoiceNo: String(supplier.invoiceNo || "").trim(),
                   invoiceDate: supplier.invoiceDate || date,
                   paid: Number(supplier.paid) || 0,
+                  discount: discountToSave(supplier.discount),
+                  round: supplier.round === true,
                 }
               : supplier.mode === "newBill"
                 ? {
@@ -642,6 +646,7 @@ export function BillSheet({
                       invoiceDate: supplier.newBill?.invoiceDate || date,
                       total: Number(supplier.newBill?.total) || 0,
                       paid: Number(supplier.newBill?.paid) || 0,
+                      round: supplier.newBill?.round === true,
                       items: billItemLines(supplier.newBill?.items || []),
                     },
                   }

@@ -2,7 +2,7 @@
 import { DatePicker } from '@/app/components/ui'
 import MoneyInput from '@/app/components/entry/MoneyInput'
 import DiscountField from '@/app/components/purchases/DiscountField'
-import { NO_DISCOUNT, afterDiscount, discountAmount, discountProblem, discountToSave } from '@/lib/purchases/discount'
+import { NO_DISCOUNT, billExtras, billTotals, discountAmount, discountProblem } from '@/lib/purchases/discount'
 import { formatMoney } from '@/lib/region/currency'
 import React, { useEffect, useState, useRef } from 'react'
 import { motion, AnimatePresence, useMotionValue, useTransform } from 'framer-motion'
@@ -197,8 +197,9 @@ export default function EditBillModal ({ isOpen, onClose, bill, onSave, isLoadin
   const [dueDate,           setDueDate]           = useState('')
   const [userEditedDueDate, setUserEditedDueDate] = useState(false)
   const [autoFilledHint,    setAutoFilledHint]    = useState('')
-  const [total,             setTotal]             = useState('') // before any discount
+  const [total,             setTotal]             = useState('') // before any discount or rounding
   const [discount,          setDiscount]          = useState(NO_DISCOUNT)
+  const [round,             setRound]             = useState(true)
   const [notes,             setNotes]             = useState('')
   const [status,            setStatus]            = useState('unpaid')
   const [attachments,       setAttachments]       = useState([])
@@ -215,7 +216,9 @@ export default function EditBillModal ({ isOpen, onClose, bill, onSave, isLoadin
     setUserEditedDueDate(true)   // existing due date is intentional — don't auto-override
     setAutoFilledHint('')
     const had = discountAmount(bill.discount) > 0
-    setTotal(had ? String(bill.subtotal) : bill.total != null ? String(bill.total) : '')
+    setTotal((had || bill.rounding) && bill.subtotal != null ? String(bill.subtotal) : bill.total != null ? String(bill.total) : '')
+    // a bill already paid against its exact total stays exact unless someone turns this on
+    setRound(bill.roundingOff ? false : bill.rounding ? true : !(Number(bill.paid) > 0))
     setDiscount(had ? { amount: String(bill.discount.amount), kind: bill.discount.kind || 'Discount', note: bill.discount.note || '' } : NO_DISCOUNT)
     setNotes(bill.notes || bill.note || '')
     setStatus(bill.status || 'unpaid')
@@ -270,7 +273,8 @@ export default function EditBillModal ({ isOpen, onClose, bill, onSave, isLoadin
     if (dueDate < invoiceDate)        return 'Due date cannot be before invoice date.'
     if (!total || Number(total) <= 0) return 'Total must be greater than 0.'
     if (discountProblem(total, discount)) return discountProblem(total, discount)
-    if (afterDiscount(total, discount) < Number(bill?.paid || 0)) return `Total can't be less than the ${Number(bill.paid).toFixed(2)} already paid on this bill.`
+    if (!(billTotals(total, discount, round).total > 0)) return 'Total must be greater than 0.'
+    if (billTotals(total, discount, round).total < Number(bill?.paid || 0)) return `Total can't be less than the ${Number(bill.paid).toFixed(2)} already paid on this bill.`
     return null
   }
 
@@ -291,6 +295,7 @@ export default function EditBillModal ({ isOpen, onClose, bill, onSave, isLoadin
       dueDate,
       total: normalizedTotal,
       discount: discountAmount(discount),
+      round,
       status,
       notes: notes.trim()
     })
@@ -301,10 +306,10 @@ export default function EditBillModal ({ isOpen, onClose, bill, onSave, isLoadin
       invoiceNo:   invoiceNo.trim(),
       invoiceDate,
       dueDate,
-      total:       afterDiscount(normalizedTotal, discount),
-      // only when there is, or was, a discount: other bills stay as they are
-      ...(discountToSave(discount) || bill.discount
-        ? { subtotal: discountToSave(discount) ? Number(normalizedTotal) : null, discount: discountToSave(discount) }
+      total:       billTotals(normalizedTotal, discount, round).total,
+      // only when there is, or was, a discount or rounding: other bills stay as they are
+      ...(Object.keys(billExtras(normalizedTotal, discount, round)).length || bill.discount || bill.rounding || bill.roundingOff
+        ? { subtotal: null, discount: null, rounding: null, roundingOff: null, ...billExtras(normalizedTotal, discount, round) }
         : {}),
       notes:       notes.trim(),
       attachments,  // existing URLs (may have some removed)
@@ -449,7 +454,7 @@ export default function EditBillModal ({ isOpen, onClose, bill, onSave, isLoadin
               <FieldLabel required>Total</FieldLabel>
               <MoneyInput size='lg' currency={currency} value={total} onValueChange={setTotal} disabled={isLoading} />
               <div className='mt-3'>
-                <DiscountField value={discount} onChange={setDiscount} before={total} currency={currency} money={(v) => formatMoney(v, currency)} />
+                <DiscountField value={discount} onChange={setDiscount} before={total} currency={currency} money={(v) => formatMoney(v, currency)} round={round} onRound={setRound} />
               </div>
             </div>
 
@@ -466,7 +471,7 @@ export default function EditBillModal ({ isOpen, onClose, bill, onSave, isLoadin
                 <div className='flex justify-between mt-0.5'>
                   <span className='text-muted'>Balance</span>
                   <span className='font-bold text-brand'>
-                    {formatMoney(Math.max(0, afterDiscount(total, discount) - Number(bill.paid ?? 0)), currency)}
+                    {formatMoney(Math.max(0, billTotals(total, discount, round).total - Number(bill.paid ?? 0)), currency)}
                   </span>
                 </div>
               </div>

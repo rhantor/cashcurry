@@ -19,6 +19,7 @@ import {
 } from "@/lib/payouts/client";
 import { linesTotal, poLines, supplierBillTotal } from "@/lib/payouts/supplier";
 import DiscountField from "@/app/components/purchases/DiscountField";
+import RoundingRow from "@/app/components/purchases/RoundingRow";
 import { priceRise } from "@/lib/purchases/orders";
 import BillItems from "@/app/components/inventory/BillItems";
 
@@ -94,7 +95,8 @@ export default function SupplierPicker({
       invoiceNo: v.invoiceNo || "",
       invoiceDate: v.invoiceDate || date,
       discount: null,
-      paid: linesTotal(lines),
+      round: true,
+      paid: supplierBillTotal({ lines, round: true }),
     });
   };
   const setLine = (i, key, val) => {
@@ -106,6 +108,8 @@ export default function SupplierPicker({
   };
   const setDiscount = (discount) =>
     set({ discount, ...(paidTouched ? {} : { paid: supplierBillTotal({ ...v, discount }) }) });
+  const setRound = (round) =>
+    set({ round, ...(paidTouched ? {} : { paid: supplierBillTotal({ ...v, round }) }) });
 
   const paying = useMemo(
     () => Object.fromEntries((v.pays || []).map((p) => [p.billId, p])),
@@ -147,7 +151,7 @@ export default function SupplierPicker({
                 vendorName: s?.name || "",
                 mode: v.mode || modes[0],
                 pays: [],
-                newBill: { invoiceDate: date, ...(v.newBill || {}) },
+                newBill: { invoiceDate: date, round: true, ...(v.newBill || {}) },
               });
             }}
             className="h-12"
@@ -327,6 +331,8 @@ export default function SupplierPicker({
                 currency={currency}
                 money={money}
                 error={errors.discount}
+                round={v.round === true}
+                onRound={setRound}
               />
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field
@@ -464,6 +470,14 @@ export default function SupplierPicker({
               />
             )}
           </Field>
+          <div className="sm:col-span-2 sm:order-last">
+            <RoundingRow
+              amount={v.newBill?.total}
+              on={v.newBill?.round === true}
+              onChange={(round) => set({ newBill: { ...v.newBill, round } })}
+              money={money}
+            />
+          </div>
           <Field
             label="Paid now, from this money"
             error={errors.paid}

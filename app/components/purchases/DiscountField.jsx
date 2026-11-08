@@ -3,9 +3,10 @@
 // comes. `before` is the bill before it; what it means: lib/purchases/discount.js
 import { cn } from "@/app/components/ui";
 import MoneyInput from "@/app/components/purchases/MoneyInput";
+import RoundingRow from "@/app/components/purchases/RoundingRow";
 import { DISCOUNT_KINDS, NO_DISCOUNT, afterDiscount, discountAmount, discountProblem } from "@/lib/purchases/discount";
 
-export default function DiscountField({ value, onChange, before, currency, money, error }) {
+export default function DiscountField({ value, onChange, before, currency, money, error, round, onRound }) {
   const v = value || NO_DISCOUNT;
   const set = (patch) => onChange({ ...v, ...patch });
   const on = discountAmount(v) > 0;
@@ -43,6 +44,7 @@ export default function DiscountField({ value, onChange, before, currency, money
         </>
       )}
       {problem && <p className="text-xs font-medium text-danger">{problem}</p>}
+      {onRound && !problem && <RoundingRow amount={afterDiscount(before, v)} on={round} onChange={onRound} money={money} />}
     </div>
   );
 }

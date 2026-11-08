@@ -1,5 +1,5 @@
 "use client";
-import { NO_DISCOUNT, afterDiscount, discountAmount, discountProblem } from "@/lib/purchases/discount";
+import { NO_DISCOUNT, billTotals, discountAmount, discountProblem } from "@/lib/purchases/discount";
 import { format } from "date-fns";
 import { personName } from "@/lib/people";
 import { formatMoney } from "@/lib/region/currency";
@@ -181,6 +181,7 @@ export default function PurchaseOrdersPage() {
       invoiceNo: "",
       invoiceDate: todayISO(),
       discount: NO_DISCOUNT,
+      round: true,
       items: (order.items || []).map((i) => ({
         itemId: i.itemId,
         name: i.name,
@@ -203,7 +204,7 @@ export default function PurchaseOrdersPage() {
   };
 
   const receiveSubtotal = sumLines(receiveData.items, "receivedQty", "finalPrice");
-  const receiveTotal = afterDiscount(receiveSubtotal, receiveData.discount);
+  const receiveTotal = billTotals(receiveSubtotal, receiveData.discount, receiveData.round).total;
 
   const handleReceiveOrder = async () => {
     if (!receiveData.invoiceNo.trim()) return toastError("Enter the supplier's invoice number.");
@@ -244,6 +245,7 @@ export default function PurchaseOrdersPage() {
         invoiceDate: receiveData.invoiceDate,
         receivedItems: receiveData.items,
         discount: receiveData.discount,
+        round: receiveData.round,
         vendorTermsDays,
         receivedBy: user || {},
         attachment,
