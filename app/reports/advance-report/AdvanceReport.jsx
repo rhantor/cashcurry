@@ -11,6 +11,7 @@ import { COLOR, ChartCard, RankedBars } from "@/app/components/dashboard/charts/
 import useCurrency from "@/app/hooks/useCurrency";
 import { formatMoney } from "@/lib/region/currency";
 import { Avatar, Skeleton, Tabs } from "@/app/components/ui";
+import SalaryMonthView from "./SalaryMonthView";
 import { ADVANCE_TYPES, AdvanceEditSheet, AdvanceRecord, AdvanceStatus, StaffSheet, paidBack, useDeleteAdvance } from "./AdvanceSheets";
 
 import { personName } from "@/lib/people";
@@ -163,25 +164,30 @@ export default function AdvanceReport() {
   };
 
   const v = view === "staff" ? staffView : entriesView;
+  const tabs = (
+    <Tabs
+      value={view}
+      onChange={setView}
+      tabs={[
+        { value: "entries", label: "Each advance" },
+        { value: "staff", label: "By staff" },
+        { value: "salary", label: "By salary month" },
+      ]}
+    />
+  );
 
   return (
     <>
+      {view === "salary" ? (
+        <SalaryMonthView companyId={companyId} branchId={branchId} branchData={branchData} money={money} toolbar={tabs} onOpen={setOpen} />
+      ) : (
       <ReportPage
         title="Advance Report"
         data={v.data}
         isLoading={isLoading}
         branchData={branchData}
         onDateSync={(d) => setFetchArgs(d)}
-        toolbar={
-          <Tabs
-            value={view}
-            onChange={setView}
-            tabs={[
-              { value: "entries", label: "Each advance" },
-              { value: "staff", label: "By staff" },
-            ]}
-          />
-        }
+        toolbar={tabs}
         columns={v.columns}
         filterConfig={v.filterConfig}
         exportFunctions={v.exportFunctions}
@@ -192,6 +198,7 @@ export default function AdvanceReport() {
         extra={v.extra}
         modalContentRenderer={v.renderer}
       />
+      )}
 
       {staff && <StaffSheet staff={staff} branch={branchData} money={money} onClose={() => setStaff(null)} onOpen={(a) => (setStaff(null), setOpen(a))} />}
       {open && (
