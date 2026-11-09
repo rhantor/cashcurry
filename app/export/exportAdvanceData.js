@@ -2,3 +2,4 @@
 export * from "./exportAdvanceData/excel";
 export * from "./exportAdvanceData/pdf";
 export * from "./exportAdvanceData/share";
+export * from "./exportAdvanceData/salaryMonth";
