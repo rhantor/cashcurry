@@ -15,7 +15,7 @@ const table = (report) =>
     [`${s.staffName}: total`, "", "", "", money(s.amount)],
   ]);
 
-export function exportSalaryMonthToPDF(report, branchData, month) {
+export function exportSalaryMonthToPDF(report, branchData, month, { save = true } = {}) {
   try {
     if (!report?.rows?.length) return toast.warning("No advances to export");
     const doc = new jsPDF();
@@ -38,7 +38,8 @@ export function exportSalaryMonthToPDF(report, branchData, month) {
         if (c.section === "body" && String(c.row.raw[0]).endsWith(": total")) c.cell.styles.fontStyle = "bold";
       },
     });
-    doc.save(`${fileName(branchData, month)}.pdf`);
+    if (save) doc.save(`${fileName(branchData, month)}.pdf`);
+    return doc;
   } catch (e) {
     console.error(e);
     toast.error("Couldn't make the PDF");
