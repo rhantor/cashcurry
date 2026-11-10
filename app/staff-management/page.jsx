@@ -511,6 +511,7 @@ function StaffManagement () {
         detailsRequest={detailTarget ? detailsRequestFor(detailTarget.id, hires) : null}
         onAskDetails={can(user?.role, 'staff.manage') ? askDetails : null}
         onOpenRequest={h => { setDetailTarget(null); setHireId(h.id) }}
+        company={branchSettings?.basic?.companyName || branchData?.name || ''}
       />
       <QuickAddSheet open={quickOpen} onClose={() => setQuickOpen(false)} />
       <SalaryChangeSheet open={!!salaryFor} onClose={() => setSalaryFor(null)} staff={salaryFor} />

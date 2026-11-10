@@ -109,4 +109,26 @@ describe("the signed letter", () => {
     expect(text).toContain("31 Oct 2026");
     expect(text).toMatch(/\/Subtype \/Image/);
   });
+
+  it("keeps the words at their size after a page break under a watermark", async () => {
+    const { buildLetterPdf } = await import("@/app/tools/appointment-letter/buildLetterPdf");
+    const { TEMPLATES } = await import("@/app/tools/appointment-letter/templates");
+    const t = TEMPLATES.fullTime;
+    const { pdf } = buildLetterPdf({
+      templateType: "fullTime", logo: null, stamp: null,
+      companyDetails: { name: "DEMO SDN BHD", registrationNo: "1", addressLine1: "1 Jalan Demo", addressLine2: "KL", phoneEmail: "Tel" },
+      letterMeta: { refNo: "R1", date: "31 October 2026", watermarkText: "Confidential" },
+      employeeDetails: { name: "Faiz", icPassport: "", addressLine1: "", addressLine2: "" },
+      jobTerms: { ...t.jobTerms, title: "Cook" }, allowances: [], signatory: { name: "KL Manager", title: "Manager" },
+      // long enough that the closing runs over onto the next page
+      clauses: { ...t.clauses, closing: Array(12).fill(t.clauses.closing).join(" ") },
+      signatorySignature: null,
+      stylingOptions: { fontFamily: "serif", fontSize: "13px", marginSize: "20mm", lineHeight: "1.6", showWatermark: true },
+      formatCurrency: (n) => `RM ${n}`,
+    });
+    expect(pdf.getNumberOfPages()).toBeGreaterThan(1);
+    // the only text set at 75 pt is the watermark itself, once a page
+    const big = pdf.output().match(/ 75(\.\d+)? Tf/g) || [];
+    expect(big.length).toBe(pdf.getNumberOfPages());
+  });
 });

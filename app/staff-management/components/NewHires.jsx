@@ -11,11 +11,12 @@ import { Check, ChevronRight, Copy, FileSignature, FileText, Link2, MessageCircl
 import { Avatar, Badge, Button, DatePicker, Field, Input, Select, Sheet, cn, confirmDialog, toast } from '@/app/components/ui'
 import MoneyInput from '@/app/components/entry/MoneyInput'
 import FileViewer from '@/app/components/common/FileViewer'
-import { STATUSES, docKinds, hireName, linkMessage, staffFormFrom } from '@/lib/hires/model'
+import { STATUSES, detailLines, docKinds, hireName, linkMessage, staffFormFrom } from '@/lib/hires/model'
 import { cancelHire, createHire, fileUrl, getLetter, sendLink, updateHire } from '@/lib/hires/client'
 import { letterForHire } from '@/app/tools/appointment-letter/letterForHire'
 import { waNumber } from '@/lib/purchases/orders'
 import { ROLE_GROUPS, roleLabelOf } from '../lib/constants'
+import JoinPdfButtons from './JoinPdfButtons'
 
 const day = d => (d ? format(parseISO(d), 'd MMM yyyy') : '')
 const EMPTY = { firstName: '', lastName: '', phone: '', role: '', department: '', startDate: '', basicSalary: '' }
@@ -150,20 +151,6 @@ function Step ({ n, done, title, children }) {
   )
 }
 
-const DETAIL_ROWS = [
-  ['Name', d => [d.firstName, d.lastName].filter(Boolean).join(' ')],
-  ['Gender', d => d.gender],
-  ['Date of birth', d => day(d.dob)],
-  ['Nationality', d => d.nationality],
-  ['IC', d => d.icNumber],
-  ['Passport', d => d.passportNumber],
-  ['Phone', d => d.phone],
-  ['Email', d => d.email],
-  ['Address', d => [d.addressLine1, d.addressLine2, d.postalCode, d.city, d.state, d.country].filter(Boolean).join(', ')],
-  ['Emergency contact', d => [d.emergencyContactName, d.emergencyContactPhone].filter(Boolean).join(' · ')],
-  ['Bank', d => [d.bankName, d.bankAccountNumber, d.bankAccountHolderName].filter(Boolean).join(' · ')]
-]
-
 /** A new hire, step by step: letter, link, checking what they sent, accepting. */
 export function HireSheet ({ hire, onClose, companyId, branchId, company, timeZone, currency, onEdit, onAccept }) {
   const router = useRouter()
@@ -233,6 +220,12 @@ export function HireSheet ({ hire, onClose, companyId, branchId, company, timeZo
               <Badge tone={STATUSES[status]?.tone}>{STATUSES[status]?.label}</Badge>
               {['draft', 'sent'].includes(status) && !forStaff && <Button size='sm' variant='ghost' onClick={() => onEdit(hire)}>Change</Button>}
             </div>
+            {submitted && hire.details && (
+              <div className='space-y-2 rounded-xl bg-surface-2 p-3'>
+                <p className='text-xs text-muted'>Everything they sent in one PDF — details, photos{hire.signed ? ', the signed letter' : ''} and documents.</p>
+                <JoinPdfButtons hire={hire} companyId={companyId} branchId={branchId} company={company} currency={currency} />
+              </div>
+            )}
 
             <ol className='space-y-5'>
               {!forStaff && <Step n={1} done={hire.letterReady} title='Appointment letter'>
@@ -279,15 +272,12 @@ export function HireSheet ({ hire, onClose, companyId, branchId, company, timeZo
                 ) : (
                   <div className='space-y-3'>
                     <dl className='divide-y divide-line overflow-hidden rounded-xl border border-line text-sm'>
-                      {DETAIL_ROWS.map(([label, get]) => {
-                        const v = get(hire.details || {})
-                        return v ? (
-                          <div key={label} className='flex gap-3 px-3 py-2'>
-                            <dt className='w-32 shrink-0 text-xs text-muted'>{label}</dt>
-                            <dd className='min-w-0 flex-1 break-words text-fg'>{v}</dd>
-                          </div>
-                        ) : null
-                      })}
+                      {detailLines(hire.details || {}).map(([label, v]) => (
+                        <div key={label} className='flex gap-3 px-3 py-2'>
+                          <dt className='w-32 shrink-0 text-xs text-muted'>{label}</dt>
+                          <dd className='min-w-0 flex-1 break-words text-fg'>{v}</dd>
+                        </div>
+                      ))}
                     </dl>
                     <div className='flex flex-wrap gap-2'>
                       {files.map((f, i) => (
