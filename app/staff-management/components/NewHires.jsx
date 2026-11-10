@@ -220,6 +220,12 @@ export function HireSheet ({ hire, onClose, companyId, branchId, company, timeZo
               <Badge tone={STATUSES[status]?.tone}>{STATUSES[status]?.label}</Badge>
               {['draft', 'sent'].includes(status) && !forStaff && <Button size='sm' variant='ghost' onClick={() => onEdit(hire)}>Change</Button>}
             </div>
+            {submitted && hire.details && (
+              <div className='space-y-2 rounded-xl bg-surface-2 p-3'>
+                <p className='text-xs text-muted'>Everything they sent in one PDF — details, photos{hire.signed ? ', the signed letter' : ''} and documents.</p>
+                <JoinPdfButtons hire={hire} companyId={companyId} branchId={branchId} company={company} currency={currency} />
+              </div>
+            )}
 
             <ol className='space-y-5'>
               {!forStaff && <Step n={1} done={hire.letterReady} title='Appointment letter'>
@@ -277,10 +283,6 @@ export function HireSheet ({ hire, onClose, companyId, branchId, company, timeZo
                       {files.map((f, i) => (
                         <Button key={f.path} size='sm' variant='secondary' icon={FileText} onClick={() => showFiles(i)}>{f.label}</Button>
                       ))}
-                    </div>
-                    <div className='space-y-1.5 rounded-xl bg-surface-2 p-3'>
-                      <p className='text-xs text-muted'>All of it in one PDF — details, photos{hire.signed ? ', the signed letter' : ''} and documents.</p>
-                      <JoinPdfButtons hire={hire} companyId={companyId} branchId={branchId} company={company} currency={currency} />
                     </div>
                     {status === 'submitted' && (
                       <Button className='w-full' icon={UserPlus} onClick={() => onAccept(hire)}>{hire.forStaffId ? 'Check and add to their record' : 'Accept as staff'}</Button>
