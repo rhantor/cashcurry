@@ -57,12 +57,14 @@ export default function BranchSwitcher({ user, branches, activeId, onSwitch, com
           onClick={toggle}
           aria-expanded={open}
           className={cn(
-            "flex min-w-0 items-center gap-2 rounded-xl border border-line bg-surface text-left transition hover:bg-surface-2",
+            // w-full: a button is as wide as its words unless told otherwise, so a long
+            // branch name would run out of its box and over the bell and account
+            "flex w-full min-w-0 items-center gap-2 rounded-xl border border-line bg-surface text-left transition hover:bg-surface-2",
             compact ? "h-9 px-2.5" : "h-10 px-3"
           )}
         >
           <Building2 className="size-4 shrink-0 text-brand" />
-          <span className="min-w-0 truncate text-sm font-semibold text-fg">{active?.name || "Choose branch"}</span>
+          <span title={active?.name} className="min-w-0 flex-1 truncate text-sm font-semibold text-fg">{active?.name || "Choose branch"}</span>
           <ChevronsUpDown className="size-3.5 shrink-0 text-subtle" />
         </button>
         )
