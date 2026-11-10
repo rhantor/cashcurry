@@ -1,10 +1,11 @@
 'use client'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { doc, getDoc } from 'firebase/firestore'
 import { db } from '@/lib/firebase'
 import { fileUrl, getLetter } from '@/lib/hires/client'
 import { letterForHire } from '@/app/tools/appointment-letter/letterForHire'
 import FileViewer from '@/app/components/common/FileViewer'
+import JoinPdfButtons from './JoinPdfButtons'
 import { format, parseISO } from 'date-fns'
 import { AlertTriangle, FileSignature, FileText, Link2, Pencil, Phone, Trash2, TrendingUp } from 'lucide-react'
 import { STATUSES } from '@/lib/hires/model'
@@ -73,9 +74,19 @@ const Group = ({ title, children }) => {
  * documents and the appointment letter they signed — for those who see pay
  * (the staff list carries the record's private half only for them).
  */
-function JoinPapers ({ staff, currency }) {
+function JoinPapers ({ staff, currency, company }) {
   const [viewer, setViewer] = useState(null)
+  const [hire, setHire] = useState(null) // the join link they filled in, for the PDF
   const docs = staff.documents || []
+  useEffect(() => {
+    setHire(null)
+    if (!staff.joinedFrom || !staff.companyId || !staff.branchId) return
+    let dead = false
+    getDoc(doc(db, 'companies', staff.companyId, 'branches', staff.branchId, 'newHires', staff.joinedFrom))
+      .then(s => !dead && s.exists() && setHire({ id: s.id, ...s.data() }))
+      .catch(() => {})
+    return () => { dead = true }
+  }, [staff.joinedFrom, staff.companyId, staff.branchId])
   if (!docs.length && !staff.joinedFrom) return null
   const open = async index => {
     try {
@@ -104,13 +115,18 @@ function JoinPapers ({ staff, currency }) {
           <Button key={d.path} size='sm' variant='secondary' icon={FileText} onClick={() => open(i)}>{d.label}</Button>
         ))}
       </div>
+      {hire?.details && (
+        <div className='mt-3'>
+          <JoinPdfButtons hire={hire} companyId={staff.companyId} branchId={staff.branchId} company={company} currency={currency} />
+        </div>
+      )}
       <FileViewer open={!!viewer} items={viewer?.items || []} index={viewer?.index || 0} onClose={() => setViewer(null)} />
     </section>
   )
 }
 
 /** One staff member: pay at a glance, then contact, work, ID and bank. */
-export default function StaffDetailModal ({ isOpen, onClose, staff, onEdit, onDelete, onLinkOffice, onUnlinkOffice, onChangeSalary, missing = [], detailsRequest = null, onAskDetails, onOpenRequest }) {
+export default function StaffDetailModal ({ isOpen, onClose, staff, onEdit, onDelete, onLinkOffice, onUnlinkOffice, onChangeSalary, missing = [], detailsRequest = null, onAskDetails, onOpenRequest, company = '' }) {
   const currency = useCurrency()
   const money = v => (v && Number(v) > 0 ? formatMoney(Number(v), currency) : null)
   const s = staff || {}
@@ -291,7 +307,7 @@ export default function StaffDetailModal ({ isOpen, onClose, staff, onEdit, onDe
             </div>
           </div>
 
-          <JoinPapers staff={s} currency={currency} />
+          <JoinPapers staff={s} currency={currency} company={company} />
 
           {s.notes && (
             <div className='rounded-xl bg-surface-2/60 p-3'>

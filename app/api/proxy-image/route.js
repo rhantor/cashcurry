@@ -22,7 +22,8 @@ function isOurStorageFile(raw) {
   if (!BUCKET) return false;
   const inOurBucket = u.pathname.startsWith(`/v0/b/${BUCKET}/o/`);
   const isFirebaseStorage = u.protocol === 'https:' && u.hostname === 'firebasestorage.googleapis.com';
-  const isLocalEmulator = LOCAL && u.protocol === 'http:' && ['127.0.0.1', 'localhost'].includes(u.hostname) && u.port === '9199';
+  // local data only: a phone on the LAN sees the emulator at the PC's address; it is fetched at 127.0.0.1 (see GET)
+  const isLocalEmulator = LOCAL && u.protocol === 'http:' && u.port === '9199';
   return inOurBucket && (isFirebaseStorage || isLocalEmulator);
 }
 
@@ -38,7 +39,9 @@ export async function GET(request) {
       return new NextResponse('Only files from this app\'s storage can be fetched', { status: 403 });
     }
 
-    const response = await fetch(url, { redirect: 'error' });
+    const target = new URL(url);
+    if (target.port === '9199' && LOCAL) target.hostname = '127.0.0.1';
+    const response = await fetch(target, { redirect: 'error' });
     if (!response.ok) {
       return new NextResponse(`Failed to fetch image: ${response.statusText}`, { status: response.status });
     }
