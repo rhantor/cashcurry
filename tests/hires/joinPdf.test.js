@@ -10,6 +10,8 @@ vi.mock("@/lib/hires/client", () => ({ fileUrl: async (path) => `http://files/${
 
 // jsdom's Blob can't give its bytes back; browsers' and Node's can
 globalThis.Blob = NodeBlob;
+// nor draw pictures: an <img> fails at once, as a phone's would on a file it can't read
+globalThis.Image = class { set src(_) { setTimeout(() => this.onerror?.(new Error("can't draw")), 0); } };
 const { joinPdf } = await import("@/lib/hires/joinPdf");
 
 const pdfOf = (pages, text = "x") => {

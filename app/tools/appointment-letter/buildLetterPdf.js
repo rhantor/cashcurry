@@ -50,6 +50,11 @@ export function buildLetterPdf({ stylingOptions, companyDetails, letterMeta, emp
 
   const drawWatermark = () => {
     if (stylingOptions.showWatermark && letterMeta.watermarkText) {
+      // a page break in the middle of a paragraph lands here: the text after
+      // it carries on in its own font, size and colour, not the watermark's
+      const font = pdf.getFont();
+      const size = pdf.getFontSize();
+      const colour = pdf.getTextColor();
       pdf.setFont('helvetica', 'bold');
       pdf.setFontSize(75);
       pdf.setTextColor(245, 245, 245); // Very light grey, elegant
@@ -57,6 +62,9 @@ export function buildLetterPdf({ stylingOptions, companyDetails, letterMeta, emp
         align: 'center',
         angle: 315
       });
+      pdf.setFont(font.fontName, font.fontStyle);
+      pdf.setFontSize(size);
+      pdf.setTextColor(colour);
     }
   };
 
