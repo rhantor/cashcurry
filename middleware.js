@@ -34,6 +34,8 @@ const ALWAYS_PUBLIC_PREFIXES = [
   "/land",
   // the branch kiosk tablet (11 Nov): no sign-in — the tablet's own token is the key
   "/clock",
+  // the face recognition model files the kiosk loads (public files, no data)
+  "/models",
 ];
 
 const starts = (path, prefix) =>
@@ -66,6 +68,10 @@ export function middleware(request) {
     const rawRole = request.cookies.get("role")?.value || "";
     if (rawRole === ROLES.staff) {
        return NextResponse.redirect(new URL("/staff-portal", request.url));
+    }
+    // the kiosk login has attendance and nothing else (11 Nov 2026)
+    if (rawRole === ROLES.kiosk) {
+       return NextResponse.redirect(new URL("/attendance-log", request.url));
     }
     return NextResponse.next();
   }
@@ -107,6 +113,6 @@ export function middleware(request) {
 // Ensure middleware never runs on static assets / PWA files
 export const config = {
   matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico|images/|fonts/|icons/|manifest\\.webmanifest|manifest\\.json|robots\\.txt|sitemap\\.xml|apple-touch-icon\\.png|site\\.webmanifest|sw\\.js|workbox-|firebase-messaging-sw\\.js|logo/|stickers/).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|images/|fonts/|icons/|manifest\\.webmanifest|manifest\\.json|robots\\.txt|sitemap\\.xml|apple-touch-icon\\.png|site\\.webmanifest|sw\\.js|workbox-|firebase-messaging-sw\\.js|logo/|stickers/|models/).*)",
   ],
 };

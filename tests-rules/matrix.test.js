@@ -24,6 +24,8 @@ const PEOPLE = {
   klSupervisor: { role: "supervisor", branchId: "kl" },
   klCashier: { role: "cashier", branchId: "kl" },
   klStaff: { role: "staff", branchId: "kl", staffId: "st-me" },
+  // the kiosk-and-attendance login (11 Nov 2026)
+  klKiosk: { role: "kiosk", branchId: "kl" },
 };
 const USERS = Object.keys(PEOPLE);
 const as = (uid) => env.authenticatedContext(uid).firestore();
@@ -121,6 +123,29 @@ describe("private staff details", () => {
   it("staff read their own private details and no one else's", async () => {
     expect(await tries(as("klStaff").doc(`${B}/staffPrivate/st-me`).get())).toBe(true);
     expect(await tries(as("klStaff").doc(`${B}/staffPrivate/st1`).get())).toBe(false);
+  });
+});
+
+describe("the kiosk login and kiosk data (11 Nov 2026)", () => {
+  it("faces and kiosk tablets are the server's alone — no one reads or writes them from the app", async () => {
+    await env.withSecurityRulesDisabled(async (ctx) => {
+      await ctx.firestore().doc(`${B}/faces/st1`).set({ samples: { s0: [0.1] } });
+      await ctx.firestore().doc("kioskDevices/abc").set({ companyId: CO, branchId: "kl" });
+    });
+    for (const u of USERS) {
+      expect(await tries(as(u).doc(`${B}/faces/st1`).get()), u).toBe(false);
+      expect(await tries(as(u).doc(`${B}/faces/st-${u}`).set({ samples: {} })), u).toBe(false);
+      expect(await tries(as(u).doc("kioskDevices/abc").get()), u).toBe(false);
+      expect(await tries(as(u).doc(`kioskDevices/k-${u}`).set({ companyId: CO })), u).toBe(false);
+    }
+  });
+  it("the kiosk login decides early OT and fixes punches, and sees no money or pay", async () => {
+    await env.withSecurityRulesDisabled((ctx) => ctx.firestore().doc(`${B}/otRequests/st1_2026-10-10`).set({ staffId: "st1", status: "pending" }));
+    expect(await tries(as("klKiosk").doc(`${B}/otRequests/st1_2026-10-10`).update({ status: "approved" }))).toBe(true);
+    expect(await tries(as("klKiosk").doc(`${B}/attendance/other`).update({ type: "out" }))).toBe(true);
+    expect(await tries(as("klKiosk").doc(`${B}/staffPrivate/st1`).get())).toBe(false);
+    expect(await tries(as("klKiosk").doc(`${B}/advances/pending-klKiosk`).get())).toBe(false);
+    expect(await tries(as("klKiosk").doc(`${B}/staff/st1`).update({ pinCode: "1234" }))).toBe(false);
   });
 });
 

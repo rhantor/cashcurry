@@ -399,12 +399,13 @@ service cloud.firestore {
     function canAdvancesApprove(c, b) { return may(c, b, leadRoles()); }
     function canPayrollView(c, b)     { return may(c, b, leadRoles().concat(['accountant'])); }
     function canPayrollManage(c, b)   { return may(c, b, leadRoles()); }
-    function canStaffView(c, b)       { return may(c, b, officeBranchRoles()); }
+    function canStaffView(c, b)       { return may(c, b, officeBranchRoles().concat(['kiosk'])); }
     function canStaffPay(c, b)        { return may(c, b, leadRoles().concat(['accountant'])); }
     function canStaffManage(c, b)     { return may(c, b, leadRoles()); }
-    function canAttendanceView(c, b)  { return may(c, b, leadRoles().concat(['inCharge', 'supervisor'])); }
-    function canAttendanceManage(c, b){ return may(c, b, leadRoles()); }
-    function canKiosk(c, b)           { return may(c, b, leadRoles().concat(['inCharge', 'supervisor'])); }
+    // 'kiosk': the branch's kiosk-and-attendance login (11 Nov 2026) — nothing else
+    function canAttendanceView(c, b)  { return may(c, b, leadRoles().concat(['inCharge', 'supervisor', 'kiosk'])); }
+    function canAttendanceManage(c, b){ return may(c, b, leadRoles().concat(['kiosk'])); }
+    function canKiosk(c, b)           { return may(c, b, leadRoles().concat(['inCharge', 'supervisor', 'kiosk'])); }
     function canRecordsDelete(c, b)   { return may(c, b, leadRoles()); }
     function canPurchasesOrder(c, b)  { return may(c, b, leadRoles().concat(['inCharge', 'accountant', 'supervisor'])); }
     function canPurchasesApprove(c, b){ return may(c, b, leadRoles().concat(['inCharge'])); }
