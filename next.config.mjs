@@ -1,3 +1,8 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const root = path.dirname(fileURLToPath(import.meta.url));
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // A check build can run beside the dev server: NEXT_DIST_DIR=.next-check npm run build
@@ -26,6 +31,12 @@ const nextConfig = {
   // (the emulator data) every 5 minutes; on Windows watching that churn
   // stopped the watcher, and edits no longer reloaded.
   webpack(config, { dev }) {
+    // The kiosk's face library (12 Nov 2026): always its browser build. Its
+    // package points Next at the Node build, which needs @tensorflow/tfjs-node.
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "@vladmandic/human$": path.join(root, "node_modules/@vladmandic/human/dist/human.esm.js"),
+    };
     if (dev) {
       config.watchOptions = {
         ...config.watchOptions,
