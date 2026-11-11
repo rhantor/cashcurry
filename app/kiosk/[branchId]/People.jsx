@@ -46,11 +46,16 @@ function FaceSheet({ person, companyId, branchId, onClose, onSaved }) {
         if (stop.current) return stream.getTracks().forEach((t) => t.stop());
         video.current.srcObject = stream;
         await video.current.play().catch(() => {});
+      } catch {
+        return setStatus("No camera here — add faces on the kiosk tablet.");
+      }
+      try {
         setStatus("Getting face recognition ready…");
         await (await import("@/lib/face/faceApi")).loadFaceApi();
         setStatus("Ready");
-      } catch {
-        setStatus("No camera here — add faces on the kiosk tablet.");
+      } catch (e) {
+        console.error("face models", e);
+        setStatus("Couldn't load face recognition — check the internet and open this again.");
       }
     })();
     return () => {
@@ -117,7 +122,7 @@ function FaceSheet({ person, companyId, branchId, onClose, onSaved }) {
             <span>{person.firstName} agrees that their face is used to clock in and out here. It is kept only for attendance and removed when they leave.</span>
           </label>
           <div className="flex gap-2">
-            <Button variant="secondary" className="flex-1" icon={ScanFace} loading={taking} disabled={status.startsWith("No camera") || status.startsWith("Starting") || status.startsWith("Getting")} onClick={take}>
+            <Button variant="secondary" className="flex-1" icon={ScanFace} loading={taking} disabled={["No camera", "Starting", "Getting", "Couldn't load"].some((x) => status.startsWith(x))} onClick={take}>
               {samples.length ? "Take again" : "Take the face"}
             </Button>
             <Button className="flex-1" loading={saving} disabled={samples.length < SAMPLES || !consent || taking} onClick={save}>Save</Button>
@@ -193,14 +198,15 @@ export default function KioskPeople({ companyId, branchId }) {
           {sorted.map((p) => (
             <li key={p.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
               <Avatar name={`${p.firstName} ${p.lastName || ""}`} src={p.photoUrl || undefined} size="md" />
-              <div className="min-w-0 flex-1">
+              <div className="min-w-[9rem] flex-1">
                 <p className="truncate font-semibold text-fg">{p.firstName} {p.lastName}</p>
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   {faces[p.id] ? <Badge tone="success">Face added</Badge> : <Badge>No face</Badge>}
                   {/^\d{4}$/.test(String(p.pinCode || "")) ? <Badge tone="info">PIN set</Badge> : <Badge tone="warning">No PIN</Badge>}
                 </div>
               </div>
-              <div className="flex flex-wrap gap-1.5">
+              {/* on a phone the buttons go on their own line */}
+              <div className="flex w-full flex-wrap gap-1.5 pl-12 sm:w-auto sm:pl-0">
                 <Button size="sm" variant="secondary" icon={ScanFace} onClick={() => setEnrol(p)}>{faces[p.id] ? "Redo face" : "Add face"}</Button>
                 <Button size="sm" variant="ghost" icon={busy === p.id ? Loader2 : KeyRound} disabled={busy === p.id} onClick={() => newPin(p)}>New PIN</Button>
                 {faces[p.id] && <Button size="sm" variant="ghost" icon={Trash2} aria-label={`Remove ${p.firstName}'s face`} disabled={busy === p.id} onClick={() => removeFace(p)} />}
