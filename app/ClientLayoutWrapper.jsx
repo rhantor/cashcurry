@@ -30,7 +30,8 @@ export default function ClientLayoutWrapper({ children }) {
   const staffPages = ["/staff-portal", "/requests", "/kiosk", "/profile", "/ui", "/messages", "/my-issues", "/my-pay", "/my-attendance", "/my-tasks"];
   // The sales landing (7 Nov): a public page of its own, shown at once (no
   // wait for the sign-in check), no menu, never sent to the login.
-  const isPublicSite = pathname === "/land" || pathname.startsWith("/land/");
+  // …and the kiosk tablet (11 Nov): no sign-in, its own full screen
+  const isPublicSite = pathname === "/land" || pathname.startsWith("/land/") || pathname === "/clock";
   const isAuthPage = isPublicSite || authPages.some((path) => pathname.startsWith(path));
   const isStaffPage = staffPages.some((path) => pathname.startsWith(path));
   const isLoggedIn = status === "signedIn" && !!user?.role;
