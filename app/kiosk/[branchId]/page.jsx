@@ -9,7 +9,7 @@ import { useParams, useRouter } from "next/navigation";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { ArrowLeft, Clock, MonitorSmartphone, Play, Trash2 } from "lucide-react";
 import { auth } from "@/lib/firebase";
-import { useSession } from "@/lib/session";
+import useSession from "@/app/hooks/useSession";
 import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
 import { clearKiosk, kioskBranch, kioskToken, setKiosk, tabletZone } from "@/lib/attendance/kioskClient";
 import { Button, Card, CardBody, Field, Input, confirmDialog, toast } from "@/app/components/ui";
