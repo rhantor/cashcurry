@@ -224,10 +224,10 @@ export default function KioskTablet() {
     let dead = false;
     let busy = false;
     let reader = null;
-    import("@/lib/face/faceApi")
+    import("@/lib/face/human")
       .then((m) => {
         reader = m.readFace;
-        return m.loadFaceApi();
+        return m.loadFace();
       })
       .then(() => !dead && setFaceStatus("look"))
       .catch(() => !dead && setFaceStatus("off"));

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import admin from "firebase-admin";
-import { cleanSamples, lookalike, packSamples } from "@/lib/attendance/face";
+import { FACE_MODEL, cleanSamples, lookalike, packSamples } from "@/lib/attendance/face";
 import { branchRef, callerMay, facesOf, facesRef, forgetFaces } from "@/lib/server/kiosk";
 import { personName } from "@/lib/people";
 
@@ -17,7 +17,9 @@ export async function GET(req) {
     const who = await callerMay(req, companyId, branchId, "attendance.faces");
     if (who.error) return fail(who.status, who.error);
     const snap = await facesRef(companyId, branchId).get();
-    return NextResponse.json({ faces: snap.docs.map((d) => ({ staffId: d.id, at: d.data().enrolledAt?.toDate?.().toISOString() || null, by: d.data().enrolledBy?.name || "" })) });
+    return NextResponse.json({
+      faces: snap.docs.map((d) => ({ staffId: d.id, at: d.data().enrolledAt?.toDate?.().toISOString() || null, by: d.data().enrolledBy?.name || "", current: d.data().model === FACE_MODEL })),
+    });
   } catch (e) {
     console.error("[kiosk faces]", e);
     return fail(500, "Couldn't list the faces.");
@@ -44,6 +46,7 @@ export async function POST(req) {
     await facesRef(companyId, branchId).doc(staffId).set({
       samples: packSamples(samples),
       count: samples.length,
+      model: FACE_MODEL,
       consent: true,
       enrolledAt: admin.firestore.FieldValue.serverTimestamp(),
       enrolledBy: { uid: who.caller.uid, name: personName(who.me) || who.me.username || "" },
