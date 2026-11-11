@@ -35,7 +35,9 @@ export default function KioskSetup() {
   const router = useRouter();
   const { user, status } = useSession();
   const companyId = user?.companyId;
-  const { data: branch = {} } = useGetSingleBranchQuery(companyId && branchId ? { companyId, branchId } : skipToken);
+  // asked only once Firebase has the sign-in, or the rules refuse it
+  const ready = status === "signedIn" && !!companyId;
+  const { data: branch = {} } = useGetSingleBranchQuery(ready && branchId ? { companyId, branchId } : skipToken);
   const [devices, setDevices] = useState(null);
   const [name, setName] = useState("Front tablet");
   const [busy, setBusy] = useState(false);
@@ -134,7 +136,7 @@ export default function KioskSetup() {
           </CardBody>
         </Card>
 
-        {can(user?.role, "attendance.faces") && companyId && <KioskPeople companyId={companyId} branchId={branchId} />}
+        {can(user?.role, "attendance.faces") && ready && <KioskPeople companyId={companyId} branchId={branchId} />}
 
         <section className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-wider text-subtle">Kiosk tablets at this branch</p>
