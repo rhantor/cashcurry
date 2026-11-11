@@ -34,6 +34,7 @@ the local emulators and opening every page (part 4).
 | `accountant` | Keeps the branch's books | One branch |
 | `supervisor` | Floor / shift supervisor | One branch |
 | `cashier` | Till | One branch |
+| `kiosk` | **Kiosk & attendance** (owner, 11 Nov 2026): the login used to set up the branch's kiosk tablet and look after attendance — add faces and kiosk PINs, see and fix punches, decide early OT. Nothing else: no money, reports, pay, staff records or settings | One branch |
 | `staff` | Everyone else; uses the staff app for their own things | Own records |
 
 Also in the data, to be cleaned up: `superadmin` and `branchadmin` (old lowercase

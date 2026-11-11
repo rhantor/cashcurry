@@ -1,16 +1,20 @@
 "use client";
 // The branch kiosk tablet (11 Nov 2026, lib/attendance/kiosk.js). Set up once
-// from /kiosk by a manager; after that no sign-in. Tap your name, enter your
-// PIN, look at the camera, tap Clock in / Clock out. In or out is worked out
-// by the server; with no internet the punch is kept here and sent later.
+// from /kiosk; after that no sign-in. Face first: stand in front of the
+// camera, your name comes up, tap Clock in / Clock out. PIN second: tap your
+// name, enter your PIN. In or out is worked out by the server; with no
+// internet faces can't be checked, so it is the PIN, and the punch is kept
+// here and sent later.
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Check, ChevronLeft, Delete, Fingerprint, Loader2, LogIn, LogOut, Search, Wifi, WifiOff, X } from "lucide-react";
+import { Check, ChevronLeft, Delete, Fingerprint, KeyRound, Loader2, LogIn, LogOut, ScanFace, Search, Wifi, WifiOff, X } from "lucide-react";
 import { roleLabelOf } from "@/app/staff-management/lib/constants";
 import { verifyBiometric } from "@/lib/attendance/biometric";
-import { cachedState, clearDropped, dropped, keep, kioskToken, loadState, punchId, queued, sendKept, sendPunch, snapshot } from "@/lib/attendance/kioskClient";
+import { cachedState, clearDropped, dropped, identify, keep, kioskToken, loadState, punchId, queued, sendKept, sendPunch, snapshot } from "@/lib/attendance/kioskClient";
 
 const time = (iso) => (iso ? new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "");
+/** A face must fill at least this much of the picture's width to be read (they are standing at the tablet). */
+const NEAR = 0.16;
 
 function LiveClock() {
   const [now, setNow] = useState(() => new Date());
@@ -34,6 +38,18 @@ function Face({ s, size = "size-16" }) {
       {(s.firstName?.[0] || "") + (s.lastName?.[0] || "")}
     </div>
   );
+}
+
+/** A <video> showing a camera stream the page already holds. */
+function Live({ stream, className = "" }) {
+  const v = useRef(null);
+  useEffect(() => {
+    if (v.current && stream) {
+      v.current.srcObject = stream;
+      v.current.play().catch(() => {});
+    }
+  }, [stream]);
+  return <video ref={v} playsInline muted className={`-scale-x-100 object-cover ${className}`} />;
 }
 
 /** PIN pad: four digits, then onDone(pin). */
@@ -70,42 +86,18 @@ function PinPad({ busy, error, onDone }) {
   );
 }
 
-/** Camera preview and the big Clock in / out button (no camera: the button alone). */
-function PhotoStep({ type, busy, onShoot }) {
-  const video = useRef(null);
-  const [cam, setCam] = useState("starting"); // starting | on | none
-  useEffect(() => {
-    let stream = null;
-    let dead = false;
-    (async () => {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 } }, audio: false });
-        if (dead) return stream.getTracks().forEach((t) => t.stop());
-        video.current.srcObject = stream;
-        await video.current.play().catch(() => {});
-        setCam("on");
-      } catch {
-        setCam("none");
-      }
-    })();
-    return () => {
-      dead = true;
-      stream?.getTracks().forEach((t) => t.stop());
-    };
-  }, []);
+/** The big Clock in / out button, with the camera above it when there is one. */
+function ConfirmStep({ type, busy, stream, onGo }) {
   const out = type === "out";
   return (
     <div className="space-y-4">
       <div className="relative mx-auto aspect-[4/3] w-full max-w-sm overflow-hidden rounded-3xl bg-black">
-        <video ref={video} playsInline muted className="h-full w-full -scale-x-100 object-cover" />
-        {cam !== "on" && (
-          <div className="absolute inset-0 flex items-center justify-center text-sm text-white/50">{cam === "starting" ? "Starting the camera…" : "No camera — the punch is saved without a photo"}</div>
-        )}
+        {stream ? <Live stream={stream} className="h-full w-full" /> : <div className="flex h-full items-center justify-center text-sm text-white/50">No camera — saved without a photo</div>}
       </div>
       <button
         type="button"
-        disabled={busy || cam === "starting"}
-        onClick={() => onShoot(cam === "on" ? snapshot(video.current) : null)}
+        disabled={busy}
+        onClick={onGo}
         className={`flex h-16 w-full items-center justify-center gap-3 rounded-2xl text-xl font-black text-black disabled:opacity-50 ${out ? "bg-orange-400" : "bg-emerald-400"}`}
       >
         {busy ? <Loader2 className="size-6 animate-spin" /> : out ? <LogOut className="size-6" /> : <LogIn className="size-6" />}
@@ -121,10 +113,13 @@ export default function KioskTablet() {
   const [notSetUp, setNotSetUp] = useState(false);
   const [waiting, setWaiting] = useState(0); // punches kept on the tablet
   const [q, setQ] = useState("");
-  const [flow, setFlow] = useState(null); // { staff, step: pin|photo, pin, method, type, error, busy }
+  const [flow, setFlow] = useState(null); // { staff, step: bio|nopin|pin|photo, pin, method, type, error, busy, descriptor }
   const [done, setDone] = useState(null); // { name, type, at, kept, earlyOt }
   const [admin, setAdmin] = useState(false);
+  const [stream, setStream] = useState(null); // the camera, held for the whole page
+  const [faceStatus, setFaceStatus] = useState("loading"); // loading | look | checking | unknown | off
   const taps = useRef({ n: 0, t: 0 });
+  const video = useRef(null); // hidden reader of the stream (faces and photos)
 
   const refresh = useCallback(async () => {
     try {
@@ -188,11 +183,105 @@ export default function KioskTablet() {
     };
   }, []);
 
+  const faces = state?.faces || 0;
+  const wantCamera = !!state && (state.settings?.camera !== false || faces > 0);
+
+  // one camera stream for the page: faces, and the photo with each punch
+  useEffect(() => {
+    if (!wantCamera || stream) return;
+    let dead = false;
+    navigator.mediaDevices
+      ?.getUserMedia({ video: { facingMode: "user", width: { ideal: 640 } }, audio: false })
+      .then((s) => {
+        if (dead) return s.getTracks().forEach((t) => t.stop());
+        setStream(s);
+      })
+      .catch(() => setFaceStatus("off"));
+    return () => {
+      dead = true;
+    };
+  }, [wantCamera, stream]);
+  useEffect(() => () => stream?.getTracks().forEach((t) => t.stop()), [stream]);
+  useEffect(() => {
+    if (video.current && stream) {
+      video.current.srcObject = stream;
+      video.current.play().catch(() => {});
+    }
+  }, [stream]);
+
   useEffect(() => {
     if (!done) return;
     const t = setTimeout(() => setDone(null), done.earlyOt ? 4500 : 2800);
     return () => clearTimeout(t);
   }, [done]);
+
+  const faceOn = online && faces > 0 && !!stream;
+
+  // face first: look for a face about once a second while nothing else is open
+  const misses = useRef(0);
+  useEffect(() => {
+    if (!faceOn || flow || done || admin) return;
+    let dead = false;
+    let busy = false;
+    let reader = null;
+    import("@/lib/face/faceApi")
+      .then((m) => {
+        reader = m.readFace;
+        return m.loadFaceApi();
+      })
+      .then(() => !dead && setFaceStatus("look"))
+      .catch(() => !dead && setFaceStatus("off"));
+    const t = setInterval(async () => {
+      if (busy || dead || !reader || !video.current?.videoWidth) return;
+      busy = true;
+      try {
+        const f = await reader(video.current);
+        if (dead) return;
+        if (!f || f.size < NEAR) {
+          misses.current = 0;
+          setFaceStatus((s) => (s === "unknown" ? s : "look"));
+          return;
+        }
+        setFaceStatus("checking");
+        const r = await identify(f.descriptor);
+        if (dead) return;
+        if (r.offline) return setOnline(false);
+        if (r.ok) {
+          misses.current = 0;
+          const s = (state?.staff || []).find((x) => x.id === r.staffId) || { id: r.staffId, firstName: r.firstName, lastName: "", photoUrl: r.photoUrl };
+          setFlow({ staff: s, step: "photo", method: "face", type: r.type, descriptor: f.descriptor, matched: true });
+        } else {
+          misses.current += 1;
+          setFaceStatus(misses.current >= 2 ? "unknown" : "look");
+        }
+      } catch {
+        /* a bad frame: the next one */
+      } finally {
+        busy = false;
+      }
+    }, 900);
+    return () => {
+      dead = true;
+      clearInterval(t);
+    };
+  }, [faceOn, flow, done, admin, state]);
+
+  // "not recognised" fades after a while
+  useEffect(() => {
+    if (faceStatus !== "unknown") return;
+    const t = setTimeout(() => {
+      misses.current = 0;
+      setFaceStatus("look");
+    }, 8000);
+    return () => clearTimeout(t);
+  }, [faceStatus]);
+
+  // a face match nobody confirms goes away
+  useEffect(() => {
+    if (!flow?.matched || flow.busy) return;
+    const t = setTimeout(() => setFlow(null), 10000);
+    return () => clearTimeout(t);
+  }, [flow]);
 
   const camera = state?.settings?.camera !== false;
   const close = () => setFlow(null);
@@ -203,7 +292,7 @@ export default function KioskTablet() {
       setFlow({ staff: s, step: "bio", type });
       try {
         if (await verifyBiometric(s.credentialId)) {
-          return camera ? setFlow({ staff: s, step: "photo", method: "biometric", type }) : finish({ staff: s, method: "biometric", type }, null);
+          return camera ? setFlow({ staff: s, step: "photo", method: "biometric", type }) : finish({ staff: s, method: "biometric", type });
         }
       } catch {
         /* falls back to the PIN */
@@ -222,17 +311,23 @@ export default function KioskTablet() {
       else if (!r.ok) return setFlow({ ...f, busy: false, error: r.error });
       else f.type = r.type;
     }
-    if (camera) setFlow({ ...f, step: "photo", busy: false, error: null });
-    else finish(f, null);
+    if (camera && stream) setFlow({ ...f, step: "photo", busy: false, error: null });
+    else finish(f);
   };
 
-  const finish = async (f, photo) => {
+  const finish = async (f) => {
     setFlow({ ...f, step: f.step || "photo", busy: true });
-    const p = { id: punchId(), staffId: f.staff.id, pin: f.pin || "", method: f.method || "pin", photo };
+    const photo = camera && video.current ? snapshot(video.current) : null;
+    const p = { id: punchId(), staffId: f.staff.id, pin: f.pin || "", method: f.method || "pin", photo, ...(f.method === "face" ? { descriptor: f.descriptor } : {}) };
     const name = f.staff.firstName || f.staff.lastName;
+    // a face can't be checked offline: only PIN (or fingerprint) punches are kept
     const r = online ? await sendPunch(p) : { offline: true };
     if (r.offline) {
       setOnline(false);
+      if (f.method === "face") {
+        setFlow(null);
+        return;
+      }
       keep({ ...p, name, at: new Date().toISOString() });
       setWaiting(queued().length);
       // shown as in / out here until the server says otherwise
@@ -259,7 +354,7 @@ export default function KioskTablet() {
     return (
       <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gray-950 px-6 text-center text-white">
         <h1 className="text-2xl font-black">This tablet is not a kiosk yet</h1>
-        <p className="max-w-md text-white/60">A manager signs in on this tablet, opens <b>Open Kiosk</b> from the menu and taps <b>Use this tablet as the kiosk</b>. After that nobody needs to sign in here.</p>
+        <p className="max-w-md text-white/60">Sign in on this tablet with the branch&apos;s kiosk login (or a manager), open <b>Open Kiosk</b> and tap <b>Use this tablet as the kiosk</b>. After that nobody needs to sign in here.</p>
         <Link href="/kiosk" className="rounded-2xl bg-white px-6 py-3 font-bold text-gray-950">Set up this tablet</Link>
       </main>
     );
@@ -268,10 +363,18 @@ export default function KioskTablet() {
   const staff = (state?.staff || []).filter((s) => !q || `${s.firstName} ${s.lastName}`.toLowerCase().includes(q.toLowerCase()));
   const inNow = (state?.staff || []).filter((s) => s.in).length;
   const s = flow?.staff;
+  const faceText = {
+    loading: "Getting face recognition ready…",
+    look: "Look at the camera",
+    checking: "Checking…",
+    unknown: "Not recognised — tap your name to use your PIN",
+    off: "Camera not available — tap your name to use your PIN",
+  }[faceStatus];
 
   return (
     <main className="flex h-[100dvh] select-none flex-col overflow-hidden bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 text-white">
       <button type="button" aria-hidden tabIndex={-1} onClick={cornerTap} className="absolute left-0 top-0 z-50 size-20 opacity-0" />
+      <video ref={video} playsInline muted className="hidden" />
 
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-3 px-5 pb-2 pt-4">
         <div className="min-w-0">
@@ -281,49 +384,68 @@ export default function KioskTablet() {
         <LiveClock />
         <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-bold ${online ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/20 text-amber-200"}`}>
           {online ? <Wifi className="size-4" /> : <WifiOff className="size-4" />}
-          {online ? "Online" : "No internet — punches are kept"}
+          {online ? "Online" : "No internet — use your PIN; punches are kept"}
           {waiting > 0 && <span className="rounded-full bg-white/15 px-2">{waiting} waiting</span>}
         </div>
       </header>
 
-      <div className="mx-auto w-full max-w-5xl shrink-0 px-5 pb-3">
-        <label className="flex h-12 items-center gap-2 rounded-2xl bg-white/10 px-4">
-          <Search className="size-5 text-white/40" />
-          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find your name" className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-white/40" />
-          {q && (
-            <button type="button" aria-label="Clear" onClick={() => setQ("")}>
-              <X className="size-5 text-white/50" />
-            </button>
-          )}
-        </label>
-      </div>
-
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6">
-        {!state ? (
-          <div className="flex h-full items-center justify-center text-white/40">
-            <Loader2 className="mr-2 size-5 animate-spin" /> Loading…
-          </div>
-        ) : (
-          <div className="mx-auto grid max-w-5xl grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-            {staff.map((x) => (
-              <button
-                key={x.id}
-                type="button"
-                onClick={() => start(x)}
-                className={`relative flex flex-col items-center rounded-3xl border p-4 transition active:scale-95 ${x.in ? "border-emerald-400/40 bg-emerald-500/10" : "border-white/10 bg-white/5"}`}
-              >
-                <Face s={x} />
-                <span className="mt-2 line-clamp-2 text-center text-sm font-bold leading-tight">{x.firstName} {x.lastName}</span>
-                <span className="mt-0.5 text-[11px] text-white/40">{roleLabelOf(x.role) || "Staff"}</span>
-                <span className={`mt-2 rounded-full px-2 py-0.5 text-[11px] font-bold ${x.in ? "bg-emerald-400/20 text-emerald-200" : "bg-white/10 text-white/50"}`}>
-                  {x.in ? `In since ${time(x.since)}` : "Not in"}
-                </span>
-                {state.settings?.biometrics && x.credentialId && <Fingerprint className="absolute right-3 top-3 size-4 text-white/30" />}
-              </button>
-            ))}
-            {!staff.length && <p className="col-span-full py-10 text-center text-white/40">No one by that name</p>}
-          </div>
+      <div className={`mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-4 px-5 pb-5 ${faceOn ? "md:flex-row" : ""}`}>
+        {faceOn && (
+          <section className="flex shrink-0 flex-col items-center gap-3 md:w-[42%]">
+            <div className="relative aspect-[4/3] w-full max-w-md overflow-hidden rounded-[2rem] bg-black ring-1 ring-white/10 md:max-w-none">
+              <Live stream={stream} className="h-full w-full" />
+              <div className="pointer-events-none absolute inset-[18%_22%] rounded-[45%] border-2 border-white/40" />
+            </div>
+            <p className={`flex items-center gap-2 text-center text-lg font-bold ${faceStatus === "unknown" ? "text-amber-200" : "text-white/80"}`}>
+              {faceStatus === "checking" || faceStatus === "loading" ? <Loader2 className="size-5 animate-spin" /> : <ScanFace className="size-5" />}
+              {faceText}
+            </p>
+          </section>
         )}
+
+        <section className="flex min-h-0 min-w-0 flex-1 flex-col">
+          {faceOn && (
+            <p className="mb-2 flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-white/40">
+              <KeyRound className="size-4" /> Or tap your name for your PIN
+            </p>
+          )}
+          <label className="mb-3 flex h-12 shrink-0 items-center gap-2 rounded-2xl bg-white/10 px-4">
+            <Search className="size-5 text-white/40" />
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Find your name" className="min-w-0 flex-1 bg-transparent text-base outline-none placeholder:text-white/40" />
+            {q && (
+              <button type="button" aria-label="Clear" onClick={() => setQ("")}>
+                <X className="size-5 text-white/50" />
+              </button>
+            )}
+          </label>
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            {!state ? (
+              <div className="flex h-full items-center justify-center text-white/40">
+                <Loader2 className="mr-2 size-5 animate-spin" /> Loading…
+              </div>
+            ) : (
+              <div className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${faceOn ? "lg:grid-cols-3" : "md:grid-cols-4 lg:grid-cols-5"}`}>
+                {staff.map((x) => (
+                  <button
+                    key={x.id}
+                    type="button"
+                    onClick={() => start(x)}
+                    className={`relative flex flex-col items-center rounded-3xl border p-4 transition active:scale-95 ${x.in ? "border-emerald-400/40 bg-emerald-500/10" : "border-white/10 bg-white/5"}`}
+                  >
+                    <Face s={x} />
+                    <span className="mt-2 line-clamp-2 text-center text-sm font-bold leading-tight">{x.firstName} {x.lastName}</span>
+                    <span className="mt-0.5 text-[11px] text-white/40">{roleLabelOf(x.role) || "Staff"}</span>
+                    <span className={`mt-2 rounded-full px-2 py-0.5 text-[11px] font-bold ${x.in ? "bg-emerald-400/20 text-emerald-200" : "bg-white/10 text-white/50"}`}>
+                      {x.in ? `In since ${time(x.since)}` : "Not in"}
+                    </span>
+                    {state.settings?.biometrics && x.credentialId && <Fingerprint className="absolute right-3 top-3 size-4 text-white/30" />}
+                  </button>
+                ))}
+                {!staff.length && <p className="col-span-full py-10 text-center text-white/40">No one by that name</p>}
+              </div>
+            )}
+          </div>
+        </section>
       </div>
 
       {flow && (
@@ -344,12 +466,17 @@ export default function KioskTablet() {
                 <Fingerprint className="size-6" /> Touch the fingerprint sensor…
               </p>
             )}
-            {flow.step === "nopin" && <p className="py-6 text-center text-white/70">{s.firstName} has no kiosk PIN yet. Ask the manager to set one in Staff.</p>}
+            {flow.step === "nopin" && <p className="py-6 text-center text-white/70">{s.firstName} has no kiosk PIN yet. Ask the manager to set one.</p>}
             {flow.step === "pin" && <PinPad busy={flow.busy} error={flow.error} onDone={pinDone} />}
             {flow.step === "photo" && (
               <>
                 {flow.error && <p className="text-center text-sm font-semibold text-red-300">{flow.error}</p>}
-                <PhotoStep type={flow.type} busy={flow.busy} onShoot={(photo) => finish(flow, photo)} />
+                <ConfirmStep type={flow.type} busy={flow.busy} stream={camera ? stream : null} onGo={() => finish(flow)} />
+                {flow.matched && (
+                  <button type="button" onClick={() => setFlow({ staff: s, step: s.hasPin ? "pin" : "nopin", type: flow.type })} className="w-full text-center text-sm font-semibold text-white/60 underline">
+                    Not {s.firstName}? Use the PIN
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -363,7 +490,7 @@ export default function KioskTablet() {
             <p className="text-2xl font-black">{done.type === "out" ? `Goodbye, ${done.name}` : `Welcome, ${done.name}`}</p>
             <p className="mt-1 font-semibold">{done.type === "out" ? "Clocked out" : "Clocked in"} at {time(done.at)}</p>
             {done.kept && <p className="mt-2 text-sm font-semibold">No internet: saved on this tablet, sent when it is back.</p>}
-            {done.earlyOt && <p className="mt-2 text-sm font-semibold">{done.earlyOt} min before your shift — the manager approves the extra time.</p>}
+            {done.earlyOt && <p className="mt-2 text-sm font-semibold">{done.earlyOt} min before your shift — the extra time waits for approval.</p>}
           </div>
         </div>
       )}
@@ -372,7 +499,7 @@ export default function KioskTablet() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4">
           <div className="w-full max-w-md space-y-4 rounded-[2rem] bg-gray-900 p-6 ring-1 ring-white/10">
             <p className="text-lg font-black">Kiosk</p>
-            <p className="text-sm text-white/60">{state?.device?.name} · {waiting} punch{waiting === 1 ? "" : "es"} waiting to be sent</p>
+            <p className="text-sm text-white/60">{state?.device?.name} · {waiting} punch{waiting === 1 ? "" : "es"} waiting to be sent · {faces} face{faces === 1 ? "" : "s"} added</p>
             {dropped().length > 0 && (
               <div className="space-y-1 rounded-2xl bg-red-500/10 p-3 text-sm">
                 <p className="font-bold text-red-200">Not saved (typed with no internet, refused later):</p>
@@ -386,7 +513,7 @@ export default function KioskTablet() {
               <button type="button" onClick={() => setAdmin(false)} className="h-12 flex-1 rounded-2xl bg-white/10 font-bold">Back to kiosk</button>
               <Link href="/kiosk" className="flex h-12 flex-1 items-center justify-center rounded-2xl bg-white font-bold text-gray-950">Close kiosk</Link>
             </div>
-            <p className="text-xs text-white/40">Closing needs a manager to sign in. The tablet stays set up.</p>
+            <p className="text-xs text-white/40">Closing needs the kiosk login (or a manager) to sign in. The tablet stays set up. Faces and PINs are added there.</p>
           </div>
         </div>
       )}

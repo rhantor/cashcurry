@@ -67,6 +67,10 @@ export function middleware(request) {
     if (rawRole === ROLES.staff) {
        return NextResponse.redirect(new URL("/staff-portal", request.url));
     }
+    // the kiosk login has attendance and nothing else (11 Nov 2026)
+    if (rawRole === ROLES.kiosk) {
+       return NextResponse.redirect(new URL("/attendance-log", request.url));
+    }
     return NextResponse.next();
   }
 

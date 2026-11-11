@@ -48,7 +48,9 @@ export default function RequestedPanel() {
   // in-charge sees only what they approve: vouchers (4.9)
   const canRequests = can(user?.role, "advances.approve");
   const canVouchers = can(user?.role, "costs.approve");
-  const [activeTab, setActiveTab] = useState(canRequests ? "advance" : "vouchers");
+  // the kiosk login: early OT only (11 Nov 2026)
+  const canOt = can(user?.role, "attendance.ot");
+  const [activeTab, setActiveTab] = useState(canRequests ? "advance" : canVouchers ? "vouchers" : "ot");
   // a notification opens its own tab: /requested-panel?tab=bills
   useEffect(() => {
     const t = new URLSearchParams(window.location.search).get("tab");
@@ -106,7 +108,7 @@ export default function RequestedPanel() {
     error: otErrorDetail,
   } = useGetOtRequestsQuery(
     { companyId, branchId, status: "pending" },
-    { skip: !canRequests || !companyId || !branchId || !otTabEnabled, pollingInterval: 5000 }
+    { skip: !canOt || !companyId || !branchId || !otTabEnabled, pollingInterval: 5000 }
   );
 
   const [updateOtRequest] = useUpdateOtRequestMutation();
@@ -228,7 +230,10 @@ export default function RequestedPanel() {
   };
 
   // The OT tab disappears if shifts get turned off while it's open.
-  const currentTab = activeTab === "ot" && !otTabEnabled ? "advance" : !canRequests && !["vouchers", "bills"].includes(activeTab) ? "vouchers" : activeTab;
+  const currentTab =
+    activeTab === "ot" && (!otTabEnabled || !canOt) ? (canRequests ? "advance" : "vouchers")
+    : !canRequests && !["vouchers", "bills", "ot"].includes(activeTab) ? (canVouchers ? "vouchers" : "ot")
+    : activeTab;
 
   if (!companyId || !branchId) return <Skeleton className="m-6 h-64" rounded="rounded-2xl" />;
 
@@ -248,7 +253,7 @@ export default function RequestedPanel() {
           onChange={setActiveTab}
           tabs={[
             ...(canRequests ? [{ value: "advance", label: tab("Staff requests", waiting.length) }, { value: "loan", label: tab("Branch loans", pendingLoans.length) }] : []),
-            ...(canRequests && otTabEnabled ? [{ value: "ot", label: tab("Early OT", pendingOt.length) }] : []),
+            ...(canOt && otTabEnabled ? [{ value: "ot", label: tab("Early OT", pendingOt.length) }] : []),
             ...(canVouchers ? [{ value: "bills", label: tab("Bills", bills.length) }, { value: "vouchers", label: tab("Vouchers", vouchers.length) }] : []),
           ]}
         />
@@ -288,7 +293,7 @@ export default function RequestedPanel() {
           items={pendingOt}
           workingId={otWorkingId}
           onAction={handleOtAction}
-          canApprove={canApproveLoans}
+          canApprove={canOt}
         />
       )}
     </div>

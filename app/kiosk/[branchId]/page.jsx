@@ -13,6 +13,8 @@ import useSession from "@/app/hooks/useSession";
 import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
 import { clearKiosk, kioskBranch, kioskToken, setKiosk, tabletZone } from "@/lib/attendance/kioskClient";
 import { Button, Card, CardBody, Field, Input, confirmDialog, toast } from "@/app/components/ui";
+import { can } from "@/lib/authz/permissions";
+import KioskPeople from "./People";
 
 const when = (iso) => (iso ? new Date(iso).toLocaleString([], { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "never");
 
@@ -98,13 +100,13 @@ export default function KioskSetup() {
   return (
     <main className="min-h-screen bg-bg px-4 py-6 sm:px-6">
       <div className="mx-auto max-w-xl space-y-5">
-        <button type="button" onClick={() => router.push("/")} className="flex items-center gap-1 text-sm font-semibold text-muted hover:text-fg">
+        <button type="button" onClick={() => router.push(can(user?.role, "dashboard.branch") ? "/" : "/attendance-log")} className="flex items-center gap-1 text-sm font-semibold text-muted hover:text-fg">
           <ArrowLeft className="size-4" /> Back to the app
         </button>
         <div>
           <p className="text-xs font-semibold uppercase tracking-wider text-subtle">Attendance kiosk</p>
           <h1 className="text-2xl font-bold text-fg">{branch?.name || "This branch"}</h1>
-          <p className="mt-1 text-sm text-muted">Staff clock in and out on one tablet at the branch: tap their name, enter their PIN, a small photo is taken. No one signs in on the tablet; if the internet drops, punches are kept and sent later.</p>
+          <p className="mt-1 text-sm text-muted">Staff clock in and out on one tablet at the branch: they look at the camera (or tap their name and enter their PIN), and a small photo is kept. No one signs in on the tablet; if the internet drops, punches are kept and sent later.</p>
         </div>
 
         <Card>
@@ -131,6 +133,8 @@ export default function KioskSetup() {
             )}
           </CardBody>
         </Card>
+
+        {can(user?.role, "attendance.faces") && companyId && <KioskPeople companyId={companyId} branchId={branchId} />}
 
         <section className="space-y-2">
           <p className="text-xs font-semibold uppercase tracking-wider text-subtle">Kiosk tablets at this branch</p>
