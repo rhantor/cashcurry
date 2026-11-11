@@ -49,7 +49,6 @@ function PunchPhoto({ punch, companyId, branchId }) {
     };
   }, [punch?.id, punch?.photoBase64, punch?.photoPath, companyId, branchId]);
   if (!src) return null;
-  // eslint-disable-next-line @next/next/no-img-element
   return <img src={src} alt={`${punch.staffName} at the kiosk`} className="mx-auto max-h-64 rounded-2xl object-contain" />;
 }
 

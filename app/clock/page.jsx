@@ -4,6 +4,7 @@
 // PIN, look at the camera, tap Clock in / Clock out. In or out is worked out
 // by the server; with no internet the punch is kept here and sent later.
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Check, ChevronLeft, Delete, Fingerprint, Loader2, LogIn, LogOut, Search, Wifi, WifiOff, X } from "lucide-react";
 import { roleLabelOf } from "@/app/staff-management/lib/constants";
 import { verifyBiometric } from "@/lib/attendance/biometric";
@@ -27,7 +28,6 @@ function LiveClock() {
 
 function Face({ s, size = "size-16" }) {
   return s.photoUrl ? (
-    // eslint-disable-next-line @next/next/no-img-element
     <img src={s.photoUrl} alt="" className={`${size} rounded-full object-cover`} />
   ) : (
     <div className={`${size} flex items-center justify-center rounded-full bg-white/10 text-lg font-black text-white/80`}>
@@ -260,7 +260,7 @@ export default function KioskTablet() {
       <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gray-950 px-6 text-center text-white">
         <h1 className="text-2xl font-black">This tablet is not a kiosk yet</h1>
         <p className="max-w-md text-white/60">A manager signs in on this tablet, opens <b>Open Kiosk</b> from the menu and taps <b>Use this tablet as the kiosk</b>. After that nobody needs to sign in here.</p>
-        <a href="/kiosk" className="rounded-2xl bg-white px-6 py-3 font-bold text-gray-950">Set up this tablet</a>
+        <Link href="/kiosk" className="rounded-2xl bg-white px-6 py-3 font-bold text-gray-950">Set up this tablet</Link>
       </main>
     );
   }
@@ -384,7 +384,7 @@ export default function KioskTablet() {
             )}
             <div className="flex gap-3">
               <button type="button" onClick={() => setAdmin(false)} className="h-12 flex-1 rounded-2xl bg-white/10 font-bold">Back to kiosk</button>
-              <a href="/kiosk" className="flex h-12 flex-1 items-center justify-center rounded-2xl bg-white font-bold text-gray-950">Close kiosk</a>
+              <Link href="/kiosk" className="flex h-12 flex-1 items-center justify-center rounded-2xl bg-white font-bold text-gray-950">Close kiosk</Link>
             </div>
             <p className="text-xs text-white/40">Closing needs a manager to sign in. The tablet stays set up.</p>
           </div>
