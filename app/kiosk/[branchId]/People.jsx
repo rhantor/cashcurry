@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { KeyRound, Loader2, ScanFace, Trash2 } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
+import useRetryOnError from "@/app/hooks/useRetryOnError";
 import { Avatar, Badge, Button, Sheet, confirmDialog, toast } from "@/app/components/ui";
 
 const SAMPLES = 4;
@@ -134,7 +135,9 @@ function FaceSheet({ person, companyId, branchId, onClose, onSaved }) {
 }
 
 export default function KioskPeople({ companyId, branchId }) {
-  const { data: staff = [], isLoading, refetch } = useGetStaffListQuery({ companyId, branchId }, { skip: !companyId || !branchId });
+  const staffQ = useGetStaffListQuery({ companyId, branchId }, { skip: !companyId || !branchId });
+  useRetryOnError(staffQ);
+  const { data: staff = [], isLoading, isError: staffFailed, refetch } = staffQ;
   const [faces, setFaces] = useState(null); // { staffId: { at, by } }
   const [enrol, setEnrol] = useState(null);
   const [busy, setBusy] = useState(null);
@@ -213,7 +216,7 @@ export default function KioskPeople({ companyId, branchId }) {
               </div>
             </li>
           ))}
-          {!sorted.length && <li className="px-4 py-3 text-sm text-muted">No staff at this branch yet.</li>}
+          {!sorted.length && <li className="px-4 py-3 text-sm text-muted">{staffFailed ? "Couldn't load the staff list — reload the page." : "No staff at this branch yet."}</li>}
         </ul>
       )}
       <FaceSheet person={enrol} companyId={companyId} branchId={branchId} onClose={() => setEnrol(null)} onSaved={load} />

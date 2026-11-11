@@ -10,6 +10,7 @@ import { skipToken } from "@reduxjs/toolkit/query";
 import { ArrowLeft, Clock, MonitorSmartphone, Play, Trash2 } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import useSession from "@/app/hooks/useSession";
+import useRetryOnError from "@/app/hooks/useRetryOnError";
 import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
 import { clearKiosk, kioskBranch, kioskToken, setKiosk, tabletZone } from "@/lib/attendance/kioskClient";
 import { Button, Card, CardBody, Field, Input, confirmDialog, toast } from "@/app/components/ui";
@@ -37,7 +38,9 @@ export default function KioskSetup() {
   const companyId = user?.companyId;
   // asked only once Firebase has the sign-in, or the rules refuse it
   const ready = status === "signedIn" && !!companyId;
-  const { data: branch = {} } = useGetSingleBranchQuery(ready && branchId ? { companyId, branchId } : skipToken);
+  const branchQ = useGetSingleBranchQuery(ready && branchId ? { companyId, branchId } : skipToken);
+  useRetryOnError(branchQ);
+  const branch = branchQ.data || {};
   const [devices, setDevices] = useState(null);
   const [name, setName] = useState("Front tablet");
   const [busy, setBusy] = useState(false);
