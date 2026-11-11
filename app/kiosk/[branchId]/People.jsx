@@ -10,7 +10,7 @@ import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
 import useRetryOnError from "@/app/hooks/useRetryOnError";
 import { Avatar, Badge, Button, Sheet, confirmDialog, toast } from "@/app/components/ui";
 
-const SAMPLES = 4;
+const SAMPLES = 5;
 const NEAR = 0.2;
 
 async function api(path, method, body, query = "") {
@@ -52,7 +52,7 @@ function FaceSheet({ person, companyId, branchId, onClose, onSaved }) {
       }
       try {
         setStatus("Getting face recognition ready…");
-        await (await import("@/lib/face/faceApi")).loadFaceApi();
+        await (await import("@/lib/face/human")).loadFace();
         setStatus("Ready");
       } catch (e) {
         console.error("face models", e);
@@ -68,13 +68,14 @@ function FaceSheet({ person, companyId, branchId, onClose, onSaved }) {
   const take = async () => {
     setTaking(true);
     setSamples([]);
-    const { readFace } = await import("@/lib/face/faceApi");
+    const { readFace } = await import("@/lib/face/human");
     const got = [];
     const until = Date.now() + 25000;
     while (got.length < SAMPLES && Date.now() < until && !stop.current) {
       try {
-        const f = await readFace(video.current, 320);
+        const f = await readFace(video.current);
         if (!f) setStatus("Look straight at the camera");
+        else if (f.count > 1) setStatus("Only one person in front of the camera, please");
         else if (f.size < NEAR) setStatus("Come a little closer");
         else {
           got.push(f.descriptor);
@@ -84,7 +85,7 @@ function FaceSheet({ person, companyId, branchId, onClose, onSaved }) {
       } catch {
         /* a bad frame */
       }
-      await new Promise((r) => setTimeout(r, 450));
+      await new Promise((r) => setTimeout(r, 500));
     }
     setStatus(got.length >= SAMPLES ? "Done — save it" : "Couldn't get clear pictures. Better light helps; try again.");
     setTaking(false);
@@ -185,7 +186,7 @@ export default function KioskPeople({ companyId, branchId }) {
   };
 
   const sorted = [...staff].sort((a, b) => `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`));
-  const withFace = faces ? sorted.filter((p) => faces[p.id]).length : 0;
+  const withFace = faces ? sorted.filter((p) => faces[p.id]?.current).length : 0;
 
   return (
     <section className="space-y-2">
@@ -204,7 +205,7 @@ export default function KioskPeople({ companyId, branchId }) {
               <div className="min-w-[9rem] flex-1">
                 <p className="truncate font-semibold text-fg">{p.firstName} {p.lastName}</p>
                 <div className="mt-1 flex flex-wrap gap-1.5">
-                  {faces[p.id] ? <Badge tone="success">Face added</Badge> : <Badge>No face</Badge>}
+                  {faces[p.id]?.current ? <Badge tone="success">Face added</Badge> : faces[p.id] ? <Badge tone="warning">Take the face again</Badge> : <Badge>No face</Badge>}
                   {/^\d{4}$/.test(String(p.pinCode || "")) ? <Badge tone="info">PIN set</Badge> : <Badge tone="warning">No PIN</Badge>}
                 </div>
               </div>
