@@ -32,6 +32,8 @@ const ALWAYS_PUBLIC_PREFIXES = [
   "/join",
   // the sales landing (7 Nov): open to everyone, signed in or not
   "/land",
+  // the branch kiosk tablet (11 Nov): no sign-in — the tablet's own token is the key
+  "/clock",
 ];
 
 const starts = (path, prefix) =>

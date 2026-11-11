@@ -21,8 +21,37 @@ import Cookies from "js-cookie";
 import { computeAttendance, formatHours as fmtHours, toLocalDateStr } from "@/lib/attendance/computeHours";
 import { shiftsEnabled } from "@/lib/attendance/shifts";
 import { getSessionUser } from "@/lib/session";
+import { auth } from "@/lib/firebase";
 import { toast, confirmDialog } from "@/app/components/ui/notify";
 import { can } from "@/lib/authz/permissions";
+
+/** The photo the kiosk took: in the punch (old kiosk), or in storage behind /api/attendance/photo (since 11 Nov). */
+function PunchPhoto({ punch, companyId, branchId }) {
+  const [src, setSrc] = useState(punch?.photoBase64 || null);
+  useEffect(() => {
+    if (punch?.photoBase64 || !punch?.photoPath || !punch?.id || !companyId || !branchId) return setSrc(punch?.photoBase64 || null);
+    let url = null;
+    let dead = false;
+    (async () => {
+      try {
+        const token = await auth.currentUser?.getIdToken();
+        const res = await fetch(`/api/attendance/photo?companyId=${encodeURIComponent(companyId)}&branchId=${encodeURIComponent(branchId)}&punchId=${encodeURIComponent(punch.id)}`, { headers: { Authorization: `Bearer ${token || ""}` } });
+        if (!res.ok || dead) return;
+        url = URL.createObjectURL(await res.blob());
+        setSrc(url);
+      } catch {
+        /* no photo shown */
+      }
+    })();
+    return () => {
+      dead = true;
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [punch?.id, punch?.photoBase64, punch?.photoPath, companyId, branchId]);
+  if (!src) return null;
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img src={src} alt={`${punch.staffName} at the kiosk`} className="mx-auto max-h-64 rounded-2xl object-contain" />;
+}
 
 export default function AttendanceLogPage() {
   const [user, setUser] = useState(null);
@@ -225,9 +254,9 @@ export default function AttendanceLogPage() {
   // the in-charge and supervisors see the log (roles matrix)
   const canManage = can(user?.role, "attendance.manage");
 
-  const openAdd = (staffId = "") => {
+  const openAdd = (staffId = "", type = "in") => {
     const s = staffList.find((x) => x.id === staffId);
-    setEditModal({ mode: "add", punch: { date: selectedDate, type: "in", staffId, staffName: s ? `${s.firstName} ${s.lastName}` : "" } });
+    setEditModal({ mode: "add", punch: { date: selectedDate, type, staffId, staffName: s ? `${s.firstName} ${s.lastName}` : "" } });
   };
 
   const removePunch = async (punch) => {
@@ -381,7 +410,14 @@ export default function AttendanceLogPage() {
                     <Avatar name={g.name} size="md" />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-fg">{g.name}</p>
-                      {g.inNow ? <Badge tone="success" dot pulse={selectedDate === today}>In</Badge> : <Badge>Left</Badge>}
+                      {/* a day gone by still "in": they forgot to clock out */}
+                      {g.inNow && selectedDate < today ? (
+                        <Badge tone="warning">No clock-out</Badge>
+                      ) : g.inNow ? (
+                        <Badge tone="success" dot pulse={selectedDate === today}>In</Badge>
+                      ) : (
+                        <Badge>Left</Badge>
+                      )}
                     </div>
                   </div>
                   <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
@@ -398,10 +434,16 @@ export default function AttendanceLogPage() {
                       >
                         {x.type === "in" ? <LogIn className="size-3" /> : <LogOut className="size-3" />}
                         {formatTime(x.timestamp)}
-                        {x.photoBase64 && <Camera className="size-3 opacity-70" />}
+                        {(x.photoBase64 || x.photoPath) && <Camera className="size-3 opacity-70" />}
+                        {x.offline && <span className="text-[10px] font-medium opacity-70">offline</span>}
                         {x.isManual && <span className="text-[10px] font-medium opacity-70">by hand</span>}
                       </button>
                     ))}
+                    {canManage && g.inNow && selectedDate < today && (
+                      <button type="button" onClick={() => openAdd(g.staffId, "out")} className="inline-flex items-center gap-1 rounded-lg border border-warning/40 px-2 py-1 text-xs font-semibold text-warning hover:bg-warning-soft">
+                        <LogOut className="size-3" /> Add clock-out
+                      </button>
+                    )}
                     {canManage && <button type="button" onClick={() => openAdd(g.staffId)} className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-muted hover:bg-surface-2 hover:text-fg" aria-label={`Add a punch for ${g.name}`}>
                       <Plus className="size-3" /> Add
                     </button>}
@@ -467,9 +509,7 @@ export default function AttendanceLogPage() {
       >
         {p && (
           <div className="space-y-4">
-            {p.photoBase64 && (
-              <img src={p.photoBase64} alt={`${p.staffName} at the kiosk`} className="mx-auto max-h-64 rounded-2xl object-contain" />
-            )}
+            <PunchPhoto punch={p} companyId={user?.companyId} branchId={branchId} />
             <Field label="Staff member">
               {({ id }) => (
                 <Select

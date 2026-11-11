@@ -1,640 +1,158 @@
 "use client";
-import React, { useState, useEffect, useRef, useCallback } from "react";
-import { useParams } from "next/navigation";
-import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
-import {
-  useKioskPunchMutation,
-  useGetBranchAttendanceTokensQuery,
-  useCreateOtRequestMutation,
-} from "@/lib/redux/api/attendanceApiSlice";
-import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
-import { Clock, LogIn, LogOut, Camera, Lock, ChevronLeft, Fingerprint, Loader2 } from "lucide-react";
-import { verifyBiometric } from "@/lib/attendance/biometric";
-import { getAttendanceDate, todayLocalStr } from "@/lib/attendance/computeHours";
-import { otRequestId, resolveStaffShift, shiftRules, shiftWindow } from "@/lib/attendance/shifts";
-import { getSessionUser } from "@/lib/session";
-import { roleLabelOf } from "@/app/staff-management/lib/constants";
-// `toast` here is the kiosk's own punch popup; app messages are `notify`.
-import { toast as notify } from "@/app/components/ui/notify";
+// Setting up the branch kiosk (11 Nov 2026). The old kiosk ran here under the
+// manager's own sign-in, checked PINs on the tablet and kept photos in the
+// punches. Now this page only sets a tablet up: a manager taps "Use this
+// tablet as the kiosk" once, and the tablet then runs /clock with no sign-in.
+// It also lists the branch's kiosk tablets, to stop one that is lost.
+import { useCallback, useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { skipToken } from "@reduxjs/toolkit/query";
+import { ArrowLeft, Clock, MonitorSmartphone, Play, Trash2 } from "lucide-react";
+import { auth } from "@/lib/firebase";
+import { useSession } from "@/lib/session";
+import { useGetSingleBranchQuery } from "@/lib/redux/api/branchApiSlice";
+import { clearKiosk, kioskBranch, kioskToken, setKiosk, tabletZone } from "@/lib/attendance/kioskClient";
+import { Button, Card, CardBody, Field, Input, confirmDialog, toast } from "@/app/components/ui";
 
-// ─── Helpers ────────────────────────────────────────────────────────────────
-function todayStr() {
-  return todayLocalStr(); // local date, not UTC (avoids day rollover near midnight)
+const when = (iso) => (iso ? new Date(iso).toLocaleString([], { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" }) : "never");
+
+async function call(method, body, query = "") {
+  const idToken = await auth.currentUser?.getIdToken();
+  const res = await fetch(`/api/kiosk/devices${query}`, {
+    method,
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken || ""}` },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || "Something went wrong");
+  return data;
 }
 
-function LiveClock() {
-  const [now, setNow] = useState(new Date());
-  useEffect(() => {
-    const t = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(t);
-  }, []);
-  return (
-    <div className="text-center select-none">
-      <div className="text-6xl md:text-8xl font-black tracking-tight text-white tabular-nums">
-        {now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true })}
-      </div>
-      <div className="text-lg md:text-xl text-white/60 font-medium mt-1">
-        {now.toLocaleDateString([], { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
-      </div>
-    </div>
-  );
-}
-
-// ─── Admin Exit Modal ───────────────────────────────────────────────────────
-function ExitModal({ onExit, onCancel }) {
-  const [code, setCode] = useState("");
-  const EXIT_CODE = "0000"; // Simple exit code — the admin sets this
-
-  return (
-    <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center">
-      <div className="bg-gray-900 border border-white/10 rounded-3xl p-8 w-80 text-center">
-        <Lock className="mx-auto text-amber-400 mb-4" size={32} />
-        <h3 className="text-white font-bold text-lg mb-2">Admin Exit</h3>
-        <p className="text-white/50 text-sm mb-6">Enter admin code to exit kiosk</p>
-        <input
-          type="password"
-          maxLength={4}
-          value={code}
-          onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-          className="w-full text-center text-3xl tracking-[1em] bg-white/10 border border-white/20 rounded-xl py-3 text-white outline-none focus:border-amber-400 transition"
-          autoFocus
-        />
-        <div className="flex gap-3 mt-6">
-          <button onClick={onCancel} className="flex-1 py-3 rounded-xl bg-white/10 text-white font-semibold hover:bg-white/20 transition">Cancel</button>
-          <button
-            onClick={() => { if (code === EXIT_CODE) onExit(); else setCode(""); }}
-            className="flex-1 py-3 rounded-xl bg-amber-500 text-black font-bold hover:bg-amber-400 transition"
-          >Unlock</button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── PIN Pad Modal ──────────────────────────────────────────────────────────
-function PinPadModal({ staff, onSuccess, onCancel }) {
-  const [pin, setPin] = useState("");
-  const [error, setError] = useState("");
-
-  const addDigit = (d) => {
-    if (pin.length >= 4) return;
-    const next = pin + d;
-    setPin(next);
-    setError("");
-
-    if (next.length === 4) {
-      // Validate
-      if (next === staff.pinCode) {
-        setTimeout(() => onSuccess(), 200);
-      } else {
-        setTimeout(() => {
-          setError("Wrong PIN. Try again.");
-          setPin("");
-        }, 300);
-      }
-    }
-  };
-
-  const backspace = () => {
-    setPin((p) => p.slice(0, -1));
-    setError("");
-  };
-
-  const dots = [0, 1, 2, 3].map((i) => (
-    <div
-      key={i}
-      className={`w-5 h-5 rounded-full border-2 transition-all duration-200 ${
-        i < pin.length
-          ? "bg-blue-400 border-blue-400 scale-110"
-          : "bg-transparent border-white/30"
-      }`}
-    />
-  ));
-
-  const keys = [1, 2, 3, 4, 5, 6, 7, 8, 9, null, 0, "⌫"];
-
-  return (
-    <div className="fixed inset-0 z-[150] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4">
-      <div className="w-full max-w-sm">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 mx-auto flex items-center justify-center text-white text-2xl font-black mb-4 shadow-lg shadow-blue-500/30">
-            {staff.firstName?.[0]}{staff.lastName?.[0]}
-          </div>
-          <h3 className="text-white font-bold text-xl">{staff.firstName} {staff.lastName}</h3>
-          <p className="text-white/50 text-sm mt-1">Enter your 4-digit PIN</p>
-        </div>
-
-        {/* Dots */}
-        <div className="flex justify-center gap-4 mb-3">{dots}</div>
-        {error && <p className="text-red-400 text-center text-sm font-semibold mb-2 animate-pulse">{error}</p>}
-
-        {/* Numpad */}
-        <div className="grid grid-cols-3 gap-3 mt-6 max-w-[280px] mx-auto">
-          {keys.map((k, i) => {
-            if (k === null) return <div key={i} />;
-            if (k === "⌫")
-              return (
-                <button key={i} onClick={backspace} className="aspect-square rounded-2xl bg-white/10 text-white text-xl flex items-center justify-center hover:bg-white/20 active:scale-95 transition-all">
-                  <ChevronLeft size={24} />
-                </button>
-              );
-            return (
-              <button
-                key={i}
-                onClick={() => addDigit(String(k))}
-                className="aspect-square rounded-2xl bg-white/10 text-white text-2xl font-bold flex items-center justify-center hover:bg-white/20 active:scale-90 transition-all select-none"
-              >
-                {k}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Cancel & Bio Manual */}
-        <div className="flex gap-4 mt-8">
-          <button onClick={onCancel} className="flex-1 py-3 rounded-xl text-white/50 font-semibold hover:text-white transition text-sm">
-            Cancel
-          </button>
-          {staff.biometric?.credentialId && (
-            <button 
-              onClick={onSuccess} // In this context, onSuccess is passed as handlePinSuccess which triggers bio or camera
-              className="flex-1 py-3 rounded-xl bg-indigo-600/20 text-indigo-400 font-bold hover:bg-indigo-600/30 transition text-sm flex items-center justify-center gap-2"
-            >
-              <Fingerprint size={16} /> Use Finger
-            </button>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Camera Snapshot Modal ──────────────────────────────────────────────────
-function CameraModal({ staff, punchType, onCapture, onCancel }) {
-  const videoRef = useRef(null);
-  const canvasRef = useRef(null);
-  const [stream, setStream] = useState(null);
-  const [ready, setReady] = useState(false);
-  const [captured, setCaptured] = useState(null);
-
-  useEffect(() => {
-    let activeStream = null;
-    navigator.mediaDevices
-      .getUserMedia({ video: { facingMode: "user", width: 640, height: 480 } })
-      .then((s) => {
-        activeStream = s;
-        setStream(s);
-        if (videoRef.current) {
-          videoRef.current.srcObject = s;
-          videoRef.current.onloadedmetadata = () => setReady(true);
-        }
-      })
-      .catch(() => {
-        // Camera not available — allow without photo
-        onCapture(null);
-      });
-
-    return () => {
-      if (activeStream) activeStream.getTracks().forEach((t) => t.stop());
-    };
-  }, []);
-
-  const snap = useCallback(() => {
-    if (!canvasRef.current || !videoRef.current) return;
-    const canvas = canvasRef.current;
-    const video = videoRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0);
-    const base64 = canvas.toDataURL("image/jpeg", 0.6);
-    setCaptured(base64);
-    // Stop stream
-    if (stream) stream.getTracks().forEach((t) => t.stop());
-  }, [stream]);
-
-  return (
-    <div className="fixed inset-0 z-[160] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4">
-      <div className="w-full max-w-md text-center">
-        <div className="mb-4">
-          <span className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold ${punchType === "in" ? "bg-green-500/20 text-green-400" : "bg-orange-500/20 text-orange-400"}`}>
-            {punchType === "in" ? <LogIn size={16} /> : <LogOut size={16} />}
-            Punch {punchType === "in" ? "IN" : "OUT"} — {staff.firstName}
-          </span>
-        </div>
-
-        <div className="relative rounded-2xl overflow-hidden bg-gray-900 border border-white/10 aspect-[4/3] mb-4">
-          {!captured ? (
-            <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
-          ) : (
-            <img src={captured} alt="Snapshot" className="w-full h-full object-cover" />
-          )}
-          {/* Overlay guide */}
-          {!captured && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-              <div className="w-40 h-40 border-2 border-dashed border-white/30 rounded-full" />
-            </div>
-          )}
-        </div>
-
-        <canvas ref={canvasRef} className="hidden" />
-
-        {!captured ? (
-          <div className="flex gap-3">
-            <button onClick={onCancel} className="flex-1 py-3 rounded-xl bg-white/10 text-white font-semibold hover:bg-white/20 transition">Cancel</button>
-            <button
-              onClick={snap}
-              disabled={!ready}
-              className="flex-1 py-3 rounded-xl bg-blue-500 text-white font-bold hover:bg-blue-400 disabled:opacity-30 transition flex items-center justify-center gap-2"
-            >
-              <Camera size={18} /> Capture
-            </button>
-          </div>
-        ) : (
-          <div className="flex gap-3">
-            <button onClick={() => setCaptured(null)} className="flex-1 py-3 rounded-xl bg-white/10 text-white font-semibold hover:bg-white/20 transition">Retake</button>
-            <button
-              onClick={() => onCapture(captured)}
-              className={`flex-1 py-3 rounded-xl font-bold transition flex items-center justify-center gap-2 ${punchType === "in" ? "bg-green-500 text-black hover:bg-green-400" : "bg-orange-500 text-black hover:bg-orange-400"}`}
-            >
-              Confirm {punchType === "in" ? "Punch In" : "Punch Out"}
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ─── Success Toast ──────────────────────────────────────────────────────────
-function SuccessToast({ name, type, onDone }) {
-  useEffect(() => {
-    const t = setTimeout(onDone, 3000);
-    return () => clearTimeout(t);
-  }, [onDone]);
-
-  return (
-    <div className="fixed inset-0 z-[170] flex items-center justify-center pointer-events-none">
-      <div className={`px-10 py-8 rounded-3xl text-center shadow-2xl animate-bounce pointer-events-auto ${type === "in" ? "bg-green-500" : "bg-orange-500"}`}>
-        <div className="text-5xl mb-2">{type === "in" ? "👋" : "👋"}</div>
-        <h2 className="text-black font-black text-2xl">{type === "in" ? "Welcome!" : "Goodbye!"}</h2>
-        <p className="text-black/70 font-semibold mt-1">{name} punched {type === "in" ? "IN" : "OUT"}</p>
-        <p className="text-black/50 text-sm mt-2">{new Date().toLocaleTimeString()}</p>
-      </div>
-    </div>
-  );
-}
-
-// ═════════════════════════════════════════════════════════════════════════════
-// MAIN KIOSK PAGE
-// ═════════════════════════════════════════════════════════════════════════════
-export default function KioskPage() {
+export default function KioskSetup() {
   const { branchId } = useParams();
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
-    const stored = getSessionUser();
-    if (stored) setUser(stored);
-  }, []);
-
-  // Keep the tablet screen awake while the kiosk is open (re-acquire when the
-  // tab becomes visible again — the lock drops on tab switch / sleep).
-  useEffect(() => {
-    let lock = null;
-    const acquire = async () => {
-      try {
-        if (document.visibilityState === "visible" && "wakeLock" in navigator) {
-          lock = await navigator.wakeLock.request("screen");
-        }
-      } catch {
-        /* wake lock unsupported or denied — non-critical */
-      }
-    };
-    acquire();
-    const onVis = () => {
-      if (document.visibilityState === "visible") acquire();
-    };
-    document.addEventListener("visibilitychange", onVis);
-    return () => {
-      document.removeEventListener("visibilitychange", onVis);
-      if (lock) lock.release().catch(() => {});
-    };
-  }, []);
-
+  const router = useRouter();
+  const { user, status } = useSession();
   const companyId = user?.companyId;
+  const { data: branch = {} } = useGetSingleBranchQuery(companyId && branchId ? { companyId, branchId } : skipToken);
+  const [devices, setDevices] = useState(null);
+  const [name, setName] = useState("Front tablet");
+  const [busy, setBusy] = useState(false);
+  const [here, setHere] = useState(null); // this tablet is this branch's kiosk
 
-  // Fetch staff list
-  const { data: staffList = [], isLoading: staffLoading } = useGetStaffListQuery(
-    companyId && branchId ? { companyId, branchId } : { skip: true }
-  );
+  useEffect(() => {
+    const b = kioskBranch();
+    setHere(!!kioskToken() && b?.branchId === branchId && b?.companyId === companyId);
+  }, [branchId, companyId]);
 
-  // Fetch today's punches
-  const { data: todayPunches = [], refetch: refetchPunches } = useGetBranchAttendanceTokensQuery(
-    companyId && branchId ? { companyId, branchId, date: todayStr() } : { skip: true }
-  );
-
-  const [kioskPunch] = useKioskPunchMutation();
-  const [createOtRequest] = useCreateOtRequestMutation();
-
-  // UI state
-  const [selectedStaff, setSelectedStaff] = useState(null);
-  const [showPinPad, setShowPinPad] = useState(false);
-  const [showCamera, setShowCamera] = useState(false);
-  const [punchType, setPunchType] = useState("in");
-  const [toast, setToast] = useState(null);
-  const [showExitModal, setShowExitModal] = useState(false);
-  const [verifyingBio, setVerifyingBio] = useState(false);
-
-  // Fetch branch settings
-  const { data: settings } = useGetBranchSettingsQuery(
-    companyId && branchId ? { companyId, branchId } : { skip: true }
-  );
-  const attendanceSettings = settings?.attendance || {};
-
-  // Determine punch type for a staff member
-  const getPunchType = useCallback(
-    (staffId) => {
-      const punches = todayPunches
-        .filter((p) => p.staffId === staffId)
-        .sort((a, b) => {
-          const ta = a.timestamp?.seconds || 0;
-          const tb = b.timestamp?.seconds || 0;
-          return tb - ta;
-        });
-      if (punches.length === 0) return "in";
-      return punches[0].type === "in" ? "out" : "in";
-    },
-    [todayPunches]
-  );
-
-  // Punching in well before the shift starts raises an early-OT request for a
-  // GM/admin to approve in the Requested Panel — until then those extra minutes
-  // aren't paid. Silent no-op when shifts are off or the staff member has none.
-  const maybeRequestEarlyOt = useCallback(
-    async (staff, type) => {
-      if (type !== "in") return;
-      const shift = resolveStaffShift(staff, attendanceSettings);
-      if (!shift) return;
-
-      const now = new Date();
-      const date = getAttendanceDate(
-        { seconds: Math.floor(now.getTime() / 1000) },
-        attendanceSettings.dayCutoffTime
-      );
-      const win = shiftWindow(date, shift);
-      if (!win) return;
-
-      const earlyMinutes = (win.start.getTime() - now.getTime()) / 60000;
-      const { earlyOtMinutes } = shiftRules(attendanceSettings);
-      if (earlyMinutes < earlyOtMinutes) return;
-
-      try {
-        await createOtRequest({
-          companyId,
-          branchId,
-          id: otRequestId(staff.id, date),
-          data: {
-            staffId: staff.id,
-            staffName: `${staff.firstName} ${staff.lastName}`,
-            date,
-            shiftStart: shift.start,
-            shiftEnd: shift.end,
-            punchInAt: now.toISOString(),
-            earlyMinutes: Math.round(earlyMinutes),
-          },
-        }).unwrap();
-      } catch (err) {
-        // Never block a punch over the approval record.
-        console.error("Early-OT request failed:", err);
-      }
-    },
-    [attendanceSettings, companyId, branchId, createOtRequest]
-  );
-
-  // Staff selection flow
-  const handleStaffSelect = async (staff) => {
-    setPunchType(getPunchType(staff.id));
-    
-    // 1. Check Duplicate Punch Interval
-    const lastPunch = todayPunches
-      .filter(p => p.staffId === staff.id)
-      .sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0))[0];
-
-    if (lastPunch && attendanceSettings.duplicatePunchInterval) {
-      const lastMs = (lastPunch.timestamp?.seconds || 0) * 1000;
-      const nowMs = Date.now();
-      const diffMin = (nowMs - lastMs) / 60000;
-      if (diffMin < attendanceSettings.duplicatePunchInterval) {
-        notify.warning(`Please wait ${Math.ceil(attendanceSettings.duplicatePunchInterval - diffMin)} more minute(s) before punching again.`);
-        return;
-      }
-    }
-
-    // 2. Biometric Verification
-    console.log("Kiosk Settings:", attendanceSettings);
-    if (attendanceSettings.useBiometrics && staff.biometric?.credentialId) {
-      setVerifyingBio(true);
-      try {
-        const ok = await verifyBiometric(staff.biometric.credentialId);
-        if (ok) {
-          setSelectedStaff(staff);
-          if (attendanceSettings.useCamera) {
-            setShowCamera(true);
-          } else {
-            handleCapture(null, staff); // Immediate punch
-          }
-          return;
-        }
-      } catch (err) {
-        console.error("Biometric failed:", err);
-        // Fallback to PIN
-      } finally {
-        setVerifyingBio(false);
-      }
-    }
-
-    // 3. PIN Fallback
-    if (!staff.pinCode) {
-      notify.warning(`${staff.firstName} does not have a Kiosk PIN configured. Please ask admin to set one.`);
-      return;
-    }
-    setSelectedStaff(staff);
-    setShowPinPad(true);
-  };
-
-  // After correct PIN
-  const handlePinSuccess = () => {
-    setShowPinPad(false);
-    if (attendanceSettings.useCamera) {
-      setShowCamera(true);
-    } else {
-      handleCapture(null);
-    }
-  };
-
-  // After capturing photo (or skipping if disabled)
-  const handleCapture = async (photoBase64, overrideStaff = null) => {
-    const staff = overrideStaff || selectedStaff;
-    if (!staff) return;
-
-    setShowCamera(false);
-
+  const list = useCallback(async () => {
+    if (!companyId) return;
     try {
-      await kioskPunch({
-        companyId,
-        branchId,
-        staffId: staff.id,
-        staffName: `${staff.firstName} ${staff.lastName}`,
-        type: punchType,
-        date: todayStr(),
-        photoBase64,
-      }).unwrap();
-
-      setToast({ name: staff.firstName, type: punchType });
-      refetchPunches();
-      maybeRequestEarlyOt(staff, punchType);
-    } catch (err) {
-      notify.error("Punch failed: " + (err?.message || "Unknown error"));
+      const r = await call("GET", null, `?companyId=${encodeURIComponent(companyId)}&branchId=${encodeURIComponent(branchId)}`);
+      setDevices(r.devices);
+    } catch (e) {
+      setDevices([]);
+      toast.error(e.message);
     }
+  }, [companyId, branchId]);
+  useEffect(() => {
+    if (status === "signedIn") list();
+  }, [status, list]);
 
-    setSelectedStaff(null);
+  const setUp = async () => {
+    setBusy(true);
+    try {
+      // a tablet that was another branch's kiosk stops being it
+      const { token } = await call("POST", { companyId, branchId, name, timeZone: tabletZone() });
+      clearKiosk();
+      setKiosk(token, { companyId, branchId });
+      router.push("/clock");
+    } catch (e) {
+      toast.error(e.message);
+      setBusy(false);
+    }
   };
 
-  // Admin exit (triple-tap top-left corner)
-  const tapCountRef = useRef(0);
-  const tapTimerRef = useRef(null);
-  const handleCornerTap = () => {
-    tapCountRef.current++;
-    if (tapCountRef.current >= 5) {
-      tapCountRef.current = 0;
-      setShowExitModal(true);
+  const stopHere = async () => {
+    if (!(await confirmDialog({ title: "Stop using this tablet as the kiosk?", message: "Staff can't punch on it until it is set up again. Punches already saved stay.", confirmLabel: "Stop", danger: true }))) return;
+    try {
+      await call("DELETE", { companyId, branchId, token: kioskToken() });
+    } catch {
+      /* gone already: still forget it here */
     }
-    clearTimeout(tapTimerRef.current);
-    tapTimerRef.current = setTimeout(() => (tapCountRef.current = 0), 2000);
+    clearKiosk();
+    setHere(false);
+    list();
   };
 
-  if (!user) return <div className="h-screen bg-gray-950 flex items-center justify-center text-white/40">Loading...</div>;
+  const remove = async (d) => {
+    if (!(await confirmDialog({ title: `Remove “${d.name}”?`, message: "That tablet stops working as the kiosk at once (e.g. it was lost). Punches already saved stay.", confirmLabel: "Remove", danger: true }))) return;
+    try {
+      await call("DELETE", { companyId, branchId, id: d.id });
+      toast.success("Removed");
+      list();
+    } catch (e) {
+      toast.error(e.message);
+    }
+  };
 
   return (
-    <div className="h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex flex-col overflow-hidden select-none">
-      {/* Invisible exit trigger — tap top-left 5 times in 2 seconds */}
-      <div className="absolute top-0 left-0 w-20 h-20 z-[100]" onClick={handleCornerTap} />
-
-      {/* Top bar */}
-      <div className="flex items-center justify-between px-6 py-4 shrink-0">
-        <div className="flex items-center gap-3">
-          <Clock className="text-blue-400" size={22} />
-          <span className="text-white/60 font-semibold text-sm tracking-wide uppercase">Attendance Kiosk</span>
+    <main className="min-h-screen bg-bg px-4 py-6 sm:px-6">
+      <div className="mx-auto max-w-xl space-y-5">
+        <button type="button" onClick={() => router.push("/")} className="flex items-center gap-1 text-sm font-semibold text-muted hover:text-fg">
+          <ArrowLeft className="size-4" /> Back to the app
+        </button>
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-wider text-subtle">Attendance kiosk</p>
+          <h1 className="text-2xl font-bold text-fg">{branch?.name || "This branch"}</h1>
+          <p className="mt-1 text-sm text-muted">Staff clock in and out on one tablet at the branch: tap their name, enter their PIN, a small photo is taken. No one signs in on the tablet; if the internet drops, punches are kept and sent later.</p>
         </div>
-        <LiveClock />
-        <div className="text-right">
-          <div className="text-white/40 text-xs font-medium">Today&apos;s Punches</div>
-          <div className="text-white font-bold text-xl">{todayPunches.length}</div>
-        </div>
-      </div>
 
-      {/* Staff grid: tap your name, then fingerprint or PIN */}
-      <div className="flex-1 overflow-y-auto px-4 pb-4">
-        <div className="max-w-5xl mx-auto">
-          <div className="flex items-center justify-between mb-4 px-2">
-            <h2 className="text-white/40 text-xs font-bold uppercase tracking-widest">Select Your Name</h2>
-          </div>
+        <Card>
+          <CardBody className="space-y-4">
+            {here ? (
+              <>
+                <div className="flex items-center gap-3">
+                  <MonitorSmartphone className="size-6 text-brand" />
+                  <p className="font-semibold text-fg">This tablet is this branch&apos;s kiosk.</p>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button icon={Play} onClick={() => router.push("/clock")}>Open the kiosk</Button>
+                  <Button variant="ghost" className="text-danger" onClick={stopHere}>Stop using this tablet</Button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-muted">Do this once, on the tablet that stays at the branch. You can then sign out — the kiosk keeps working.</p>
+                <Field label="Name for this tablet">
+                  <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Front tablet" />
+                </Field>
+                <Button icon={Clock} loading={busy} disabled={!companyId} onClick={setUp}>Use this tablet as the kiosk</Button>
+              </>
+            )}
+          </CardBody>
+        </Card>
 
-          {staffLoading ? (
-            <div className="text-center text-white/30 py-20">Loading staff...</div>
+        <section className="space-y-2">
+          <p className="text-xs font-semibold uppercase tracking-wider text-subtle">Kiosk tablets at this branch</p>
+          {devices === null ? (
+            <p className="text-sm text-muted">Loading…</p>
+          ) : devices.length === 0 ? (
+            <p className="text-sm text-muted">None yet.</p>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-              {staffList.map((s) => {
-                const nextPunch = getPunchType(s.id);
-                const isPunchedIn = nextPunch === "out";
-                return (
-                  <button
-                    key={s.id}
-                    onClick={() => handleStaffSelect(s)}
-                    className={`relative flex flex-col items-center p-5 rounded-2xl border transition-all duration-200 active:scale-95 ${
-                      isPunchedIn
-                        ? "bg-green-500/10 border-green-500/30 hover:bg-green-500/20"
-                        : "bg-white/5 border-white/10 hover:bg-white/10"
-                    }`}
-                  >
-                    {/* Avatar */}
-                    <div className={`w-16 h-16 rounded-full flex items-center justify-center text-lg font-black mb-3 shadow-md ${
-                      isPunchedIn
-                        ? "bg-gradient-to-br from-green-400 to-emerald-600 text-white"
-                        : "bg-gradient-to-br from-gray-600 to-gray-700 text-white/70"
-                    }`}>
-                      {s.photoUrl ? (
-                        <img src={s.photoUrl} alt={s.firstName} className="w-full h-full rounded-full object-cover" />
-                      ) : (
-                        <>{s.firstName?.[0]}{s.lastName?.[0]}</>
-                      )}
-                    </div>
-
-                    <span className="text-white font-semibold text-sm text-center leading-tight">
-                      {s.firstName} {s.lastName?.[0]}.
-                    </span>
-                    <span className="text-[10px] text-white/40 font-medium mt-1 capitalize">{roleLabelOf(s.role) || "Staff"}</span>
-
-                    {/* Status indicator */}
-                    <div className={`absolute top-3 right-3 w-3 h-3 rounded-full ${isPunchedIn ? "bg-green-400 animate-pulse" : "bg-gray-600"}`} />
-                    
-                    {/* Biometric Icon */}
-                    {attendanceSettings.useBiometrics && s.biometric?.credentialId && (
-                      <div className="absolute bottom-3 right-3 text-white/20">
-                        <Fingerprint size={14} />
-                      </div>
-                    )}
-
-                    {/* Verifying Overlay */}
-                    {verifyingBio && selectedStaff?.id === s.id && (
-                      <div className="absolute inset-0 bg-indigo-600/40 backdrop-blur-[2px] rounded-2xl flex items-center justify-center">
-                        <Loader2 className="text-white animate-spin" size={24} />
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+            <ul className="divide-y divide-line overflow-hidden rounded-2xl border border-line bg-surface">
+              {devices.map((d) => (
+                <li key={d.id} className="flex items-center gap-3 px-4 py-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-semibold text-fg">{d.name}</p>
+                    <p className="text-xs text-muted">Set up by {d.by || "—"} · last seen {when(d.lastSeenAt)}</p>
+                  </div>
+                  <Button size="sm" variant="ghost" icon={Trash2} aria-label={`Remove ${d.name}`} onClick={() => remove(d)} />
+                </li>
+              ))}
+            </ul>
           )}
-        </div>
+        </section>
       </div>
-
-      {/* Modals */}
-      {showPinPad && selectedStaff && (
-        <PinPadModal
-          staff={selectedStaff}
-          onSuccess={handlePinSuccess}
-          onCancel={() => { setShowPinPad(false); setSelectedStaff(null); }}
-        />
-      )}
-
-      {showCamera && selectedStaff && (
-        <CameraModal
-          staff={selectedStaff}
-          punchType={punchType}
-          onCapture={handleCapture}
-          onCancel={() => { setShowCamera(false); setSelectedStaff(null); }}
-        />
-      )}
-
-      {toast && (
-        <SuccessToast
-          name={toast.name}
-          type={toast.type}
-          onDone={() => setToast(null)}
-        />
-      )}
-
-      {showExitModal && (
-        <ExitModal
-          onExit={() => {
-            setShowExitModal(false);
-            window.location.href = "/";
-          }}
-          onCancel={() => setShowExitModal(false)}
-        />
-      )}
-    </div>
+    </main>
   );
 }
