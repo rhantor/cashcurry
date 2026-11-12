@@ -204,7 +204,7 @@ export default function StaffDetailModal ({ isOpen, onClose, staff, onEdit, onDe
             <Avatar name={fullName} src={s.photoUrl} size='lg' />
             <div className='min-w-0 space-y-1.5'>
               <div className='flex flex-wrap gap-1.5'>
-                {s.uid ? <Badge tone='success' dot>Staff app login</Badge> : s.officeUid ? <Badge tone='info' dot>Office login · {s.officeName || 'linked'}</Badge> : <Badge>No staff app login</Badge>}
+                {!isCurrent(s) ? <Badge>{s.uid ? 'Staff app login switched off' : 'Left the job'}</Badge> : s.uid ? <Badge tone='success' dot>Staff app login</Badge> : s.officeUid ? <Badge tone='info' dot>Office login · {s.officeName || 'linked'}</Badge> : <Badge>No staff app login</Badge>}
                 {s.salaryMode && <Badge tone='info'>Paid by the {s.salaryMode === 'hours' ? 'hour' : s.salaryMode === 'days' ? 'day' : 'month'}</Badge>}
               </div>
               {/* an office login sees this record's pay under Me (30 Oct) */}
