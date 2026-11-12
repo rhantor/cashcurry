@@ -12,6 +12,7 @@ import usePendingRequests from "@/app/components/shell/usePendingRequests";
 import { useIssuesWaiting } from "@/app/components/issues/useIssues";
 import { useServerCash } from "@/app/components/requests/CashInHand";
 import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
+import { currentStaff } from "@/lib/staff/leaving";
 import { useAway, useChecks, useTasks } from "@/lib/tasks/client";
 import { dutyGaps, dutyRows } from "@/lib/tasks/model";
 import { useOnShift } from "./ShiftCard";
@@ -41,7 +42,8 @@ function BranchPulse({ user, branch, today: activeToday, onOpen }) {
   const shift = useOnShift(companyId, id, today);
   const { list: tasks } = useTasks(companyId, id, { all: true });
   const { checks } = useChecks(companyId, id, { from: today, to: today, all: true });
-  const { data: staff } = useGetStaffListQuery({ companyId, branchId: id }, { skip: !companyId });
+  const { data: allStaff } = useGetStaffListQuery({ companyId, branchId: id }, { skip: !companyId });
+  const staff = useMemo(() => (allStaff ? currentStaff(allStaff) : allStaff), [allStaff]); // not those who left the job
   const away = useAway(companyId, id, user, staff || NONE);
   const rows = useMemo(() => dutyRows(tasks, checks, today, away), [tasks, checks, today, away]);
   const done = rows.filter((r) => r.done).length;

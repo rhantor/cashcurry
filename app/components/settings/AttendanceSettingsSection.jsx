@@ -4,6 +4,7 @@ import SettingsSection from "./SettingsSection";
 import { FieldRow, NumberField, Toggle, SectionCard } from "./fields";
 import ShiftRulesSection from "./ShiftRulesSection";
 import { useGetStaffListQuery, useUpdateStaffMutation } from "@/lib/redux/api/staffApiSlice";
+import { currentStaff } from "@/lib/staff/leaving";
 import { registerBiometric, isBiometricAvailable } from "@/lib/attendance/biometric";
 import { Fingerprint, CheckCircle2, ShieldAlert, Loader2 } from "lucide-react";
 import { toast } from "@/app/components/ui/notify";
@@ -12,9 +13,10 @@ export default function AttendanceSettingsSection({ role, companyId, branchId, v
   const v = value || {};
   const patch = (p) => onChange({ ...v, ...p });
 
-  const { data: staffList = [], isLoading: loadingStaff } = useGetStaffListQuery(
+  const { data: allStaff = [], isLoading: loadingStaff } = useGetStaffListQuery(
     companyId && branchId ? { companyId, branchId } : { skip: true }
   );
+  const staffList = currentStaff(allStaff); // not those who left the job
   const [updateStaff] = useUpdateStaffMutation();
 
   const [biometricSupported, setBiometricSupported] = useState(false);

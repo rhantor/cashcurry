@@ -23,7 +23,7 @@ export default function NewIssueSheet({ open, onClose, user, branchId, branches 
   const picker = useRef(null);
   const previews = useMemo(() => photos.map((f) => URL.createObjectURL(f)), [photos]);
   const here = branch || branchId;
-  const team = people.filter((p) => p.branchId === here || !p.branchId);
+  const team = people.filter((p) => (p.branchId === here || !p.branchId) && !p.left);
 
   const reset = () => {
     setTitle("");

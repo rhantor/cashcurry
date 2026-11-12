@@ -161,6 +161,7 @@ export default function ChatApp({ user, branches = [], allBranches, className })
   const { chats, ready } = useChats(user, branches);
   const people = useChatPeople(user?.companyId);
   const peopleById = useMemo(() => Object.fromEntries(people.map((p) => [p.uid, p])), [people]);
+  const working = useMemo(() => people.filter((p) => !p.left), [people]); // new chats: not those who left the job
   // names from every branch the company has, so a chat is never shown as just "Branch"
   const branchNames = useMemo(() => Object.fromEntries((allBranches || branches).map((b) => [b.id, b.name])), [allBranches, branches]);
   const [q, setQ] = useState("");
@@ -291,11 +292,11 @@ export default function ChatApp({ user, branches = [], allBranches, className })
         )}
       </section>
 
-      <DirectSheet open={sheet === "direct"} onClose={() => setSheet(null)} user={user} people={people} onOpened={open} />
-      {sheet === "group" && <GroupSheet open onClose={() => setSheet(null)} user={user} people={people} onSaved={(id) => id && open(id)} />}
-      {sheet === "manage" && active?.kind === "group" && <GroupSheet open onClose={() => setSheet(null)} user={user} people={people} chat={active} onSaved={(id) => open(id)} />}
+      <DirectSheet open={sheet === "direct"} onClose={() => setSheet(null)} user={user} people={working} onOpened={open} />
+      {sheet === "group" && <GroupSheet open onClose={() => setSheet(null)} user={user} people={working} onSaved={(id) => id && open(id)} />}
+      {sheet === "manage" && active?.kind === "group" && <GroupSheet open onClose={() => setSheet(null)} user={user} people={working} chat={active} onSaved={(id) => open(id)} />}
       <LabelsSheet open={!!labelChat} onClose={() => setLabelChat(null)} user={user} chat={labelChat?.manage ? null : labelChat} prefs={labelPrefs} />
-      {forwarding && <ForwardSheet msg={forwarding} onClose={() => setForwarding(null)} user={user} chats={titled} people={people} onSent={(id) => id && open(id)} />}
+      {forwarding && <ForwardSheet msg={forwarding} onClose={() => setForwarding(null)} user={user} chats={titled} people={working} onSent={(id) => id && open(id)} />}
     </div>
   );
 }

@@ -11,6 +11,7 @@ import { formatMoney } from '@/lib/region/currency'
 import PayOutQueue from '@/app/components/requests/PayOutQueue'
 import { useAddAdvanceEntryMutation } from '@/lib/redux/api/AdvanceApiSlice'
 import { useGetStaffListQuery } from '@/lib/redux/api/staffApiSlice'
+import { currentStaff } from '@/lib/staff/leaving'
 import { useAddStaffLoanMutation } from '@/lib/redux/api/staffLoanApiSlice'
 import { getSessionUser } from '@/lib/session'
 import { Button, CountUp, DatePicker, Field, Input, Switch, Tabs, Textarea, cn, toast } from '@/app/components/ui'
@@ -624,7 +625,8 @@ export default function AdvanceLoanEntry () {
   const currency = useCurrency()
   const money = v => formatMoney(v, currency)
   const [tab, setTab] = useState('advance')
-  const { data: staff = [], isLoading: staffLoading } = useGetStaffListQuery({ companyId, branchId }, { skip: !companyId || !branchId })
+  const { data: allStaff = [], isLoading: staffLoading } = useGetStaffListQuery({ companyId, branchId }, { skip: !companyId || !branchId })
+  const staff = useMemo(() => currentStaff(allStaff), [allStaff]) // not those who left the job
   const manager = can(role, 'advances.approve') // approvers record one handed over on the spot
 
   const head = <Head companyId={companyId} branchId={branchId} user={user} manager={manager} tab={tab} setTab={setTab} />
