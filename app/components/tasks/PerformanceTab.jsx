@@ -183,7 +183,7 @@ export default function PerformanceTab({ tasks, loading, manage, lead = false, c
           {rows.map(({ person, p, r }) => (
             <li key={person.uid} className="min-w-0 space-y-3 rounded-2xl border border-line bg-surface p-4">
               <div className="flex items-center gap-3">
-                <Avatar name={person.name} />
+                <Avatar name={person.name} uid={person.uid} />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-fg">{person.name}</p>
                   <p className="text-xs text-muted">{p.given} task{p.given === 1 ? "" : "s"} this month</p>

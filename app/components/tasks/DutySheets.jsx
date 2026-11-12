@@ -158,7 +158,7 @@ export function CoverSheet({ item, onClose, people, companyId, branchId, user, t
                 aria-pressed={pick === p.uid}
                 className={cn("flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition", pick === p.uid ? "border-brand bg-brand-soft" : "border-line hover:bg-surface-2", off && "opacity-60")}
               >
-                <Avatar name={p.name} size="sm" />
+                <Avatar name={p.name} uid={p.uid} size="sm" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-semibold text-fg">{p.uid === user.uid ? `${p.name} (me)` : p.name}</span>
                   <span className={cn("block text-xs", off ? "text-warning" : "text-muted")}>{off || (p.uid === (usual.away?.uid || usual.uid) ? "Usually does it" : usual.away && p.uid === usual.uid ? "Has it for now" : "Free")}</span>

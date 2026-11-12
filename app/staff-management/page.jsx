@@ -1,7 +1,10 @@
 'use client'
 
 import { moveTasksToLead } from '@/lib/tasks/client'
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { doc, updateDoc } from 'firebase/firestore'
+import { db } from '@/lib/firebase'
+import { refreshPhotos } from '@/app/hooks/usePhoto'
 import { useRouter, useSearchParams } from 'next/navigation'
 import useSession from '@/app/hooks/useSession'
 import { useHires, acceptHire, fileUrl, createHire } from '@/lib/hires/client'
@@ -85,7 +88,7 @@ function StaffManagement () {
   const currency = useCurrency()
   const money = n => formatMoney(Number(n) || 0, currency)
 
-  const { data: staffList = [], isLoading } = useGetStaffListQuery({ companyId, branchId }, { skip: !companyId || !branchId })
+  const { data: staffList = [], isLoading, refetch: refetchStaff } = useGetStaffListQuery({ companyId, branchId }, { skip: !companyId || !branchId })
   // office logins that can be linked to a staff record (30 Oct): this branch's, and the company roles
   const people = useChatPeople(companyId)
   const officeLogins = useMemo(
@@ -146,6 +149,34 @@ function StaffManagement () {
   // people joining (30 Oct): made here, filled in by them from a link, accepted into the list
   const { user } = useSession()
   const canSeePrivate = can(user?.role, 'staff.pay') // phone is public; IC, address, birth date are not
+
+  // Joined from the link before 12 Nov: the photo they sent may not be on their
+  // record (it was shown in the form but not kept). Put it there, once, for
+  // those with no photo — it then shows everywhere.
+  const photoFixed = useRef(new Set())
+  useEffect(() => {
+    if (!companyId || !branchId || !canSeePrivate || !can(user?.role, 'staff.manage')) return
+    const sentPhoto = s => (s.documents || []).find(d => d?.kind === 'photo' && d.path)
+    const todo = staffList.filter(s => !s.photoUrl && sentPhoto(s) && !photoFixed.current.has(s.id))
+    if (!todo.length) return
+    todo.forEach(s => photoFixed.current.add(s.id))
+    ;(async () => {
+      let n = 0
+      for (const s of todo) {
+        try {
+          const url = await fileUrl(sentPhoto(s).path)
+          await updateDoc(doc(db, 'companies', companyId, 'branches', branchId, 'staff', s.id), { photoUrl: url })
+          n++
+        } catch {
+          /* the file is gone or not readable: leave it */
+        }
+      }
+      if (n) {
+        refetchStaff()
+        refreshPhotos()
+      }
+    })()
+  }, [staffList, companyId, branchId, canSeePrivate, user?.role, refetchStaff])
   const { list: hires } = useHires(companyId, branchId, ready)
   const [hireForm, setHireForm] = useState(null) // { hire? }: the new hire sheet
   const [hireId, setHireId] = useState(null) // the one open
@@ -183,7 +214,8 @@ function StaffManagement () {
       if (!existing) return toast.error('That staff member is no longer on the list')
       const sent = Object.fromEntries(Object.entries(hire.details || {}).filter(([, v]) => String(v ?? '').trim() !== ''))
       try {
-        if (hire.files?.photo?.path && !existing.photoUrl) sent.photoUrl = await fileUrl(hire.files.photo.path)
+        // the photo they sent becomes their profile photo (12 Nov)
+        if (hire.files?.photo?.path) sent.photoUrl = await fileUrl(hire.files.photo.path)
       } catch {
         /* no photo then */
       }
@@ -256,6 +288,7 @@ function StaffManagement () {
       }
       setModalMode(null)
       setEditTarget(null)
+      refreshPhotos() // a new or changed photo shows everywhere
     } catch (err) {
       toast.error(err?.message || 'Something went wrong')
     }
@@ -586,7 +619,7 @@ function StaffManagement () {
             {officeLogins.map(p => (
               <li key={p.uid}>
                 <button type='button' onClick={() => setLinkUid(p.uid)} aria-pressed={linkUid === p.uid} className={cn('flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition', linkUid === p.uid ? 'border-brand bg-brand-soft' : 'border-line hover:bg-surface-2')}>
-                  <Avatar name={p.name} size='sm' />
+                  <Avatar name={p.name} uid={p.uid} size='sm' />
                   <span className='min-w-0 flex-1'>
                     <span className='block truncate text-sm font-semibold text-fg'>{p.name}</span>
                     <span className='block text-xs text-muted'>{loginRoleLabel(p.role)}</span>

@@ -57,7 +57,7 @@ export default function SideNav({ sections, activePath, badges = {}, user, compa
       {/* me */}
       <div className={cn("shrink-0 border-t border-line p-3", collapsed && "flex flex-col items-center gap-2")}>
         <div className={cn("flex items-center gap-3", !collapsed && "rounded-xl px-2 py-1.5")}>
-          <Avatar name={personName(user)} size="md" />
+          <Avatar name={personName(user)} uid={user?.uid} staffId={user?.staffId} size="md" />
           {!collapsed && (
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-fg">{personName(user) || "Me"}</p>

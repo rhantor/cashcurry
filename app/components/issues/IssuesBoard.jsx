@@ -68,7 +68,7 @@ function IssueCard({ issue, today, branchName, onOpen }) {
           <span className="ml-auto inline-flex items-center gap-1.5 text-[11px] text-muted">
             {issue.assignedTo ? (
               <>
-                <Avatar name={issue.assignedTo.name} size="sm" />
+                <Avatar name={issue.assignedTo.name} uid={issue.assignedTo.uid} size="sm" />
                 {issue.assignedTo.name.split(" ")[0]}
               </>
             ) : (

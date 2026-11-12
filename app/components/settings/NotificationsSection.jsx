@@ -127,7 +127,7 @@ export default function NotificationsSection({ companyId, branchId }) {
                       on ? "border-brand/40 bg-brand-soft text-fg" : "border-line bg-surface text-muted hover:border-brand/30"
                     )}
                   >
-                    <Avatar name={p.name} size="sm" />
+                    <Avatar name={p.name} uid={p.uid} size="sm" />
                     <span className="font-semibold">{p.name}</span>
                     <span className="text-subtle">{roleLabel(p.role)}</span>
                     {on && <Check className="size-3.5 text-brand" />}

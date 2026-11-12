@@ -87,7 +87,7 @@ function MoreMenu({ sections, hidden, activePath, badges, user, isCompany, branc
     <div className="space-y-4">
       {/* me + branch */}
       <div className="flex items-center gap-3">
-        <Avatar name={personName(user)} size="lg" />
+        <Avatar name={personName(user)} uid={user?.uid} staffId={user?.staffId} size="lg" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-base font-bold text-fg">{personName(user) || "Me"}</p>
           <p className="text-xs text-muted">{roleName(user?.role)}</p>

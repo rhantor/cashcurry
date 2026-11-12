@@ -110,7 +110,7 @@ export default function PayOutQueue({ companyId, branchId, user, title = "Waitin
           return (
             <li key={key} className="px-4 py-3">
               <div className="flex items-center gap-3">
-                <Avatar name={item.staffName} size="sm" />
+                <Avatar name={item.staffName} staffId={item.staffId} size="sm" />
                 <div className="min-w-0 flex-1">
                   <p className="flex items-center gap-1.5 text-sm font-semibold text-fg">
                     <span className="truncate">{item.staffName || "—"}</span>

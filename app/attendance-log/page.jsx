@@ -421,7 +421,7 @@ export default function AttendanceLogPage() {
               {byStaff.map((g) => (
                 <div key={g.staffId} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:gap-4 sm:p-4">
                   <div className="flex min-w-0 items-center gap-3 sm:w-56">
-                    <Avatar name={g.name} size="md" />
+                    <Avatar name={g.name} staffId={g.staffId} size="md" />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-fg">{g.name}</p>
                       {/* a day gone by still "in": they forgot to clock out */}

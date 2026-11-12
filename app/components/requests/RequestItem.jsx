@@ -104,7 +104,7 @@ export default function RequestItem({ req, actions = [], onAction, busy, currenc
         </div>
       )}
       <div className={cn("flex items-start gap-3", asPaper && "hidden")}>
-        {showWho && <Avatar name={req.staffName} />}
+        {showWho && <Avatar name={req.staffName} staffId={req.staffId} />}
         <div className="min-w-0 flex-1">
           <p className="flex flex-wrap items-center gap-1.5">
             {showWho && <span className="truncate text-sm font-semibold text-fg">{req.staffName || "—"}</span>}

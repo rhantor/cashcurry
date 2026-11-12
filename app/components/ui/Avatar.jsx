@@ -1,4 +1,7 @@
+"use client";
+import { useState } from "react";
 import { cn } from "./cn";
+import usePhoto from "@/app/hooks/usePhoto";
 
 // Soft background + strong text, picked from the name so a person keeps their colour.
 const SWATCHES = [
@@ -20,13 +23,20 @@ const initials = (name) =>
 
 const SIZES = { sm: "size-7 text-[10px]", md: "size-9 text-xs", lg: "size-12 text-sm" };
 
-/** A person's photo, or their initials on a colour that's always theirs. `status` adds an online dot. */
-export default function Avatar({ name, src, size = "md", status, className }) {
+/**
+ * A person's photo, or their initials on a colour that's always theirs. `status` adds an online dot.
+ * `staffId` / `uid`: their staff record's photo is found by itself (12 Nov 2026), when `src` isn't given.
+ */
+export default function Avatar({ name, src, staffId, uid, size = "md", status, className }) {
+  const found = usePhoto({ uid, staffId, name: typeof name === "string" ? name : "" });
+  const [broken, setBroken] = useState(null);
+  const url = src || found;
+  const show = url && url !== broken;
   return (
     <span className={cn("relative inline-flex shrink-0", className)}>
-      {src ? (
+      {show ? (
         // Staff photos come from Storage URLs (a plain <img>, not next/image).
-        <img src={src} alt={name || ""} className={cn("rounded-full object-cover", SIZES[size])} />
+        <img src={url} alt={name || ""} onError={() => setBroken(url)} className={cn("rounded-full object-cover", SIZES[size])} />
       ) : (
         <span className={cn("inline-flex items-center justify-center rounded-full font-bold", SIZES[size], SWATCHES[hash(name) % SWATCHES.length])}>
           {initials(name)}
