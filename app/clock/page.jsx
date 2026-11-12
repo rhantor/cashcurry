@@ -7,7 +7,7 @@
 // here and sent later.
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Check, ChevronLeft, Delete, Fingerprint, KeyRound, Loader2, LogIn, LogOut, ScanFace, Search, Wifi, WifiOff, X } from "lucide-react";
+import { Check, ChevronLeft, Delete, Fingerprint, KeyRound, Loader2, LogIn, LogOut, RotateCw, ScanFace, Search, Wifi, WifiOff, X } from "lucide-react";
 import { roleLabelOf } from "@/app/staff-management/lib/constants";
 import { verifyBiometric } from "@/lib/attendance/biometric";
 import { cachedState, clearDropped, dropped, identify, keep, kioskToken, loadState, punchId, queued, sendKept, sendPunch, snapshot } from "@/lib/attendance/kioskClient";
@@ -141,6 +141,23 @@ export default function KioskTablet() {
     setWaiting(r.left);
     if (r.sent || r.refused) refresh();
   }, [refresh]);
+
+  // Refresh (12 Nov): an iPad kiosk on the home screen has no reload button.
+  // Online: send any kept punches, then load the page afresh (new staff, faces,
+  // settings, a new version of the app, a stuck camera). No internet: only
+  // what the tablet can do — the page stays, so punches keep being kept.
+  const [reloading, setReloading] = useState(false);
+  const reloadAll = async () => {
+    if (reloading) return;
+    setReloading(true);
+    if (!navigator.onLine) {
+      await refresh();
+      setReloading(false);
+      return;
+    }
+    await flush().catch(() => {});
+    window.location.reload();
+  };
 
   useEffect(() => {
     if (!kioskToken()) return setNotSetUp(true);
@@ -387,6 +404,15 @@ export default function KioskTablet() {
           {online ? "Online" : "No internet — use your PIN; punches are kept"}
           {waiting > 0 && <span className="rounded-full bg-white/15 px-2">{waiting} waiting</span>}
         </div>
+        <button
+          type="button"
+          onClick={reloadAll}
+          disabled={reloading}
+          className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-bold text-white/80 ring-1 ring-white/15 transition hover:bg-white/15 active:scale-95 disabled:opacity-60"
+        >
+          <RotateCw className={`size-4 ${reloading ? "animate-spin" : ""}`} />
+          Refresh
+        </button>
       </header>
 
       <div className={`mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col gap-4 px-5 pb-5 ${faceOn ? "md:flex-row" : ""}`}>
