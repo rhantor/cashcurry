@@ -18,10 +18,49 @@ import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import { ROOT, LOCAL_DIR, LOCAL_PROJECT_ID, EMULATOR_DATA_DIR, NEXT_LOCAL_ENV } from "./config.mjs";
+import { EXPORT_NAME, checkFirestoreExport, ensurePrev, findGoodCopies, fsyncTree, installExport, keptDirFor, savingDirFor } from "./exportSafety.mjs";
 
-if (!fs.existsSync(EMULATOR_DATA_DIR)) {
-  console.error("No local data yet. Run `npm run local:seed` first.");
-  process.exit(1);
+const KEEP_DIR = keptDirFor(EMULATOR_DATA_DIR);
+const FIRESTORE_DIR = path.join(EMULATOR_DATA_DIR, EXPORT_NAME);
+
+// Never start on a broken copy (12 Nov 2026: an export of only zero bytes).
+// The emulators would load nothing, and the next save would write that over
+// everything — so stop, and say which good copy to go back to.
+{
+  const goodCopies = () => findGoodCopies({ dataDir: EMULATOR_DATA_DIR, keepDir: KEEP_DIR, localDir: LOCAL_DIR, projectId: LOCAL_PROJECT_ID });
+  if (!fs.existsSync(path.join(EMULATOR_DATA_DIR, "firebase-export-metadata.json"))) {
+    const copies = goodCopies();
+    if (!copies.length) {
+      console.error("No local data yet. Run `npm run local:seed` first.");
+    } else {
+      console.error(`\n  The local data folder ${path.relative(ROOT, EMULATOR_DATA_DIR)} is missing or incomplete,`);
+      console.error("  but good Firestore copies exist — don't re-seed before looking at them:");
+      copies.forEach((c) => console.error(`    ${path.relative(ROOT, c.dir)}    (${c.label})`));
+      console.error("  Logins and files (auth_export, storage_export) come only from a full data folder.\n");
+    }
+    process.exit(1);
+  }
+  const startCheck = checkFirestoreExport(FIRESTORE_DIR, LOCAL_PROJECT_ID);
+  if (!startCheck.ok) {
+    const copies = goodCopies();
+    console.error(`\n  The saved local data is broken — ${path.relative(ROOT, FIRESTORE_DIR)}: ${startCheck.reason}.`);
+    console.error("  The emulators were NOT started, and nothing was changed.");
+    if (copies.length) {
+      console.error("  Put a good copy back (the broken one is set aside, not deleted):");
+      copies.forEach((c) => console.error(`    npm run local:restore-save -- "${path.relative(ROOT, c.dir)}"    (${c.label})`));
+    } else {
+      console.error("  No good copy found in .local/emulator-data-kept or .local/rescue-*.");
+    }
+    console.error("");
+    process.exit(1);
+  }
+  try {
+    if (ensurePrev({ dataDir: EMULATOR_DATA_DIR, keepDir: KEEP_DIR, projectId: LOCAL_PROJECT_ID })) {
+      console.log(`  [a spare good copy of the local data is kept in ${path.relative(ROOT, KEEP_DIR)}]`);
+    }
+  } catch (e) {
+    console.log(`  [could not keep a spare copy of the local data: ${e.message}]`);
+  }
 }
 
 // ── phone mode ──
@@ -77,10 +116,38 @@ function shutdown(code, { fromSignal = false } = {}) {
   stopping = true;
   if (!fromSignal) children.forEach(stopChild);
   const waitAll = setInterval(() => {
-    if (children.every((c) => c.exitCode !== null || c.signalCode !== null)) process.exit(code);
+    if (children.every((c) => c.exitCode !== null || c.signalCode !== null)) {
+      clearInterval(waitAll);
+      finish(code);
+    }
   }, 200);
   // Safety net: never leave emulators behind if they ignore the signal.
-  setTimeout(() => { clearInterval(waitAll); children.forEach(stopChild); process.exit(code); }, 15_000).unref();
+  setTimeout(() => { clearInterval(waitAll); children.forEach(stopChild); finish(code); }, 15_000).unref();
+}
+
+// On exit the Firebase CLI has just written its own export (--export-on-exit)
+// by deleting the data folder and renaming a new one in, without flushing it
+// to disk. Flush it now, so a power cut right after Ctrl+C can't leave files
+// of zeros, and check it.
+let finished = false;
+function finish(code) {
+  if (finished) return;
+  finished = true;
+  try {
+    let files = 0;
+    for (const f of [EXPORT_NAME, "auth_export", "storage_export", "firebase-export-metadata.json"]) {
+      files += fsyncTree(path.join(EMULATOR_DATA_DIR, f));
+    }
+    const check = checkFirestoreExport(FIRESTORE_DIR, LOCAL_PROJECT_ID);
+    console.log(
+      check.ok
+        ? `  [local data written to disk and checked: ${check.records} records, ${files} files]`
+        : `  [WARNING: the saved local data is not good (${check.reason}). The last good save is in ${path.relative(ROOT, KEEP_DIR)}.]`
+    );
+  } catch (e) {
+    console.log(`  [could not flush the local data to disk: ${e.message}]`);
+  }
+  process.exit(code);
 }
 process.on("SIGINT", () => shutdown(0, { fromSignal: true }));
 process.on("SIGTERM", () => shutdown(0));
@@ -150,38 +217,35 @@ function localLoginEnv() {
 // save would be lost.
 //
 // Firestore (where nearly all changes are) is saved straight from its own
-// emulator, into a fresh folder first, and swapped in only once that export
-// is complete — so a failed save never leaves an empty copy behind. The CLI's
-// whole-suite `emulators:export` is not used for this: on Windows it crashed
-// the CLI mid-export (21 Oct 2026), taking every emulator down with it.
-// Accounts and files are still saved on Ctrl+C (--export-on-exit).
+// emulator into .local/emulator-data-kept/saving, flushed to disk, checked
+// record by record, and only then swapped in; the copy it replaces becomes
+// firestore_export.prev there (see exportSafety.mjs). A failed or broken save
+// never touches the current copy. The CLI's whole-suite `emulators:export`
+// is not used for this: on Windows it crashed the CLI mid-export (21 Oct
+// 2026), taking every emulator down with it. Accounts and files are still
+// saved on Ctrl+C (--export-on-exit).
 const AUTOSAVE_MS = 5 * 60 * 1000;
 let saving = false;
 async function saveFirestore() {
-  const tmp = path.join(LOCAL_DIR, "autosave-tmp");
+  const tmp = savingDirFor(KEEP_DIR);
   fs.rmSync(tmp, { recursive: true, force: true });
   fs.mkdirSync(tmp, { recursive: true });
   const res = await fetch(`http://127.0.0.1:8080/emulator/v1/projects/${LOCAL_PROJECT_ID}:export`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ database: `projects/${LOCAL_PROJECT_ID}/databases/(default)`, export_directory: tmp, export_name: "firestore_export" }),
+    body: JSON.stringify({ database: `projects/${LOCAL_PROJECT_ID}/databases/(default)`, export_directory: tmp, export_name: EXPORT_NAME }),
   });
   if (!res.ok) throw new Error(`export ${res.status}`);
-  const fresh = path.join(tmp, "firestore_export");
-  if (!fs.existsSync(path.join(fresh, "firestore_export.overall_export_metadata"))) throw new Error("export left no metadata");
-  const target = path.join(EMULATOR_DATA_DIR, "firestore_export");
-  const old = path.join(LOCAL_DIR, "autosave-old");
-  fs.rmSync(old, { recursive: true, force: true });
-  if (fs.existsSync(target)) fs.renameSync(target, old);
-  fs.renameSync(fresh, target);
-  fs.rmSync(old, { recursive: true, force: true });
+  if (stopping) throw new Error("stopping"); // the CLI's exit export owns the folder now
+  const saved = installExport({ fresh: path.join(tmp, EXPORT_NAME), dataDir: EMULATOR_DATA_DIR, keepDir: KEEP_DIR, projectId: LOCAL_PROJECT_ID });
   fs.rmSync(tmp, { recursive: true, force: true });
+  return saved;
 }
 setInterval(() => {
   if (saving || stopping) return;
   saving = true;
   saveFirestore()
-    .then(() => console.log(`  [local data saved ${new Date().toLocaleTimeString()}]`))
+    .then((s) => console.log(`  [local data saved ${new Date().toLocaleTimeString()} — ${s.records} records, checked]`))
     .catch((e) => console.log(`  [local data NOT saved: ${e.message} — the last save is kept]`))
     .finally(() => {
       saving = false;
