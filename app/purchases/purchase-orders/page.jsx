@@ -46,6 +46,7 @@ import {
   Repeat,
   ListPlus,
 } from "lucide-react";
+import { Menu } from "@/app/components/ui";
 import { SENT_VIA, dueText, followUpOrder, lateDays, missingLines, repeatOrder } from "@/lib/purchases/orders";
 import { useRouter } from "next/navigation";
 import { OrdersContext } from "./OrdersContext";
@@ -558,7 +559,8 @@ export default function PurchaseOrdersPage() {
   /* ---------------------------------- pdf ---------------------------------- */
   const [printing, setPrinting] = useState(null);
 
-  const exportPDF = async (order) => {
+  // withPrices (13 Nov): the copy for management to approve; the supplier's has no prices
+  const exportPDF = async (order, { withPrices = false } = {}) => {
     setPrinting(order.id);
     try {
       // The logo is fetched per print rather than cached: it is one small
@@ -573,6 +575,7 @@ export default function PurchaseOrdersPage() {
         branchBasic: branchSettings?.basic,
         currency,
         logoDataUrl,
+        withPrices,
       });
     } catch (e) {
       console.error(e);
@@ -775,6 +778,15 @@ export default function PurchaseOrdersPage() {
                     </button>
                   </div>
                 )}
+                {showApproval && canApprove && (
+                  <button
+                    onClick={() => exportPDF(order, { withPrices: true })}
+                    disabled={printing === order.id}
+                    className="w-full min-h-[40px] rounded-2xl bg-surface-2/60 text-sm font-semibold text-fg flex items-center justify-center gap-2 active:bg-surface-2 disabled:opacity-50"
+                  >
+                    <FileText className={`w-4 h-4 ${printing === order.id ? "animate-pulse" : ""}`} /> See the PDF with prices
+                  </button>
+                )}
 
                 {showApproval && !canApprove && (
                   <div className="min-h-[48px] rounded-2xl bg-surface-2/60 text-muted font-medium text-sm
@@ -846,14 +858,31 @@ export default function PurchaseOrdersPage() {
                       <Repeat className="w-4 h-4" />
                     </button>
                   )}
-                  <button
-                    onClick={() => exportPDF(order)}
-                    disabled={printing === order.id}
-                    aria-label="Download PDF"
-                    className={`${iconBtn} disabled:opacity-50`}
-                  >
-                    <FileText className={`w-4 h-4 ${printing === order.id ? "animate-pulse" : ""}`} />
-                  </button>
+                  {status === "Received" ? (
+                    <button
+                      onClick={() => exportPDF(order)}
+                      disabled={printing === order.id}
+                      aria-label="Download PDF"
+                      className={`${iconBtn} disabled:opacity-50`}
+                    >
+                      <FileText className={`w-4 h-4 ${printing === order.id ? "animate-pulse" : ""}`} />
+                    </button>
+                  ) : (
+                    // with or without prices (13 Nov): prices for management, none for the supplier
+                    <Menu
+                      align="start"
+                      width={250}
+                      trigger={(p) => (
+                        <button {...p} disabled={printing === order.id} aria-label="Download PDF" title="PDF" className={`${iconBtn} disabled:opacity-50`}>
+                          <FileText className={`w-4 h-4 ${printing === order.id ? "animate-pulse" : ""}`} />
+                        </button>
+                      )}
+                      items={[
+                        { label: "PDF with prices (for approval)", icon: FileText, onSelect: () => exportPDF(order, { withPrices: true }) },
+                        { label: "PDF without prices (for the supplier)", icon: FileText, onSelect: () => exportPDF(order) },
+                      ]}
+                    />
+                  )}
                   {canCancel(order) && (
                     <button
                       onClick={() => setPendingAction({ kind: "cancel", order })}
