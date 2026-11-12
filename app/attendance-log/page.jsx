@@ -11,7 +11,7 @@ import {
 import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
 import { hereOn } from "@/lib/staff/leaving";
 import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
-import { Clock, LogIn, LogOut, ChevronLeft, ChevronRight, Camera, Download, List, LayoutGrid, Plus, Trash2, Save, UserX } from "lucide-react";
+import { Clock, LogIn, LogOut, ChevronLeft, ChevronRight, Camera, Download, List, LayoutGrid, Plus, RotateCw, Trash2, Save, UserX } from "lucide-react";
 import { addMonths, format, parseISO } from "date-fns";
 import { Avatar, Badge, Button, Card, DataTable, DatePicker, EmptyState, Field, Input, Select, Sheet, Skeleton, Tabs, cn } from "@/app/components/ui";
 import { ChoiceCards } from "@/app/components/entry/Choices";
@@ -75,22 +75,22 @@ export default function AttendanceLogPage() {
   const skip = !companyId || !branchId;
   
   // Daily Punches
-  const { data: punches = [], isLoading: isLoadingDaily } = useGetBranchAttendanceTokensQuery(
+  const { data: punches = [], isLoading: isLoadingDaily, refetch: refetchDaily } = useGetBranchAttendanceTokensQuery(
     !skip ? { companyId, branchId, date: selectedDate } : { skip: true }
   );
 
   // Monthly Punches for Export and Summary
   const currentMonthStart = selectedDate.substring(0, 7) + "-01";
   const currentMonthEnd = selectedDate.substring(0, 7) + "-31";
-  const { data: monthlyPunches = [], isLoading: isLoadingMonthly } = useGetBranchAttendanceByPeriodQuery(
+  const { data: monthlyPunches = [], isLoading: isLoadingMonthly, refetch: refetchMonthly } = useGetBranchAttendanceByPeriodQuery(
     !skip ? { companyId, branchId, startDate: currentMonthStart, endDate: currentMonthEnd } : { skip: true }
   );
 
-  const { data: staffList = [] } = useGetStaffListQuery(
+  const { data: staffList = [], refetch: refetchStaff } = useGetStaffListQuery(
     !skip ? { companyId, branchId } : { skip: true }
   );
 
-  const { data: settings } = useGetBranchSettingsQuery(
+  const { data: settings, refetch: refetchSettings } = useGetBranchSettingsQuery(
     !skip ? { companyId, branchId } : { skip: true }
   );
   const attendanceSettings = settings?.attendance || {};
@@ -98,12 +98,23 @@ export default function AttendanceLogPage() {
 
   // Early-OT decisions for the month — they change how the engine pays an early
   // punch-in, so the log must agree with what the approver decided.
-  const { data: otRequests = [] } = useGetOtRequestsQuery(
+  const { data: otRequests = [], refetch: refetchOt } = useGetOtRequestsQuery(
     !skip && shiftsOn
       ? { companyId, branchId, startDate: currentMonthStart, endDate: currentMonthEnd }
       : { skip: true },
     { skip: skip || !shiftsOn }
   );
+
+  // Refresh (12 Nov): the log is read once, so a tablet left open (an iPad has
+  // no reload button) fetches the new punches on a tap
+  const [refreshing, setRefreshing] = useState(false);
+  const refreshAll = async () => {
+    if (skip) return;
+    setRefreshing(true);
+    const again = [refetchDaily, refetchMonthly, refetchStaff, refetchSettings, ...(shiftsOn ? [refetchOt] : [])];
+    await Promise.all(again.map((f) => Promise.resolve().then(() => f()).catch(() => {})));
+    setRefreshing(false);
+  };
 
   // { [staffId]: { [date]: status } }
   const otApprovalsByStaff = useMemo(() => {
@@ -340,6 +351,9 @@ export default function AttendanceLogPage() {
           <p className="text-sm text-muted">Who punched in and out, and the hours that go to payroll.</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          <Button variant="secondary" icon={RotateCw} loading={refreshing} onClick={refreshAll}>
+            Refresh
+          </Button>
           <Button variant="secondary" icon={Download} loading={isExporting} onClick={handleExport}>
             Time card
           </Button>
