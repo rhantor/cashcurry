@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import crypto from "node:crypto";
 import admin from "firebase-admin";
 import { branchRef, callerMay } from "@/lib/server/kiosk";
+import { isCurrent } from "@/lib/staff/leaving";
 
 // A staff member's kiosk PIN (11 Nov 2026), set by those who look after
 // attendance — the kiosk login among them, who may not edit staff records.
@@ -21,6 +22,7 @@ export async function POST(req) {
     const staffCol = branchRef(companyId, branchId).collection("staff");
     const [me, all] = await Promise.all([staffCol.doc(staffId).get(), staffCol.get()]);
     if (!me.exists) return fail(404, "Not on the staff list.");
+    if (!isCurrent(me.data())) return fail(409, "They have left the job. Bring them back in Staff management first.");
     const taken = new Set(all.docs.filter((d) => d.id !== staffId).map((d) => String(d.data().pinCode || "")));
     let pin = String(body.pin || "");
     if (pin) {
