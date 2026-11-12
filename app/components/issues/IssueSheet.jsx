@@ -199,7 +199,7 @@ export default function IssueSheet({ issue, onClose, user, people = [], branchNa
                 </li>
               ) : (
                 <li key={c.id} className="flex gap-2.5">
-                  <Avatar name={c.byName} size="sm" />
+                  <Avatar name={c.byName} uid={c.byUid} size="sm" />
                   <div className="min-w-0 flex-1 rounded-2xl rounded-tl-md bg-surface-2 px-3 py-2">
                     <p className="flex items-baseline gap-2 text-xs">
                       <span className="font-semibold text-fg">{c.byName}</span>

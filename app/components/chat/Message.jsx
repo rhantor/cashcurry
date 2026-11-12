@@ -142,7 +142,7 @@ export default function Message({ msg, me, showName, showAvatar, first, status, 
 
   return (
     <div className={cn("group flex items-end gap-2", mine ? "flex-row-reverse" : "flex-row")}>
-      <div className="w-8 shrink-0">{!mine && showAvatar && <Avatar name={msg.byName} size="sm" />}</div>
+      <div className="w-8 shrink-0">{!mine && showAvatar && <Avatar name={msg.byName} uid={msg.byUid} size="sm" />}</div>
       <div className={cn("flex min-w-0 max-w-[80%] flex-col sm:max-w-[62%]", mine ? "items-end" : "items-start")}>
         {!mine && showName && <span className={cn("mb-0.5 px-1 text-[11px] font-semibold", toneOf(msg.byUid))}>{msg.byName}</span>}
         {sticker ? (

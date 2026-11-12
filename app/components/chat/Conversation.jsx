@@ -157,7 +157,7 @@ export default function Conversation({ chat, user, peopleById, branchName, muted
             <Icon className="size-[18px]" />
           </span>
         ) : (
-          <Avatar name={title} />
+          <Avatar name={title} uid={chat.kind === "direct" ? (chat.members || []).find((u) => u !== user?.uid) : undefined} />
         )}
         <div className="min-w-0 flex-1">
           <p className="truncate text-[15px] font-bold text-fg">{title}</p>
@@ -170,7 +170,7 @@ export default function Conversation({ chat, user, peopleById, branchName, muted
           <div className="hidden -space-x-2 sm:flex">
             {(chat.members || []).slice(0, 4).map((u) => (
               <span key={u} className="rounded-full ring-2 ring-surface">
-                <Avatar name={peopleById[u]?.name || "?"} size="sm" />
+                <Avatar name={peopleById[u]?.name || "?"} uid={u} size="sm" />
               </span>
             ))}
           </div>

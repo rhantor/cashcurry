@@ -47,7 +47,7 @@ function ChatRow({ chat, active, muted, labels = [], onOpen, onLabels, onMute, m
             <Icon className="size-5" />
           </span>
         ) : (
-          <Avatar name={chat.title} size="lg" />
+          <Avatar name={chat.title} uid={chat.kind === "direct" ? (chat.members || []).find((u) => u !== me) : undefined} size="lg" />
         )}
         <span className="min-w-0 flex-1">
           <span className="flex items-baseline gap-2">

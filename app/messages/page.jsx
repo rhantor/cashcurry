@@ -31,7 +31,7 @@ export default function MessagesPage() {
         <LogoMark size={28} />
         <h1 className="flex-1 text-base font-bold tracking-tight text-fg">Messages</h1>
         <NotificationBell />
-        {user && <Avatar name={personName(user)} size="md" />}
+        {user && <Avatar name={personName(user)} uid={user?.uid} staffId={user?.staffId} size="md" />}
       </header>
       {user?.uid ? <ChatApp user={user} branches={mine} allBranches={branches} className="min-h-0 flex-1" /> : <Skeleton className="m-4 flex-1" rounded="rounded-2xl" />}
     </div>

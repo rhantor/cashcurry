@@ -179,7 +179,7 @@ export default function TaskDetailSheet({ task, onClose, companyId, branchId, us
                 const me = c.byUid === user.uid;
                 return (
                   <li key={c.id} className={cn("flex gap-2", me && "flex-row-reverse")}>
-                    <Avatar name={c.byName} size="sm" />
+                    <Avatar name={c.byName} uid={c.byUid} size="sm" />
                     <div className={cn("max-w-[80%] space-y-1 rounded-2xl px-3 py-2", me ? "bg-brand-soft" : "bg-surface-2")}>
                       <p className="text-[11px] text-muted">{me ? "You" : c.byName} · {when(c.createdAt)}</p>
                       {c.text && <p className="whitespace-pre-line text-sm text-fg">{c.text}</p>}

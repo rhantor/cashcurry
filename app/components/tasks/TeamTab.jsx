@@ -195,7 +195,7 @@ export default function TeamTab({ tasks, loading, people, companyId, branchId, u
       <div className="space-y-4">
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" icon={ArrowLeft} onClick={() => setOpenUid(null)} aria-label="Back to the team" />
-          <Avatar name={open.person.name} />
+          <Avatar name={open.person.name} uid={open.person.uid} />
           <div className="min-w-0 flex-1">
             <p className="truncate text-base font-semibold text-fg">{open.person.name}</p>
             <p className="text-xs text-muted">
@@ -256,7 +256,7 @@ export default function TeamTab({ tasks, loading, people, companyId, branchId, u
           {rows.map((r) => (
             <li key={r.person.uid}>
               <button type="button" onClick={() => { setOpenUid(r.person.uid); setView("todo"); }} className="flex w-full items-center gap-3 px-4 py-3 text-left hover:bg-surface-2">
-                <Avatar name={r.person.name} size="sm" />
+                <Avatar name={r.person.name} uid={r.person.uid} size="sm" />
                 <span className="min-w-0 flex-1 space-y-1.5">
                   <span className="flex items-center gap-2">
                     <span className="truncate text-sm font-medium text-fg">{r.person.name}</span>

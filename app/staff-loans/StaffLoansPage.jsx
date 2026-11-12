@@ -45,7 +45,7 @@ function LoanCard({ loan, money, onEditTerms, canEdit, flat = false }) {
   const body = (
     <>
       <button type="button" onClick={() => setOpen(!open)} aria-expanded={open} className="flex w-full items-start gap-3 px-4 py-3.5 text-left transition-colors hover:bg-surface-2/40">
-        {!flat && <Avatar name={loan.staffName} />}
+        {!flat && <Avatar name={loan.staffName} staffId={loan.staffId} />}
         <span className="min-w-0 flex-1">
           <span className="flex flex-wrap items-center gap-1.5">
             <span className="truncate text-sm font-semibold text-fg">{flat ? `${money(loan.amount)} loan` : loan.staffName}</span>
