@@ -64,10 +64,10 @@ export default function LeavingSheet ({ staff, onClose, companyId, branchId }) {
       {staff && (
         <div className='space-y-4'>
           <Field label='Last working day' error={errors.leftOn}>
-            <DatePicker value={leftOn} onChange={setLeftOn} max={today} invalid={!!errors.leftOn} placeholder='Their last day' />
+            <DatePicker value={leftOn} onChange={v => { setLeftOn(v); setErrors(x => ({ ...x, leftOn: undefined })) }} max={today} invalid={!!errors.leftOn} placeholder='Their last day' />
           </Field>
           <Field label='Why' error={errors.reason}>
-            <Select value={reason} onChange={e => setReason(e.target.value)} invalid={!!errors.reason}>
+            <Select value={reason} onChange={e => { setReason(e.target.value); setErrors(x => ({ ...x, reason: undefined })) }} invalid={!!errors.reason}>
               <option value=''>Choose…</option>
               {LEAVING_REASONS.map(r => (
                 <option key={r.value} value={r.value}>{r.label}</option>

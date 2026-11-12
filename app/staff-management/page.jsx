@@ -346,7 +346,7 @@ function StaffManagement () {
             <p className='flex min-w-0 items-center gap-1.5'>
               <span className='truncate font-semibold text-fg'>{fullName(s)}</span>
               {/* details still to get (6 Nov): only those who see private details can tell */}
-              {canSeePrivate && missingDetails(s).length > 0 && (
+              {canSeePrivate && isCurrent(s) && missingDetails(s).length > 0 && (
                 <span className='shrink-0 rounded-full bg-warning-soft px-1.5 py-px text-[10px] font-semibold text-warning'>{missingDetails(s).length} missing</span>
               )}
             </p>
@@ -371,7 +371,7 @@ function StaffManagement () {
       key: 'login',
       label: 'Staff app',
       sortValue: s => (s.uid ? 1 : 0),
-      render: s => (s.uid ? <Badge tone='success' dot>Has a login</Badge> : s.officeUid ? <Badge tone='info' dot>Office login · {s.officeName || 'linked'}</Badge> : <Badge>No login yet</Badge>)
+      render: s => (!isCurrent(s) ? <Badge>{s.uid ? 'Login switched off' : 'Left'}</Badge> : s.uid ? <Badge tone='success' dot>Has a login</Badge> : s.officeUid ? <Badge tone='info' dot>Office login · {s.officeName || 'linked'}</Badge> : <Badge>No login yet</Badge>)
     },
     {
       key: 'actions',
@@ -559,7 +559,7 @@ function StaffManagement () {
         onLeave={can(user?.role, 'staff.manage') ? s => { setDetailTarget(null); setLeavingFor(s) } : null}
         onBack={can(user?.role, 'staff.manage') ? bringBack : null}
         onChangeSalary={can(user?.role, 'staff.manage') ? s => { setDetailTarget(null); setSalaryFor(s) } : null}
-        missing={detailTarget && canSeePrivate ? missingDetails(detailTarget) : []}
+        missing={detailTarget && canSeePrivate && isCurrent(detailTarget) ? missingDetails(detailTarget) : []}
         detailsRequest={detailTarget ? detailsRequestFor(detailTarget.id, hires) : null}
         onAskDetails={can(user?.role, 'staff.manage') ? askDetails : null}
         onOpenRequest={h => { setDetailTarget(null); setHireId(h.id) }}
