@@ -78,6 +78,10 @@ Also run `npm run test:rules` if the rules changed.
   Before restarting, export from the running emulator over REST
   (`POST …/emulator/v1/projects/<id>:export`) into `.local/rescue-…`, then
   copy that into the emulator data.
+- Never keep copies inside `.local/emulator-data`: the CLI deletes that whole
+  folder on Ctrl+C. Spare copies go in `.local/emulator-data-kept`. If
+  `dev:local` refuses to start on a broken copy, use `npm run local:restore-save`
+  (see "Saving the local data" in `docs/LOCAL_DEV.md`).
 - Don't upload to the Storage emulator through the admin SDK. It crashes the
   emulator suite. Use the REST path, as `lib/server/hires.js` does.
 - If the dev server is running, build into `.next-check` so the two builds
