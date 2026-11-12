@@ -6,6 +6,7 @@
 import { useCallback, useMemo } from "react";
 import { format, parseISO } from "date-fns";
 import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
+import { currentStaff } from "@/lib/staff/leaving";
 import { useGetAdvanceEntriesQuery } from "@/lib/redux/api/AdvanceApiSlice";
 import { useGetStaffLoansQuery } from "@/lib/redux/api/staffLoanApiSlice";
 import { useApprovedLeaves } from "@/lib/tasks/client";
@@ -23,7 +24,8 @@ export default function useRequestHints({ companyId, branchId, requests = [], cu
   const money = here.some((r) => r.type !== "leave");
   const where_ = { companyId, branchId };
   const off = !companyId || !branchId;
-  const { data: staff } = useGetStaffListQuery(where_, { skip: off || !leave });
+  const { data: allStaff } = useGetStaffListQuery(where_, { skip: off || !leave });
+  const staff = useMemo(() => (allStaff ? currentStaff(allStaff) : allStaff), [allStaff]); // not those who left the job
   const leaves = useApprovedLeaves(companyId, branchId, !off && leave);
   const { data: advances } = useGetAdvanceEntriesQuery({ ...where_, status: "approved" }, { skip: off || !money });
   const { data: loans } = useGetStaffLoansQuery({ ...where_, status: "approved" }, { skip: off || !money });

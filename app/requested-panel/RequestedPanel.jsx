@@ -5,6 +5,7 @@ import RequestInbox from "@/app/components/requests/RequestInbox";
 import LeaveSheet from "@/app/components/requests/LeaveSheet";
 import { useGetRequestsQuery } from "@/lib/redux/api/requestsApiSlice";
 import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
+import { currentStaff } from "@/lib/staff/leaving";
 import { CalendarPlus } from "lucide-react";
 import {
   useGetLoanEntriesQuery,
@@ -83,7 +84,8 @@ export default function RequestedPanel() {
     { skip: !canRequests || !companyId || (!branchId && !allBranches), pollingInterval: 15000 }
   );
   const [leaveOpen, setLeaveOpen] = useState(false);
-  const { data: staff = [], isLoading: staffLoading } = useGetStaffListQuery({ companyId, branchId }, { skip: !companyId || !branchId || !leaveOpen });
+  const { data: allStaff = [], isLoading: staffLoading } = useGetStaffListQuery({ companyId, branchId }, { skip: !companyId || !branchId || !leaveOpen });
+  const staff = useMemo(() => currentStaff(allStaff), [allStaff]); // not those who left the job
 
   const {
     data: loans,

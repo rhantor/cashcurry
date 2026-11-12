@@ -16,13 +16,15 @@ import {
   useDeleteStaffMutation,
   useGenerateStaffLoginMutation,
   useResetStaffPinMutation,
-  useLinkOfficeLoginMutation
+  useLinkOfficeLoginMutation,
+  useStaffLeavingMutation
 } from '@/lib/redux/api/staffApiSlice'
+import { currentStaff, isCurrent, leftLine } from '@/lib/staff/leaving'
 import { useGetSingleBranchQuery } from '@/lib/redux/api/branchApiSlice'
 import { useGetBranchSettingsQuery } from '@/lib/redux/api/branchSettingsApiSlice'
 import { skipToken } from '@reduxjs/toolkit/query'
 import { shiftsEnabled } from '@/lib/attendance/shifts'
-import { Check, Copy, Eye, KeyRound, Link2, Link2Off, MoreHorizontal, Pencil, Plus, Search, Smartphone, Store, Trash2, UserPlus, Users, Wallet, Zap } from 'lucide-react'
+import { Check, Copy, Eye, KeyRound, Link2, Link2Off, MoreHorizontal, Pencil, Plus, Search, Smartphone, Store, Trash2, UserCheck, UserMinus, UserPlus, Users, Wallet, Zap } from 'lucide-react'
 import { Avatar, Badge, Button, DataTable, Input, Menu, Select, Sheet, Skeleton, cn } from '@/app/components/ui'
 import { toast, confirmDialog } from '@/app/components/ui/notify'
 import StatTiles from '@/app/components/purchases/StatTiles'
@@ -38,6 +40,7 @@ import StaffDetailModal from './components/StaffDetailModal'
 import SalaryChangeSheet from './components/SalaryChangeSheet'
 import QuickAddSheet from './components/QuickAddSheet'
 import NewHires, { HireSheet, NewHireSheet } from './components/NewHires'
+import LeavingSheet from './components/LeavingSheet'
 
 const fullName = s => `${s?.firstName || ''} ${s?.lastName || ''}`.trim() || s?.name || 'Unnamed'
 
@@ -126,6 +129,12 @@ function StaffManagement () {
 
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
+  // working here, or left the job (12 Nov)
+  const [view, setView] = useState('working') // "working" | "left"
+  const [leavingFor, setLeavingFor] = useState(null)
+  const [staffLeaving] = useStaffLeavingMutation()
+  const working = useMemo(() => currentStaff(staffList), [staffList])
+  const leftCount = staffList.length - working.length
   const [modalMode, setModalMode] = useState(null) // "add" | "edit" | null
   const [editTarget, setEditTarget] = useState(null)
   const [detailTarget, setDetailTarget] = useState(null)
@@ -199,7 +208,8 @@ function StaffManagement () {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
-    return staffList.filter(s => {
+    const shown = view === 'left' && leftCount ? staffList.filter(s => !isCurrent(s)) : working
+    return shown.filter(s => {
       const matchSearch =
         !q ||
         fullName(s).toLowerCase().includes(q) ||
@@ -209,7 +219,7 @@ function StaffManagement () {
         (s.department || '').toLowerCase().includes(q)
       return matchSearch && (!roleFilter || s.role === roleFilter)
     })
-  }, [staffList, search, roleFilter])
+  }, [staffList, working, view, leftCount, search, roleFilter])
 
   const openAdd = () => {
     setEditTarget(null)
@@ -248,6 +258,23 @@ function StaffManagement () {
       setEditTarget(null)
     } catch (err) {
       toast.error(err?.message || 'Something went wrong')
+    }
+  }
+
+  // back at work: on the kiosk and lists again; their face is taken again
+  const bringBack = async s => {
+    const ok = await confirmDialog({
+      title: `Bring ${fullName(s)} back?`,
+      message: 'They are on the staff list, kiosk and payroll again, and their staff app login works again. Add their face on the kiosk again.',
+      confirmLabel: 'Bring back'
+    })
+    if (!ok) return
+    try {
+      await staffLeaving({ companyId, branchId, staffId: s.id, back: true }).unwrap()
+      if (detailTarget?.id === s.id) setDetailTarget(null)
+      toast.success(`${fullName(s)} is back`)
+    } catch (err) {
+      toast.error("Couldn't bring them back", { description: err?.message })
     }
   }
 
@@ -302,8 +329,8 @@ function StaffManagement () {
     return <StatusScreen full={false} icon={Store} tone='warning' title='Pick a branch first' message='Staff belong to a branch — choose one from the top bar to see its staff.' />
   }
 
-  const withLogin = staffList.filter(s => s.uid).length
-  const payTotal = staffList.reduce((n, s) => n + (Number(s.basicSalary) || 0), 0)
+  const withLogin = working.filter(s => s.uid).length
+  const payTotal = working.reduce((n, s) => n + (Number(s.basicSalary) || 0), 0)
   const roleLabel = r => roleLabelOf(r) || 'Staff'
 
   const columns = [
@@ -327,6 +354,7 @@ function StaffManagement () {
               {roleLabel(s.role)}
               {s.department ? ` · ${s.department}` : ''}
             </p>
+            {!isCurrent(s) && <p className='truncate text-[11px] font-semibold text-warning'>{leftLine(s)}</p>}
           </div>
         </div>
       )
@@ -363,11 +391,13 @@ function StaffManagement () {
             items={[
               { label: 'Open', icon: Eye, onSelect: () => setDetailTarget(s) },
               { label: 'Edit', icon: Pencil, onSelect: () => openEdit(s) },
-              !s.uid && { label: generatingFor === s.id ? 'Making the login…' : 'Make a staff app login', icon: KeyRound, onSelect: () => handleGenerateLogin(s) },
-              s.uid && { label: 'Reset PIN', icon: KeyRound, onSelect: () => handleResetPin(s) },
-              !s.uid && !s.officeUid && { label: 'Link an office login', icon: Link2, onSelect: () => { setLinkUid(''); setLinkFor(s) } },
+              isCurrent(s) && !s.uid && { label: generatingFor === s.id ? 'Making the login…' : 'Make a staff app login', icon: KeyRound, onSelect: () => handleGenerateLogin(s) },
+              isCurrent(s) && s.uid && { label: 'Reset PIN', icon: KeyRound, onSelect: () => handleResetPin(s) },
+              isCurrent(s) && !s.uid && !s.officeUid && { label: 'Link an office login', icon: Link2, onSelect: () => { setLinkUid(''); setLinkFor(s) } },
               s.officeUid && { label: 'Unlink the office login', icon: Link2Off, onSelect: () => unlinkOffice(s) },
               'divider',
+              isCurrent(s) ? { label: 'Left the job', icon: UserMinus, onSelect: () => setLeavingFor(s) } : { label: 'Bring back', icon: UserCheck, onSelect: () => bringBack(s) },
+              !isCurrent(s) && { label: 'When and why they left', icon: Pencil, onSelect: () => setLeavingFor(s) },
               { label: 'Delete', icon: Trash2, danger: true, onSelect: () => handleDelete(s) }
             ].filter(Boolean)}
           />
@@ -401,17 +431,37 @@ function StaffManagement () {
       <StatTiles
         loading={isLoading}
         tiles={[
-          { label: 'Staff', value: String(staffList.length), note: `At ${branchData?.name || 'this branch'}`, icon: Users, tone: 'bg-brand-soft text-brand' },
+          { label: 'Staff', value: String(working.length), note: leftCount ? `At ${branchData?.name || 'this branch'} · ${leftCount} left` : `At ${branchData?.name || 'this branch'}`, icon: Users, tone: 'bg-brand-soft text-brand' },
           { label: 'Basic pay a month', value: money(payTotal), note: 'Before OT and allowances', icon: Wallet, tone: 'bg-surface-2 text-muted' },
           {
             label: 'Staff app logins',
-            value: `${withLogin} of ${staffList.length}`,
-            note: withLogin < staffList.length ? 'Make one from a staff member’s menu' : 'Everyone can sign in',
+            value: `${withLogin} of ${working.length}`,
+            note: withLogin < working.length ? 'Make one from a staff member’s menu' : 'Everyone can sign in',
             icon: Smartphone,
             tone: 'bg-info-soft text-info'
           }
         ]}
       />
+
+      {leftCount > 0 && (
+        <div className='inline-flex rounded-xl bg-surface-2 p-1' role='tablist' aria-label='Who to show'>
+          {[
+            ['working', `Working (${working.length})`],
+            ['left', `Left the job (${leftCount})`]
+          ].map(([k, label]) => (
+            <button
+              key={k}
+              type='button'
+              role='tab'
+              aria-selected={view === k}
+              onClick={() => setView(k)}
+              className={cn('rounded-lg px-3 py-1.5 text-sm font-semibold transition', view === k ? 'bg-surface text-fg shadow-sm ring-1 ring-line' : 'text-muted hover:text-fg')}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {staffList.length > 0 && (
         <div className='flex flex-col gap-2 sm:flex-row'>
@@ -506,6 +556,8 @@ function StaffManagement () {
         onDelete={handleDelete}
         onLinkOffice={s => { setLinkUid(''); setLinkFor(s) }}
         onUnlinkOffice={unlinkOffice}
+        onLeave={can(user?.role, 'staff.manage') ? s => { setDetailTarget(null); setLeavingFor(s) } : null}
+        onBack={can(user?.role, 'staff.manage') ? bringBack : null}
         onChangeSalary={can(user?.role, 'staff.manage') ? s => { setDetailTarget(null); setSalaryFor(s) } : null}
         missing={detailTarget && canSeePrivate ? missingDetails(detailTarget) : []}
         detailsRequest={detailTarget ? detailsRequestFor(detailTarget.id, hires) : null}
@@ -514,6 +566,7 @@ function StaffManagement () {
         company={branchSettings?.basic?.companyName || branchData?.name || ''}
       />
       <QuickAddSheet open={quickOpen} onClose={() => setQuickOpen(false)} />
+      <LeavingSheet staff={leavingFor} onClose={() => setLeavingFor(null)} companyId={companyId} branchId={branchId} />
       <SalaryChangeSheet open={!!salaryFor} onClose={() => setSalaryFor(null)} staff={salaryFor} />
 
       {/* an office login linked to this staff record: they see their own pay under Me */}

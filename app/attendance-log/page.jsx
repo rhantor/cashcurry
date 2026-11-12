@@ -9,6 +9,7 @@ import {
   useDeleteAttendancePunchMutation
 } from "@/lib/redux/api/attendanceApiSlice";
 import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
+import { hereOn } from "@/lib/staff/leaving";
 import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
 import { Clock, LogIn, LogOut, ChevronLeft, ChevronRight, Camera, Download, List, LayoutGrid, Plus, Trash2, Save, UserX } from "lucide-react";
 import { addMonths, format, parseISO } from "date-fns";
@@ -247,7 +248,7 @@ export default function AttendanceLogPage() {
     }, {})
   ).map((g) => ({ ...g, inNow: g.punches[g.punches.length - 1]?.type === "in" }));
   const hereNow = byStaff.filter((g) => g.inNow).length;
-  const notIn = staffList.filter((s) => !byStaff.some((g) => g.staffId === s.id));
+  const notIn = staffList.filter((s) => hereOn(s, selectedDate) && !byStaff.some((g) => g.staffId === s.id)); // not those who had left by then
 
   // adding, changing and deleting punches: branchAdmin, manager and company roles;
   // the in-charge and supervisors see the log (roles matrix)
@@ -521,7 +522,7 @@ export default function AttendanceLogPage() {
                   }}
                 >
                   <option value="">Choose…</option>
-                  {staffList.map((s) => (
+                  {staffList.filter((s) => hereOn(s, p.date || selectedDate) || s.id === p.staffId).map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.firstName} {s.lastName}
                     </option>

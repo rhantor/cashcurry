@@ -7,7 +7,8 @@ import { letterForHire } from '@/app/tools/appointment-letter/letterForHire'
 import FileViewer from '@/app/components/common/FileViewer'
 import JoinPdfButtons from './JoinPdfButtons'
 import { format, parseISO } from 'date-fns'
-import { AlertTriangle, FileSignature, FileText, Link2, Pencil, Phone, Trash2, TrendingUp } from 'lucide-react'
+import { AlertTriangle, FileSignature, FileText, Link2, Pencil, Phone, Trash2, TrendingUp, UserCheck, UserMinus } from 'lucide-react'
+import { isCurrent, leftLine } from '@/lib/staff/leaving'
 import { STATUSES } from '@/lib/hires/model'
 import useCurrency from '@/app/hooks/useCurrency'
 import { formatMoney } from '@/lib/region/currency'
@@ -126,7 +127,7 @@ function JoinPapers ({ staff, currency, company }) {
 }
 
 /** One staff member: pay at a glance, then contact, work, ID and bank. */
-export default function StaffDetailModal ({ isOpen, onClose, staff, onEdit, onDelete, onLinkOffice, onUnlinkOffice, onChangeSalary, missing = [], detailsRequest = null, onAskDetails, onOpenRequest, company = '' }) {
+export default function StaffDetailModal ({ isOpen, onClose, staff, onEdit, onDelete, onLeave, onBack, onLinkOffice, onUnlinkOffice, onChangeSalary, missing = [], detailsRequest = null, onAskDetails, onOpenRequest, company = '' }) {
   const currency = useCurrency()
   const money = v => (v && Number(v) > 0 ? formatMoney(Number(v), currency) : null)
   const s = staff || {}
@@ -165,6 +166,11 @@ export default function StaffDetailModal ({ isOpen, onClose, staff, onEdit, onDe
           ) : (
             <span />
           )}
+          {onLeave && isCurrent(s) && (
+            <Button variant='ghost' icon={UserMinus} className='ml-auto' onClick={() => onLeave(staff)}>
+              Left the job
+            </Button>
+          )}
           {onEdit && (
             <Button
               icon={Pencil}
@@ -181,6 +187,19 @@ export default function StaffDetailModal ({ isOpen, onClose, staff, onEdit, onDe
     >
       {staff && (
         <div className='space-y-5'>
+          {/* left the job (12 Nov): when and why, and the way back */}
+          {!isCurrent(s) && (
+            <div className='flex flex-wrap items-center justify-between gap-3 rounded-xl bg-warning-soft px-4 py-3'>
+              <div className='min-w-0'>
+                <p className='text-sm font-semibold text-warning'>{leftLine(s)}</p>
+                {s.leftNote && <p className='mt-0.5 text-xs text-muted'>{s.leftNote}</p>}
+              </div>
+              <div className='flex gap-2'>
+                {onLeave && <Button size='sm' variant='ghost' onClick={() => onLeave(staff)}>Change</Button>}
+                {onBack && <Button size='sm' variant='secondary' icon={UserCheck} onClick={() => onBack(staff)}>Bring back</Button>}
+              </div>
+            </div>
+          )}
           <div className='flex items-center gap-4'>
             <Avatar name={fullName} src={s.photoUrl} size='lg' />
             <div className='min-w-0 space-y-1.5'>

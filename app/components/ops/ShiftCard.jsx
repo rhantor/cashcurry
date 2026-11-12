@@ -9,6 +9,7 @@ import { Avatar, Badge, Skeleton, cn } from "@/app/components/ui";
 import { useGetBranchAttendanceTokensQuery } from "@/lib/redux/api/attendanceApiSlice";
 import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
 import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
+import { currentStaff } from "@/lib/staff/leaving";
 import { useApprovedLeaves } from "@/lib/tasks/client";
 import { awayByStaff } from "@/lib/tasks/model";
 import { onShift, shiftSummary, shiftText } from "@/lib/ops/model";
@@ -20,7 +21,8 @@ const FIRST = 8; // shown before "Show everyone"
 /** Today's staff, punches and leave at a branch → onShift(…); `now` moves on each minute. */
 export function useOnShift(companyId, branchId, today) {
   const on = !!companyId && !!branchId && !!today;
-  const { data: staff, isLoading: staffLoading } = useGetStaffListQuery({ companyId, branchId }, { skip: !on });
+  const { data: allStaff, isLoading: staffLoading } = useGetStaffListQuery({ companyId, branchId }, { skip: !on });
+  const staff = useMemo(() => (allStaff ? currentStaff(allStaff) : allStaff), [allStaff]); // not those who left the job
   const { data: punches, isLoading: punchesLoading } = useGetBranchAttendanceTokensQuery({ companyId, branchId, date: today }, { skip: !on, pollingInterval: 60000 });
   const { data: settings } = useGetBranchSettingsQuery({ companyId, branchId }, { skip: !on });
   const leaves = useApprovedLeaves(companyId, branchId, on);

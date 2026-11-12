@@ -40,6 +40,7 @@ import {
   useSuppliers,
 } from "@/lib/payouts/client";
 import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
+import { currentStaff } from "@/lib/staff/leaving";
 import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { isCompanyRole, voucherLimits } from "@/lib/authz/permissions";
@@ -92,10 +93,11 @@ export function HandOutSheet({
   const [errors, setErrors] = useState({});
   const [busy, setBusy] = useState(false);
   const [sig, setSig] = useState(null); // whoever takes the money signs for it (1 Nov)
-  const { data: staff = [] } = useGetStaffListQuery(
+  const { data: allStaff = [] } = useGetStaffListQuery(
     { companyId, branchId },
     { skip: !open || !companyId || !branchId },
   );
+  const staff = useMemo(() => currentStaff(allStaff), [allStaff]); // not those who left the job
 
   useEffect(() => {
     if (!open) return;

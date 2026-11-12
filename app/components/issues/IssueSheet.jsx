@@ -46,7 +46,7 @@ export default function IssueSheet({ issue, onClose, user, people = [], branchNa
   const can = issueActions(issue, user);
   const st = STATUSES[issue.status] || STATUSES.open;
   const cat = categoryOf(issue.category);
-  const team = people.filter((p) => p.branchId === branchId || !p.branchId);
+  const team = people.filter((p) => (p.branchId === branchId || !p.branchId) && !p.left);
   const run = async (key, fn, done) => {
     setBusy(key);
     try {

@@ -3,6 +3,7 @@
 import { dayKey, isPaidOut } from '@/lib/finance/rules'
 import React, { useEffect, useMemo, useState } from 'react'
 import { useGetStaffListQuery } from '@/lib/redux/api/staffApiSlice'
+import { paidFor } from '@/lib/staff/leaving'
 import { useGetBranchSettingsQuery } from '@/lib/redux/api/branchSettingsApiSlice'
 import { useGetCompanyDetailsQuery } from '@/lib/redux/api/authApiSlice'
 import { useGetSingleBranchQuery } from '@/lib/redux/api/branchApiSlice'
@@ -160,15 +161,15 @@ export default function PayrollBuilder () {
   const statutoryConfig = branchSettings?.payroll?.statutoryDeductions
   const baseList = useMemo(() => {
     if (pastPending) return []
-    if (!pastMonth) return staffList
+    if (!pastMonth) return staffList.filter(s => paidFor(s, period)) // not those who left before this month
     const byId = new Map(staffList.map(s => [s.id, s]))
     return paidEntries
       .map(e => staffAsPaid(e, byId.get(e.staffId), statutoryConfig || []))
       .sort((a, b) => getStaffName(a).localeCompare(getStaffName(b)))
-  }, [pastPending, pastMonth, staffList, paidEntries, statutoryConfig])
+  }, [pastPending, pastMonth, staffList, paidEntries, statutoryConfig, period])
   // each person at the pay in force for this month (a raise from a later month is not paid yet; 6 Nov)
   const roster = useMemo(() => rosterOf(baseList, staffList, sheet).map(s => payFor(s, period)), [baseList, staffList, sheet, period])
-  const sheetChoices = useMemo(() => sheetChoicesOf(baseList, staffList), [baseList, staffList])
+  const sheetChoices = useMemo(() => sheetChoicesOf(baseList, staffList.filter(s => paidFor(s, period))), [baseList, staffList, period])
   const [showSheetPicker, setShowSheetPicker] = useState(false)
   function setOnSheet (id, on) {
     setSheet(prev => changeSheet(prev, id, on, baseList.some(s => s.id === id)))

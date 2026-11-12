@@ -6,6 +6,7 @@
 import { useMemo } from "react";
 import { useChatPeople } from "@/app/components/chat/useChat";
 import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
+import { currentStaff } from "@/lib/staff/leaving";
 import { canManageTasks, canTeamTasks, leadOf, teamOf } from "@/lib/tasks/model";
 import { useAway, useTasks } from "@/lib/tasks/client";
 import { personName } from "@/lib/people";
@@ -24,14 +25,14 @@ export default function useTaskTeam(user, branchId) {
   const everyone = useChatPeople(gives ? companyId : null);
   // staff records say who leads whom (Staff management → Job → Supervisor)
   const { data: staffData } = useGetStaffListQuery({ companyId, branchId }, { skip: !gives || !companyId || !branchId });
-  const staff = staffData || NONE;
+  const staff = useMemo(() => (staffData ? currentStaff(staffData) : NONE), [staffData]); // not those who left the job
   // who is off when (31 Oct): days off on the staff records, approved leave — everyone's
   // for those who give tasks, else only one's own
   const away = useAway(companyId, branchId, user, gives ? staff : null);
 
   // who tasks can be given to: management — the branch's people; a supervisor — their team
   const people = useMemo(() => {
-    const here = everyone.filter((p) => p.branchId === branchId && p.uid !== user?.uid);
+    const here = everyone.filter((p) => p.branchId === branchId && p.uid !== user?.uid && !p.left);
     if (manage) return here;
     if (!lead) return [];
     const team = new Set(teamOf(staff, user?.uid));

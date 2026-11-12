@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import admin from "firebase-admin";
 import { FACE_MODEL, cleanSamples, lookalike, packSamples } from "@/lib/attendance/face";
+import { isCurrent } from "@/lib/staff/leaving";
 import { branchRef, callerMay, facesOf, facesRef, forgetFaces } from "@/lib/server/kiosk";
 import { personName } from "@/lib/people";
 
@@ -36,6 +37,7 @@ export async function POST(req) {
     if (body.consent !== true) return fail(400, "Tick that they agreed first.");
     const staff = await branchRef(companyId, branchId).collection("staff").doc(staffId).get();
     if (!staff.exists) return fail(404, "Not on the staff list.");
+    if (!isCurrent(staff.data())) return fail(409, "They have left the job. Bring them back in Staff management first.");
     const { samples, error } = cleanSamples(body.samples);
     if (error) return fail(400, error);
     const other = lookalike(samples, await facesOf(companyId, branchId, { fresh: true }), staffId);

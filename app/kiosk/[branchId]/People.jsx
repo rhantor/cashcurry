@@ -7,6 +7,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { KeyRound, Loader2, ScanFace, Trash2 } from "lucide-react";
 import { auth } from "@/lib/firebase";
 import { useGetStaffListQuery } from "@/lib/redux/api/staffApiSlice";
+import { currentStaff } from "@/lib/staff/leaving";
 import useRetryOnError from "@/app/hooks/useRetryOnError";
 import { Avatar, Badge, Button, Sheet, confirmDialog, toast } from "@/app/components/ui";
 
@@ -138,7 +139,8 @@ function FaceSheet({ person, companyId, branchId, onClose, onSaved }) {
 export default function KioskPeople({ companyId, branchId }) {
   const staffQ = useGetStaffListQuery({ companyId, branchId }, { skip: !companyId || !branchId });
   useRetryOnError(staffQ);
-  const { data: staff = [], isLoading, isError: staffFailed, refetch } = staffQ;
+  const { data: allStaff = [], isLoading, isError: staffFailed, refetch } = staffQ;
+  const staff = currentStaff(allStaff); // not those who left the job
   const [faces, setFaces] = useState(null); // { staffId: { at, by } }
   const [enrol, setEnrol] = useState(null);
   const [busy, setBusy] = useState(null);
