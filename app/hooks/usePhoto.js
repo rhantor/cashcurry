@@ -4,7 +4,6 @@
 // staff id or their login. One list for the company from /api/people/photos,
 // kept a few minutes and shared by every <Avatar>.
 import { useEffect, useSyncExternalStore } from "react";
-import { auth } from "@/lib/firebase";
 
 const EMPTY = { byStaff: {}, byUid: {}, byName: {} };
 const nameKey = (n) => String(n || "").trim().replace(/\s+/g, " ").toLowerCase();
@@ -24,6 +23,8 @@ export function loadPhotos({ fresh = false } = {}) {
   if (!fresh && at && Date.now() - at < TTL) return Promise.resolve(data);
   loading = (async () => {
     try {
+      // Firebase is loaded only when a photo is wanted (keeps <Avatar> light)
+      const { auth } = await import("@/lib/firebase");
       await auth?.authStateReady?.();
       const u = auth?.currentUser;
       if (!u) return data;
