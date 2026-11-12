@@ -9,6 +9,7 @@ import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { ROOT, LOCAL_DIR, LOCAL_PROJECT_ID, EMULATOR_DATA_DIR, BACKUP_DIR } from "./config.mjs";
 import { buildDemoCompany, writeBackupFolder, demoGuide } from "./demo/demoCompany.mjs";
+import { EXPORT_NAME, checkFirestoreExport, ensurePrev, fsyncTree, keptDirFor, prevDirFor } from "./exportSafety.mjs";
 
 const useBackup = process.argv.includes("--backup");
 let source = BACKUP_DIR;
@@ -44,5 +45,23 @@ const result = spawnSync(
 
 if (result.error?.code === "ENOENT") {
   console.error("Firebase CLI not found. Install it with: npm install -g firebase-tools");
+}
+if (result.status === 0) {
+  // The CLI renames its export into place without flushing it to disk
+  // (12 Nov 2026: a power cut left files of zero bytes). Flush and check.
+  for (const f of [EXPORT_NAME, "auth_export", "storage_export", "firebase-export-metadata.json"]) {
+    fsyncTree(path.join(EMULATOR_DATA_DIR, f));
+  }
+  const check = checkFirestoreExport(path.join(EMULATOR_DATA_DIR, EXPORT_NAME), LOCAL_PROJECT_ID);
+  if (!check.ok) {
+    console.error(`The seeded data did not save properly (${check.reason}). Run the seed again.`);
+    process.exit(1);
+  }
+  console.log(`Local data written to disk and checked: ${check.records} records.`);
+  // The spare copy belongs to the old data now: set it aside, keep a fresh one.
+  const keepDir = keptDirFor(EMULATOR_DATA_DIR);
+  const prev = prevDirFor(keepDir);
+  if (fs.existsSync(prev)) fs.renameSync(prev, `${prev}-before-seed-${Date.now()}`);
+  ensurePrev({ dataDir: EMULATOR_DATA_DIR, keepDir, projectId: LOCAL_PROJECT_ID });
 }
 process.exit(result.status ?? 1);
