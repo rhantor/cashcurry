@@ -111,6 +111,17 @@ describe("bills & vouchers (4.9, 4.10)", () => {
   });
 });
 
+describe("vendor bills waiting for approval (13 Nov)", () => {
+  it("go to those who keep the books, not the owner unless chosen, never the one who added it", async () => {
+    const { NOTIFY_TYPES, mayGet } = await import("@/lib/notify/model");
+    const t = NOTIFY_TYPES["purchases.bills"];
+    for (const r of ["gm", "superAdmin", "branchAdmin", "manager", "accountant"]) expect(t.defaultFor(r)).toBe(true);
+    for (const r of ["owner", "inCharge", "supervisor", "cashier", "staff"]) expect(t.defaultFor(r)).toBe(false);
+    expect(mayGet("purchases.bills", "owner")).toBe(true);
+    expect(mayGet("purchases.bills", "supervisor")).toBe(false);
+  });
+});
+
 describe("who may get each kind (canGet)", () => {
   it("only those who can open what it links to", async () => {
     const { mayGet, recipientsFor } = await import("@/lib/notify/model");

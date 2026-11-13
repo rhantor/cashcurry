@@ -68,6 +68,8 @@ const notifyOn = (collection, handler, label) =>
     }
   });
 exports.notifyPayouts = notifyOn("payouts", "onPayout", "payouts");
+// a supervisor's or in-charge's new vendor bill waits for approval (13 Nov 2026)
+exports.notifyVendorBills = notifyOn("vendorBills", "onVendorBill", "vendor bills");
 exports.notifyCostVouchers = notifyOn("costs", "onCostVoucher", "vouchers");
 
 // Chat (4.4): a push for each new message; the directory of who can be messaged.
