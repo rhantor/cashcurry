@@ -102,6 +102,7 @@ Branch settings**, though the database lets the owner change staff and settings.
 | Purchases: order guides, POs, receive goods | E | E | E | E | E | E | E | E | — | — |
 | Purchases: approve POs | A | A | A | A | A | A | — | — | — | — |
 | Purchases: bills, pay bills, payments | A | A | A | A | A | — | A | — | — | — |
+| Purchases: add a new vendor bill (13 Nov; in-charge's and supervisor's wait for a manager or accountant to approve) | E | E | E | E | E | E | E | E | — | — |
 | Warranties | E | E | E | E | E | E | E | E | — | — |
 | Inventory: count stock, write off waste (8 Nov) | E | E | E | E | E | E | E | E | — | — |
 | Inventory: start it, minimums, count day, remove a count | A | A | A | A | A | A | — | — | — | — |

@@ -19,6 +19,8 @@ import { uploadInvoiceFile } from "@/lib/storage/uploadInvoice";
 import useCurrency from "@/app/hooks/useCurrency";
 import { toast, confirmDialog } from "@/app/components/ui/notify";
 import { stampOf } from "@/lib/people";
+import { waitsForApproval } from "@/lib/purchases/billApproval";
+import WaitingBills from "@/app/components/purchases/WaitingBills";
 import { formatMoney } from "@/lib/region/currency";
 import { Button, CountUp, DatePicker, Field, Input, Select, Skeleton, Textarea } from "@/app/components/ui";
 import MoneyInput from "@/app/components/entry/MoneyInput";
@@ -59,6 +61,8 @@ const nonEmpty = (s) => (s || "").trim();
 export default function NewBillPage() {
   const currency = useCurrency();
   const { ready, companyId, branchId, user } = useResolvedCompanyBranch();
+  // a supervisor's or in-charge's bill waits for the manager or accountant to approve it (13 Nov)
+  const waits = waitsForApproval(user?.role);
 
   // Vendors
   const vArgs = ready && companyId ? { companyId } : skipToken;
@@ -269,8 +273,8 @@ export default function NewBillPage() {
     // this vendor's bills here for the number first (any status).
     try {
       const key = (v) => String(v || "").trim().toLowerCase().replace(/\s+/g, "");
-      const theirs = await findVendorBills({ companyId, branchId, vendorId }).unwrap();
-      const same = (theirs || []).find((b) => key(b.invoiceNo) && key(b.invoiceNo) === key(invoiceNo));
+      const theirs = await findVendorBills({ companyId, branchId, vendorId, withWaiting: true }).unwrap();
+      const same = (theirs || []).find((b) => b.status !== "rejected" && key(b.invoiceNo) && key(b.invoiceNo) === key(invoiceNo));
       if (same) {
         const ok = await confirmDialog({
           title: `${nonEmpty(invoiceNo)} is already saved`,
@@ -316,6 +320,7 @@ export default function NewBillPage() {
         attachments: [url],
         items: billItemLines(lines),
         createdBy: stampOf(user || {}),
+        waiting: waits,
       };
 
       await addVendorBill({
@@ -330,7 +335,7 @@ export default function NewBillPage() {
       // 4) Clear
       resetForm();
       lastSubmitHashRef.current = "";
-      toast.success("Bill saved successfully!");
+      toast.success(waits ? "Sent for approval. It counts as owed once the manager or accountant approves it." : "Bill saved successfully!");
     } catch (e) {
       console.error(e);
       setErrText(e?.data?.message || e?.message || "Failed to save bill.");
@@ -351,7 +356,7 @@ export default function NewBillPage() {
 
   const save = (
     <Button size="lg" className="w-full" loading={saving || (submitting && !isUploading)} disabled={saveDisabled} onClick={handleSave}>
-      {isUploading ? `Uploading… ${Math.floor(uploadPct)}%` : "Save bill"}
+      {isUploading ? `Uploading… ${Math.floor(uploadPct)}%` : waits ? "Send for approval" : "Save bill"}
     </Button>
   );
 
@@ -374,11 +379,17 @@ export default function NewBillPage() {
           {errText && <p className="rounded-xl bg-danger-soft px-3 py-2 text-xs font-medium text-danger">{errText}</p>}
           {save}
           <p className="text-[11px] text-muted">
-            Saved as owed to the vendor. Pay it from{" "}
-            <Link href="/purchases/due-bills" className="font-semibold text-brand hover:underline">
-              Due bills
-            </Link>
-            .
+            {!waits ? (
+              <>
+                Saved as owed to the vendor. Pay it from{" "}
+                <Link href="/purchases/due-bills" className="font-semibold text-brand hover:underline">
+                  Due bills
+                </Link>
+                .
+              </>
+            ) : (
+              "The manager or accountant approves it, then it is owed to the vendor."
+            )}
           </p>
         </div>
       }
@@ -392,6 +403,7 @@ export default function NewBillPage() {
         </div>
       }
     >
+      {waits && <WaitingBills companyId={companyId} branchId={branchId} user={user} mode="mine" />}
       {(vendorsIsError || branchIsError) && (
         <div className="rounded-2xl bg-danger-soft p-4 text-sm text-danger">
           <b>Couldn&apos;t load the vendors.</b> {vendorsError?.data?.message || vendorsError?.message || branchError?.message || ""}

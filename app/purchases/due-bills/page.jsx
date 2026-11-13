@@ -27,6 +27,7 @@ import DueBillsFilters from './components/DueBillsFilters'
 import ViewBillModal from './components/ViewBillModal'
 import ExportBillsModal from './components/ExportBillsModal'
 import PayBillsModal from '@/app/components/purchases/PayBillsModal'
+import WaitingBills from '@/app/components/purchases/WaitingBills'
 import { uploadInvoiceFile } from "@/lib/storage/uploadInvoice"
 import useCurrency from '@/app/hooks/useCurrency'
 import { toast, confirmDialog } from "@/app/components/ui/notify";
@@ -484,6 +485,9 @@ const handleSaveEdit = async (billId, formData) => {
         onExportExcel={handleExportExcel}
         isExporting={isExporting}
       />
+
+      {/* bills from a supervisor or in-charge, to approve first (13 Nov) */}
+      <WaitingBills companyId={companyId} branchId={branchId} user={user} mode='decide' />
 
       {/* Filters Bar */}
       <DueBillsFilters
