@@ -3,6 +3,7 @@
 // saved and paid; this mends them if they ever drift (or for old data).
 import { db } from "@/lib/firebase";
 import { collection, getDocs, writeBatch } from "firebase/firestore";
+import { counts } from "@/lib/purchases/billApproval";
 
 export async function recountVendorTotals(companyId, log = () => {}) {
   // 1. Get all vendors
@@ -36,7 +37,8 @@ export async function recountVendorTotals(companyId, log = () => {}) {
       billsSnap.docs.forEach(bDoc => {
         const b = bDoc.data();
         const vId = b.vendorId;
-        if (vId && vendorsMap[vId]) {
+        // a bill waiting for approval, or sent back, is not owed (13 Nov)
+        if (vId && vendorsMap[vId] && counts(b)) {
           vendorsMap[vId].totalBilled += Number(b.total || 0);
           vendorsMap[vId].currentBalance += Number(b.balance || 0);
         }
