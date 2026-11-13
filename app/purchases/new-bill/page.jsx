@@ -19,6 +19,7 @@ import { uploadInvoiceFile } from "@/lib/storage/uploadInvoice";
 import useCurrency from "@/app/hooks/useCurrency";
 import { toast, confirmDialog } from "@/app/components/ui/notify";
 import { stampOf } from "@/lib/people";
+import { can } from "@/lib/authz/permissions";
 import { formatMoney } from "@/lib/region/currency";
 import { Button, CountUp, DatePicker, Field, Input, Select, Skeleton, Textarea } from "@/app/components/ui";
 import MoneyInput from "@/app/components/entry/MoneyInput";
@@ -59,6 +60,8 @@ const nonEmpty = (s) => (s || "").trim();
 export default function NewBillPage() {
   const currency = useCurrency();
   const { ready, companyId, branchId, user } = useResolvedCompanyBranch();
+  // a supervisor or in-charge adds the bill; paying it is for the books (13 Nov)
+  const seesDueBills = can(user?.role, "purchases.bills");
 
   // Vendors
   const vArgs = ready && companyId ? { companyId } : skipToken;
@@ -374,11 +377,17 @@ export default function NewBillPage() {
           {errText && <p className="rounded-xl bg-danger-soft px-3 py-2 text-xs font-medium text-danger">{errText}</p>}
           {save}
           <p className="text-[11px] text-muted">
-            Saved as owed to the vendor. Pay it from{" "}
-            <Link href="/purchases/due-bills" className="font-semibold text-brand hover:underline">
-              Due bills
-            </Link>
-            .
+            {seesDueBills ? (
+              <>
+                Saved as owed to the vendor. Pay it from{" "}
+                <Link href="/purchases/due-bills" className="font-semibold text-brand hover:underline">
+                  Due bills
+                </Link>
+                .
+              </>
+            ) : (
+              "Saved as owed to the vendor. The manager or accountant pays it."
+            )}
           </p>
         </div>
       }

@@ -21,6 +21,17 @@ describe("the owner's decisions", () => {
     expect(can("accountant", "advances.approve")).toBe(false);
   });
 
+  it("supervisor and in-charge add a new vendor bill, but don't pay bills or see the due list (13 Nov)", () => {
+    for (const r of ["supervisor", "inCharge"]) {
+      expect(can(r, "purchases.billAdd")).toBe(true);
+      expect(can(r, "purchases.bills")).toBe(false);
+      expect(canOpen(r, "/purchases/new-bill")).toBe(true);
+      expect(canOpen(r, "/purchases/due-bills")).toBe(false);
+    }
+    expect(can("cashier", "purchases.billAdd")).toBe(false);
+    expect(can("staff", "purchases.billAdd")).toBe(false);
+  });
+
   it("supervisor and cashier enter, they don't see the books", () => {
     for (const r of ["supervisor", "cashier"]) {
       for (const c of ["reports.view", "dashboard.branch", "dashboard.company", "payroll.view", "staff.pay"]) expect(can(r, c)).toBe(false);
