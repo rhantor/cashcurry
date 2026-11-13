@@ -146,6 +146,40 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
     await deliver({ companyId, branchId, uids, type: "purchases.approval", message, link: "/purchases/purchase-orders", ref: `requisitions/${id}` });
   }
 
+  // ── a supervisor's new vendor bill (13 Nov 2026) ───────────────────────────
+  /** Waiting → those who keep the books; approved / sent back → whoever added it. */
+  async function onVendorBill({ companyId, branchId, id, before, after }) {
+    if (!after) return;
+    const was = before?.status;
+    const now = after.status;
+    const isNew = now === "waiting" && was !== "waiting";
+    const decided = was === "waiting" && (now === "unpaid" || now === "rejected");
+    if (!isNew && !decided) return;
+    const [all, b] = await Promise.all([people(companyId), branch(companyId, branchId)]);
+    const office = N.branchPeople(all, branchId);
+    const books = N.recipientsFor("purchases.bills", { config: b.config, people: office });
+    const maker = after.createdBy?.uid;
+    const what = `${after.vendorName || "A supplier"}${after.invoiceNo ? ` · ${after.invoiceNo}` : ""} · ${N.formatMoney(after.total || 0, b.currency)}`;
+    const ref = `vendorBills/${id}`;
+    if (isNew) {
+      const message = { title: `Vendor bill to approve · ${b.name}`, body: `${what}${after.createdBy?.name ? ` — added by ${after.createdBy.name}` : ""}` };
+      await deliver({ companyId, branchId, uids: books.filter((u) => u !== maker), type: "purchases.bills", message, link: "/purchases/due-bills", ref, tag: `vbill_${id}` });
+      return;
+    }
+    const by = after.approval?.by?.name || "a manager";
+    const approved = now === "unpaid";
+    if (maker && maker !== after.approval?.by?.uid) {
+      const message = approved
+        ? { title: "Vendor bill approved", body: `${what} — ${by}` }
+        : { title: "Vendor bill sent back", body: `${what} — ${by}${after.approval?.reason ? `: “${after.approval.reason}”` : ""}` };
+      await deliver({ companyId, branchId, uids: [maker], type: "requests.mine", message, link: "/purchases/new-bill", ref });
+    }
+    const done = approved
+      ? { title: `Vendor bill approved · ${b.name}`, body: `${what} — approved by ${by}` }
+      : { title: `Vendor bill sent back · ${b.name}`, body: `${what} — sent back by ${by}` };
+    await closeOut({ companyId, uids: books, ref, type: "purchases.bills", message: done, link: "/purchases/due-bills" });
+  }
+
   // ── pay-out bills and vouchers (4.9, 4.10) ─────────────────────────────────
   /** Those who approve at this branch; with `makers`, only those senior to them (lib/notify/model.js seniorTo). */
   async function approvers(companyId, branchId, b, makers = null) {
@@ -602,5 +636,5 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
     }
   }
 
-  return { deliver, onRequest, onPurchaseOrder, lateOrders, warrantyReminders, orderReminders, onPayout, onCostVoucher, dailySummaries, onChatMessage, onUser, onIssue, onIssueComment, onTask, onTaskComment, taskReminders, onStaffLogin };
+  return { deliver, onRequest, onPurchaseOrder, onVendorBill, lateOrders, warrantyReminders, orderReminders, onPayout, onCostVoucher, dailySummaries, onChatMessage, onUser, onIssue, onIssueComment, onTask, onTaskComment, taskReminders, onStaffLogin };
 };
