@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { actorFromChange } from "@/lib/audit/actor";
+import { actorFromChange, deleterOf, onlyDeleteStamp } from "@/lib/audit/actor";
 import { cleanDetails, normalizeLog } from "@/lib/audit/normalize";
 import { changeRows, summaryOf, showValue } from "@/lib/audit/describe";
 
@@ -31,6 +31,25 @@ describe("who made a change", () => {
   it("says nothing when the record doesn't tell", () => {
     expect(actorFromChange({ action: "deleted", before: cost })).toBeNull();
     expect(actorFromChange({ action: "updated", before: cost, after: { ...cost, amount: 90 } })).toBeNull();
+  });
+});
+
+describe("approvals and deletes say who (14 Nov)", () => {
+  const bill = { vendorId: "v1", total: 217, status: "waiting", approval: { status: "waiting" }, createdBy: { uid: "s1", name: "Shihab" } };
+  it("credits a vendor bill's approval to whoever approved it", () => {
+    const ok = { ...bill, status: "unpaid", approval: { status: "approved", by: { uid: "a1", name: "Antor" }, at: "2026-11-14T06:45:32.719Z" } };
+    expect(actorFromChange({ action: "updated", before: bill, after: ok })).toEqual({ uid: "a1", name: "Antor" });
+  });
+  it("credits a delete to whoever stamped it just before", () => {
+    const stamped = { ...bill, deletedBy: { uid: "a1", name: "Antor" }, deletedAt: "2026-11-14T07:06:00.000Z" };
+    expect(actorFromChange({ action: "deleted", before: stamped })).toEqual({ uid: "a1", name: "Antor" });
+    expect(deleterOf({ ...bill, deletedBy: { uid: "a1", name: "" } })).toEqual({ uid: "a1", name: "" });
+    expect(deleterOf(bill)).toBeNull();
+  });
+  it("leaves out the stamp itself, but not a real change", () => {
+    expect(onlyDeleteStamp(bill, { ...bill, deletedBy: { uid: "a1" }, deletedAt: "x" })).toBe(true);
+    expect(onlyDeleteStamp(bill, { ...bill, total: 1, deletedBy: { uid: "a1" } })).toBe(false);
+    expect(onlyDeleteStamp(bill, bill)).toBe(false);
   });
 });
 
