@@ -3,16 +3,17 @@
 // of the till to buy something, and the bill when it comes back. What is
 // still out shows by person and how long it has been out; bills sent back
 // wait here to be tried again.
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { format, parseISO } from "date-fns";
-import { Clock, HandCoins, ReceiptText, RotateCcw, Trash2 } from "lucide-react";
+import { Clock, HandCoins, History, ReceiptText, RotateCcw, Trash2, Wallet } from "lucide-react";
 import useSession from "@/app/hooks/useSession";
 import useCurrency from "@/app/hooks/useCurrency";
-import { Badge, Button, Card, EmptyState, Skeleton, cn, confirmDialog, toast } from "@/app/components/ui";
+import { Badge, Button, Card, EmptyState, Skeleton, Tabs, cn, confirmDialog, toast } from "@/app/components/ui";
 import { formatMoney } from "@/lib/region/currency";
 import { ageText, openByPerson } from "@/lib/payouts/model";
 import { cancelPayout, useLivePayouts } from "@/lib/payouts/client";
 import { BillSheet, HandOutSheet } from "@/app/components/payouts/PayoutSheets";
+import PayoutHistory from "@/app/components/payouts/PayoutHistory";
 
 const day = (d) => (d ? format(parseISO(d), "EEE d MMM") : "");
 
@@ -26,6 +27,11 @@ export default function PayoutsPage() {
   const [handing, setHanding] = useState(false);
   const [billFor, setBillFor] = useState(null);
   const [retry, setRetry] = useState(null);
+  // Now: what is out and waiting · History (14 Nov): yesterday and the month — /payouts?tab=history
+  const [tab, setTab] = useState("now");
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("tab") === "history") setTab("history");
+  }, []);
 
   const takeBack = async (p) => {
     if (!(await confirmDialog({ title: "Take this pay-out back?", message: `${money(p.amount)} to ${p.to?.name}. Only if it was a mistake and the money is back in the till.`, confirmLabel: "Take back", danger: true }))) return;
@@ -48,6 +54,13 @@ export default function PayoutsPage() {
         </div>
         <Button icon={HandCoins} onClick={() => setHanding(true)}>Hand out money</Button>
       </div>
+
+      <Tabs value={tab} onChange={setTab} tabs={[{ value: "now", label: "Now", icon: Wallet }, { value: "history", label: "History", icon: History }]} />
+
+      {tab === "history" ? (
+        <PayoutHistory companyId={companyId} branchId={branchId} money={money} />
+      ) : (
+      <>
 
       <div className="grid gap-3 sm:grid-cols-3">
         <Card className="p-4">
@@ -130,6 +143,9 @@ export default function PayoutsPage() {
             ))}
           </Card>
         </section>
+      )}
+
+      </>
       )}
 
       <HandOutSheet open={handing} onClose={() => setHanding(false)} companyId={companyId} branchId={branchId} user={user} />
