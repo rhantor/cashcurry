@@ -184,6 +184,11 @@ async function nameOfUser(uid) {
 
 async function actorOf(event, change) {
   const fromRecord = audit.actorFromChange(change);
+  // a delete: the record says who, by account (14 Nov)
+  const deleter = change.action === "deleted" ? audit.deleterOf(change.before) : null;
+  if (deleter?.uid && !(event.authType === "app_user" && event.authId)) {
+    return { actorUid: deleter.uid, actorName: deleter.name || (await nameOfUser(deleter.uid)) || "unknown", actorFrom: "record" };
+  }
   if (event.authType === "app_user" && event.authId) {
     const uid = event.authId;
     const name = fromRecord?.uid === uid ? fromRecord.name : (await nameOfUser(uid)) || fromRecord?.name || "";
@@ -207,6 +212,8 @@ function makeAuditTrigger(collectionPath, collectionName) {
     if (!before && after) action = "created";
     else if (before && !after) action = "deleted";
     else action = "updated";
+    // only who is about to delete it: the delete's own entry says so
+    if (action === "updated" && audit.onlyDeleteStamp(before, after)) return;
 
     try {
       const who = await actorOf(event, { action, before, after });
