@@ -14,7 +14,9 @@ const TONE = { open: "warning", pending: "info", approved: "success", rejected: 
 
 export default function PayoutHistory({ companyId, branchId, money }) {
   const today = useBusinessToday();
-  const [date, setDate] = useState(() => shiftDay(today, -1));
+  // yesterday until someone picks a day: the branch's today can settle after the first render
+  const [picked, setDate] = useState(null);
+  const date = picked || shiftDay(today, -1);
   const [view, setView] = useState("day");
   const [data, setData] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -76,7 +78,8 @@ export default function PayoutHistory({ companyId, branchId, money }) {
             </div>
             <div>
               <p className="text-xs text-muted">Change</p>
-              <p className="font-semibold text-fg">{money(mon.totals.change)}</p>
+              <p className="font-semibold text-fg">{money(Math.abs(mon.totals.change))}</p>
+              <p className="text-xs text-subtle">{mon.totals.change > 0 ? "back to the till" : mon.totals.change < 0 ? "more paid from the till" : "nothing back"}</p>
             </div>
           </div>
           {!mon.days.length ? (
