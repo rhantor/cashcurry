@@ -484,7 +484,12 @@ export default function AttendanceLogPage() {
                           <span className="ml-1 text-xs font-medium text-muted">{g.inNow && selectedDate === today ? "so far" : "worked"}</span>
                         </p>
                         <p className="text-xs tabular-nums text-muted">
-                          {[h.breakMinutes > 0 && `break ${formatDuration(h.breakMinutes / 60)}`, h.ot > 0 && `${formatHours(h.ot)} OT`].filter(Boolean).join(" · ") || "no break"}
+                          {[
+                            // a shift can pay less (or more) than the clock: say so
+                            !running && Math.abs(h.clocked - h.worked) >= 1 / 60 && `clocked ${formatDuration(h.clocked)}`,
+                            h.breakMinutes > 0 && `break ${formatDuration(h.breakMinutes / 60)}`,
+                            h.ot > 0 && `${formatHours(h.ot)} OT`,
+                          ].filter(Boolean).join(" · ") || "no break"}
                         </p>
                       </div>
                     );

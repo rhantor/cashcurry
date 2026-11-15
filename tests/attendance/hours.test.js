@@ -28,6 +28,7 @@ describe("a day's worked time in the Attendance Log (15 Nov)", () => {
     expect(formatDuration(days[0].worked)).toBe("12h 02m");
     expect(days[0].breakMinutes).toBe(54);
     expect(days[0].stillIn).toBe(false);
+    expect(formatDuration(days[0].clocked)).toBe("12h 02m");
     expect(Math.round(days[0].ot * 100) / 100).toBe(4.03);
   });
   it("knows someone is still clocked in", () => {
