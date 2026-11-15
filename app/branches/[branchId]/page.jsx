@@ -7,8 +7,6 @@ import {
   useGetBranchesQuery,
   useUpdateBranchMutation,
   useDeleteAdminMutation,
-  useUpdateBranchAdminMutation,
-  useUpdateBranchUserMutation,
   useDeleteBranchUserMutation,
   useAddBranchUserMutation,
 } from "@/lib/redux/api/branchApiSlice";
@@ -19,7 +17,8 @@ import Settings from "./Settings";
 import UserModal from "./UserModal";
 import AddBranchUserModal from "@/app/components/settings/users/modals/AddBranchUserModal";
 import { LoaderCircle } from "lucide-react";
-import { confirmDialog } from "@/app/components/ui/notify";
+import { confirmDialog, toast } from "@/app/components/ui/notify";
+import { saveLogin, savedText } from "@/lib/users/client";
 
 const BranchDetailsPage = () => {
   const user = getSessionUser();
@@ -34,10 +33,9 @@ const BranchDetailsPage = () => {
     useUpdateBranchMutation();
   const [deleteAdmin, { isLoading: isDeletingAdmin }] =
     useDeleteAdminMutation();
-  const [updateBranchAdmin, { isLoading: isUpdatingAdmin }] =
-    useUpdateBranchAdminMutation();
-  const [updateBranchUser, { isLoading: isUpdatingUser }] =
-    useUpdateBranchUserMutation();
+  // a login's name, email or role: through the server (15 Nov) — the browser may not write a role
+  const [isUpdatingAdmin, setUpdatingAdmin] = useState(false);
+  const [isUpdatingUser, setUpdatingUser] = useState(false);
   const [deleteBranchUser, { isLoading: isDeletingUser }] =
     useDeleteBranchUserMutation();
   const [addBranchUser, { isLoading: isAddingUser }] =
@@ -99,27 +97,18 @@ const BranchDetailsPage = () => {
   const handleUpdateBranchAdmin = async (updatedAdmin) => {
     setUpdatingAdminId(updatedAdmin.id); // mark as updating
     try {
-      await updateBranchAdmin({
-        companyId: user?.companyId,
-        branchId,
-        adminId: updatedAdmin.id,
-        updates: {
-          name: updatedAdmin.name,
-          email: updatedAdmin.email,
-          username:
-            updatedAdmin.username ||
-            updatedAdmin.name.toLowerCase().replace(/\s+/g, "_"),
-          role: "branchAdmin",
-        },
-      }).unwrap();
+      setUpdatingAdmin(true);
+      const out = await saveLogin(updatedAdmin.id, { fullName: updatedAdmin.name, ...(updatedAdmin.email ? { email: updatedAdmin.email } : {}) });
+      toast.success(savedText(out));
 
       // Update local state
       setAdmins((prev) =>
         prev.map((adm) => (adm.id === updatedAdmin.id ? updatedAdmin : adm))
       );
     } catch (err) {
-      console.error("Failed to update admin:", err);
+      toast.error(err.message || "Couldn't save the change.");
     } finally {
+      setUpdatingAdmin(false);
       setUpdatingAdminId(null); // clear updating flag
       setModalType(null);
       setCurrentAdmin(null);
@@ -129,27 +118,18 @@ const BranchDetailsPage = () => {
   const handleUpdateBranchUser = async (updateUser) => {
     // setUpdatingAdminId(updatedAdmin.id); // mark as updating
     try {
-      await updateBranchUser({
-        companyId: user?.companyId,
-        branchId,
-        userId: updateUser.id,
-        updates: {
-          fullName: updateUser.name,
-          email: updateUser.email,
-          userName:
-            updateUser.username ||
-            updateUser.name.toLowerCase().replace(/\s+/g, "_"),
-          role: updateUser.role,
-        },
-      }).unwrap();
+      setUpdatingUser(true);
+      const out = await saveLogin(updateUser.id, { fullName: updateUser.name, role: updateUser.role, ...(updateUser.email ? { email: updateUser.email } : {}) });
+      toast.success(savedText(out));
 
       // Update local state
       setBranchUsers((prev) =>
         prev.map((adm) => (adm.id === updateUser.id ? updateUser : adm))
       );
     } catch (err) {
-      console.error("Failed to update user:", err);
+      toast.error(err.message || "Couldn't save the change.");
     } finally {
+      setUpdatingUser(false);
       setUpdatingAdminId(null); // clear updating flag
       setModalType(null);
       setCurrentAdmin(null);

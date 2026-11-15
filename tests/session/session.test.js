@@ -49,11 +49,22 @@ describe("session", () => {
     expect(s.getSession().status).toBe("signedIn");
   });
 
-  it("takes role and branch from the database, not the stale cache", async () => {
+  it("an admin changed the role or branch: signed out, to sign in again with the new one (15 Nov)", async () => {
     const s = await freshSession({
       cached: { uid: "u1", role: "manager", companyId: "co", branchId: "kl" },
       profile: { uid: "u1", role: "cashier", companyId: "co", branchId: "pj", userName: "ali" },
     });
+    await signIn("u1");
+    await flush();
+    expect(s.getSession()).toMatchObject({ status: "signedOut", user: null });
+    expect(localStorage.getItem("user")).toBeNull();
+    expect(Cookies.get("role")).toBeUndefined();
+    expect(s.takeSignOutReason()).toBe("role");
+    expect(s.takeSignOutReason()).toBeNull();
+  });
+
+  it("signing in fresh takes role and branch from the database", async () => {
+    const s = await freshSession({ profile: { uid: "u1", role: "cashier", companyId: "co", branchId: "pj", userName: "ali" } });
     await signIn("u1");
     expect(s.getSessionUser()).toMatchObject({ role: "cashier", branchId: "pj", username: "ali" });
     expect(s.getSession().activeBranchId).toBe("pj");

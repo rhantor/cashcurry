@@ -1,5 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
+import { roleOptions, BRANCH_ASSIGNABLE } from "@/lib/authz/permissions";
 
 export default function EditBranchAdminModal({
   open,
@@ -10,11 +11,14 @@ export default function EditBranchAdminModal({
 }) {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
+  // a branch admin can be given another branch role (15 Nov)
+  const [role, setRole] = useState("branchAdmin");
 
   useEffect(() => {
     if (open && admin) {
       setFullName(admin.fullName || admin.username || "");
       setEmail(admin.email || "");
+      setRole("branchAdmin");
     }
   }, [open, admin]);
 
@@ -28,7 +32,7 @@ export default function EditBranchAdminModal({
     onSave?.({
       fullName: fullName.trim(),
       email: email.trim(),
-      role: "branchAdmin",
+      role,
     });
   };
 
@@ -60,6 +64,26 @@ export default function EditBranchAdminModal({
               onChange={(e) => setEmail(e.target.value)}
               placeholder="optional"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-fg">
+              Role
+            </label>
+            <select
+              className="w-full border rounded-lg px-3 py-2 mt-1"
+              value={role}
+              onChange={(e) => setRole(e.target.value)}
+            >
+              {roleOptions(BRANCH_ASSIGNABLE, "branchAdmin").map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
+            </select>
+            {role !== "branchAdmin" && (
+              <p className="mt-1 text-xs text-muted">They sign in again and get the new role&apos;s menu.</p>
+            )}
           </div>
 
           <div className="flex justify-end gap-2 pt-2">
