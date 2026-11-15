@@ -19,7 +19,7 @@ import StatTiles from "@/app/components/purchases/StatTiles";
 import StatusScreen from "@/app/components/common/StatusScreen";
 import * as XLSX from "xlsx";
 import Cookies from "js-cookie";
-import { computeAttendance, formatHours as fmtHours, toLocalDateStr } from "@/lib/attendance/computeHours";
+import { computeAttendance, formatDuration, formatHours as fmtHours, toLocalDateStr } from "@/lib/attendance/computeHours";
 import { shiftsEnabled } from "@/lib/attendance/shifts";
 import { getSessionUser } from "@/lib/session";
 import { auth } from "@/lib/firebase";
@@ -57,6 +57,7 @@ export default function AttendanceLogPage() {
   const [user, setUser] = useState(null);
   const [selectedDate, setSelectedDate] = useState(toLocalDateStr(new Date()));
   const [viewMode, setViewMode] = useState("daily"); // "daily" or "monthly"
+  const [personDays, setPersonDays] = useState(null); // month view: one person's days (15 Nov)
   const [editModal, setEditModal] = useState(null); // { punch: null, mode: 'add' | 'edit' }
   const [isSaving, setIsSaving] = useState(false);
 
@@ -93,7 +94,7 @@ export default function AttendanceLogPage() {
   const { data: settings, refetch: refetchSettings } = useGetBranchSettingsQuery(
     !skip ? { companyId, branchId } : { skip: true }
   );
-  const attendanceSettings = settings?.attendance || {};
+  const attendanceSettings = useMemo(() => settings?.attendance || {}, [settings]);
   const shiftsOn = shiftsEnabled(attendanceSettings);
 
   // Early-OT decisions for the month — they change how the engine pays an early
@@ -202,20 +203,27 @@ export default function AttendanceLogPage() {
     }
   };
 
+  // Each person's month, day by day (shared engine — the same hours payroll uses)
+  const attendanceByStaff = useMemo(() => {
+    const out = {};
+    if (!monthlyPunches.length || !staffList.length) return out;
+    staffList.forEach((staff) => {
+      const myPunches = monthlyPunches.filter((p) => p.staffId === staff.id);
+      if (!myPunches.length) return;
+      out[staff.id] = computeAttendance({ punches: myPunches, staff, settings: attendanceSettings, otApprovals: otApprovalsByStaff[staff.id] });
+    });
+    return out;
+  }, [monthlyPunches, staffList, attendanceSettings, otApprovalsByStaff]);
+  /** One person's hours on the day picked, or null. */
+  const dayHours = (staffId) => attendanceByStaff[staffId]?.days.find((d) => d.date === selectedDate) || null;
+
   // Monthly Summary Calculation (shared engine)
   const monthlySummaries = useMemo(() => {
-    if (!monthlyPunches.length || !staffList.length) return [];
+    if (!staffList.length) return [];
 
     return staffList.map(staff => {
-      const myPunches = monthlyPunches.filter(p => p.staffId === staff.id);
-      if (myPunches.length === 0) return null;
-
-      const { totals } = computeAttendance({
-        punches: myPunches,
-        staff,
-        settings: attendanceSettings,
-        otApprovals: otApprovalsByStaff[staff.id]
-      });
+      if (!attendanceByStaff[staff.id]) return null;
+      const { totals } = attendanceByStaff[staff.id];
 
       return {
         id: staff.id,
@@ -230,7 +238,7 @@ export default function AttendanceLogPage() {
         pendingOtDays: totals.pendingOtDays
       };
     }).filter(s => s !== null);
-  }, [monthlyPunches, staffList, attendanceSettings, otApprovalsByStaff]);
+  }, [staffList, attendanceByStaff]);
 
   const sortedDaily = [...punches].sort((a, b) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
 
@@ -462,6 +470,30 @@ export default function AttendanceLogPage() {
                       <Plus className="size-3" /> Add
                     </button>}
                   </div>
+                  {/* how long they worked that day (15 Nov) — breaks left out, as payroll counts it */}
+                  {(() => {
+                    const h = dayHours(g.staffId);
+                    if (!h) return isLoadingMonthly ? <Skeleton className="h-9 w-24 shrink-0" /> : null;
+                    // still in today: count up to now from their last punch in
+                    const lastIn = g.inNow && selectedDate === today ? g.punches[g.punches.length - 1]?.timestamp?.seconds : null;
+                    const running = lastIn ? Math.max(0, Date.now() / 1000 - lastIn) / 3600 : 0;
+                    return (
+                      <div className="shrink-0 text-left sm:w-36 sm:text-right">
+                        <p className="text-sm font-bold tabular-nums text-fg">
+                          {formatDuration(h.worked + running)}
+                          <span className="ml-1 text-xs font-medium text-muted">{g.inNow && selectedDate === today ? "so far" : "worked"}</span>
+                        </p>
+                        <p className="text-xs tabular-nums text-muted">
+                          {[
+                            // a shift can pay less (or more) than the clock: say so
+                            !running && Math.abs(h.clocked - h.worked) >= 1 / 60 && `clocked ${formatDuration(h.clocked)}`,
+                            h.breakMinutes > 0 && `break ${formatDuration(h.breakMinutes / 60)}`,
+                            h.ot > 0 && `${formatHours(h.ot)} OT`,
+                          ].filter(Boolean).join(" · ") || "no break"}
+                        </p>
+                      </div>
+                    );
+                  })()}
                 </div>
               ))}
             </Card>
@@ -472,6 +504,7 @@ export default function AttendanceLogPage() {
           columns={monthColumns}
           rows={monthlySummaries}
           loading={isLoadingMonthly}
+          onRowClick={(s) => setPersonDays(s)}
           pageSize={0}
           defaultSort={{ key: "name", dir: "asc" }}
           empty={{ icon: LayoutGrid, title: `No punches in ${niceMonth}`, description: "The month's hours show here once staff punch in." }}
@@ -487,6 +520,37 @@ export default function AttendanceLogPage() {
           }
         />
       )}
+
+      {/* one person's month, day by day (15 Nov) */}
+      <Sheet
+        open={!!personDays}
+        onClose={() => setPersonDays(null)}
+        title={personDays?.name || ""}
+        description={personDays ? `${niceMonth} · ${personDays.days} day${personDays.days === 1 ? "" : "s"} · ${formatDuration(personDays.worked)} worked${personDays.ot > 0 ? ` · ${formatHours(personDays.ot)} OT` : ""}` : ""}
+        size="lg"
+      >
+        <div className="divide-y divide-line">
+          {[...(attendanceByStaff[personDays?.id]?.days || [])].reverse().map((d) => (
+            <button
+              key={d.date}
+              type="button"
+              onClick={() => { setSelectedDate(d.date); setViewMode("daily"); setPersonDays(null); }}
+              className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 py-3 text-left hover:bg-surface-2/60"
+            >
+              <span className="w-24 shrink-0 text-sm font-semibold text-fg">{format(parseISO(d.date), "EEE d MMM")}</span>
+              <span className="min-w-0 flex-1 text-xs tabular-nums text-muted">
+                {d.pairs.length ? d.pairs.map((x) => `${x.in}–${x.out}`).join(", ") : "—"}
+                {d.stillIn ? " · no clock-out" : ""}
+                {d.breakMinutes > 0 ? ` · break ${formatDuration(d.breakMinutes / 60)}` : ""}
+              </span>
+              <span className="text-right text-sm font-bold tabular-nums text-fg">
+                {formatDuration(d.worked)}
+                {d.ot > 0 && <span className="ml-1 text-xs font-semibold text-warning">{formatHours(d.ot)} OT</span>}
+              </span>
+            </button>
+          ))}
+        </div>
+      </Sheet>
 
       {/* add or change a punch */}
       <Sheet
