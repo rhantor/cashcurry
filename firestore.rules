@@ -300,11 +300,30 @@ service cloud.firestore {
       return isAuth() && u.companyId == companyId && (u.role in companyRoles() || u.role in branchRoles);
     }
 
+    // Settings → Roles (owner, 15 Nov 2026): an extra right a company switched on
+    // for a branch role (lib/authz/permissions.js OPTIONAL_GRANTS). Only adds;
+    // put last in an `||` so a missing document can't refuse anything else.
+    function granted(c, b, cap) {
+      let u = userData();
+      let path = /databases/$(database)/documents/companies/$(c)/settings/roles;
+      return isAuth() && u.companyId == c && inBranch(u, b) && exists(path) &&
+        get(path).data.get('grants', {}).get(cap, []).hasAny([u.role]);
+    }
+    // the only switches there are, each for its one role
+    function rolesSwitchesOk(g) {
+      return g.keys().hasOnly(['cashInHand.view', 'costs.enter', 'payouts.handOut', 'advances.payOut', 'attendance.view']) &&
+        g.get('cashInHand.view', []).hasOnly(['supervisor']) &&
+        g.get('costs.enter', []).hasOnly(['supervisor']) &&
+        g.get('payouts.handOut', []).hasOnly(['accountant']) &&
+        g.get('advances.payOut', []).hasOnly(['inCharge']) &&
+        g.get('attendance.view', []).hasOnly(['accountant']);
+    }
+
     function canReportsView(c, b)     { return may(c, b, leadRoles().concat(['inCharge', 'accountant'])); }
     function canSalesEnter(c, b)      { return may(c, b, officeBranchRoles()); }
-    function canCostsEnter(c, b)      { return may(c, b, leadRoles().concat(['inCharge', 'accountant'])); }
+    function canCostsEnter(c, b)      { return may(c, b, leadRoles().concat(['inCharge', 'accountant'])) || granted(c, b, 'costs.enter'); }
     function canCostsApprove(c, b)    { return may(c, b, leadRoles().concat(['inCharge'])); }
-    function canPayoutsHandOut(c, b)  { return may(c, b, leadRoles().concat(['inCharge', 'supervisor', 'cashier'])); }
+    function canPayoutsHandOut(c, b)  { return may(c, b, leadRoles().concat(['inCharge', 'supervisor', 'cashier'])) || granted(c, b, 'payouts.handOut'); }
     // ── a pay-out spent at a supplier (4.10, lib/payouts/supplier.js) ──
     // those who hand out or approve pay-outs, in any branch of the company
     function canPayoutsAny(c) { return mayInCompany(c, leadRoles().concat(['inCharge', 'supervisor', 'cashier'])); }
@@ -395,7 +414,7 @@ service cloud.firestore {
     function canCashBank(c, b)        { return may(c, b, leadRoles().concat(['accountant'])); }
     function canSalariesEnter(c, b)   { return may(c, b, leadRoles().concat(['accountant'])); }
     function canAdvancesRequest(c, b) { return may(c, b, officeBranchRoles()); }
-    function canAdvancesPayOut(c, b)  { return may(c, b, leadRoles().concat(['accountant', 'supervisor', 'cashier'])); }
+    function canAdvancesPayOut(c, b)  { return may(c, b, leadRoles().concat(['accountant', 'supervisor', 'cashier'])) || granted(c, b, 'advances.payOut'); }
     function canAdvancesApprove(c, b) { return may(c, b, leadRoles()); }
     function canPayrollView(c, b)     { return may(c, b, leadRoles().concat(['accountant'])); }
     function canPayrollManage(c, b)   { return may(c, b, leadRoles()); }
@@ -403,7 +422,7 @@ service cloud.firestore {
     function canStaffPay(c, b)        { return may(c, b, leadRoles().concat(['accountant'])); }
     function canStaffManage(c, b)     { return may(c, b, leadRoles()); }
     // 'kiosk': the branch's kiosk-and-attendance login (11 Nov 2026) — nothing else
-    function canAttendanceView(c, b)  { return may(c, b, leadRoles().concat(['inCharge', 'supervisor', 'kiosk'])); }
+    function canAttendanceView(c, b)  { return may(c, b, leadRoles().concat(['inCharge', 'supervisor', 'kiosk'])) || granted(c, b, 'attendance.view'); }
     function canAttendanceManage(c, b){ return may(c, b, leadRoles().concat(['kiosk'])); }
     function canKiosk(c, b)           { return may(c, b, leadRoles().concat(['inCharge', 'supervisor', 'kiosk'])); }
     function canRecordsDelete(c, b)   { return may(c, b, leadRoles()); }
@@ -740,6 +759,10 @@ service cloud.firestore {
       match /settings/{docId} {
         allow read: if belongsToCompany(companyId);
         allow write: if docId == 'costCategories' && mayInCompany(companyId, []);
+        // Settings → Roles (15 Nov 2026): the owner or a super admin switches extra rights on
+        allow write: if docId == 'roles' && isCompanyAdmin(companyId) &&
+          request.resource.data.keys().hasOnly(['grants', 'updatedAt', 'updatedBy']) &&
+          rolesSwitchesOk(request.resource.data.get('grants', {}));
       }
 
       match /vendors/{vendorId} {

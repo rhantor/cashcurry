@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/server/firebaseAdmin";
 import { cashInHand } from "@/lib/server/cashInHand";
 import { can, isCompanyRole } from "@/lib/authz/permissions";
+import { companyGrants } from "@/lib/server/grants";
 
 // The till's cash for the Requested panel and Ops (30 Oct), for whoever may see it
 // there (cashInHand.view) — the cashier among them, whose rules keep the
@@ -27,7 +28,7 @@ export async function POST(req) {
     }
     const snap = await adminDb.collection("users").doc(caller.uid).get();
     const me = snap.exists ? snap.data() : null;
-    const allowed = me && me.companyId === companyId && can(me.role, "cashInHand.view") && (isCompanyRole(me.role) || me.branchId === branchId);
+    const allowed = me && me.companyId === companyId && can(me.role, "cashInHand.view", await companyGrants(companyId)) && (isCompanyRole(me.role) || me.branchId === branchId);
     if (!allowed) return fail(403, "You can't see this branch's cash.");
 
     return NextResponse.json(await cashInHand({ companyId, branchId, today }));
