@@ -1,14 +1,14 @@
 "use client";
 
 import { looksLikeStaffId } from "@/lib/staff/login";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion, useAnimationControls } from "framer-motion";
 import { ArrowRight, Eye, EyeOff, FlaskConical, KeyRound, Lock, ShieldCheck, UserRound } from "lucide-react";
 import { useLoginMutation } from "@/lib/redux/api/authApiSlice";
 import { USE_EMULATOR } from "@/lib/firebase";
-import { signedIn } from "@/lib/session";
+import { signedIn, takeSignOutReason } from "@/lib/session";
 import { readPendingSignup } from "@/lib/signupPending";
 import BrandPanel, { Globe } from "@/app/components/auth/BrandPanel";
 import { Button, Logo, cn } from "@/app/components/ui";
@@ -98,6 +98,11 @@ export default function LoginPage() {
   const [caps, setCaps] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  // signed out because an admin changed this login's role (15 Nov)
+  const [notice, setNotice] = useState("");
+  useEffect(() => {
+    if (takeSignOutReason() === "role") setNotice("Your role was changed. Sign in again to carry on.");
+  }, []);
   const [login, { isLoading }] = useLoginMutation();
   const router = useRouter();
   const shake = useAnimationControls(); // the form shakes on each failed try
@@ -249,6 +254,9 @@ export default function LoginPage() {
                 </AnimatePresence>
               </div>
 
+              {notice && !error && (
+                <p role="status" className="rounded-xl bg-info-soft px-3.5 py-2.5 text-sm font-medium text-info">{notice}</p>
+              )}
               <AnimatePresence mode="wait" initial={false}>
                 {error && (
                   <motion.p

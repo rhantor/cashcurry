@@ -2,22 +2,23 @@
 "use client";
 
 import React, { useMemo, useState } from "react";
+import { useDispatch } from "react-redux";
+import { saveLogin as postLogin, savedText } from "@/lib/users/client";
 import { useAddBranchUserMutation } from "@/lib/redux/api/branchApiSlice";
 import AddBranchUserModal from "./modals/AddBranchUserModal";
 
 // ⬇️ NEW: import create-company-user hook + modal
 import {
+  authApiSlice,
   useGetCompaniesUsersQuery,
-  useUpdateCompanyUserMutation,
   useDeleteCompanyUserMutation,
   useAddCompanyUserMutation, // <-- NEW
 } from "@/lib/redux/api/authApiSlice";
 
 import {
+  branchApiSlice,
   useGetBranchesQuery,
-  useUpdateBranchAdminMutation,
   useDeleteAdminMutation,
-  useUpdateBranchUserMutation,
   useDeleteBranchUserMutation,
 } from "@/lib/redux/api/branchApiSlice";
 
@@ -33,7 +34,7 @@ import AddCompanyUserModal from "./modals/AddCompanyUserModal"; // <-- NEW
 
 // Helpers
 import { can } from "@/lib/authz/permissions";
-import { sanitizeUpdates, normalizeRole } from "@/lib/format/sanitize";
+import { normalizeRole } from "@/lib/format/sanitize";
 import { getSessionUser } from "@/lib/session";
 import { toast, confirmDialog } from "@/app/components/ui/notify";
 import { Skeleton, Tabs } from "@/app/components/ui";
@@ -63,18 +64,32 @@ export default function UserManagement() {
   } = useGetBranchesQuery(companyId, { skip: !companyId });
 
   // Mutations
-  const [updateCompanyUser, { isLoading: savingCompanyUser }] =
-    useUpdateCompanyUserMutation();
+  const dispatch = useDispatch();
+  const [saving, setSaving] = useState(false);
+  // role, name, email, username: through the server (15 Nov) - the browser may not write a role
+  const saveLogin = async (uid, changes) => {
+    setSaving(true);
+    try {
+      const out = await postLogin(uid, changes);
+      dispatch(branchApiSlice.util.invalidateTags(["Branches", "BranchUsers"]));
+      dispatch(authApiSlice.util.invalidateTags(["User"]));
+      toast.success(savedText(out));
+      return true;
+    } catch (e) {
+      toast.error(e.message || "Couldn't save the change.");
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+  const savingCompanyUser = saving;
+  const savingAdmin = saving;
+  const savingBranchUser = saving;
   const [deleteCompanyUser] = useDeleteCompanyUserMutation();
   const [addCompanyUser, { isLoading: creatingCompanyUser }] =
     useAddCompanyUserMutation(); // <-- NEW
 
-  const [updateBranchAdmin, { isLoading: savingAdmin }] =
-    useUpdateBranchAdminMutation();
   const [deleteAdmin] = useDeleteAdminMutation();
-
-  const [updateBranchUser, { isLoading: savingBranchUser }] =
-    useUpdateBranchUserMutation();
 
   const [deleteBranchUser] = useDeleteBranchUserMutation();
   const [addBranchUser, { isLoading: creatingBranchUser }] =
@@ -115,25 +130,7 @@ export default function UserManagement() {
 
   const handleSaveCompanyUser = async (payload) => {
     if (!editingCompanyUser) return;
-    try {
-      const updates = sanitizeUpdates({
-        userName: payload.userName,
-        role: payload.role,
-      });
-      if (!Object.keys(updates).length) {
-        closeEditCompanyUser();
-        return;
-      }
-      await updateCompanyUser({
-        companyId,
-        uid: editingCompanyUser.id,
-        ...updates,
-      }).unwrap();
-      closeEditCompanyUser();
-    } catch (e) {
-      console.error(e);
-      toast.error("Failed to save company user.");
-    }
+    if (await saveLogin(editingCompanyUser.id, { userName: payload.userName, role: payload.role })) closeEditCompanyUser();
   };
 
   const handleDeleteCompanyUser = async (u) => {
@@ -191,27 +188,8 @@ export default function UserManagement() {
   const handleSaveAdmin = async (payload) => {
     const { branchId, admin } = editingAdmin || {};
     if (!branchId || !admin) return;
-    try {
-      const updates = sanitizeUpdates({
-        fullName: payload.fullName,
-        email: payload.email,
-        role: "branchAdmin",
-      });
-      if (!Object.keys(updates).length) {
-        closeEditAdmin();
-        return;
-      }
-      await updateBranchAdmin({
-        companyId,
-        branchId,
-        adminId: admin.id,
-        updates,
-      }).unwrap();
-      closeEditAdmin();
-    } catch (e) {
-      console.error(e);
-      toast.error("Failed to save branch admin.");
-    }
+    const changes = { fullName: payload.fullName, role: payload.role || "branchAdmin", ...(payload.email ? { email: payload.email } : {}) };
+    if (await saveLogin(admin.id, changes)) closeEditAdmin();
   };
 
   const handleDeleteAdmin = async (branchId, a) => {
@@ -233,27 +211,8 @@ export default function UserManagement() {
   const handleSaveBranchUser = async (payload) => {
     const { branchId, user } = editingBranchUser || {};
     if (!branchId || !user) return;
-    try {
-      const updates = sanitizeUpdates({
-        fullName: payload.fullName,
-        email: payload.email,
-        role: payload.role,
-      });
-      if (!Object.keys(updates).length) {
-        closeEditBranchUser();
-        return;
-      }
-      await updateBranchUser({
-        companyId,
-        branchId,
-        userId: user.id,
-        updates,
-      }).unwrap();
-      closeEditBranchUser();
-    } catch (e) {
-      console.error(e);
-      toast.error("Failed to save branch user.");
-    }
+    const changes = { fullName: payload.fullName, role: payload.role, ...(payload.email ? { email: payload.email } : {}) };
+    if (await saveLogin(user.id, changes)) closeEditBranchUser();
   };
 
   const handleDeleteBranchUser = async (branchId, u) => {
