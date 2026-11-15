@@ -109,7 +109,7 @@ export default function RolesSettings() {
           <table className="w-full min-w-[760px] text-sm">
             <thead>
               <tr className="border-y border-line bg-surface-2/60 text-[11px] uppercase tracking-wide text-subtle">
-                <th className="sticky left-0 z-10 bg-surface-2 px-4 py-2 text-left font-semibold">Can</th>
+                <th className="sticky left-0 z-10 min-w-[13rem] bg-surface-2 px-4 py-2 text-left font-semibold">Can</th>
                 {GUIDE_ROLES.map((r) => (
                   <th key={r} className="px-2 py-2 text-center font-semibold" title={ROLE_LABELS[r] || roleLabel(r)}>
                     {SHORT[r]}
