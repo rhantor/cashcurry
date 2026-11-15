@@ -142,6 +142,8 @@ Settled while building it:
 - Inside a page, a role that may see but not change gets a read-only page
   (vendors, items, attendance log, payroll history for the accountant).
 
+**Extra rights (Settings → Roles, 15 Nov 2026).** The owner or a super admin may switch on, for the whole company: supervisor sees the till's cash; supervisor enters costs; accountant hands out pay-outs; in-charge hands over approved advances; accountant sees attendance. Only these, only adding — no switch takes a right away. They live in `companies/{c}/settings/roles` (`OPTIONAL_GRANTS` in `lib/authz/permissions.js`; `granted()` in `firestore.rules`).
+
 Rules that go with it:
 1. **Nobody approves their own** request, pay-out or voucher (decided 16 Oct).
    A voucher (cost with no invoice) or pay-out bill is checked by someone

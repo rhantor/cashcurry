@@ -1,15 +1,17 @@
 "use client";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { Building2, Monitor, Moon, Palette, ReceiptText, Sun, Users } from "lucide-react";
+import { Building2, Monitor, Moon, Palette, ReceiptText, ShieldCheck, Sun, Users } from "lucide-react";
 import BranchManagement from "../components/settings/BranchManagement";
 import UserManagement from "../components/settings/users/UserMangement";
 import CostCategories from "../components/settings/CostCategories";
+import RolesSettings from "../components/settings/RolesSettings";
 import { Card, cn, useTheme } from "@/app/components/ui";
 import { ChoiceCards } from "@/app/components/entry/Choices";
 
 const SECTIONS = [
   { id: "users", label: "People", note: "Who can sign in, and their role", icon: Users },
+  { id: "roles", label: "Roles", note: "What each role can do, and extra rights", icon: ShieldCheck },
   { id: "branches", label: "Branches", note: "Add and look after branches", icon: Building2 },
   { id: "costs", label: "Cost categories", note: "What costs can be entered under", icon: ReceiptText },
   { id: "appearance", label: "Appearance", note: "Light or dark", icon: Palette },
@@ -78,6 +80,7 @@ export default function SettingsPage() {
             <p className="mt-0.5 text-sm text-muted">{sec.note}</p>
           </div>
           {active === "users" && <UserManagement />}
+          {active === "roles" && <RolesSettings />}
           {active === "branches" && <BranchManagement />}
           {active === "costs" && <CostCategories />}
           {active === "appearance" && <Appearance />}

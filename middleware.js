@@ -6,7 +6,7 @@
 // or write, and API routes check the caller's ID token themselves.
 import { NextResponse } from "next/server";
 import { ROLES } from "@/lib/authz/roles";
-import { canOpen, normalizeRole } from "@/lib/authz/permissions";
+import { canOpen, cleanGrants, normalizeRole } from "@/lib/authz/permissions";
 
 const PUBLIC_PATHS = [
   "/login",
@@ -101,7 +101,10 @@ export function middleware(request) {
   // Role-based authorization (deny by default: a page not in the matrix is
   // open to office roles only, never to staff or an unknown role)
   const role = normalizeRole(request.cookies.get("role")?.value || "");
-  if (!canOpen(role, pathname)) {
+  // the company's extra rights for this role (Settings → Roles), as lib/session wrote them
+  const granted = (request.cookies.get("grants")?.value || "").split(",").filter(Boolean);
+  const grants = cleanGrants(Object.fromEntries(granted.map((c) => [c, [role]])));
+  if (!canOpen(role, pathname, grants)) {
     const unauth = new URL("/unauthorized", request.url);
     unauth.searchParams.set("from", pathname);
     return NextResponse.redirect(unauth);
