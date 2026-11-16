@@ -75,7 +75,8 @@ export default function JobTab() {
   const { form, errors, change } = useStaffFormContext();
   // the branch's supervisors: who leads this person's work and gives them tasks (4.11)
   const { companyId, branchId } = useSession();
-  const supervisors = useChatPeople(companyId).filter(p => p.role === 'supervisor' && p.branchId === branchId);
+  // a kitchen lead leads the kitchen's people the same way (16 Nov 2026)
+  const supervisors = useChatPeople(companyId).filter(p => ['supervisor', 'kitchenLead'].includes(p.role) && p.branchId === branchId);
   const pickSupervisor = uid => {
     const s = supervisors.find(p => p.uid === uid);
     change({ target: { name: 'supervisorUid', value: uid } });

@@ -15,7 +15,7 @@ import { createAuditLog } from "@/lib/redux/api/auditUtils";
 import { Button, Card, Skeleton, Switch, cn } from "@/app/components/ui";
 import { confirmDialog, toast } from "@/app/components/ui/notify";
 
-const SHORT = { owner: "Owner", superAdmin: "Super admin", gm: "GM", branchAdmin: "Branch admin", manager: "Manager", inCharge: "In-charge", accountant: "Accountant", supervisor: "Supervisor", cashier: "Cashier", kiosk: "Kiosk" };
+const SHORT = { owner: "Owner", superAdmin: "Super admin", gm: "GM", branchAdmin: "Branch admin", manager: "Manager", inCharge: "In-charge", accountant: "Accountant", supervisor: "Supervisor", cashier: "Cashier", kitchenLead: "Kitchen", kiosk: "Kiosk" };
 
 export default function RolesSettings() {
   const { user } = useSession();

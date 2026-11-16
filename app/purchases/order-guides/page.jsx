@@ -289,6 +289,7 @@ export default function OrderGuidesPage() {
           notes: `Generated from Order Guide: ${selectedGuide.name}`,
           createdBy: user?.uid || "Unknown User",
           createdByName: personName(user, "Unknown"),
+          createdByRole: user?.role || "", // a kitchen lead's order waits for approval (16 Nov 2026)
           totalEst: orderTotal,
           status: "Pending", // Maps to Purchase Orders pipeline
         },

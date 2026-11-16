@@ -47,7 +47,8 @@ import {
   ListPlus,
 } from "lucide-react";
 import { Menu } from "@/app/components/ui";
-import { SENT_VIA, dueText, followUpOrder, lateDays, missingLines, repeatOrder } from "@/lib/purchases/orders";
+import { SENT_VIA, dueText, followUpOrder, lateDays, missingLines, needsApproval, receiveCheck, repeatOrder } from "@/lib/purchases/orders";
+import { receivedBillWaits } from "@/lib/purchases/billApproval";
 import { useRouter } from "next/navigation";
 import { OrdersContext } from "./OrdersContext";
 import EditOrderSheet from "./components/EditOrderSheet";
@@ -110,6 +111,8 @@ export default function PurchaseOrdersPage() {
   // branch settings.
   const requireApproval = branchSettings?.purchases?.requirePoApproval === true;
   const canApprove = can(user?.role, "purchases.approve");
+  // a kitchen lead's order always waits for approval (16 Nov 2026), whatever the branch's policy
+  const waitsApproval = (order) => needsApproval(order, requireApproval);
 
   const [updateOrder, { isLoading: updating }] = useUpdateRequisitionMutation();
   const [addOrder, { isLoading: adding }] = useAddRequisitionMutation();
@@ -206,6 +209,9 @@ export default function PurchaseOrdersPage() {
 
   const receiveSubtotal = sumLines(receiveData.items, "receivedQty", "finalPrice");
   const receiveTotal = billTotals(receiveSubtotal, receiveData.discount, receiveData.round).total;
+  // goods in: costs more than ordered, from someone who doesn't keep the books → the bill waits
+  const receiveChecked = selectedOrder ? receiveCheck(selectedOrder, receiveData.items, receiveTotal) : null;
+  const receiveWaits = !!receiveChecked && receivedBillWaits(user?.role, receiveChecked);
 
   const handleReceiveOrder = async () => {
     if (!receiveData.invoiceNo.trim()) return toastError("Enter the supplier's invoice number.");
@@ -250,6 +256,8 @@ export default function PurchaseOrdersPage() {
         vendorTermsDays,
         receivedBy: user || {},
         attachment,
+        waits: receiveWaits,
+        check: receiveChecked,
       }).unwrap();
 
       // The bill lives in a different api slice, so refresh it by hand.
@@ -264,9 +272,10 @@ export default function PurchaseOrdersPage() {
       // the bill. Prices are kept per branch: two branches buying the same
       // product at different rates should not overwrite each other, and
       // `defaultPrice` (the company planning price) is never touched.
+      // (a bill waiting for approval may yet be sent back with wrong prices: not until then)
       await Promise.allSettled(
         receiveData.items
-          .filter((item) => Number(item.finalPrice) > 0)
+          .filter((item) => !receiveWaits && Number(item.finalPrice) > 0)
           .map((item) =>
             recordBranchPrice({
               companyId,
@@ -281,7 +290,9 @@ export default function PurchaseOrdersPage() {
       setOpenReceiveSheet(false);
       setInvoiceFile(null);
       setInvoicePreview(null);
-      toastOk("Goods received. The supplier's bill has been created.");
+      toastOk(receiveWaits
+        ? "Goods received. It costs more than ordered, so the bill waits for a manager or accountant to approve."
+        : "Goods received. The supplier's bill has been created.");
     } catch (e) {
       console.error(e);
       toastError(e?.message || "Could not receive this order. Nothing was saved.");
@@ -299,7 +310,9 @@ export default function PurchaseOrdersPage() {
   const [confirmReapproval, setConfirmReapproval] = useState(false);
 
   // an order collected with a pay-out waits on that bill: nothing changes it meanwhile
-  const canEdit = (order) => !order.payoutHold && ["Pending", "Approved", "Sent", "Rejected"].includes(normalizeStatus(order.status));
+  // a kitchen lead changes their order before it goes to the supplier, not after (16 Nov 2026)
+  const canEdit = (order) => !order.payoutHold && ["Pending", "Approved", "Sent", "Rejected"].includes(normalizeStatus(order.status)) &&
+    !(user?.role === "kitchenLead" && normalizeStatus(order.status) === "Sent");
   const canCancel = (order) => !order.payoutHold && ["Pending", "Approved", "Sent"].includes(normalizeStatus(order.status));
 
   const handleOpenEdit = (order) => {
@@ -413,7 +426,7 @@ export default function PurchaseOrdersPage() {
     // back for a fresh one rather than being sent with quantities nobody signed
     // off. Without the approval policy there is nothing to reset.
     const wasApproved = normalizeStatus(selectedOrder.status) === "Approved";
-    if (requireApproval && wasApproved) {
+    if (waitsApproval(selectedOrder) && wasApproved) {
       setConfirmReapproval(true);
       return;
     }
@@ -453,13 +466,13 @@ export default function PurchaseOrdersPage() {
   };
 
   const orderMissing = async (order) => {
-    const res = await startOrder(followUpOrder(order, { uid: user?.uid, name: personName(user) }), (no) => `${no || "New order"} made for what was missing — send it when ready.`);
+    const res = await startOrder(followUpOrder(order, { uid: user?.uid, name: personName(user), role: user?.role }), (no) => `${no || "New order"} made for what was missing — send it when ready.`);
     if (res) await updateOrder({ companyId, branchId, requisitionId: order.id, patch: { followUpPoId: res.id, followUpPoNo: res.poNo || "" } }).unwrap().catch(() => {});
   };
 
   const orderAgain = (order) => {
     const byId = new Map(catalog.map((i) => [i.id, i]));
-    const data = repeatOrder(order, { uid: user?.uid, name: personName(user) }, { inCatalog: (id) => byId.has(id), priceOf: (id) => branchLastPrice(byId.get(id), branchId) });
+    const data = repeatOrder(order, { uid: user?.uid, name: personName(user), role: user?.role }, { inCatalog: (id) => byId.has(id), priceOf: (id) => branchLastPrice(byId.get(id), branchId) });
     if (!data.items.length) return toastError("None of these items are sold at this branch any more.");
     return startOrder(data, (no) => `${no || "New order"} made — change it if you need, then send it.`);
   };
@@ -590,7 +603,7 @@ export default function PurchaseOrdersPage() {
     "w-11 h-11 flex items-center justify-center rounded-xl text-muted bg-surface-2/60 active:bg-surface-2 transition-colors";
 
   return (
-    <OrdersContext.Provider value={{ receiving, ready, companyId, branchId, user, currency, fmtMoney, router, dispatch, toastOk, toastError, toastNode, args, companyArgs, orders, ordersLoading, vendors, catalog, branchSettings, branch, company, requireApproval, canApprove, invoiceFile, setInvoiceFile, invoicePreview, setInvoicePreview, uploadPct, setUploadPct, uploading, setUploading, busy, selectedOrder, setSelectedOrder, statusFilter, setStatusFilter, search, setSearch, visibleOrders, openReceiveSheet, setOpenReceiveSheet, receiveData, setReceiveData, handleOpenReceive, updateReceiveRow, receiveSubtotal, receiveTotal, handleReceiveOrder, openEditSheet, setOpenEditSheet, editData, setEditData, showPicker, setShowPicker, pickSearch, setPickSearch, pickCategory, setPickCategory, confirmReapproval, setConfirmReapproval, canEdit, canCancel, handleOpenEdit, updateEditRow, removeEditRow, addableItems, pickableItems, handleAddEditRow, editTotal, saveEdit, handleSaveEdit, pendingAction, setPendingAction, runStatusChange, handleSend, sendingOrder, setSendingOrder, confirmPendingAction, actionCopy, printing, setPrinting, exportPDF }}>
+    <OrdersContext.Provider value={{ receiveChecked, receiveWaits, receiving, ready, companyId, branchId, user, currency, fmtMoney, router, dispatch, toastOk, toastError, toastNode, args, companyArgs, orders, ordersLoading, vendors, catalog, branchSettings, branch, company, requireApproval, canApprove, invoiceFile, setInvoiceFile, invoicePreview, setInvoicePreview, uploadPct, setUploadPct, uploading, setUploading, busy, selectedOrder, setSelectedOrder, statusFilter, setStatusFilter, search, setSearch, visibleOrders, openReceiveSheet, setOpenReceiveSheet, receiveData, setReceiveData, handleOpenReceive, updateReceiveRow, receiveSubtotal, receiveTotal, handleReceiveOrder, openEditSheet, setOpenEditSheet, editData, setEditData, showPicker, setShowPicker, pickSearch, setPickSearch, pickCategory, setPickCategory, confirmReapproval, setConfirmReapproval, canEdit, canCancel, handleOpenEdit, updateEditRow, removeEditRow, addableItems, pickableItems, handleAddEditRow, editTotal, saveEdit, handleSaveEdit, pendingAction, setPendingAction, runStatusChange, handleSend, sendingOrder, setSendingOrder, confirmPendingAction, actionCopy, printing, setPrinting, exportPDF }}>
     <div className="mx-auto max-w-7xl space-y-4 px-4 py-5 pb-24">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
@@ -646,7 +659,7 @@ export default function PurchaseOrdersPage() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {visibleOrders.map((order) => {
           const status = normalizeStatus(order.status);
-          const showApproval = status === "Pending" && requireApproval;
+          const showApproval = status === "Pending" && waitsApproval(order);
           return (
             <div
               key={order.id}
@@ -737,6 +750,20 @@ export default function PurchaseOrdersPage() {
                   </p>
                 )}
 
+                {status === "Received" && order.billWaiting && (
+                  <p className="font-semibold text-warning">Bill waiting for a manager or accountant — it costs more than ordered</p>
+                )}
+
+                {status === "Sent" && order.receiveSentBack?.reason && (
+                  <p className="text-danger">
+                    Bill sent back{order.receiveSentBack.by?.name ? ` by ${order.receiveSentBack.by.name}` : ""}: {order.receiveSentBack.reason} — receive the goods again
+                  </p>
+                )}
+
+                {status === "Pending" && waitsApproval(order) && !requireApproval && (
+                  <p className="text-subtle">Kitchen order — a manager approves it before it goes to the supplier</p>
+                )}
+
                 {order.lastEditedAt && status !== "Received" && (
                   <p className="text-subtle">
                     Edited {format(new Date(order.lastEditedAt), "d MMM yyyy")}
@@ -801,7 +828,7 @@ export default function PurchaseOrdersPage() {
                   </div>
                 )}
 
-                {!order.payoutHold && (status === "Approved" || (status === "Pending" && !requireApproval)) && (
+                {!order.payoutHold && (status === "Approved" || (status === "Pending" && !waitsApproval(order))) && (
                   <button
                     onClick={() => handleSend(order)}
                     className="w-full min-h-[48px] rounded-2xl bg-info text-white font-bold

@@ -7,7 +7,7 @@ import { Button, Card, cn, toast } from "@/app/components/ui";
 import { personName } from "@/lib/people";
 // Set NEXT_PUBLIC_SUPPORT_EMAIL to show a way to write to the Cash Curry team.
 const SUPPORT_EMAIL = process.env.NEXT_PUBLIC_SUPPORT_EMAIL || "";
-const ROLE = { owner: "Owner", gm: "General manager", superAdmin: "Super admin", branchAdmin: "Branch admin", manager: "Manager", accountant: "Accountant", supervisor: "Supervisor", cashier: "Cashier", staff: "Staff" };
+const ROLE = { owner: "Owner", gm: "General manager", superAdmin: "Super admin", branchAdmin: "Branch admin", manager: "Manager", accountant: "Accountant", supervisor: "Supervisor", cashier: "Cashier", kitchenLead: "Kitchen lead", staff: "Staff" };
 
 const TIPS = [
   { icon: RefreshCw, title: "Something looks stuck or out of date", text: "Pull down to refresh on a phone, or reload the page. Saved entries are kept." },
