@@ -38,6 +38,7 @@
     "android:icons": "node scripts/android-icons.mjs"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "1.4.0",
     "@capacitor/app": "^8.1.2",
     "@capacitor/core": "^8.5.3",
     "@capacitor/push-notifications": "^8.1.3",

@@ -49,6 +49,8 @@ import {
 import { Menu } from "@/app/components/ui";
 import { SENT_VIA, dueText, followUpOrder, lateDays, missingLines, needsApproval, receiveCheck, repeatOrder } from "@/lib/purchases/orders";
 import { receivedBillWaits } from "@/lib/purchases/billApproval";
+import { fillReceive } from "@/lib/purchases/invoiceRead";
+import { readInvoice } from "@/lib/purchases/readInvoiceClient";
 import { useRouter } from "next/navigation";
 import { OrdersContext } from "./OrdersContext";
 import EditOrderSheet from "./components/EditOrderSheet";
@@ -121,6 +123,8 @@ export default function PurchaseOrdersPage() {
   const [recordBranchPrice] = useRecordBranchPurchasePriceMutation();
 
   const [invoiceFile, setInvoiceFile] = useState(null);
+  // the invoice read from its photo (16 Nov 2026): { busy } while reading, then { reading, fill }
+  const [invoiceRead, setInvoiceRead] = useState(null);
   const [invoicePreview, setInvoicePreview] = useState(null);
   const [uploadPct, setUploadPct] = useState(0);
   const [uploading, setUploading] = useState(false);
@@ -179,6 +183,7 @@ export default function PurchaseOrdersPage() {
     };
     setSelectedOrder(order);
     setInvoiceFile(null);
+    setInvoiceRead(null);
     setInvoicePreview(null);
     setUploadPct(0);
     setReceiveData({
@@ -198,6 +203,28 @@ export default function PurchaseOrdersPage() {
       })),
     });
     setOpenReceiveSheet(true);
+  };
+
+  // fill the form from the invoice's photo; whoever saves still looks it over
+  const readInvoicePhoto = async () => {
+    if (!invoiceFile || !selectedOrder) return;
+    setInvoiceRead({ busy: true });
+    try {
+      const items = (selectedOrder.items || []).map((i) => ({ id: i.itemId, name: i.name, unit: i.unit }));
+      const reading = await readInvoice({ companyId, branchId, file: invoiceFile, vendorName: selectedOrder.vendorName, items });
+      const fill = fillReceive(receiveData.items, reading);
+      setReceiveData((p) => ({
+        ...p,
+        items: fill.items,
+        invoiceNo: fill.invoiceNo || p.invoiceNo,
+        invoiceDate: fill.invoiceDate || p.invoiceDate,
+        discount: fill.discount > 0 ? { amount: String(fill.discount), kind: "Discount", note: "From the invoice" } : p.discount,
+      }));
+      setInvoiceRead({ reading, fill });
+    } catch (e) {
+      setInvoiceRead(null);
+      toastError(e?.message || "Couldn't read the invoice.");
+    }
   };
 
   const updateReceiveRow = (itemId, key, val) => {
@@ -603,7 +630,7 @@ export default function PurchaseOrdersPage() {
     "w-11 h-11 flex items-center justify-center rounded-xl text-muted bg-surface-2/60 active:bg-surface-2 transition-colors";
 
   return (
-    <OrdersContext.Provider value={{ receiveChecked, receiveWaits, receiving, ready, companyId, branchId, user, currency, fmtMoney, router, dispatch, toastOk, toastError, toastNode, args, companyArgs, orders, ordersLoading, vendors, catalog, branchSettings, branch, company, requireApproval, canApprove, invoiceFile, setInvoiceFile, invoicePreview, setInvoicePreview, uploadPct, setUploadPct, uploading, setUploading, busy, selectedOrder, setSelectedOrder, statusFilter, setStatusFilter, search, setSearch, visibleOrders, openReceiveSheet, setOpenReceiveSheet, receiveData, setReceiveData, handleOpenReceive, updateReceiveRow, receiveSubtotal, receiveTotal, handleReceiveOrder, openEditSheet, setOpenEditSheet, editData, setEditData, showPicker, setShowPicker, pickSearch, setPickSearch, pickCategory, setPickCategory, confirmReapproval, setConfirmReapproval, canEdit, canCancel, handleOpenEdit, updateEditRow, removeEditRow, addableItems, pickableItems, handleAddEditRow, editTotal, saveEdit, handleSaveEdit, pendingAction, setPendingAction, runStatusChange, handleSend, sendingOrder, setSendingOrder, confirmPendingAction, actionCopy, printing, setPrinting, exportPDF }}>
+    <OrdersContext.Provider value={{ invoiceRead, setInvoiceRead, readInvoicePhoto, receiveChecked, receiveWaits, receiving, ready, companyId, branchId, user, currency, fmtMoney, router, dispatch, toastOk, toastError, toastNode, args, companyArgs, orders, ordersLoading, vendors, catalog, branchSettings, branch, company, requireApproval, canApprove, invoiceFile, setInvoiceFile, invoicePreview, setInvoicePreview, uploadPct, setUploadPct, uploading, setUploading, busy, selectedOrder, setSelectedOrder, statusFilter, setStatusFilter, search, setSearch, visibleOrders, openReceiveSheet, setOpenReceiveSheet, receiveData, setReceiveData, handleOpenReceive, updateReceiveRow, receiveSubtotal, receiveTotal, handleReceiveOrder, openEditSheet, setOpenEditSheet, editData, setEditData, showPicker, setShowPicker, pickSearch, setPickSearch, pickCategory, setPickCategory, confirmReapproval, setConfirmReapproval, canEdit, canCancel, handleOpenEdit, updateEditRow, removeEditRow, addableItems, pickableItems, handleAddEditRow, editTotal, saveEdit, handleSaveEdit, pendingAction, setPendingAction, runStatusChange, handleSend, sendingOrder, setSendingOrder, confirmPendingAction, actionCopy, printing, setPrinting, exportPDF }}>
     <div className="mx-auto max-w-7xl space-y-4 px-4 py-5 pb-24">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>

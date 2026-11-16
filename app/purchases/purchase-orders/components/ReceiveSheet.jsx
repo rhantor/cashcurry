@@ -10,10 +10,12 @@ import DiscountField from "@/app/components/purchases/DiscountField";
 import { billTotals, discountAmount, signedMoney } from "@/lib/purchases/discount";
 import { lineTotal } from "../shared";
 import { checkLineText, priceRise } from "@/lib/purchases/orders";
+import { extraText, totalGap } from "@/lib/purchases/invoiceRead";
+import { Sparkles } from "lucide-react";
 import { useOrdersContext } from "../OrdersContext";
 
 export default function ReceiveSheet() {
-  const { receiveChecked, receiveWaits, receiving, currency, fmtMoney, invoiceFile, setInvoiceFile, invoicePreview, setInvoicePreview, uploadPct, uploading, busy, selectedOrder, openReceiveSheet, setOpenReceiveSheet, receiveData, setReceiveData, updateReceiveRow, receiveSubtotal, receiveTotal, handleReceiveOrder } = useOrdersContext();
+  const { invoiceRead, setInvoiceRead, readInvoicePhoto, receiveChecked, receiveWaits, receiving, currency, fmtMoney, invoiceFile, setInvoiceFile, invoicePreview, setInvoicePreview, uploadPct, uploading, busy, selectedOrder, openReceiveSheet, setOpenReceiveSheet, receiveData, setReceiveData, updateReceiveRow, receiveSubtotal, receiveTotal, handleReceiveOrder } = useOrdersContext();
   return (
     <>
       {/* ----------------------------- Receive sheet ---------------------------- */}
@@ -98,8 +100,39 @@ export default function ReceiveSheet() {
             onRemove={() => {
               setInvoiceFile(null);
               setInvoicePreview(null);
+              setInvoiceRead(null);
             }}
           />
+
+          {invoiceFile && !invoiceRead?.fill && (
+            <button
+              type="button"
+              onClick={readInvoicePhoto}
+              disabled={!!invoiceRead?.busy}
+              className="flex w-full min-h-[48px] items-center justify-center gap-2 rounded-2xl border border-brand/30 bg-brand-soft font-semibold text-brand disabled:opacity-60"
+            >
+              <Sparkles className="h-5 w-5" />
+              {invoiceRead?.busy ? "Reading the invoice…" : "Read the invoice for me"}
+            </button>
+          )}
+
+          {invoiceRead?.fill && (() => {
+            const f = invoiceRead.fill;
+            const gap = totalGap(invoiceRead.reading, receiveTotal);
+            const name = (id) => receiveData.items.find((i) => i.itemId === id)?.name || "an item";
+            const warn = f.check.length || f.missing.length || f.extra.length || gap;
+            return (
+              <div className={`rounded-2xl px-3.5 py-3 text-sm ${warn ? "bg-warning-soft" : "bg-success-soft"}`}>
+                <p className="font-semibold text-fg">Filled {f.filled.length} of {receiveData.items.length} from the photo — check before you save</p>
+                <ul className="mt-1 space-y-0.5 text-xs text-muted">
+                  {f.check.map((id) => <li key={id}>Check {name(id)}: hard to read, or a different unit on the invoice</li>)}
+                  {f.missing.length > 0 && <li>Not found on the invoice: {f.missing.join(", ")} — left as ordered</li>}
+                  {f.extra.map((l, i) => <li key={i}>On the invoice, not on the order: {extraText(l, fmtMoney)}</li>)}
+                  {gap !== 0 && <li>The invoice says {fmtMoney(invoiceRead.reading.total)}; these lines come to {fmtMoney(receiveTotal)}</li>}
+                </ul>
+              </div>
+            );
+          })()}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <label className="block">
