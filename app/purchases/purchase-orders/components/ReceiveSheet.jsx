@@ -9,11 +9,11 @@ import MoneyInput from "@/app/components/purchases/MoneyInput";
 import DiscountField from "@/app/components/purchases/DiscountField";
 import { billTotals, discountAmount, signedMoney } from "@/lib/purchases/discount";
 import { lineTotal } from "../shared";
-import { priceRise } from "@/lib/purchases/orders";
+import { checkLineText, priceRise } from "@/lib/purchases/orders";
 import { useOrdersContext } from "../OrdersContext";
 
 export default function ReceiveSheet() {
-  const { receiving, currency, fmtMoney, invoiceFile, setInvoiceFile, invoicePreview, setInvoicePreview, uploadPct, uploading, busy, selectedOrder, openReceiveSheet, setOpenReceiveSheet, receiveData, setReceiveData, updateReceiveRow, receiveSubtotal, receiveTotal, handleReceiveOrder } = useOrdersContext();
+  const { receiveChecked, receiveWaits, receiving, currency, fmtMoney, invoiceFile, setInvoiceFile, invoicePreview, setInvoicePreview, uploadPct, uploading, busy, selectedOrder, openReceiveSheet, setOpenReceiveSheet, receiveData, setReceiveData, updateReceiveRow, receiveSubtotal, receiveTotal, handleReceiveOrder } = useOrdersContext();
   return (
     <>
       {/* ----------------------------- Receive sheet ---------------------------- */}
@@ -37,6 +37,16 @@ export default function ReceiveSheet() {
                 <span className="font-semibold tabular-nums">{signedMoney(billTotals(receiveSubtotal, receiveData.discount, receiveData.round).rounding, fmtMoney)}</span>
               </div>
             )}
+            {receiveWaits && (
+              <div className="rounded-xl bg-warning-soft px-3 py-2 text-xs text-fg">
+                <p className="font-semibold">Costs more than ordered — the bill waits for a manager or accountant</p>
+                <ul className="mt-1 space-y-0.5 text-muted">
+                  {receiveChecked.lines.slice(0, 4).map((l, i) => <li key={i}>{checkLineText(l, fmtMoney)}</li>)}
+                  {receiveChecked.lines.length > 4 && <li>and {receiveChecked.lines.length - 4} more</li>}
+                  {receiveChecked.over && <li>Total {fmtMoney(receiveChecked.total)}, ordered {fmtMoney(receiveChecked.orderTotal)}</li>}
+                </ul>
+              </div>
+            )}
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs font-semibold text-subtle uppercase tracking-wide">Invoice total</p>
               <p className="text-xl font-bold text-fg tabular-nums">
@@ -55,6 +65,8 @@ export default function ReceiveSheet() {
                 ? "Saving…"
                 : !invoiceFile
                 ? "Add the invoice photo first"
+                : receiveWaits
+                ? "Confirm & send the bill for approval"
                 : "Confirm & Create Bill"}
             </button>
           </div>

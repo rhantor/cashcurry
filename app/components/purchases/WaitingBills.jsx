@@ -1,5 +1,6 @@
 "use client";
-// New vendor bills from a supervisor or in-charge, waiting for approval (13 Nov 2026).
+// New vendor bills from a supervisor or in-charge, waiting for approval (13 Nov 2026), and
+// goods received on an order that cost more than ordered (kitchen lead and others, 16 Nov 2026).
 // decide: on Due Bills, for those who keep the books — Approve / Send back.
 // mine: on New Vendor Bill, for the person who added them — waiting and sent back.
 
@@ -8,6 +9,7 @@ import { skipToken } from "@reduxjs/toolkit/query";
 import { CheckCircle2, Clock, Paperclip, Undo2 } from "lucide-react";
 import { useDecideVendorBillMutation, useGetVendorBillsQuery } from "@/lib/redux/api/vendorBillsApiSlice";
 import { REJECTED, WAITING, approvalLine, cleanReason } from "@/lib/purchases/billApproval";
+import { checkLineText } from "@/lib/purchases/orders";
 import { formatMoney } from "@/lib/region/currency";
 import { stampOf } from "@/lib/people";
 import useCurrency from "@/app/hooks/useCurrency";
@@ -59,7 +61,7 @@ export default function WaitingBills({ companyId, branchId, user, mode = "decide
         {mode === "mine" ? "Your bills for approval" : `Waiting for approval (${list.length})`}
       </h2>
       {mode === "decide" && (
-        <p className="mb-3 text-xs text-muted">Added by a supervisor or in-charge. They count as owed once approved.</p>
+        <p className="mb-3 text-xs text-muted">Added by a supervisor, in-charge or kitchen lead, or goods received that cost more than ordered. They count as owed once approved; a received order sent back opens to receive again.</p>
       )}
       <ul className="space-y-2">
         {list.map((b) => (
@@ -72,6 +74,12 @@ export default function WaitingBills({ companyId, branchId, user, mode = "decide
                 </p>
                 <p className={`mt-1 text-xs font-medium ${b.status === REJECTED ? "text-danger" : "text-warning"}`}>{approvalLine(b)}</p>
                 {b.notes ? <p className="mt-1 text-xs text-muted">Note: {b.notes}</p> : null}
+                {b.poCheck ? (
+                  <ul className="mt-1 space-y-0.5 text-xs text-fg">
+                    {(b.poCheck.lines || []).map((l, i) => <li key={i}>{checkLineText(l, money)}</li>)}
+                    {b.poCheck.over ? <li>Total {money(b.total)}, ordered {money(b.poCheck.orderTotal)}</li> : null}
+                  </ul>
+                ) : null}
               </div>
               <div className="text-right">
                 <p className="text-base font-bold text-fg">{money(b.total)}</p>

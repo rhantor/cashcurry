@@ -26,6 +26,8 @@ const PEOPLE = {
   klStaff: { role: "staff", branchId: "kl", staffId: "st-me" },
   // the kiosk-and-attendance login (11 Nov 2026)
   klKiosk: { role: "kiosk", branchId: "kl" },
+  // the kitchen lead (16 Nov 2026)
+  klKitchen: { role: "kitchenLead", branchId: "kl" },
 };
 const USERS = Object.keys(PEOPLE);
 const as = (uid) => env.authenticatedContext(uid).firestore();
@@ -49,10 +51,11 @@ const PROBES = {
   "staff.manage": (u) => as(u).doc(`${B}/staff/new-${u}`).set({ firstName: "N" }),
   "attendance.view": (u) => as(u).doc(`${B}/attendance/other`).get(),
   "kiosk.open": (u) => as(u).doc(`${B}/attendance/punch-${u}`).set({ staffId: "st1", date: "2026-10-10", type: "in" }),
-  "purchases.order": (u) => as(u).doc(`${B}/requisitions/po-${u}`).set({ status: "Pending", vendorId: "v1" }),
+  "purchases.order": (u) => as(u).doc(`${B}/requisitions/po-${u}`).set({ status: "Pending", vendorId: "v1", createdBy: u, createdByRole: PEOPLE[u].role }),
   "purchases.approve": (u) => as(u).doc(`${B}/requisitions/pending-${u}`).update({ status: "Approved", approvedBy: u }),
   "purchases.bills": (u) => as(u).doc(`${B}/vendorPayments/vp-${u}`).set({ vendorId: "v1", total: 1 }),
-  "purchases.billAdd": (u) => as(u).doc(`${B}/vendorBills/b-${u}`).set({ vendorId: "v1", total: 1, paid: 0, balance: 1, status: "unpaid" }),
+  // a new bill as someone who doesn't keep the books saves it: waiting (13 / 16 Nov)
+  "purchases.billAdd": (u) => as(u).doc(`${B}/vendorBills/b-${u}`).set({ vendorId: "v1", total: 1, paid: 0, balance: 0, status: "waiting" }),
   "warranties.manage": (u) => as(u).doc(`${B}/warranties/w-${u}`).set({ itemName: "Chiller", endsOn: "2027-01-01", status: "active", createdBy: { uid: u } }),
   "inventory.count": (u) => as(u).doc(`${B}/stockTakes/c-${u}`).set({ date: "2026-11-14", vendorId: "v1", lines: [{ itemId: "i1", qty: 3 }], by: { uid: u } }),
   "inventory.manage": (u) => as(u).doc(`${B}/stockSettings/main`).set({ startDate: "2026-11-08", min: { i1: USERS.indexOf(u) } }),

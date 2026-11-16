@@ -133,10 +133,24 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
   }
 
   // ── purchase orders waiting for approval ───────────────────────────────────
+  // a kitchen lead's order always waits (16 Nov 2026); approved or turned down, they hear
   async function onPurchaseOrder({ companyId, branchId, id, before, after }) {
+    if (after && before?.status === "Pending" && ["Approved", "Rejected"].includes(after.status) && after.createdByRole === "kitchenLead") {
+      const maker = after.createdBy;
+      const decider = after.status === "Approved" ? after.approvedBy : after.rejectedBy;
+      if (!maker || maker === decider) return;
+      const b = await branch(companyId, branchId);
+      const who = (after.status === "Approved" ? after.approvedByName : after.rejectedByName) || "a manager";
+      const what = `${after.poNo ? `${after.poNo} · ` : ""}${after.vendorName || "A supplier"} · ${N.formatMoney(after.totalEst || 0, b.currency)}`;
+      const message = after.status === "Approved"
+        ? { title: "Purchase order approved", body: `${what} — ${who}. Send it to the supplier.` }
+        : { title: "Purchase order turned down", body: `${what} — ${who}${after.rejectionReason ? `: “${after.rejectionReason}”` : ""}` };
+      await deliver({ companyId, branchId, uids: [maker], type: "requests.mine", message, link: "/purchases/purchase-orders", ref: `requisitions/${id}` });
+      return;
+    }
     if (!after || after.status !== "Pending" || before?.status === "Pending") return;
     const [all, b] = await Promise.all([people(companyId), branch(companyId, branchId)]);
-    if (b.settings?.purchases?.requirePoApproval !== true) return; // no approval step at this branch
+    if (b.settings?.purchases?.requirePoApproval !== true && after.createdByRole !== "kitchenLead") return; // no approval step here
     const by = after.createdBy || after.lastEditedBy;
     const uids = N.recipientsFor("purchases.approval", { config: b.config, people: N.branchPeople(all, branchId) }).filter((u) => u !== by);
     const message = {
@@ -172,7 +186,7 @@ module.exports = function makeNotify({ db, fcm, FieldValue }) {
       const message = approved
         ? { title: "Vendor bill approved", body: `${what} — ${by}` }
         : { title: "Vendor bill sent back", body: `${what} — ${by}${after.approval?.reason ? `: “${after.approval.reason}”` : ""}` };
-      await deliver({ companyId, branchId, uids: [maker], type: "requests.mine", message, link: "/purchases/new-bill", ref });
+      await deliver({ companyId, branchId, uids: [maker], type: "requests.mine", message, link: after.sourcePoId ? "/purchases/purchase-orders" : "/purchases/new-bill", ref });
     }
     const done = approved
       ? { title: `Vendor bill approved · ${b.name}`, body: `${what} — approved by ${by}` }

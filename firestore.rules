@@ -413,12 +413,12 @@ service cloud.firestore {
     }
     function canCashBank(c, b)        { return may(c, b, leadRoles().concat(['accountant'])); }
     function canSalariesEnter(c, b)   { return may(c, b, leadRoles().concat(['accountant'])); }
-    function canAdvancesRequest(c, b) { return may(c, b, officeBranchRoles()); }
+    function canAdvancesRequest(c, b) { return may(c, b, officeBranchRoles().concat(['kitchenLead'])); }
     function canAdvancesPayOut(c, b)  { return may(c, b, leadRoles().concat(['accountant', 'supervisor', 'cashier'])) || granted(c, b, 'advances.payOut'); }
     function canAdvancesApprove(c, b) { return may(c, b, leadRoles()); }
     function canPayrollView(c, b)     { return may(c, b, leadRoles().concat(['accountant'])); }
     function canPayrollManage(c, b)   { return may(c, b, leadRoles()); }
-    function canStaffView(c, b)       { return may(c, b, officeBranchRoles().concat(['kiosk'])); }
+    function canStaffView(c, b)       { return may(c, b, officeBranchRoles().concat(['kiosk', 'kitchenLead'])); }
     function canStaffPay(c, b)        { return may(c, b, leadRoles().concat(['accountant'])); }
     function canStaffManage(c, b)     { return may(c, b, leadRoles()); }
     // 'kiosk': the branch's kiosk-and-attendance login (11 Nov 2026) — nothing else
@@ -426,10 +426,12 @@ service cloud.firestore {
     function canAttendanceManage(c, b){ return may(c, b, leadRoles().concat(['kiosk'])); }
     function canKiosk(c, b)           { return may(c, b, leadRoles().concat(['inCharge', 'supervisor', 'kiosk'])); }
     function canRecordsDelete(c, b)   { return may(c, b, leadRoles()); }
-    function canPurchasesOrder(c, b)  { return may(c, b, leadRoles().concat(['inCharge', 'accountant', 'supervisor'])); }
+    // 'kitchenLead' (16 Nov 2026): the kitchen orders, takes goods in and counts stock — see requisitions and vendorBills
+    function canPurchasesOrder(c, b)  { return may(c, b, leadRoles().concat(['inCharge', 'accountant', 'supervisor', 'kitchenLead'])); }
     function canPurchasesApprove(c, b){ return may(c, b, leadRoles().concat(['inCharge'])); }
     function canPurchasesBills(c, b)  { return may(c, b, leadRoles().concat(['accountant'])); }
-    function canWarranties(c, b)      { return may(c, b, leadRoles().concat(['inCharge', 'accountant', 'supervisor'])); }
+    function canWarranties(c, b)      { return may(c, b, leadRoles().concat(['inCharge', 'accountant', 'supervisor', 'kitchenLead'])); }
+    function canInventoryManage(c, b) { return may(c, b, leadRoles().concat(['inCharge', 'kitchenLead'])); }
     function canBranchSettings(c, b)  { return may(c, b, leadRoles()); }
     // reservation deposit receipts (lib/reservations/receipt.js)
     function canReservationReceipt(c, b) { return may(c, b, officeBranchRoles()); }
@@ -460,7 +462,7 @@ service cloud.firestore {
     // a supervisor at this branch (their own team only)
     function canTasksTeam(c, b) {
       let u = userData();
-      return isAuth() && u.companyId == c && inBranch(u, b) && u.role == 'supervisor';
+      return isAuth() && u.companyId == c && inBranch(u, b) && u.role in ['supervisor', 'kitchenLead'];
     }
     // `uid` is staff at this branch whose record names me as supervisor, or names no one
     function inMyTeam(c, b, uid) {
@@ -521,11 +523,45 @@ service cloud.firestore {
         (d.kind == 'group' && canChatGroups(c) && request.auth.uid in m && d.createdBy == request.auth.uid)
       );
     }
-    function canCatalogView(c)        { return mayInCompany(c, leadRoles().concat(['inCharge', 'accountant', 'supervisor'])); }
+    function canCatalogView(c)        { return mayInCompany(c, leadRoles().concat(['inCharge', 'accountant', 'supervisor', 'kitchenLead'])); }
     function canCatalogManage(c)      { return mayInCompany(c, leadRoles().concat(['accountant'])); }
     function canBranchLoans(c)        { return mayInCompany(c, leadRoles().concat(['accountant'])); }
-    function canPurchasesOrderAny(c)  { return mayInCompany(c, leadRoles().concat(['inCharge', 'accountant', 'supervisor'])); }
+    function canPurchasesOrderAny(c)  { return mayInCompany(c, leadRoles().concat(['inCharge', 'accountant', 'supervisor', 'kitchenLead'])); }
     function isOfficeMember(c)        { return mayInCompany(c, officeBranchRoles()); }
+
+    // ── the kitchen lead's orders (16 Nov 2026) ──
+    function isKitchen() { return userData().role == 'kitchenLead'; }
+    // a kitchen lead's new order waits for approval, marked as theirs
+    function kitchenOrderOk() {
+      let d = request.resource.data;
+      return !isKitchen() || (d.get('createdByRole', '') == 'kitchenLead' &&
+        d.get('status', '') == 'Pending' && d.get('approvedBy', '') == '');
+    }
+    // a kitchen lead's order goes to the supplier only once approved; the kitchen takes
+    // goods in only on a sent order, and changing what is ordered clears the approval
+    function kitchenStepOk() {
+      let before = resource.data;
+      let after = request.resource.data;
+      let st = after.get('status', '');
+      let moved = st != before.get('status', '');
+      return !(moved && st == 'Sent' && before.get('createdByRole', '') == 'kitchenLead' && after.get('approvedBy', '') == '') &&
+        !(isKitchen() && moved && st == 'Received' && before.get('status', '') != 'Sent') &&
+        !(isKitchen() && changedKeys().hasAny(['items', 'totalEst']) && after.get('approvedBy', '') != '') &&
+        !(isKitchen() && changedKeys().hasAny(['createdByRole']));
+    }
+    // a new vendor bill that is not owed yet: it waits for the books
+    function billWaits() {
+      let d = request.resource.data;
+      return d.get('status', '') == 'waiting' && d.get('paid', 0) == 0 && d.get('balance', 0) == 0;
+    }
+    // the bill raised by receiving an order, in the same write: no more than the order's total
+    function poBillCounts(c, b, billId) {
+      let d = request.resource.data;
+      let po = getAfter(/databases/$(database)/documents/companies/$(c)/branches/$(b)/requisitions/$(d.get('sourcePoId', 'none'))).data;
+      return d.get('status', '') == 'unpaid' && d.get('paid', 0) == 0 && near(d.get('balance', -1), d.get('total', 0)) &&
+        po.get('status', '') == 'Received' && po.get('billId', '') == billId &&
+        near(po.get('finalTotal', -1), d.get('total', 0)) && d.get('total', 0) <= po.get('totalEst', 0) + 0.005;
+    }
 
     // a purchase order change that approves, rejects or re-opens it (sending an
     // approved order, or an edit that clears its approval, is not)
@@ -1269,8 +1305,11 @@ service cloud.firestore {
           // those who hand out pay-outs see what suppliers are owed, to pick a bill (4.10)
           allow read: if canPurchasesBills(companyId, branchId) || canPayoutsHandOut(companyId, branchId) || canCostsApprove(companyId, branchId);
           allow update, delete: if canPurchasesBills(companyId, branchId);
-          // receiving goods against a purchase order raises the bill
-          allow create: if canPurchasesBills(companyId, branchId) || canPurchasesOrder(companyId, branchId);
+          // receiving goods against a purchase order raises the bill. Those who don't keep the
+          // books (16 Nov 2026): a bill that waits for approval, or the bill of the order they
+          // just received, for no more than the order's total — dearer ones wait
+          allow create: if canPurchasesBills(companyId, branchId) ||
+            (canPurchasesOrder(companyId, branchId) && (billWaits() || poBillCounts(companyId, branchId, docId)));
           // a pay-out's supplier bill approved: the bill it paid, or the bill it raised
           allow update: if canCostsApprove(companyId, branchId) &&
             changedKeys().hasOnly(['paid', 'balance', 'status', 'updatedAt', 'paymentHistory', 'lastPayoutSettleId']) &&
@@ -1289,11 +1328,12 @@ service cloud.firestore {
 
         // ── Purchase Requisitions ────────────────────────────────────────────
         match /requisitions/{docId} {
-          allow read, create, delete: if canPurchasesOrder(companyId, branchId);
+          allow read, delete: if canPurchasesOrder(companyId, branchId);
+          allow create: if canPurchasesOrder(companyId, branchId) && kitchenOrderOk();
           // those who hand out pay-outs pick an order to collect (4.10)
           allow read: if canPayoutsHandOut(companyId, branchId);
           allow update: if canPurchasesApprove(companyId, branchId) ||
-            (canPurchasesOrder(companyId, branchId) && !isApprovalChange());
+            (canPurchasesOrder(companyId, branchId) && !isApprovalChange() && kitchenStepOk());
           // the goods came with a pay-out bill: the order waits for that bill's
           // approval (it can't be received twice) — set by whoever brought it,
           // pointing at their own pending bill for this very order
@@ -1362,7 +1402,7 @@ service cloud.firestore {
                            request.resource.data.by.uid == request.auth.uid &&
                            request.resource.data.date is string &&
                            request.resource.data.lines is list;
-          allow update, delete: if canPurchasesApprove(companyId, branchId);
+          allow update, delete: if canInventoryManage(companyId, branchId);
         }
         match /stockWaste/{docId} {
           allow read: if canPurchasesOrder(companyId, branchId);
@@ -1370,11 +1410,11 @@ service cloud.firestore {
                            request.resource.data.by.uid == request.auth.uid &&
                            request.resource.data.date is string &&
                            request.resource.data.qty is number && request.resource.data.qty > 0;
-          allow update, delete: if canPurchasesApprove(companyId, branchId);
+          allow update, delete: if canInventoryManage(companyId, branchId);
         }
         match /stockSettings/{docId} {
           allow read: if canPurchasesOrder(companyId, branchId);
-          allow write: if canPurchasesApprove(companyId, branchId);
+          allow write: if canInventoryManage(companyId, branchId);
         }
 
         // ── POS: Order Guides ────────────────────────────────────────────────

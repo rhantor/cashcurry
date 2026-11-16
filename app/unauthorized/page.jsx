@@ -5,7 +5,7 @@ import { ArrowLeft, House, ShieldAlert } from "lucide-react";
 import StatusScreen from "@/app/components/common/StatusScreen";
 import useSession from "@/app/hooks/useSession";
 
-const ROLE = { owner: "an owner", gm: "a general manager", superAdmin: "a super admin", branchAdmin: "a branch admin", manager: "a manager", accountant: "an accountant", supervisor: "a supervisor", cashier: "a cashier", staff: "staff" };
+const ROLE = { owner: "an owner", gm: "a general manager", superAdmin: "a super admin", branchAdmin: "a branch admin", manager: "a manager", accountant: "an accountant", supervisor: "a supervisor", cashier: "a cashier", kitchenLead: "a kitchen lead", staff: "staff" };
 
 // "/company/dashboard" → "Company dashboard"
 const pageName = (path) => {
