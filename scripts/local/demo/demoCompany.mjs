@@ -38,6 +38,7 @@ const USERS = [
   ["supervisor", "kl_supervisor", "KL Supervisor", KL],
   ["cashier", "kl_cashier", "KL Cashier", KL],
   ["kiosk", "kl_kiosk", "KL Kiosk", KL], // the kiosk tablet and attendance only (11 Nov 2026)
+  ["kitchenLead", "kl_kitchen", "KL Kitchen Lead", KL], // orders, goods in, stock — no money (16 Nov 2026)
   ["branchAdmin", "pj_admin", "PJ Branch Admin", PJ],
   ["staff", "ali", "Ali Hassan", KL], // the staff app: Ali's own requests and pay
 ];
