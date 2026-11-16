@@ -5,7 +5,10 @@ import { skipToken } from "@reduxjs/toolkit/query";
 import useResolvedCompanyBranch from "@/app/hooks/useResolvedCompanyBranch";
 import Link from "next/link";
 import { format, parseISO } from "date-fns";
-import { AlertTriangle, ReceiptText, Store } from "lucide-react";
+import { AlertTriangle, ReceiptText, Sparkles, Store } from "lucide-react";
+import { useGetItemsQuery } from "@/lib/redux/api/itemsApiSlice";
+import { extraText, fillNewBill } from "@/lib/purchases/invoiceRead";
+import { readInvoice } from "@/lib/purchases/readInvoiceClient";
 // BillPaidSection removed — bills are always created as credit/unpaid
 import { useGetVendorsQuery } from "@/lib/redux/api/vendorsApiSlice";
 import {
@@ -97,6 +100,8 @@ export default function NewBillPage() {
   const [round, setRound] = useState(true); // the bill to the nearest 0.05
   const [note, setNote] = useState("");
   const [lines, setLines] = useState([]); // what came, for stock (8 Nov)
+  // the invoice read from its photo (16 Nov 2026): { busy } while reading, then { reading, fill, vendorFound }
+  const [invoiceRead, setInvoiceRead] = useState(null);
 
   const [file, setFile] = useState(null);
   const [uploadPct, setUploadPct] = useState(0);
@@ -110,6 +115,7 @@ export default function NewBillPage() {
   const lastSubmitHashRef = useRef(""); // prevents ultra-fast duplicate clicks
 
   const [addVendorBill, { isLoading: saving }] = useAddVendorBillMutation();
+  const { data: catalog = [] } = useGetItemsQuery(ready && companyId && branchId ? { companyId, branchId } : skipToken);
   const [findVendorBills] = useLazyGetVendorBillsQuery();
 
   const selectedVendor = useMemo(
@@ -158,6 +164,30 @@ export default function NewBillPage() {
     isUploading ||
     vendorsLoading ||
     branchLoading;
+
+  /* ----------------------- read the invoice's photo (16 Nov 2026) ----------------------- */
+  const readPhoto = async () => {
+    if (!file) return;
+    setInvoiceRead({ busy: true });
+    try {
+      const v = vendors.find((x) => x.id === vendorId);
+      const reading = await readInvoice({ companyId, branchId, file, vendorName: v?.name || "", items: catalog });
+      const fill = fillNewBill(reading, catalog);
+      const key = (t) => String(t || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const said = key(reading.supplierName);
+      const match = !vendorId && said ? choosable(vendors, "").find((x) => key(x.name) && (said.includes(key(x.name)) || key(x.name).includes(said))) : null;
+      if (match) setVendorId(match.id);
+      if (fill.invoiceNo) setInvoiceNo(fill.invoiceNo);
+      if (fill.invoiceDate) setInvoiceDate(fill.invoiceDate);
+      if (fill.total > 0) setTotal(String(fill.total));
+      if (fill.discount > 0) setDiscount({ amount: String(fill.discount), kind: "Discount", note: "From the invoice" });
+      if (fill.rows.length) setLines(fill.rows);
+      setInvoiceRead({ reading, fill, vendorFound: !!vendorId || !!match });
+    } catch (e) {
+      setInvoiceRead(null);
+      toast.error(e?.message || "Couldn't read the invoice.");
+    }
+  };
 
   /* ----------------------- default invoice date to today ----------------------- */
   useEffect(() => {
@@ -224,6 +254,7 @@ export default function NewBillPage() {
   /* ----------------------- reset form ----------------------- */
   const resetForm = () => {
     setVendorId("");
+    setInvoiceRead(null);
     setInvoiceNo("");
     setInvoiceDate(todayISO()); // back to today for speed
     setDueDate("");
@@ -492,9 +523,30 @@ export default function NewBillPage() {
             file={file}
             preview={preview}
             progress={uploadPct}
-            onPick={(f, url) => (setFile(f), setPreview(url))}
-            onRemove={() => (setFile(null), setPreview(null), setUploadPct(0))}
+            onPick={(f, url) => (setFile(f), setPreview(url), setInvoiceRead(null))}
+            onRemove={() => (setFile(null), setPreview(null), setUploadPct(0), setInvoiceRead(null))}
           />
+          {file && !invoiceRead?.fill && (
+            <button
+              type="button"
+              onClick={readPhoto}
+              disabled={!!invoiceRead?.busy}
+              className="mt-3 flex w-full min-h-[48px] items-center justify-center gap-2 rounded-2xl border border-brand/30 bg-brand-soft font-semibold text-brand disabled:opacity-60"
+            >
+              <Sparkles className="h-5 w-5" />
+              {invoiceRead?.busy ? "Reading the invoice…" : "Read the invoice for me"}
+            </button>
+          )}
+          {invoiceRead?.fill && (
+            <div className={`mt-3 rounded-2xl px-3.5 py-3 text-sm ${invoiceRead.fill.extra.length || !invoiceRead.vendorFound ? "bg-warning-soft" : "bg-success-soft"}`}>
+              <p className="font-semibold text-fg">Filled from the photo — check before you save</p>
+              <ul className="mt-1 space-y-0.5 text-xs text-muted">
+                {!invoiceRead.vendorFound && <li>Supplier on the invoice: {invoiceRead.reading.supplierName || "not shown"} — pick the vendor above</li>}
+                <li>{invoiceRead.fill.rows.length} item{invoiceRead.fill.rows.length === 1 ? "" : "s"} added under What came</li>
+                {invoiceRead.fill.extra.map((l, i) => <li key={i}>Not in your items list: {extraText(l, money)}</li>)}
+              </ul>
+            </div>
+          )}
         </div>
         <div className="mt-4">
           <DiscountField value={discount} onChange={setDiscount} before={total} currency={currency} money={money} round={round} onRound={setRound} />
