@@ -35,6 +35,7 @@ the local emulators and opening every page (part 4).
 | `supervisor` | Floor / shift supervisor | One branch |
 | `cashier` | Till | One branch |
 | `kiosk` | **Kiosk & attendance** (owner, 11 Nov 2026): the login used to set up the branch's kiosk tablet and look after attendance — add faces and kiosk PINs, see and fix punches, decide early OT. Nothing else: no money, reports, pay, staff records or settings | One branch |
+| `kitchenLead` | **Kitchen lead** (owner, 16 Nov 2026), usually the head chef: order guides and purchase orders, taking goods in with the invoice photo, stock counts, waste and minimums, the item list, warranties, and tasks for the kitchen team. **Their orders always wait for a manager's or branch admin's approval** before they go to the supplier. When goods come in larger or dearer than ordered (or with no price on the order), the bill waits for a manager or accountant to approve; sent back, the order opens to receive again. No sales, costs, cash, reports, pay or bills to pay | One branch |
 | `staff` | Everyone else; uses the staff app for their own things | Own records |
 
 Also in the data, to be cleaned up: `superadmin` and `branchadmin` (old lowercase
@@ -102,7 +103,7 @@ Branch settings**, though the database lets the owner change staff and settings.
 | Purchases: order guides, POs, receive goods | E | E | E | E | E | E | E | E | — | — |
 | Purchases: approve POs | A | A | A | A | A | A | — | — | — | — |
 | Purchases: bills, pay bills, payments | A | A | A | A | A | — | A | — | — | — |
-| Purchases: add a new vendor bill (13 Nov; in-charge's and supervisor's wait for a manager or accountant to approve) | E | E | E | E | E | E | E | E | — | — |
+| Purchases: add a new vendor bill (13 Nov; in-charge's, supervisor's and kitchen lead's wait for a manager or accountant to approve; 16 Nov: so does any of theirs from goods received that cost more than ordered) | E | E | E | E | E | E | E | E | — | — |
 | Warranties | E | E | E | E | E | E | E | E | — | — |
 | Inventory: count stock, write off waste (8 Nov) | E | E | E | E | E | E | E | E | — | — |
 | Inventory: start it, minimums, count day, remove a count | A | A | A | A | A | A | — | — | — | — |

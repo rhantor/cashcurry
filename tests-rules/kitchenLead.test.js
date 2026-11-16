@@ -44,11 +44,12 @@ beforeEach(async () => {
 });
 
 // receive an order and raise its bill in one write, as the app does
-const receive = (uid, poId, total, status = "unpaid") => {
+// (each time a new bill, as the app does)
+const receive = (uid, poId, total, status = "unpaid", billId = `bill-${poId}`) => {
   const d = db(uid);
   const batch = d.batch();
-  batch.update(d.doc(PO(poId)), { status: "Received", billId: `bill-${poId}`, finalTotal: total, billWaiting: status === "waiting" });
-  batch.set(d.doc(`${B}/vendorBills/bill-${poId}`), { vendorId: "v1", total, paid: 0, balance: status === "waiting" ? 0 : total, status, sourcePoId: poId });
+  batch.update(d.doc(PO(poId)), { status: "Received", billId, finalTotal: total, billWaiting: status === "waiting" });
+  batch.set(d.doc(`${B}/vendorBills/${billId}`), { vendorId: "v1", total, paid: 0, balance: status === "waiting" ? 0 : total, status, sourcePoId: poId });
   return batch.commit();
 };
 
@@ -104,7 +105,7 @@ describe("goods in, by the kitchen lead", () => {
     batch.update(d.doc(`${B}/vendorBills/bill-sent`), { status: "rejected", approval: { status: "rejected", reason: "check price" } });
     batch.update(d.doc(PO("sent")), { status: "Sent", billId: "", billWaiting: false, receivedItems: [], finalTotal: 0, receiveSentBack: { reason: "check price" } });
     expect(await ok(batch.commit())).toBe(true);
-    expect(await ok(receive("klKitchen", "sent", 50))).toBe(true);
+    expect(await ok(receive("klKitchen", "sent", 50, "unpaid", "bill-sent-2"))).toBe(true);
   });
 });
 
