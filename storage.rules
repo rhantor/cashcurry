@@ -163,6 +163,10 @@ service firebase.storage {
       allow read: if canAccessBranch(companyId, branchId);
       allow create, update: if canUpload(companyId, branchId) &&
         request.resource.size <= 10 * 1024 * 1024;
+      // the kitchen lead's photo of the invoice when goods come in (16 Nov 2026)
+      allow create: if canAccessBranch(companyId, branchId) && userData().role == 'kitchenLead' &&
+        request.resource.size <= 10 * 1024 * 1024 &&
+        (request.resource.contentType.matches('image/.*') || request.resource.contentType == 'application/pdf');
       allow delete: if canDelete(companyId, branchId);
     }
 

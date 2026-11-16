@@ -9,7 +9,7 @@ import BranchSwitcher from "./BranchSwitcher";
 import { CountBadge } from "./SideNav";
 
 import { personName } from "@/lib/people";
-const roleName = (r) => ({ owner: "Owner", gm: "General manager", superAdmin: "Super admin", branchAdmin: "Branch admin" })[r] || (r ? r[0].toUpperCase() + r.slice(1) : "");
+const roleName = (r) => ({ owner: "Owner", gm: "General manager", superAdmin: "Super admin", branchAdmin: "Branch admin", inCharge: "In charge", kitchenLead: "Kitchen lead" })[r] || (r ? r[0].toUpperCase() + r.slice(1) : "");
 
 /**
  * The phone's bottom bar: Home, the role's three most-used pages, and More —

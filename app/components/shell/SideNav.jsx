@@ -7,7 +7,7 @@ import { Avatar, LogoMark, Tooltip, cn, menuIcon } from "@/app/components/ui";
 import { spring } from "@/app/components/ui/motion";
 
 import { personName } from "@/lib/people";
-const roleName = (r) => ({ owner: "Owner", gm: "General manager", superAdmin: "Super admin", branchAdmin: "Branch admin" })[r] || (r ? r[0].toUpperCase() + r.slice(1) : "");
+const roleName = (r) => ({ owner: "Owner", gm: "General manager", superAdmin: "Super admin", branchAdmin: "Branch admin", inCharge: "In charge", kitchenLead: "Kitchen lead" })[r] || (r ? r[0].toUpperCase() + r.slice(1) : "");
 
 /** The computer's sidebar: sections, a sliding highlight, groups that open, and a collapsed (icons only) mode. */
 export default function SideNav({ sections, activePath, badges = {}, user, companyName, collapsed, onToggleCollapsed, onSignOut }) {
