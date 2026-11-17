@@ -27,7 +27,7 @@ vi.mock("@anthropic-ai/sdk", () => {
   return { default: Anthropic };
 });
 
-const { POST } = await import("@/app/api/purchases/read-invoice/route.js");
+const { GET, POST } = await import("@/app/api/purchases/read-invoice/route.js");
 
 const ask = (uid, body = {}) =>
   POST(new Request("http://x/api/purchases/read-invoice", {
@@ -51,6 +51,12 @@ beforeEach(() => {
 });
 
 describe("read-invoice", () => {
+  it("says whether reading is set up, so the button shows only then", async () => {
+    expect(await (await GET()).json()).toEqual({ ready: true });
+    delete process.env.ANTHROPIC_API_KEY;
+    expect(await (await GET()).json()).toEqual({ ready: false });
+  });
+
   it("reads the photo for someone who takes goods in", async () => {
     const res = await ask("kitchen");
     expect(res.status).toBe(200);
