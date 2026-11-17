@@ -26,9 +26,9 @@ describe("count and order on one sheet (17 Nov 2026)", () => {
 
   it("the save button says what will happen", () => {
     expect(saveLabel({ count: [], order: [] })).toBe("Fill in stock or an order");
-    expect(saveLabel({ count: [1, 2], order: [] })).toBe("Save the stock count (2)");
-    expect(saveLabel({ count: [1, 2], order: [1] })).toBe("Save · 1 to order, 2 counted");
-    expect(saveLabel({ count: [], order: [1, 2, 3] })).toBe("Save · 3 to order");
+    expect(saveLabel({ count: [1, 2], order: [] })).toBe("Save the count");
+    expect(saveLabel({ count: [1, 2], order: [1] })).toBe("Save & order");
+    expect(saveLabel({ count: [], order: [1, 2, 3] })).toBe("Order");
   });
 });
 
