@@ -11,6 +11,9 @@ describe("byHandEntries", () => {
     const list = byHandEntries([AUG, { id: "p1", source: "payroll", totalSalary: 900, month: "2026-08" }]);
     expect(list).toEqual([{ id: "e1", amount: 12500.4, paymentDate: "2026-09-08", method: "Bank transfer", note: "August salary" }]);
   });
+  it("the Salary Entry screen's own field for how it was paid (paidMethod)", () => {
+    expect(byHandEntries([{ id: "z", totalSalary: 100, paymentDate: "2026-08-10", paidMethod: "cash" }])[0].method).toBe("cash");
+  });
   it("older entries: amount or date under other names", () => {
     expect(byHandEntries([{ id: "x", amount: 300, date: "2026-07-10" }])[0]).toMatchObject({ amount: 300, paymentDate: "2026-07-10", method: "", note: "" });
   });
