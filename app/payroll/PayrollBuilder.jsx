@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { useGetStaffListQuery } from '@/lib/redux/api/staffApiSlice'
 import { paidFor } from '@/lib/staff/leaving'
 import { useGetBranchSettingsQuery } from '@/lib/redux/api/branchSettingsApiSlice'
+import { regionOf } from '@/lib/region'
 import { useGetCompanyDetailsQuery } from '@/lib/redux/api/authApiSlice'
 import { useGetSingleBranchQuery } from '@/lib/redux/api/branchApiSlice'
 import { useGetAdvanceEntriesQuery } from '@/lib/redux/api/AdvanceApiSlice'
@@ -467,7 +468,8 @@ export default function PayrollBuilder () {
         companyId, branchId, startDate: bufStart, endDate: bufEnd,
       }).unwrap()
 
-      const settings = branchSettings?.attendance || {}
+      // hours on the branch's clock, wherever payroll is run from (17 Nov 2026)
+      const settings = { ...(branchSettings?.attendance || {}), timeZone: regionOf(branchSettings).timeZone }
 
       // Early-OT decisions for the month. Anything still pending is imported as
       // unpaid (paid from shift start) — we warn so it can be approved first.
