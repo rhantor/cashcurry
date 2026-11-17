@@ -14,6 +14,7 @@ import { ageText, openByPerson } from "@/lib/payouts/model";
 import { cancelPayout, useLivePayouts } from "@/lib/payouts/client";
 import { BillSheet, HandOutSheet } from "@/app/components/payouts/PayoutSheets";
 import PayoutHistory from "@/app/components/payouts/PayoutHistory";
+import CashToBuy, { useMarketOrders } from "@/app/components/payouts/CashToBuy";
 
 const day = (d) => (d ? format(parseISO(d), "EEE d MMM") : "");
 
@@ -25,6 +26,9 @@ export default function PayoutsPage() {
   const people = useMemo(() => openByPerson(open), [open]);
   const outNow = open.reduce((s, p) => s + (Number(p.amount) || 0), 0);
   const [handing, setHanding] = useState(false);
+  // the market's orders waiting for cash (17 Nov 2026)
+  const market = useMarketOrders(companyId, branchId);
+  const [cashFor, setCashFor] = useState(null);
   const [billFor, setBillFor] = useState(null);
   const [retry, setRetry] = useState(null);
   // Now: what is out and waiting · History (14 Nov): yesterday and the month — /payouts?tab=history
@@ -36,8 +40,9 @@ export default function PayoutsPage() {
   const takeBack = async (p) => {
     if (!(await confirmDialog({ title: "Take this pay-out back?", message: `${money(p.amount)} to ${p.to?.name}. Only if it was a mistake and the money is back in the till.`, confirmLabel: "Take back", danger: true }))) return;
     try {
-      await cancelPayout(companyId, branchId, p.id);
+      await cancelPayout(companyId, branchId, p.id, p.forPo?.poId || null);
       toast.success("Taken back");
+      if (p.forPo?.poId) market.refetch();
     } catch (e) {
       toast.error("Couldn't take it back", { description: e.message });
     }
@@ -61,6 +66,8 @@ export default function PayoutsPage() {
         <PayoutHistory companyId={companyId} branchId={branchId} money={money} />
       ) : (
       <>
+
+      <CashToBuy list={market.list} money={money} onGive={setCashFor} />
 
       <div className="grid gap-3 sm:grid-cols-3">
         <Card className="p-4">
@@ -148,7 +155,16 @@ export default function PayoutsPage() {
       </>
       )}
 
-      <HandOutSheet open={handing} onClose={() => setHanding(false)} companyId={companyId} branchId={branchId} user={user} />
+      <HandOutSheet open={handing} onClose={() => setHanding(false)} onDone={() => market.refetch()} companyId={companyId} branchId={branchId} user={user} />
+      <HandOutSheet
+        open={!!cashFor}
+        onClose={() => setCashFor(null)}
+        onDone={() => market.refetch()}
+        companyId={companyId}
+        branchId={branchId}
+        user={user}
+        preset={cashFor ? { po: cashFor } : null}
+      />
       <BillSheet payout={billFor} retry={retry} onClose={() => { setBillFor(null); setRetry(null); }} companyId={companyId} branchId={branchId} user={user} />
     </div>
   );

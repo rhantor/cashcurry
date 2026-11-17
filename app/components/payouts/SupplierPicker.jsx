@@ -74,7 +74,7 @@ export default function SupplierPicker({
     let live = true;
     setOrders(null);
     if (!v.vendorId || !modes.includes("po")) return;
-    openOrdersOf(companyId, branchId, v.vendorId, settleId)
+    openOrdersOf(companyId, branchId, v.vendorId, settleId, v.poId || "")
       .then((o) => live && setOrders(o))
       .catch(() => live && setOrders([]));
     return () => {

@@ -81,6 +81,7 @@ export function HandOutSheet({
   branchId,
   user,
   preset = null,
+  onDone = null, // after it's handed out (the purchase orders page reloads its orders)
 }) {
   const currency = useCurrency();
   const [date, setDate] = useDefaultDate();
@@ -105,7 +106,22 @@ export function HandOutSheet({
     setName("");
     setErrors({});
     setSig(null);
-    if (preset?.vendorId) {
+    if (preset?.po?.id) {
+      // from a purchase order: "Give cash to buy" (17 Nov 2026) — this order, at about what it comes to
+      const po = preset.po;
+      setKind("supplier");
+      setSupplier({
+        vendorId: po.vendorId,
+        vendorName: po.vendorName || "",
+        mode: "po",
+        poId: po.id,
+        poNo: po.poNo || "",
+        totalEst: Number(po.totalEst) || 0,
+        lines: poLines(po),
+      });
+      setAmount(Number(po.totalEst) > 0 ? String(po.totalEst) : "");
+      setPurpose(`Buy ${po.poNo || "the order"} at ${po.vendorName || "the market"}`);
+    } else if (preset?.vendorId) {
       const pays = (preset.bills || []).map((b) => ({
         billId: b.id,
         invoiceNo: b.invoiceNo || "",
@@ -127,7 +143,7 @@ export function HandOutSheet({
       setAmount("");
       setPurpose("");
     }
-  }, [open, preset?.vendorId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [open, preset?.vendorId, preset?.po?.id]); // eslint-disable-line react-hooks/exhaustive-deps
   // paying bills: the money is what the ticked bills come to (it can still be changed);
   // collecting an order: about what the order comes to
   const pickSupplier = (s) => {
@@ -194,6 +210,7 @@ export function HandOutSheet({
       toast.success("Handed out", {
         description: `${formatMoney(Number(amount), currency)} · the till goes down now`,
       });
+      onDone?.();
       onClose();
     } catch (err) {
       toast.error("Couldn't save", { description: err.message });

@@ -45,7 +45,10 @@ import {
   RotateCcw,
   Repeat,
   ListPlus,
+  HandCoins,
 } from "lucide-react";
+import { HandOutSheet } from "@/app/components/payouts/PayoutSheets";
+import { canGiveCash, isMarket } from "@/lib/purchases/countAndOrder";
 import { Menu } from "@/app/components/ui";
 import { SENT_VIA, dueText, followUpOrder, lateDays, missingLines, needsApproval, receiveCheck, repeatOrder } from "@/lib/purchases/orders";
 import { receivedBillWaits } from "@/lib/purchases/billApproval";
@@ -99,7 +102,7 @@ export default function PurchaseOrdersPage() {
   const companyArgs = ready && companyId ? { companyId } : skipToken;
 
   // always fresh on arrival — an order made from a guide a moment ago must be here
-  const { data: orders = [], isLoading: ordersLoading } = useGetRequisitionsQuery(args, { refetchOnMountOrArgChange: true });
+  const { data: orders = [], isLoading: ordersLoading, refetch: refetchOrders } = useGetRequisitionsQuery(args, { refetchOnMountOrArgChange: true });
   const { data: vendors = [] } = useGetVendorsQuery(companyArgs);
   // Only what this branch stocks — adding another branch's product to an order
   // would be a mistake, not a convenience.
@@ -113,6 +116,9 @@ export default function PurchaseOrdersPage() {
   // branch settings.
   const requireApproval = branchSettings?.purchases?.requirePoApproval === true;
   const canApprove = can(user?.role, "purchases.approve");
+  // cash to buy an order at the market (17 Nov 2026): whoever hands out pay-outs
+  const canHandOut = can(user?.role, "payouts.handOut");
+  const [cashFor, setCashFor] = useState(null);
   // a kitchen lead's order always waits for approval (16 Nov 2026), whatever the branch's policy
   const waitsApproval = (order) => needsApproval(order, requireApproval);
 
@@ -711,7 +717,11 @@ export default function PurchaseOrdersPage() {
                 </span>
               </div>
 
-              <p className="text-xs text-muted mb-3">{STATUS_HINT[status] || ""}</p>
+              <p className="text-xs text-muted mb-3">
+                {isMarket(vendors.find((v) => v.id === order.vendorId)) && !["Received", "Cancelled", "Rejected"].includes(status)
+                  ? order.cashOut?.payoutId ? "Being bought at the market" : "Waiting for cash to buy at the market"
+                  : STATUS_HINT[status] || ""}
+              </p>
 
               {status === "Sent" && order.deliverBy && !order.payoutHold && (
                 <p
@@ -855,7 +865,28 @@ export default function PurchaseOrdersPage() {
                   </div>
                 )}
 
-                {!order.payoutHold && (status === "Approved" || (status === "Pending" && !waitsApproval(order))) && (
+                {order.cashOut?.payoutId && !order.payoutHold && status !== "Received" && (
+                  <div className="min-h-[48px] rounded-2xl bg-info-soft px-3 py-2 text-sm font-medium text-fg flex items-center justify-center text-center">
+                    {fmtMoney(order.cashOut.amount)} cash with {order.cashOut.to || "someone"} to buy this — they bring the bills back in Pay-outs
+                  </div>
+                )}
+
+                {canHandOut && canGiveCash(order, { needsApproval: waitsApproval(order) }) && (
+                  <button
+                    onClick={() => setCashFor(order)}
+                    className={`w-full min-h-[48px] rounded-2xl font-bold flex items-center justify-center gap-2 active:brightness-95 transition-colors ${
+                      isMarket(vendors.find((v) => v.id === order.vendorId)) ? "bg-brand text-brand-fg" : "bg-surface-2 text-fg"
+                    }`}
+                  >
+                    <HandCoins className="w-5 h-5" /> Give cash to buy
+                  </button>
+                )}
+
+                {!canHandOut && isMarket(vendors.find((v) => v.id === order.vendorId)) && canGiveCash(order, { needsApproval: waitsApproval(order) }) && (
+                  <p className="text-center text-xs text-muted">Bought with cash at the market — the cashier or supervisor gives the money from Pay-outs</p>
+                )}
+
+                {!order.payoutHold && !order.cashOut?.payoutId && !isMarket(vendors.find((v) => v.id === order.vendorId)) && (status === "Approved" || (status === "Pending" && !waitsApproval(order))) && (
                   <button
                     onClick={() => handleSend(order)}
                     className="w-full min-h-[48px] rounded-2xl bg-info text-white font-bold
@@ -865,7 +896,7 @@ export default function PurchaseOrdersPage() {
                   </button>
                 )}
 
-                {status === "Sent" && !order.payoutHold && (
+                {status === "Sent" && !order.payoutHold && !order.cashOut?.payoutId && (
                   <button
                     onClick={() => handleOpenReceive(order)}
                     className="w-full min-h-[48px] rounded-2xl bg-brand text-brand-fg font-bold
@@ -980,6 +1011,16 @@ export default function PurchaseOrdersPage() {
       <ReceiveSheet />
 
       <SendOrderSheet today={today} />
+
+      <HandOutSheet
+        open={!!cashFor}
+        onClose={() => setCashFor(null)}
+        onDone={() => refetchOrders()}
+        companyId={companyId}
+        branchId={branchId}
+        user={user}
+        preset={cashFor ? { po: cashFor } : null}
+      />
 
       <ConfirmSheet
         open={!!pendingAction}

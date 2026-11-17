@@ -1343,6 +1343,15 @@ service cloud.firestore {
             getAfter(/databases/$(database)/documents/companies/$(companyId)/branches/$(branchId)/payouts/$(request.resource.data.payoutHold)).data.get('status', '') == 'pending' &&
             getAfter(/databases/$(database)/documents/companies/$(companyId)/branches/$(branchId)/payouts/$(request.resource.data.payoutHold)).data.get('supplier', {}).get('poId', '') == docId &&
             getAfter(/databases/$(database)/documents/companies/$(companyId)/branches/$(branchId)/payouts/$(request.resource.data.payoutHold)).data.by.uid == request.auth.uid;
+          // money handed out to buy this order (17 Nov 2026): marked by whoever hands it out,
+          // pointing at their own pay-out for this very order made in the same write — or
+          // cleared when that pay-out is taken back
+          allow update: if canPayoutsHandOut(companyId, branchId) &&
+            changedKeys().hasOnly(['cashOut', 'updatedAt']) &&
+            !(resource.data.get('status', '') in ['Received', 'Cancelled', 'Rejected']) &&
+            (request.resource.data.get('cashOut', null) == null || (
+              getAfter(/databases/$(database)/documents/companies/$(companyId)/branches/$(branchId)/payouts/$(request.resource.data.cashOut.payoutId)).data.get('forPo', {}).get('poId', '') == docId &&
+              getAfter(/databases/$(database)/documents/companies/$(companyId)/branches/$(branchId)/payouts/$(request.resource.data.cashOut.payoutId)).data.by.uid == request.auth.uid));
         }
 
         // ── Document number counters (PO numbers, etc.) ───────────────────────
