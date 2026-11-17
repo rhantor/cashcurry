@@ -1,6 +1,6 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { Button, Field, Input, Sheet, Textarea } from "@/app/components/ui";
+import { Button, Field, Input, Sheet, Switch, Textarea } from "@/app/components/ui";
 import { toast } from "@/app/components/ui/notify";
 
 const BLANK = {
@@ -19,6 +19,8 @@ const BLANK = {
   ownerName: "",
   enquiriesEmail: "",
   website: "",
+  // bought with cash at the market, from many shops (17 Nov 2026): "cash" or ""
+  buyWith: "",
 };
 
 const fromVendor = (v) => Object.fromEntries(Object.keys(BLANK).map((k) => [k, v?.[k] ?? ""]));
@@ -29,6 +31,7 @@ export const toVendorPatch = (f) => ({
   termsDays: f.termsDays === "" || f.termsDays == null ? null : Number(f.termsDays),
   maxOpenBills: f.maxOpenBills === "" || f.maxOpenBills == null ? null : Number(f.maxOpenBills),
   leadDays: f.leadDays === "" || f.leadDays == null ? null : Number(f.leadDays),
+  buyWith: f.buyWith === "cash" ? "cash" : "",
 });
 
 const Group = ({ title, children }) => (
@@ -96,6 +99,14 @@ export default function VendorForm({ open, vendor, onClose, onSave }) {
 
         <Group title="Ordering">
           {text("leadDays", "Delivers in (days)", { type: "number", inputMode: "numeric", hint: "After an order is sent — sets the day it's due (blank = next day)", placeholder: "e.g. 2" })}
+          <div className="sm:col-span-2 rounded-xl border border-line bg-surface-2/50 p-3">
+            <Switch
+              checked={f.buyWith === "cash"}
+              onChange={(on) => setF((x) => ({ ...x, buyWith: on ? "cash" : "" }))}
+              label="Market — bought with cash"
+            />
+            <p className="mt-1.5 text-xs text-muted">From many shops, not one supplier. Its orders aren&apos;t sent anywhere: they show &ldquo;Give cash to buy&rdquo;, and the shopper brings the bills back in Pay-outs.</p>
+          </div>
         </Group>
 
         <Group title="Paying them">

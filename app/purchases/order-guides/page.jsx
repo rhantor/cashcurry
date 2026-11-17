@@ -18,7 +18,8 @@ import { useAddRequisitionMutation } from "@/lib/redux/api/requisitionsApiSlice"
 import Sheet from "@/app/components/purchases/Sheet";
 import QtyStepper from "@/app/components/purchases/QtyStepper";
 import { useBusinessToday } from "@/app/hooks/useRegion";
-import { useInventory } from "@/lib/inventory/client";
+import { addCount, useInventory } from "@/lib/inventory/client";
+import { saveLabel, splitCountOrder } from "@/lib/purchases/countAndOrder";
 import { qtyText } from "@/lib/inventory/model";
 import ConfirmSheet from "@/app/components/purchases/ConfirmSheet";
 import ItemFilterBar, { filterItems } from "@/app/components/purchases/ItemFilterBar";
@@ -52,7 +53,7 @@ export default function OrderGuidesPage() {
   const { ready, companyId, branchId, user } = useResolvedCompanyBranch();
   // what is in stock, beside each line while ordering (Inventory, 8 Nov)
   const today = useBusinessToday();
-  const { data: inventory } = useInventory(ready ? companyId : null, ready ? branchId : null, today);
+  const { data: inventory, reload: reloadStock } = useInventory(ready ? companyId : null, ready ? branchId : null, today);
   const stockOf = (itemId) => (inventory?.started ? inventory.stock?.[itemId] : null);
   const currency = useCurrency();
   const fmtMoney = (n) => formatMoney(n, currency);
@@ -234,6 +235,8 @@ export default function OrderGuidesPage() {
           requestedQty: r.parQty === "" || r.parQty == null ? "" : String(r.parQty),
           // What this branch last paid, falling back to the planning price.
           estPrice: branchLastPrice(itemData, branchId),
+          // what's on the shelf now, counted while ordering (17 Nov 2026); blank = not counted
+          have: "",
         };
       });
     setOrderItems(defaultRows);
@@ -250,8 +253,22 @@ export default function OrderGuidesPage() {
     handleOpenOrder(guide);
   }, [guides, items]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const updateOrderRow = (itemId, val) => {
-    setOrderItems((prev) => prev.map((row) => (row.itemId === itemId ? { ...row, requestedQty: val } : row)));
+  const updateOrderRow = (itemId, val, key = "requestedQty") => {
+    setOrderItems((prev) => prev.map((row) => (row.itemId === itemId ? { ...row, [key]: val } : row)));
+  };
+
+  // count and order on one sheet, like the kitchen's paper one (17 Nov 2026)
+  const split = useMemo(
+    () => splitCountOrder(orderItems.map((r) => ({ ...r, onHand: stockOf(r.itemId)?.onHand ?? 0 }))),
+    [orderItems, inventory] // eslint-disable-line react-hooks/exhaustive-deps
+  );
+  const [savingCount, setSavingCount] = useState(false);
+  // Enter / "next" on a phone keyboard moves to the next box
+  const nextBox = (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const boxes = [...document.querySelectorAll("[data-count-order]")];
+    boxes[boxes.indexOf(e.currentTarget) + 1]?.focus();
   };
 
   const chosen = orderItems.filter((i) => Number(i.requestedQty || 0) > 0);
@@ -266,8 +283,37 @@ export default function OrderGuidesPage() {
   );
 
   const handleSubmitOrder = async () => {
-    if (chosen.length === 0) {
-      return toastError("Add a quantity to at least one item.");
+    const bad = Object.keys(split.problems);
+    if (bad.length) {
+      const row = orderItems.find((r) => r.itemId === bad[0]);
+      return toastError(`${row?.name || "An item"}: ${split.problems[bad[0]]}`);
+    }
+    if (!split.count.length && !split.order.length) {
+      return toastError("Fill in what's in stock, or an amount to order.");
+    }
+
+    // the stock count first, so goods that come in for this order count on top of it
+    if (split.count.length) {
+      setSavingCount(true);
+      try {
+        await addCount(companyId, branchId, {
+          date: today,
+          vendorId: selectedGuide.vendorId,
+          vendorName: selectedGuide.vendorName,
+          lines: split.count,
+          note: `Counted while ordering: ${selectedGuide.name}`,
+        }, user || {});
+        reloadStock?.();
+      } catch (e) {
+        console.error(e);
+        setSavingCount(false);
+        return toastError("Could not save the stock count. Nothing was ordered — try again.");
+      }
+      setSavingCount(false);
+      if (!split.order.length) {
+        setOpenOrderSheet(false);
+        return toastOk(`Stock counted: ${split.count.length} item${split.count.length === 1 ? "" : "s"}.`);
+      }
     }
 
     try {
@@ -296,12 +342,12 @@ export default function OrderGuidesPage() {
       }).unwrap();
 
       setOpenOrderSheet(false);
-      toastOk(res?.poNo ? `Order ${res.poNo} created.` : "Purchase order created.");
+      toastOk(`${res?.poNo ? `Order ${res.poNo} created` : "Purchase order created"}${split.count.length ? `, and ${split.count.length} counted` : ""}.`);
       // straight to the new order, shown first and marked
       router.push(res?.id ? `/purchases/purchase-orders?new=${res.id}` : "/purchases/purchase-orders");
     } catch (e) {
       console.error(e);
-      toastError("Could not submit the order. Please try again.");
+      toastError(split.count.length ? "The stock count is saved, but the order didn't go through. Try again with only the order filled in." : "Could not submit the order. Please try again.");
     }
   };
 
@@ -426,6 +472,8 @@ export default function OrderGuidesPage() {
       </div>
 
       {/* ------------------------------ Order sheet ----------------------------- */}
+      {/* Count and order (17 Nov 2026): each line has "in stock" and "order", like the
+          kitchen's paper sheet — compact rows for a phone or tablet. */}
       <Sheet
         open={openOrderSheet && !!selectedGuide}
         title={selectedGuide?.name || "Order"}
@@ -436,7 +484,7 @@ export default function OrderGuidesPage() {
           <div className="flex items-center gap-3">
             <div className="min-w-0">
               <p className="text-xs font-semibold text-subtle uppercase tracking-wide">
-                {chosen.length} item{chosen.length === 1 ? "" : "s"}
+                {split.order.length} to order · {split.count.length} counted
               </p>
               <p className="text-xl font-bold text-fg tabular-nums truncate">
                 {fmtMoney(orderTotal)}
@@ -444,11 +492,11 @@ export default function OrderGuidesPage() {
             </div>
             <button
               onClick={handleSubmitOrder}
-              disabled={busy || chosen.length === 0}
+              disabled={busy || savingCount || (!split.count.length && !split.order.length)}
               className="flex-1 min-h-[52px] rounded-2xl bg-brand text-brand-fg font-bold text-base
                          active:brightness-95 disabled:opacity-40 transition-colors"
             >
-              {creatingOrder ? "Sending…" : "Submit Order"}
+              {savingCount ? "Saving the count…" : creatingOrder ? "Sending…" : saveLabel(split)}
             </button>
           </div>
         }
@@ -472,55 +520,68 @@ export default function OrderGuidesPage() {
               </div>
             )}
 
-            {/* Filtering only hides rows; quantities already entered still count
-                towards the order, so say so rather than let it look lost. */}
-            <p className="text-sm text-muted mb-3">
+            <p className="text-sm text-muted mb-2">
               {orderCategory || orderSearch
-                ? `Showing ${visibleOrderItems.length} of ${orderItems.length}. Amounts you already entered are still in the order.`
-                : "Quantities are prefilled from your usual amounts. Change what you need, leave the rest at zero."}
+                ? `Showing ${visibleOrderItems.length} of ${orderItems.length}. What you already filled in is kept.`
+                : "Count what's on the shelf, then what to order. Leave a box empty to skip it."}
             </p>
 
-            <div className="space-y-2.5">
+            <div className="rounded-2xl border border-line bg-surface">
+              <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_4.75rem_4.75rem] sm:grid-cols-[minmax(0,1fr)_6.5rem_6.5rem] gap-2 rounded-t-2xl border-b border-line bg-surface-2 px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-subtle">
+                <span>Item</span>
+                <span className="text-center">In stock</span>
+                <span className="text-center">Order</span>
+              </div>
               {visibleOrderItems.map((item) => {
-                const qty = Number(item.requestedQty || 0);
-                const picked = qty > 0;
+                const st = stockOf(item.itemId);
+                const ordering = Number(item.requestedQty || 0) > 0;
+                const counted = item.have !== "" && item.have != null;
+                const wrong = split.problems[item.itemId];
                 return (
                   <div
                     key={item.itemId}
-                    className={`rounded-2xl border p-3.5 transition-colors ${
-                      picked ? "border-brand/30 bg-brand-soft/40" : "border-line bg-surface"
+                    className={`grid grid-cols-[minmax(0,1fr)_4.75rem_4.75rem] sm:grid-cols-[minmax(0,1fr)_6.5rem_6.5rem] items-center gap-2 border-b border-line px-3 py-2 last:border-b-0 ${
+                      ordering ? "bg-brand-soft/30" : ""
                     }`}
                   >
-                    <div className="flex items-start justify-between gap-3 mb-3">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          {picked && <Check className="w-4 h-4 text-brand shrink-0" />}
-                          <span className="font-semibold text-fg text-[15px] leading-snug">
-                            {item.name}
-                          </span>
-                        </div>
-                        <p className="text-xs text-muted mt-0.5">
-                          {item.category ? `${item.category} · ` : ""}
-                          {fmtMoney(item.estPrice)} / {item.unit}
-                        </p>
-                        {stockOf(item.itemId) && (
-                          <p className={`text-xs mt-0.5 font-semibold ${stockOf(item.itemId).low ? "text-danger" : "text-muted"}`}>
-                            In stock {qtyText(Math.max(0, stockOf(item.itemId).onHand), item.unit)}
-                            {stockOf(item.itemId).min > 0 && ` · keep ${qtyText(stockOf(item.itemId).min, "")}`}
-                          </p>
-                        )}
-                      </div>
-                      {picked && (
-                        <p className="text-base font-bold text-fg tabular-nums shrink-0">
-                          {fmtMoney(qty * Number(item.estPrice || 0))}
-                        </p>
-                      )}
+                    <div className="min-w-0">
+                      <p className="truncate text-[15px] font-semibold leading-snug text-fg">{item.name}</p>
+                      <p className={`truncate text-xs ${wrong || st?.low ? "text-danger" : "text-muted"}`}>
+                        {wrong
+                          ? wrong
+                          : [
+                              item.unit,
+                              st ? `had ${qtyText(Math.max(0, st.onHand), "")}` : "",
+                              st?.min > 0 ? `keep ${qtyText(st.min, "")}` : "",
+                              Number(item.estPrice) > 0 ? `${fmtMoney(item.estPrice)} each` : "",
+                            ].filter(Boolean).join(" · ")}
+                      </p>
                     </div>
-
-                    <QtyStepper
+                    <input
+                      data-count-order
+                      inputMode="decimal"
+                      enterKeyHint="next"
+                      value={item.have}
+                      onChange={(e) => updateOrderRow(item.itemId, e.target.value.replace(/[^0-9.]/g, ""), "have")}
+                      onKeyDown={nextBox}
+                      placeholder={st ? String(Math.max(0, st.onHand)) : "—"}
+                      aria-label={`${item.name} in stock now`}
+                      className={`h-11 w-full rounded-xl border text-center text-base font-semibold tabular-nums outline-none focus:border-brand ${
+                        counted ? "border-line bg-surface" : "border-line bg-surface-2/60 placeholder:text-subtle/60"
+                      }`}
+                    />
+                    <input
+                      data-count-order
+                      inputMode="decimal"
+                      enterKeyHint="next"
                       value={item.requestedQty}
-                      onChange={(v) => updateOrderRow(item.itemId, v)}
-                      unit={item.unit}
+                      onChange={(e) => updateOrderRow(item.itemId, e.target.value.replace(/[^0-9.]/g, ""))}
+                      onKeyDown={nextBox}
+                      placeholder="0"
+                      aria-label={`${item.name} to order`}
+                      className={`h-11 w-full rounded-xl border text-center text-base font-bold tabular-nums outline-none focus:border-brand ${
+                        ordering ? "border-brand/40 bg-surface text-fg" : "border-line bg-surface-2/60"
+                      }`}
                     />
                   </div>
                 );

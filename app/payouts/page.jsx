@@ -36,7 +36,7 @@ export default function PayoutsPage() {
   const takeBack = async (p) => {
     if (!(await confirmDialog({ title: "Take this pay-out back?", message: `${money(p.amount)} to ${p.to?.name}. Only if it was a mistake and the money is back in the till.`, confirmLabel: "Take back", danger: true }))) return;
     try {
-      await cancelPayout(companyId, branchId, p.id);
+      await cancelPayout(companyId, branchId, p.id, p.forPo?.poId || null);
       toast.success("Taken back");
     } catch (e) {
       toast.error("Couldn't take it back", { description: e.message });
