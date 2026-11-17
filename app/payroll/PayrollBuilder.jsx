@@ -19,6 +19,7 @@ import {
   useFinalizePayrollRunMutation,
   useRevertPayrollRunMutation,
   useMarkPayrollRunPaidMutation,
+  useMarkPayrollRunPaidByEntryMutation,
   useDeletePayrollRunMutation,
 } from '@/lib/redux/api/payrollRunApiSlice'
 import {
@@ -49,7 +50,8 @@ import useCurrency from '@/app/hooks/useCurrency'
 import { formatMoney } from '@/lib/region/currency'
 import SlipCard from './components/SlipCard'
 
-import { salaryMonth } from '@/lib/payroll/salaryMonth'
+import { salaryEntriesOf, salaryMonth } from '@/lib/payroll/salaryMonth'
+import { byHandEntries, entryMatch } from '@/lib/payroll/paidByEntry'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -100,6 +102,9 @@ export default function PayrollBuilder () {
   const [busy, setBusy] = useState(false)
   const [showPaidModal, setShowPaidModal] = useState(false)
   const [paidForm, setPaidForm] = useState({ method: '', reference: '', paidAt: '' })
+  // the month's salary entries made by hand — null while loading (17 Nov 2026)
+  const [handEntries, setHandEntries] = useState(null)
+  const [pickedEntry, setPickedEntry] = useState('')
   const [printTarget, setPrintTarget] = useState(null) // { mode: 'single'|'all', slip? }
 
   useEffect(() => {
@@ -135,6 +140,8 @@ export default function PayrollBuilder () {
   const { data: savedSlips = [] } = useGetPayrollSlipsQuery(
     companyId && branchId && runId ? { companyId, branchId, runId } : skipToken
   )
+  // net pay as finalized — what a Salary Entry made by hand is compared with
+  const savedNet = useMemo(() => Math.round(savedSlips.reduce((n, sl) => n + (Number(sl.netPay) || 0), 0) * 100) / 100, [savedSlips])
 
   // ── A month that was paid before ───────────────────────────────────────────
   // Shown as it was paid, from its salary entries: the staff paid that month
@@ -208,6 +215,7 @@ export default function PayrollBuilder () {
   const [finalize]       = useFinalizePayrollRunMutation()
   const [revert]         = useRevertPayrollRunMutation()
   const [markPaid]       = useMarkPayrollRunPaidMutation()
+  const [markPaidByEntry] = useMarkPayrollRunPaidByEntryMutation()
   const [deleteDraft]    = useDeletePayrollRunMutation()
   const [fetchAttendance] = useLazyGetBranchAttendanceByPeriodQuery()
   const [fetchOtRequests] = useLazyGetOtRequestsQuery()
@@ -629,7 +637,46 @@ export default function PayrollBuilder () {
   function openPaidModal () {
     const r = existingRun?.reopened
     if (r) setPaidForm({ method: r.paymentMethod || '', reference: r.paymentReference || '', paidAt: dayKey(r.paidAt) || '' })
+    setHandEntries(null)
+    setPickedEntry('')
     setShowPaidModal(true)
+    // Already paid by hand on the Salary Entry screen? Offer to mark it paid by
+    // that entry, so the month isn't counted twice.
+    salaryEntriesOf(companyId, branchId, period)
+      .then(list => {
+        const hand = byHandEntries(list)
+        setHandEntries(hand)
+        const keep = hand.find(e => e.id === r?.paidByEntry?.id) || hand.find(e => entryMatch(e, savedNet).same) || (hand.length === 1 ? hand[0] : null)
+        setPickedEntry(keep?.id || '')
+      })
+      .catch(() => setHandEntries([]))
+  }
+
+  // Paid by a Salary Entry: the run and payslips say paid, no salary is added
+  async function handleMarkPaidByEntry () {
+    const entry = (handEntries || []).find(e => e.id === pickedEntry)
+    if (!runId || !entry) return
+    const { diff, same } = entryMatch(entry, savedNet)
+    if (!same) {
+      const ok = await confirmDialog({
+        title: `The entry is ${fmtAmt(Math.abs(diff))} ${diff < 0 ? 'less' : 'more'} than the payroll`,
+        message:
+          `The Salary Entry of ${entry.paymentDate || 'that day'} is ${money(entry.amount)}; this payroll's net pay is ${money(savedNet)}. ` +
+          'The payslips will still show the payroll amounts. Correct the payroll first if staff were paid differently.',
+        confirmLabel: 'Mark paid anyway',
+      })
+      if (!ok) return
+    }
+    setBusy(true)
+    try {
+      await markPaidByEntry({ companyId, branchId, runId, entryId: entry.id, paidBy: currentUser }).unwrap()
+      setShowPaidModal(false)
+      flash('ok', 'Marked paid by the Salary Entry. No salary was added.')
+    } catch (e) {
+      flash('error', e.message || 'Failed to mark paid')
+    } finally {
+      setBusy(false)
+    }
   }
 
   async function handleMarkPaid () {
@@ -902,14 +949,49 @@ export default function PayrollBuilder () {
         open={showPaidModal}
         onClose={() => setShowPaidModal(false)}
         title={`Mark ${periodLabel(period)} as paid`}
-        description={`${money(totals.net)} net pay to ${roster.length} staff. Each slip is then counted as salary.`}
+        description={handEntries?.length
+          ? `${periodLabel(period)} salaries were already entered by hand. Mark this payroll paid by that entry, so they aren't counted twice.`
+          : `${money(totals.net)} net pay to ${roster.length} staff. Each slip is then counted as salary.`}
         footer={
-          <div className='flex justify-end gap-2'>
+          <div className='flex flex-wrap justify-end gap-2'>
             <Button variant='ghost' onClick={() => setShowPaidModal(false)}>Cancel</Button>
-            <Button icon={Wallet} loading={busy} onClick={handleMarkPaid}>Mark paid</Button>
+            {handEntries?.length
+              ? <Button icon={Check} loading={busy} disabled={!pickedEntry} onClick={handleMarkPaidByEntry} data-paid-by-entry>Mark paid by this entry</Button>
+              : <Button icon={Wallet} loading={busy} disabled={handEntries === null} onClick={handleMarkPaid}>Mark paid</Button>}
           </div>
         }
       >
+        {handEntries?.length ? (
+          <div className='space-y-3'>
+            <p className='text-sm text-muted'>
+              Payroll net pay: <b className='text-fg'>{money(savedNet)}</b>. Pick the Salary Entry that paid it. The payroll and every payslip then say paid, and <b className='text-fg'>no salary is added</b>: the entry already took the money out.
+            </p>
+            <div className='space-y-2' role='radiogroup' aria-label='Salary entries made by hand'>
+              {handEntries.map(e => {
+                const { diff, same } = entryMatch(e, savedNet)
+                const on = pickedEntry === e.id
+                return (
+                  <label key={e.id} className={cn('flex cursor-pointer items-start gap-3 rounded-xl border px-3 py-3 text-sm', on ? 'border-brand/50 bg-brand-soft' : 'border-line bg-surface-2')}>
+                    <input type='radio' name='paid-by-entry' checked={on} onChange={() => setPickedEntry(e.id)} className='mt-0.5 size-[18px] accent-[var(--cc-brand-hover)]' />
+                    <span className='min-w-0 flex-1'>
+                      <span className='flex flex-wrap items-baseline justify-between gap-x-3'>
+                        <b className='text-fg'>{money(e.amount)}</b>
+                        <span className='text-xs text-muted'>paid {e.paymentDate || '—'}{e.method ? ` · ${e.method}` : ''}</span>
+                      </span>
+                      {e.note && <span className='mt-0.5 block break-words text-xs text-muted'>{e.note}</span>}
+                      <span className={cn('mt-1 block text-xs font-medium', same ? 'text-success' : 'text-warning')}>
+                        {same ? 'Same as the payroll' : `${fmtAmt(Math.abs(diff))} ${diff < 0 ? 'less' : 'more'} than the payroll`}
+                      </span>
+                    </span>
+                  </label>
+                )
+              })}
+            </div>
+            <div className='flex justify-end'>
+              <Button variant='ghost' size='sm' onClick={() => setHandEntries([])}>These were for something else: pay through payroll</Button>
+            </div>
+          </div>
+        ) : (
         <div className='space-y-4'>
           <Field label='Paid by'>
             {() => (
@@ -930,6 +1012,7 @@ export default function PayrollBuilder () {
             {() => <DatePicker value={paidForm.paidAt} onChange={v => setPaidForm(f => ({ ...f, paidAt: v }))} />}
           </Field>
         </div>
+        )}
       </Sheet>
 
       {/* ── choose who is on the sheet ─────────────────────────────────── */}
