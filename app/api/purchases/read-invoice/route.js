@@ -32,6 +32,11 @@ async function countRead(companyId, branchId, day) {
   });
 }
 
+/** Is reading set up here? Only yes or no — the screens show the button only when it is. */
+export async function GET() {
+  return NextResponse.json({ ready: !!process.env.ANTHROPIC_API_KEY });
+}
+
 export async function POST(req) {
   try {
     if (!adminAuth || !adminDb) return fail(500, "Server is not configured.");

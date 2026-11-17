@@ -8,7 +8,7 @@ import { format, parseISO } from "date-fns";
 import { AlertTriangle, ReceiptText, Sparkles, Store } from "lucide-react";
 import { useGetItemsQuery } from "@/lib/redux/api/itemsApiSlice";
 import { extraText, fillNewBill } from "@/lib/purchases/invoiceRead";
-import { readInvoice } from "@/lib/purchases/readInvoiceClient";
+import { readInvoice, useInvoiceReading } from "@/lib/purchases/readInvoiceClient";
 // BillPaidSection removed — bills are always created as credit/unpaid
 import { useGetVendorsQuery } from "@/lib/redux/api/vendorsApiSlice";
 import {
@@ -102,6 +102,7 @@ export default function NewBillPage() {
   const [lines, setLines] = useState([]); // what came, for stock (8 Nov)
   // the invoice read from its photo (16 Nov 2026): { busy } while reading, then { reading, fill, vendorFound }
   const [invoiceRead, setInvoiceRead] = useState(null);
+  const canRead = useInvoiceReading(); // hidden until reading is set up (an API key)
 
   const [file, setFile] = useState(null);
   const [uploadPct, setUploadPct] = useState(0);
@@ -526,7 +527,7 @@ export default function NewBillPage() {
             onPick={(f, url) => (setFile(f), setPreview(url), setInvoiceRead(null))}
             onRemove={() => (setFile(null), setPreview(null), setUploadPct(0), setInvoiceRead(null))}
           />
-          {file && !invoiceRead?.fill && (
+          {canRead && file && !invoiceRead?.fill && (
             <button
               type="button"
               onClick={readPhoto}

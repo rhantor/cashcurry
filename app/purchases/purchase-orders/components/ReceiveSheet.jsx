@@ -12,9 +12,11 @@ import { lineTotal } from "../shared";
 import { checkLineText, priceRise } from "@/lib/purchases/orders";
 import { extraText, totalGap } from "@/lib/purchases/invoiceRead";
 import { Sparkles } from "lucide-react";
+import { useInvoiceReading } from "@/lib/purchases/readInvoiceClient";
 import { useOrdersContext } from "../OrdersContext";
 
 export default function ReceiveSheet() {
+  const canRead = useInvoiceReading();
   const { invoiceRead, setInvoiceRead, readInvoicePhoto, receiveChecked, receiveWaits, receiving, currency, fmtMoney, invoiceFile, setInvoiceFile, invoicePreview, setInvoicePreview, uploadPct, uploading, busy, selectedOrder, openReceiveSheet, setOpenReceiveSheet, receiveData, setReceiveData, updateReceiveRow, receiveSubtotal, receiveTotal, handleReceiveOrder } = useOrdersContext();
   return (
     <>
@@ -104,7 +106,7 @@ export default function ReceiveSheet() {
             }}
           />
 
-          {invoiceFile && !invoiceRead?.fill && (
+          {canRead && invoiceFile && !invoiceRead?.fill && (
             <button
               type="button"
               onClick={readInvoicePhoto}
