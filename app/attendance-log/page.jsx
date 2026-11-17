@@ -20,6 +20,8 @@ import StatusScreen from "@/app/components/common/StatusScreen";
 import * as XLSX from "xlsx";
 import Cookies from "js-cookie";
 import { computeAttendance, formatDuration, formatHours as fmtHours, toLocalDateStr } from "@/lib/attendance/computeHours";
+import { useRegion } from "@/app/hooks/useRegion";
+import { businessDateFor, clockText, instantAt } from "@/lib/region";
 import { shiftsEnabled } from "@/lib/attendance/shifts";
 import { getSessionUser } from "@/lib/session";
 import { auth } from "@/lib/firebase";
@@ -55,7 +57,11 @@ function PunchPhoto({ punch, companyId, branchId }) {
 
 export default function AttendanceLogPage() {
   const [user, setUser] = useState(null);
-  const [selectedDate, setSelectedDate] = useState(toLocalDateStr(new Date()));
+  // the branch's clock (17 Nov 2026): punches read and are fixed in Malaysia's time,
+  // even when the log is opened from Bangladesh
+  const region = useRegion();
+  const tz = region?.timeZone || null;
+  const [selectedDate, setSelectedDate] = useState(() => businessDateFor(new Date(), "00:00", tz));
   const [viewMode, setViewMode] = useState("daily"); // "daily" or "monthly"
   const [personDays, setPersonDays] = useState(null); // month view: one person's days (15 Nov)
   const [editModal, setEditModal] = useState(null); // { punch: null, mode: 'add' | 'edit' }
@@ -94,7 +100,7 @@ export default function AttendanceLogPage() {
   const { data: settings, refetch: refetchSettings } = useGetBranchSettingsQuery(
     !skip ? { companyId, branchId } : { skip: true }
   );
-  const attendanceSettings = useMemo(() => settings?.attendance || {}, [settings]);
+  const attendanceSettings = useMemo(() => ({ ...(settings?.attendance || {}), timeZone: tz }), [settings, tz]);
   const shiftsOn = shiftsEnabled(attendanceSettings);
 
   // Early-OT decisions for the month — they change how the engine pays an early
@@ -135,7 +141,7 @@ export default function AttendanceLogPage() {
 
   const formatTime = (ts) => {
     if (!ts?.seconds) return "—";
-    return new Date(ts.seconds * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+    return clockText(new Date(ts.seconds * 1000), tz);
   };
 
   const formatHours = (hours) => fmtHours(hours, attendanceSettings);
@@ -253,7 +259,7 @@ export default function AttendanceLogPage() {
     return <StatusScreen full={false} icon={Clock} tone="warning" title="Pick a branch first" message="Attendance is kept per branch — choose one from the top bar." />;
   }
 
-  const today = toLocalDateStr(new Date());
+  const today = businessDateFor(new Date(), "00:00", tz);
   const month = selectedDate.substring(0, 7);
   const niceDay = format(parseISO(selectedDate), "EEEE, d MMM yyyy");
   const niceMonth = format(parseISO(`${month}-01`), "MMMM yyyy");
@@ -302,8 +308,8 @@ export default function AttendanceLogPage() {
     try {
       const timeStr = p.time || formatTime(p.timestamp);
       const [h, m] = timeStr.split(":").map(Number);
-      const tsDate = parseISO(p.date); // the day on this device's clock, not UTC
-      tsDate.setHours(h, m, 0, 0);
+      // that time on the branch's clock, not this device's (17 Nov 2026)
+      const tsDate = instantAt(p.date, h * 60 + m, tz);
       const payload = { staffId: p.staffId, staffName: p.staffName, type: p.type, date: p.date, timestamp: tsDate.toISOString(), isManual: true };
       if (editModal.mode === "add") await addPunch({ companyId, branchId, data: payload }).unwrap();
       else await updatePunch({ companyId, branchId, punchId: p.id, data: payload }).unwrap();

@@ -13,6 +13,7 @@ import { useGetAdvanceEntriesQuery } from "@/lib/redux/api/AdvanceApiSlice";
 import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
 import { computeAttendance, formatClock, getAttendanceDate, toLocalDateStr } from "@/lib/attendance/computeHours";
 import { shiftsEnabled } from "@/lib/attendance/shifts";
+import { regionOf } from "@/lib/region";
 import { byPeriodDesc } from "@/lib/payroll/payslipCopy";
 import { owedBy } from "@/lib/ops/model";
 
@@ -112,7 +113,8 @@ export function useMyWork(user, publicStaff, priv, offset = 0) {
   const staffId = user?.staffId || staff?.id;
 
   const { data: branchSettings } = useGetBranchSettingsQuery(where_ || skipToken);
-  const attendanceSettings = useMemo(() => branchSettings?.attendance || {}, [branchSettings]);
+  // the branch's clock, not this phone's (17 Nov 2026)
+  const attendanceSettings = useMemo(() => ({ ...(branchSettings?.attendance || {}), timeZone: regionOf(branchSettings).timeZone }), [branchSettings]);
 
   // From a day before the period (overnight shifts) up to its end (today at most)
   const todayStr = period?.endStr || toLocalDateStr(new Date());
@@ -146,7 +148,7 @@ export function useMyWork(user, publicStaff, priv, offset = 0) {
     const unpaired = {};
     const lastIn = {};
     own.forEach((p) => {
-      const d = getAttendanceDate(p.timestamp, attendanceSettings.dayCutoffTime) || p.date;
+      const d = getAttendanceDate(p.timestamp, attendanceSettings.dayCutoffTime, attendanceSettings.timeZone) || p.date;
       if (!d) return;
       unpaired[d] = (unpaired[d] || 0) + (p.type === "in" ? 1 : p.type === "out" ? -1 : 0);
       if (p.type === "in" && (p.timestamp?.seconds || 0) > (lastIn[d]?.seconds || 0)) lastIn[d] = p.timestamp;
@@ -154,7 +156,7 @@ export function useMyWork(user, publicStaff, priv, offset = 0) {
     const { days } = computeAttendance({ punches: own, staff, settings: attendanceSettings, otApprovals });
     const inPeriod = days
       .filter((d) => d.date >= period.startStr && d.date <= period.endStr)
-      .map((d) => ({ ...d, unpaired: !!unpaired[d.date], openIn: unpaired[d.date] > 0 ? formatClock(lastIn[d.date]) : null }));
+      .map((d) => ({ ...d, unpaired: !!unpaired[d.date], openIn: unpaired[d.date] > 0 ? formatClock(lastIn[d.date], attendanceSettings.timeZone) : null }));
     const basicHours = inPeriod.reduce((s, d) => s + d.basic, 0);
     const otHours = inPeriod.reduce((s, d) => s + d.ot, 0);
     return {

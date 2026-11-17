@@ -1,15 +1,17 @@
 "use client";
 import { format, isValid, parseISO } from "date-fns";
 import { Clock } from "lucide-react";
+import { activeRegion, clockText } from "@/lib/region";
 import { RequestCard, RequestList } from "./RequestCard";
 
 // Early-OT approvals. Raised automatically by the kiosk when someone punches in
 // well before their shift starts (threshold in Settings → Attendance).
 // Approved → the extra minutes are paid as OT. Rejected → the day is paid from
 // the shift start, as if they had arrived on time.
+// on the branch's clock, not this device's (17 Nov 2026)
 const time = (iso) => {
   const d = iso ? new Date(iso) : null;
-  return d && !Number.isNaN(d.getTime()) ? d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false }) : "";
+  return d && !Number.isNaN(d.getTime()) ? clockText(d, activeRegion().timeZone) : "";
 };
 const day = (v) => {
   const d = v ? parseISO(v) : null;
