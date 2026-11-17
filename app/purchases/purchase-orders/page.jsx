@@ -717,7 +717,11 @@ export default function PurchaseOrdersPage() {
                 </span>
               </div>
 
-              <p className="text-xs text-muted mb-3">{STATUS_HINT[status] || ""}</p>
+              <p className="text-xs text-muted mb-3">
+                {isMarket(vendors.find((v) => v.id === order.vendorId)) && !["Received", "Cancelled", "Rejected"].includes(status)
+                  ? order.cashOut?.payoutId ? "Being bought at the market" : "Waiting for cash to buy at the market"
+                  : STATUS_HINT[status] || ""}
+              </p>
 
               {status === "Sent" && order.deliverBy && !order.payoutHold && (
                 <p
