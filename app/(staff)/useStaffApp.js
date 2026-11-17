@@ -10,10 +10,9 @@ import { db } from "@/lib/firebase";
 import { useGetBranchAttendanceByPeriodQuery, useGetOtRequestsQuery } from "@/lib/redux/api/attendanceApiSlice";
 import { useGetStaffLoansQuery } from "@/lib/redux/api/staffLoanApiSlice";
 import { useGetAdvanceEntriesQuery } from "@/lib/redux/api/AdvanceApiSlice";
-import { useGetBranchSettingsQuery } from "@/lib/redux/api/branchSettingsApiSlice";
+import { useAttendanceSettings } from "@/lib/attendance/settingsClient";
 import { computeAttendance, formatClock, getAttendanceDate, toLocalDateStr } from "@/lib/attendance/computeHours";
 import { shiftsEnabled } from "@/lib/attendance/shifts";
-import { regionOf } from "@/lib/region";
 import { byPeriodDesc } from "@/lib/payroll/payslipCopy";
 import { owedBy } from "@/lib/ops/model";
 
@@ -112,9 +111,11 @@ export function useMyWork(user, publicStaff, priv, offset = 0) {
   const where_ = skip ? null : { companyId: user.companyId, branchId: user.branchId };
   const staffId = user?.staffId || staff?.id;
 
-  const { data: branchSettings } = useGetBranchSettingsQuery(where_ || skipToken);
-  // the branch's clock, not this phone's (17 Nov 2026)
-  const attendanceSettings = useMemo(() => ({ ...(branchSettings?.attendance || {}), timeZone: regionOf(branchSettings).timeZone }), [branchSettings]);
+  // The day cut-off, shifts and the branch's clock (not this phone's), through the
+  // server: staff can't read the settings document itself, and without its
+  // cut-off a 01:50 clock-out landed on the next day (17 Nov 2026).
+  const { settings: rules, loading: rulesLoading } = useAttendanceSettings(where_?.companyId, where_?.branchId);
+  const attendanceSettings = useMemo(() => rules || {}, [rules]);
 
   // From a day before the period (overnight shifts) up to its end (today at most)
   const todayStr = period?.endStr || toLocalDateStr(new Date());
@@ -174,5 +175,5 @@ export function useMyWork(user, publicStaff, priv, offset = 0) {
     };
   }, [staff, period, punches, attendanceSettings, otRequests, loans, advances]);
 
-  return { period, stats, loading: !staff || (canAttendance && punchesLoading) };
+  return { period, stats, loading: !staff || (canAttendance && (punchesLoading || rulesLoading)) };
 }
