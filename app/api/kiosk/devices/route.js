@@ -52,6 +52,7 @@ export async function GET(req) {
         by: x.createdBy?.name || "",
         createdAt: x.createdAt?.toDate?.().toISOString() || null,
         lastSeenAt: x.lastSeenAt?.toDate?.().toISOString() || null,
+        speed: x.speed ? { ...x.speed, at: x.speed.at?.toDate?.().toISOString() || null } : null,
       }))
       .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
     return NextResponse.json({ devices });

@@ -7,8 +7,10 @@ export async function GET(req) {
   try {
     const dev = await kioskDevice(req.headers.get("x-kiosk-token"));
     if (!dev) return NextResponse.json({ error: "This tablet is not set up as a kiosk.", code: "not_set_up" }, { status: 401 });
-    const timeZone = new URL(req.url).searchParams.get("tz");
-    return NextResponse.json(await kioskState(dev, { timeZone }));
+    const q = new URL(req.url).searchParams;
+    let speed = null;
+    try { speed = q.get("speed") ? JSON.parse(q.get("speed")) : null; } catch { speed = null; }
+    return NextResponse.json(await kioskState(dev, { timeZone: q.get("tz"), speed }));
   } catch (e) {
     console.error("[kiosk state]", e);
     return NextResponse.json({ error: "Couldn't load the kiosk." }, { status: 500 });

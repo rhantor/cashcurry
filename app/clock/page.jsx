@@ -10,7 +10,8 @@ import Link from "next/link";
 import { Check, ChevronLeft, Delete, Fingerprint, KeyRound, Loader2, LogIn, LogOut, RotateCw, ScanFace, Search, Wifi, WifiOff, X } from "lucide-react";
 import { roleLabelOf } from "@/app/staff-management/lib/constants";
 import { verifyBiometric } from "@/lib/attendance/biometric";
-import { cachedState, clearDropped, dropped, identify, keep, kioskToken, loadState, punchId, queued, sendKept, sendPunch, snapshot } from "@/lib/attendance/kioskClient";
+import { cachedState, clearDropped, dropped, identify, keep, kioskToken, loadState, punchId, queued, readSpeed, sendKept, sendPunch, snapshot, writeSpeed } from "@/lib/attendance/kioskClient";
+import { addSpeed, isSlow, speedSummary, timeToReload } from "@/lib/attendance/kioskSpeed";
 
 const time = (iso) => (iso ? new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "");
 /** A face must fill at least this much of the picture's width to be read (they are standing at the tablet). */
@@ -107,6 +108,20 @@ function ConfirmStep({ type, busy, stream, onGo }) {
   );
 }
 
+const sec = (ms) => (ms == null ? "—" : `${(ms / 1000).toFixed(1)} s`);
+/** Today's face speed on this tablet, in the corner menu. */
+function SpeedPanel({ s }) {
+  if (!s) return null;
+  const slow = isSlow(s);
+  return (
+    <div className={`rounded-2xl p-3 text-sm ${slow ? "bg-red-500/10 text-red-100" : "bg-white/5 text-white/70"}`} data-speed-panel>
+      <p className="font-bold">Face speed today</p>
+      <p>Look {sec(s.lookMs)} · read {sec(s.readMs)} · answer {sec(s.answerMs)}{s.reads ? ` · ${s.reads} read` : ""}</p>
+      <p className="text-xs text-white/50">Open for {Math.round(s.upHours || 0)} h. It reloads itself each night; Refresh does it now.</p>
+    </div>
+  );
+}
+
 export default function KioskTablet() {
   const [state, setState] = useState(null);
   const [online, setOnline] = useState(true);
@@ -119,11 +134,27 @@ export default function KioskTablet() {
   const [stream, setStream] = useState(null); // the camera, held for the whole page
   const [faceStatus, setFaceStatus] = useState("loading"); // loading | look | checking | unknown | off
   const taps = useRef({ n: 0, t: 0 });
+  const openedAt = useRef(Date.now()); // how long this page has been open (an iPad kiosk is never reloaded by hand)
+  const openedDay = useRef(null); // the business day it was opened on
+  const speedSent = useRef(0);
+  const [speed, setSpeed] = useState(() => readSpeed());
+  const upHours = () => (Date.now() - openedAt.current) / 3600e3;
+  const measure = useCallback((kind, ms) => {
+    setSpeed((t) => {
+      const next = addSpeed(t, kind, ms, state?.today || t?.date || "");
+      writeSpeed(next);
+      return next;
+    });
+  }, [state?.today]);
   const video = useRef(null); // hidden reader of the stream (faces and photos)
 
   const refresh = useCallback(async () => {
     try {
-      const s = await loadState();
+      // about every 10 minutes the tablet says how fast it reads faces (the manager's list of tablets shows it)
+      const due = Date.now() - speedSent.current > 10 * 60000;
+      const s = await loadState(due ? { speed: speedSummary(readSpeed(), { upHours: upHours() }) } : {});
+      if (due) speedSent.current = Date.now();
+      if (!openedDay.current) openedDay.current = s.today || null;
       setState(s);
       setOnline(true);
     } catch (e) {
@@ -252,16 +283,20 @@ export default function KioskTablet() {
       if (busy || dead || !reader || !video.current?.videoWidth) return;
       busy = true;
       try {
-        const f = await reader(video.current);
+        const t0 = performance.now();
+        const f = await reader(video.current, { near: NEAR }); // a quick look; the face is read only when near
         if (dead) return;
-        if (!f || f.size < NEAR) {
+        measure(f?.descriptor ? "read" : "look", performance.now() - t0);
+        if (!f || !f.descriptor || f.size < NEAR) {
           misses.current = 0;
           setFaceStatus((s) => (s === "unknown" ? s : "look"));
           return;
         }
         setFaceStatus("checking");
+        const t1 = performance.now();
         const r = await identify(f.descriptor);
         if (dead) return;
+        if (!r.offline) measure("answer", performance.now() - t1);
         if (r.offline) return setOnline(false);
         if (r.ok) {
           misses.current = 0;
@@ -281,7 +316,13 @@ export default function KioskTablet() {
       dead = true;
       clearInterval(t);
     };
-  }, [faceOn, flow, done, admin, state]);
+  }, [faceOn, flow, done, admin, state, measure]);
+
+  // once the business day turns, a kiosk that has been open all along loads itself afresh
+  // (when nobody is using it): days without a reload made the iPad's face reading slow
+  useEffect(() => {
+    if (timeToReload({ openedDay: openedDay.current, today: state?.today, busy: !!(flow || done || admin), online, waiting, openMs: Date.now() - openedAt.current })) window.location.reload();
+  }, [state?.today, flow, done, admin, online, waiting]);
 
   // "not recognised" fades after a while
   useEffect(() => {
@@ -526,6 +567,7 @@ export default function KioskTablet() {
           <div className="w-full max-w-md space-y-4 rounded-[2rem] bg-gray-900 p-6 ring-1 ring-white/10">
             <p className="text-lg font-black">Kiosk</p>
             <p className="text-sm text-white/60">{state?.device?.name} · {waiting} punch{waiting === 1 ? "" : "es"} waiting to be sent · {faces} face{faces === 1 ? "" : "s"} added</p>
+            <SpeedPanel s={speedSummary(speed, { upHours: upHours() })} />
             {dropped().length > 0 && (
               <div className="space-y-1 rounded-2xl bg-red-500/10 p-3 text-sm">
                 <p className="font-bold text-red-200">Not saved (typed with no internet, refused later):</p>
