@@ -5,6 +5,7 @@
 // tablet as the kiosk" once, and the tablet then runs /clock with no sign-in.
 // It also lists the branch's kiosk tablets, to stop one that is lost.
 import { useCallback, useEffect, useState } from "react";
+import { isSlow } from "@/lib/attendance/kioskSpeed";
 import { useParams, useRouter } from "next/navigation";
 import { skipToken } from "@reduxjs/toolkit/query";
 import { ArrowLeft, Clock, MonitorSmartphone, Play, Trash2 } from "lucide-react";
@@ -29,6 +30,19 @@ async function call(method, body, query = "") {
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(data.error || "Something went wrong");
   return data;
+}
+
+const secs = (ms) => (ms == null ? "—" : `${(ms / 1000).toFixed(1)} s`);
+/** How fast this tablet read faces on its last reported day (the kiosk sends it about every 10 minutes). */
+function SpeedLine({ speed }) {
+  if (!speed?.date) return null;
+  const slow = isSlow(speed);
+  return (
+    <p className={`text-xs ${slow ? "font-semibold text-danger" : "text-muted"}`} data-kiosk-speed>
+      Faces {speed.date}: read {secs(speed.readMs)} · answer {secs(speed.answerMs)}{speed.reads ? ` · ${speed.reads} read` : ""}{speed.upHours != null ? ` · open ${Math.round(speed.upHours)} h` : ""}
+      {slow ? " — slow: tap Refresh on the tablet" : ""}
+    </p>
+  );
 }
 
 export default function KioskSetup() {
@@ -154,6 +168,7 @@ export default function KioskSetup() {
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-semibold text-fg">{d.name}</p>
                     <p className="text-xs text-muted">Set up by {d.by || "—"} · last seen {when(d.lastSeenAt)}</p>
+                    <SpeedLine speed={d.speed} />
                   </div>
                   <Button size="sm" variant="ghost" icon={Trash2} aria-label={`Remove ${d.name}`} onClick={() => remove(d)} />
                 </li>
